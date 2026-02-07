@@ -11,7 +11,6 @@ use App\Helpers\Permission;
 use App\Services\AutomationService;
 use App\Models\Automation;
 use App\Models\AutomationNode;
-use App\Models\WhatsAppAccount;
 use App\Models\IntegrationAccount;
 use App\Models\Funnel;
 use App\Models\User;

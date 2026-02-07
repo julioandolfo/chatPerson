@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../config/database.php';
 
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Helpers\Database;
 
 // Setar header HTML
@@ -21,7 +21,7 @@ try {
 }
 
 // Buscar todas as contas WhatsApp
-$accounts = Database::fetchAll("SELECT * FROM whatsapp_accounts ORDER BY id");
+$accounts = Database::fetchAll("SELECT * FROM integration_accounts WHERE channel = 'whatsapp' ORDER BY id");
 
 ?>
 <!DOCTYPE html>

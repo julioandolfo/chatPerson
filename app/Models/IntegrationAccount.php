@@ -16,10 +16,13 @@ class IntegrationAccount extends Model
         'config', 'webhook_url', 'webhook_secret', 
         'default_funnel_id', 'default_stage_id', 
         'last_sync_at', 'error_message',
-        'whatsapp_id', // ID correspondente em whatsapp_accounts (legado)
-        // Campos WaVoIP (migrados de whatsapp_accounts)
+        'whatsapp_id',
+        // Campos Quepasa (migrados de whatsapp_accounts)
+        'quepasa_user', 'quepasa_trackid', 'quepasa_chatid', 'quepasa_token',
+        'instance_id', 'api_key',
+        // Campos WaVoIP
         'wavoip_token', 'wavoip_enabled',
-        // Campos de monitoramento de conexão (migrados de whatsapp_accounts)
+        // Campos de monitoramento de conexão
         'last_connection_check', 'last_connection_result',
         'last_connection_message', 'consecutive_failures',
         // Campos de limite de novas conversas (rate limit)
@@ -232,7 +235,10 @@ class IntegrationAccount extends Model
         }
         
         // Fallback: buscar pelo phone_number da whatsapp_accounts
-        $waAccount = WhatsAppAccount::find($whatsappAccountId);
+        $waAccount = \App\Helpers\Database::fetch(
+            "SELECT phone_number FROM whatsapp_accounts WHERE id = ? LIMIT 1",
+            [$whatsappAccountId]
+        );
         if ($waAccount && !empty($waAccount['phone_number'])) {
             return self::findByPhone($waAccount['phone_number'], 'whatsapp');
         }
@@ -271,9 +277,12 @@ class IntegrationAccount extends Model
             return (int)$account['whatsapp_id'];
         }
         
-        // Fallback: buscar pelo phone_number
+        // Fallback: buscar pelo phone_number na whatsapp_accounts
         if (!empty($account['phone_number'])) {
-            $waAccount = WhatsAppAccount::findByPhone($account['phone_number']);
+            $waAccount = \App\Helpers\Database::fetch(
+                "SELECT id FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
+                [$account['phone_number']]
+            );
             return $waAccount ? (int)$waAccount['id'] : null;
         }
         
@@ -309,6 +318,103 @@ class IntegrationAccount extends Model
         
         \App\Helpers\Logger::unificacao("[ERROR] Conversa #{$convId}: ❌ Nenhum account_id disponível para envio");
         return null;
+    }
+
+    // ========================================
+    // MÉTODOS PARA WhatsAppService (substituem WhatsAppAccount::)
+    // ========================================
+
+    /**
+     * Buscar contas WhatsApp por campo (substitui WhatsAppAccount::where())
+     * Retorna array de contas que correspondem ao filtro
+     */
+    public static function whereWhatsApp(string $field, string $operator, $value): array
+    {
+        $sql = "SELECT * FROM integration_accounts WHERE channel = 'whatsapp' AND `{$field}` {$operator} ?";
+        return \App\Helpers\Database::fetchAll($sql, [$value]);
+    }
+
+    /**
+     * Atualizar conta em integration_accounts E sincronizar com whatsapp_accounts
+     * Substitui WhatsAppAccount::update() garantindo ambas as tabelas atualizadas
+     */
+    public static function updateWithSync(int $id, array $data): bool
+    {
+        // Atualizar integration_accounts
+        $result = self::update($id, $data);
+        
+        // Sincronizar com whatsapp_accounts (backward compat)
+        try {
+            $account = self::find($id);
+            if ($account) {
+                $waId = $account['whatsapp_id'] ?? null;
+                if (!$waId && !empty($account['phone_number'])) {
+                    $wa = \App\Helpers\Database::fetch(
+                        "SELECT id FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
+                        [$account['phone_number']]
+                    );
+                    $waId = $wa['id'] ?? null;
+                }
+                if ($waId) {
+                    // Mapear campos que existem em whatsapp_accounts
+                    $waFields = ['name', 'phone_number', 'provider', 'api_url', 'api_key', 'status',
+                        'quepasa_user', 'quepasa_trackid', 'quepasa_chatid', 'quepasa_token',
+                        'instance_id', 'wavoip_token', 'wavoip_enabled', 'default_funnel_id', 'default_stage_id',
+                        'last_connection_check', 'last_connection_result', 'last_connection_message', 'consecutive_failures',
+                        'config'];
+                    $waUpdate = array_intersect_key($data, array_flip($waFields));
+                    if (!empty($waUpdate)) {
+                        // Atualizar whatsapp_accounts via SQL direto
+                        $setParts = [];
+                        $params = [];
+                        foreach ($waUpdate as $field => $value) {
+                            $setParts[] = "`{$field}` = ?";
+                            $params[] = $value;
+                        }
+                        $params[] = $waId;
+                        \App\Helpers\Database::getInstance()->prepare(
+                            "UPDATE whatsapp_accounts SET " . implode(', ', $setParts) . " WHERE id = ?"
+                        )->execute($params);
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // Não falhar se sync legado der erro
+            \App\Helpers\Logger::unificacao("[SYNC] ⚠️ Erro ao sincronizar IA#{$id} com whatsapp_accounts: " . $e->getMessage());
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Criar conta WhatsApp em integration_accounts E sincronizar com whatsapp_accounts
+     * Substitui WhatsAppAccount::create()
+     */
+    public static function createWhatsApp(array $data): int
+    {
+        // Garantir channel = whatsapp
+        $data['channel'] = 'whatsapp';
+        
+        // Mapear quepasa_token → api_token se necessário
+        if (!empty($data['quepasa_token']) && empty($data['api_token'])) {
+            $data['api_token'] = $data['quepasa_token'];
+        }
+        
+        // Mapear provider
+        if (empty($data['provider'])) {
+            $data['provider'] = 'quepasa';
+        }
+        
+        $integrationId = self::create($data);
+        
+        // Sincronizar com whatsapp_accounts
+        try {
+            self::syncToWhatsAppAccounts($integrationId, $data);
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::unificacao("[SYNC] ⚠️ Erro ao criar sync whatsapp_accounts para IA#{$integrationId}: " . $e->getMessage());
+        }
+        
+        return $integrationId;
     }
 
     // ========================================
@@ -349,7 +455,10 @@ class IntegrationAccount extends Model
     public static function syncToWhatsAppAccounts(int $integrationId, array $data): void
     {
         // Verificar se já existe em whatsapp_accounts pelo phone_number
-        $existingWa = WhatsAppAccount::findByPhone($data['phone_number']);
+        $existingWa = \App\Helpers\Database::fetch(
+            "SELECT * FROM whatsapp_accounts WHERE phone_number = ? LIMIT 1",
+            [$data['phone_number']]
+        );
         
         if ($existingWa) {
             // Atualizar whatsapp_id na integration_accounts se não estiver definido
@@ -386,7 +495,15 @@ class IntegrationAccount extends Model
                 $waData['quepasa_chatid'] = $config['quepasa_chatid'];
             }
             
-            $waId = WhatsAppAccount::create($waData);
+            // Criar em whatsapp_accounts via SQL direto (sem depender do model)
+            $waFields = array_keys($waData);
+            $waPlaceholders = implode(', ', array_fill(0, count($waFields), '?'));
+            $waColumns = implode(', ', array_map(fn($f) => "`{$f}`", $waFields));
+            $stmt = \App\Helpers\Database::getInstance()->prepare(
+                "INSERT INTO whatsapp_accounts ({$waColumns}) VALUES ({$waPlaceholders})"
+            );
+            $stmt->execute(array_values($waData));
+            $waId = \App\Helpers\Database::getInstance()->lastInsertId();
             
             // Atualizar whatsapp_id na integration_accounts
             self::update($integrationId, ['whatsapp_id' => $waId]);

@@ -13,7 +13,7 @@ use App\Services\CampaignNotificationService;
 use App\Models\Campaign;
 use App\Models\ContactList;
 use App\Models\IntegrationAccount;
-use App\Models\WhatsAppAccount;
+// WhatsAppAccount removido - usar IntegrationAccount
 use App\Models\Funnel;
 use App\Models\FunnelStage;
 use App\Helpers\Response;
@@ -495,11 +495,10 @@ class CampaignController
     }
 
     /**
-     * Garantir que contas WhatsApp existam em integration_accounts
+     * Obter contas WhatsApp para campanhas (direto de integration_accounts)
      */
     private function getWhatsAppAccountsForCampaign(): array
     {
-        $this->syncWhatsAppIntegrationAccounts();
         return IntegrationAccount::getByChannel('whatsapp');
     }
 
@@ -562,7 +561,7 @@ class CampaignController
     }
 
     /**
-     * Sincronizar todas as contas do whatsapp_accounts (legado - mantido para compatibilidade)
+     * @deprecated Não mais necessário - integration_accounts é a tabela primária
      */
     private function syncWhatsAppIntegrationAccounts(): void
     {

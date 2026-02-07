@@ -684,16 +684,10 @@ class ConversationController
                 // Verificar se a conta WhatsApp existe e está ativa (integration_accounts unificado)
                 $whatsappAccount = \App\Models\IntegrationAccount::find($whatsappAccountId);
                 if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
-                    // Fallback legado: tentar em whatsapp_accounts
-                    $whatsappAccount = \App\Models\WhatsAppAccount::find($whatsappAccountId);
-                    if (!$whatsappAccount || ($whatsappAccount['status'] ?? '') !== 'active') {
-                        Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
-                        return;
-                    }
-                    $accountType = 'integration';
-                } else {
-                    $accountType = 'whatsapp';
+                    Response::json(['success' => false, 'message' => 'Integração WhatsApp inválida ou inativa'], 400);
+                    return;
                 }
+                $accountType = 'integration';
                 
                 // ✅ CORRIGIDO: Se usuário não selecionou funil/etapa, usar defaults da conta WhatsApp
                 if (!$funnelId && !$stageId) {

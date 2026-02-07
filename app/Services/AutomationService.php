@@ -9,7 +9,7 @@ namespace App\Services;
 use App\Models\Automation;
 use App\Models\AutomationNode;
 use App\Models\Conversation;
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Helpers\Validator;
 
 class AutomationService

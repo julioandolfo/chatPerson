@@ -10,7 +10,6 @@ use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\WhatsAppService;
 use App\Services\NotificameService;
-use App\Models\WhatsAppAccount;
 use App\Models\IntegrationAccount;
 
 class IntegrationController
@@ -325,18 +324,8 @@ class IntegrationController
                 $data = array_merge($data, $rateLimitFields);
             }
 
-            if (IntegrationAccount::update($id, $data)) {
-                \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: Conta IA#{$id} atualizada em integration_accounts");
-                // Sincronizar com whatsapp_accounts legado (se existir)
-                try {
-                    $waId = IntegrationAccount::getWhatsAppIdFromIntegrationId($id);
-                    if ($waId) {
-                        WhatsAppAccount::update($waId, $data);
-                        \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: ✅ Sincronizado com whatsapp_accounts (WA#{$waId})");
-                    }
-                } catch (\Exception $e) {
-                    \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: ⚠️ Erro ao sincronizar com whatsapp_accounts: " . $e->getMessage());
-                }
+            if (IntegrationAccount::updateWithSync($id, $data)) {
+                \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: Conta IA#{$id} atualizada (com sync)");
                 
                 Response::json([
                     'success' => true,

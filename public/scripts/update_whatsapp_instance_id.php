@@ -13,7 +13,7 @@ if (php_sapi_name() !== 'cli') {
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/../../config/database.php';
 
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Helpers\Logger;
 use App\Helpers\Database;
 
@@ -28,7 +28,7 @@ try {
 $accountId = 12; // Altere para o ID correto da sua conta
 
 // Buscar conta
-$account = WhatsAppAccount::find($accountId);
+$account = IntegrationAccount::find($accountId);
 
 if (!$account) {
     die("❌ Conta WhatsApp #{$accountId} não encontrada!\n");
@@ -130,7 +130,7 @@ if (php_sapi_name() === 'cli') {
     }
     
     // Atualizar
-    WhatsAppAccount::update($accountId, ['instance_id' => $newInstanceId]);
+    IntegrationAccount::updateWithSync($accountId, ['instance_id' => $newInstanceId]);
     Logger::quepasa("Instance ID atualizado manualmente via script para conta {$accountId}: {$newInstanceId}");
     
     echo "✅ Instance ID atualizado com sucesso!\n";

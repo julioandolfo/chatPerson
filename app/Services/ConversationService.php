@@ -10,7 +10,7 @@ use App\Models\Conversation;
 use App\Models\Contact;
 use App\Models\Message;
 use App\Models\User;
-use App\Models\WhatsAppAccount;
+use App\Models\IntegrationAccount;
 use App\Models\Funnel;
 use App\Models\Setting;
 use App\Helpers\Validator;

@@ -276,9 +276,22 @@ class TagController
         try {
             $userId = Auth::id();
             $tabs = UserConversationTab::getByUserWithCounts($userId);
+            
+            // Contagem total de conversas abertas
+            $totalCount = 0;
+            try {
+                $result = \App\Helpers\Database::fetch(
+                    "SELECT COUNT(*) as total FROM conversations WHERE status = 'open'"
+                );
+                $totalCount = $result ? (int)$result['total'] : 0;
+            } catch (\Exception $e) {
+                // Ignorar erro na contagem
+            }
+            
             Response::json([
                 'success' => true,
-                'tabs' => $tabs
+                'tabs' => $tabs,
+                'total_count' => $totalCount
             ]);
         } catch (\Exception $e) {
             Response::json([

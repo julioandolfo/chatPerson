@@ -411,9 +411,24 @@ ob_start();
 }
 
 .conversations-list-filters {
-    padding: 10px 20px;
+    padding: 0;
     border-bottom: 1px solid var(--bs-border-color);
     flex-shrink: 0;
+}
+
+/* Grid de filtros: 2 colunas preenchendo toda a largura */
+.filters-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+}
+
+.filters-grid .form-select {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: 11.5px !important;
+    padding: 4px 28px 4px 8px !important;
+    height: 30px !important;
 }
 
 .conversations-list-items {
@@ -2565,38 +2580,38 @@ function getChannelInfo(channel) {
                         </button>
                     </h2>
                     <div id="filtersCollapse" class="accordion-collapse collapse" aria-labelledby="filtersHeading" data-bs-parent="#filtersAccordion">
-                        <div class="accordion-body" style="padding: 12px;">
-                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                <select id="filter_status" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
+                        <div class="accordion-body" style="padding: 8px 12px;">
+                            <div class="filters-grid">
+                                <select id="filter_status" class="form-select form-select-sm form-select-solid">
                                     <option value="" <?= empty($filters['status']) && empty($filters['is_spam']) && empty($filters['unanswered']) ? 'selected' : '' ?>>Todas</option>
                                     <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
                                     <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
                                     <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>⚠️ Spam</option>
-                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>🔴 Não respondidas</option>
+                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>Spam</option>
+                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>Não respondidas</option>
                                 </select>
                                 
-                <select id="filter_channel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 120px;">
-                    <option value="">Canais</option>
-                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
-                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
-                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
-                    <option value="instagram_comment" <?= ($filters['channel'] ?? '') === 'instagram_comment' ? 'selected' : '' ?>>Instagram Comentário</option>
-                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
-                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
-                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
-                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>Email</option>
-                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>Chat</option>
-                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>Mercado Livre</option>
-                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>WebChat</option>
-                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>OLX</option>
-                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>LinkedIn</option>
-                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>Google Business</option>
-                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>YouTube</option>
-                </select>
+                                <select id="filter_channel" class="form-select form-select-sm form-select-solid">
+                                    <option value="">Canais</option>
+                                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
+                                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
+                                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
+                                    <option value="instagram_comment" <?= ($filters['channel'] ?? '') === 'instagram_comment' ? 'selected' : '' ?>>Instagram Coment.</option>
+                                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
+                                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
+                                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
+                                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>Email</option>
+                                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>Chat</option>
+                                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>Mercado Livre</option>
+                                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>WebChat</option>
+                                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>OLX</option>
+                                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>LinkedIn</option>
+                                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>Google Business</option>
+                                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>YouTube</option>
+                                </select>
                                 
                                 <?php if (!empty($departments)): ?>
-                                <select id="filter_department" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                <select id="filter_department" class="form-select form-select-sm form-select-solid">
                                     <option value="">Setores</option>
                                     <?php foreach ($departments as $dept): ?>
                                         <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
@@ -2607,7 +2622,7 @@ function getChannelInfo(channel) {
                                 <?php endif; ?>
                                 
                                 <?php if (!empty($tags)): ?>
-                                <select id="filter_tag" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                <select id="filter_tag" class="form-select form-select-sm form-select-solid">
                                     <option value="">Tags</option>
                                     <?php foreach ($tags as $tag): ?>
                                         <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
@@ -2622,9 +2637,9 @@ function getChannelInfo(channel) {
                                 $currentUserId = \App\Helpers\Auth::id();
                                 ?>
                                 <?php if ($canViewAllConversations || !empty($agents)): ?>
-                                <select id="filter_agent" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;">
+                                <select id="filter_agent" class="form-select form-select-sm form-select-solid">
                                     <option value="">Agentes</option>
-                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>🔴 Não atribuídas</option>
+                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>Não atribuídas</option>
                                     <?php if ($canViewAllConversations && !empty($agents)): ?>
                                         <?php foreach ($agents as $agent): ?>
                                             <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
@@ -2643,15 +2658,15 @@ function getChannelInfo(channel) {
                                 </select>
                                 <?php endif; ?>
 
-                                <!-- Filtros de Funil/Etapa (carregados via JS) -->
-                                <select id="filter_funnel" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 140px;">
+                                <select id="filter_funnel" class="form-select form-select-sm form-select-solid">
                                     <option value="">Funil</option>
                                 </select>
-                                <select id="filter_stage" class="form-select form-select-sm form-select-solid" style="width: auto; min-width: 160px;" disabled>
+                                <select id="filter_stage" class="form-select form-select-sm form-select-solid" disabled>
                                     <option value="">Etapa</option>
                                 </select>
-                                
-                                <button type="button" class="btn btn-sm btn-light-primary" onclick="openAdvancedFilters()" title="Filtros Avançados">
+                            </div>
+                            <div class="d-flex align-items-center gap-2 mt-2">
+                                <button type="button" class="btn btn-sm btn-light-primary flex-grow-1" onclick="openAdvancedFilters()" title="Filtros Avançados">
                                     <i class="ki-duotone ki-setting-2 fs-6 me-1">
                                         <span class="path1"></span>
                                         <span class="path2"></span>
@@ -2679,6 +2694,9 @@ function getChannelInfo(channel) {
             <div class="d-flex align-items-center gap-0 overflow-auto hide-scrollbar" id="conversationTabsList">
                 <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
                     <span class="tab-name">Todas</span>
+                    <?php if (!empty($conversations)): ?>
+                        <span class="tab-count"><?= count($conversations) ?></span>
+                    <?php endif; ?>
                 </button>
                 <?php if (!empty($userTabs)): ?>
                     <?php foreach ($userTabs as $tab): ?>
@@ -21272,11 +21290,13 @@ async function refreshConversationTabs() {
             
             const activeTab = localStorage.getItem('activeConversationTab') || 'all';
             
-            // Preservar botão "Todas" e botão "+"
+            const totalCount = data.total_count || 0;
+            
             let html = `
                 <button type="button" class="btn btn-sm conversation-tab ${activeTab === 'all' ? 'active' : ''}" 
                         data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
                     <span class="tab-name">Todas</span>
+                    ${totalCount > 0 ? `<span class="tab-count">${totalCount}</span>` : ''}
                 </button>`;
             
             data.tabs.forEach(tab => {

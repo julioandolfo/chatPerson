@@ -3,6 +3,16 @@
  * Editor visual para mockups manuais
  */
 
+// Helper para normalizar URLs (se não existir)
+if (typeof normalizeImageUrl === 'undefined') {
+    function normalizeImageUrl(url) {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        if (url.startsWith('/')) return url;
+        return '/' + url;
+    }
+}
+
 let mockupCanvas = null;
 
 /**
@@ -47,7 +57,9 @@ function initMockupCanvasEditor(containerId = 'mockupCanvasContainer') {
 function setupCanvasTools() {
     // Adicionar produto
     if (mockupWizard.selectedProduct) {
-        fabric.Image.fromURL('/' + mockupWizard.selectedProduct, (img) => {
+        const productUrl = normalizeImageUrl(mockupWizard.selectedProduct);
+        
+        fabric.Image.fromURL(productUrl, (img) => {
             img.scaleToWidth(mockupCanvas.width * 0.8);
             img.center();
             mockupCanvas.add(img);
@@ -57,7 +69,9 @@ function setupCanvasTools() {
 
     // Adicionar logo
     if (mockupWizard.selectedLogo) {
-        fabric.Image.fromURL('/' + mockupWizard.selectedLogo, (img) => {
+        const logoUrl = normalizeImageUrl(mockupWizard.selectedLogo);
+        
+        fabric.Image.fromURL(logoUrl, (img) => {
             const config = mockupWizard.logoConfig;
             
             // Aplicar configurações

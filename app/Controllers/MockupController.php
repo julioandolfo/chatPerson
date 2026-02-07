@@ -679,11 +679,19 @@ class MockupController
                     
                     foreach ($attachments as $attachment) {
                         if (($attachment['type'] ?? '') === 'image') {
+                            // Garantir que URL/path não tenham duplicação
+                            $path = $attachment['path'] ?? $attachment['url'] ?? '';
+                            $url = $attachment['url'] ?? $attachment['path'] ?? '';
+                            
+                            // Remover barra inicial se existir para evitar duplicação
+                            $path = ltrim($path, '/');
+                            $url = ltrim($url, '/');
+                            
                             $images[] = [
                                 'id' => $message['id'],
-                                'url' => $attachment['url'] ?? $attachment['path'],
-                                'path' => $attachment['path'] ?? $attachment['url'],
-                                'filename' => $attachment['filename'] ?? basename($attachment['path'] ?? ''),
+                                'url' => $url,
+                                'path' => $path,
+                                'filename' => $attachment['filename'] ?? basename($path),
                                 'created_at' => $message['created_at'],
                                 'sender_name' => $message['sender_name'] ?? 'Desconhecido'
                             ];

@@ -3,6 +3,26 @@
  * Sistema de geração de mockups com GPT-4o Vision + DALL-E 3
  */
 
+/**
+ * Normalizar URL para evitar duplicação
+ */
+function normalizeImageUrl(url) {
+    if (!url) return '';
+    
+    // Se já for URL completa (http/https), retornar como está
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url;
+    }
+    
+    // Se já tem barra inicial, retornar como está
+    if (url.startsWith('/')) {
+        return url;
+    }
+    
+    // Adicionar barra inicial
+    return '/' + url;
+}
+
 // Estado global do wizard
 let mockupWizard = {
     currentStep: 1,
@@ -94,10 +114,13 @@ async function loadConversationImages() {
         data.data.forEach(img => {
             const col = document.createElement('div');
             col.className = 'col-md-3 col-sm-4 col-6 mb-3';
+            
+            const imgUrl = normalizeImageUrl(img.url || img.path);
+            
             col.innerHTML = `
                 <div class="card mockup-image-card" onclick="selectProductImage('${img.path}', this)">
                     <div class="card-body p-2 text-center">
-                        <img src="/${img.url}" class="img-fluid rounded" style="max-height: 120px; object-fit: cover;">
+                        <img src="${imgUrl}" class="img-fluid rounded" style="max-height: 120px; object-fit: cover;">
                         <div class="mt-2 text-muted small">${img.sender_name}</div>
                         <div class="mockup-image-check d-none">
                             <i class="fas fa-check-circle text-success fs-2"></i>
@@ -183,9 +206,12 @@ async function loadConversationLogos() {
         data.data.forEach(logo => {
             const col = document.createElement('div');
             col.className = 'col-auto mb-2';
+            
+            const logoUrl = normalizeImageUrl(logo.thumbnail_path || logo.logo_path);
+            
             col.innerHTML = `
                 <div class="mockup-logo-card ${logo.is_primary ? 'border-primary' : ''}" onclick="selectLogo('${logo.logo_path}', this)">
-                    <img src="/${logo.thumbnail_path || logo.logo_path}" class="img-fluid rounded" style="max-width: 80px; max-height: 80px; object-fit: contain;">
+                    <img src="${logoUrl}" class="img-fluid rounded" style="max-width: 80px; max-height: 80px; object-fit: contain;">
                     ${logo.is_primary ? '<div class="badge badge-primary badge-sm">Principal</div>' : ''}
                 </div>
             `;
@@ -295,11 +321,14 @@ function updateLogoPreview() {
         return;
     }
 
+    const productUrl = normalizeImageUrl(mockupWizard.selectedProduct);
+    const logoUrl = normalizeImageUrl(mockupWizard.selectedLogo);
+    
     // Simular preview (em produção, usar canvas real)
     previewContainer.innerHTML = `
         <div class="position-relative" style="max-width: 400px; margin: 0 auto;">
-            <img src="/${mockupWizard.selectedProduct}" class="img-fluid rounded">
-            <img src="/${mockupWizard.selectedLogo}" 
+            <img src="${productUrl}" class="img-fluid rounded">
+            <img src="${logoUrl}" 
                  class="position-absolute" 
                  style="
                      width: ${mockupWizard.logoConfig.size}%;
@@ -403,15 +432,18 @@ REQUISITOS:
  * Exibir resumo da configuração
  */
 function displayMockupSummary() {
+    const productUrl = normalizeImageUrl(mockupWizard.selectedProduct);
+    const logoUrl = normalizeImageUrl(mockupWizard.selectedLogo);
+    
     const summary = `
         <div class="row">
             <div class="col-md-6">
                 <strong>Produto:</strong><br>
-                <img src="/${mockupWizard.selectedProduct}" class="img-fluid rounded mb-2" style="max-height: 100px;">
+                <img src="${productUrl}" class="img-fluid rounded mb-2" style="max-height: 100px;">
             </div>
             <div class="col-md-6">
                 <strong>Logo:</strong><br>
-                <img src="/${mockupWizard.selectedLogo}" class="img-fluid rounded mb-2" style="max-height: 100px;">
+                <img src="${logoUrl}" class="img-fluid rounded mb-2" style="max-height: 100px;">
             </div>
         </div>
         <div class="row mt-3">
@@ -485,13 +517,15 @@ async function generateMockup() {
         // Fechar modal
         bootstrap.Modal.getInstance(document.getElementById('kt_modal_mockup_generator')).hide();
 
+        const resultUrl = normalizeImageUrl(data.data.image_path);
+        
         // Mostrar resultado
         Swal.fire({
             icon: 'success',
             title: 'Mockup Gerado!',
             html: `
                 <div class="text-center">
-                    <img src="/${data.data.image_path}" class="img-fluid rounded mb-3" style="max-width: 100%;">
+                    <img src="${resultUrl}" class="img-fluid rounded mb-3" style="max-width: 100%;">
                     <p class="text-muted">Tempo: ${(data.data.processing_time / 1000).toFixed(1)}s | Custo: $${data.data.costs.total.toFixed(4)}</p>
                 </div>
             `,

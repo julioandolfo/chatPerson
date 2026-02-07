@@ -1,4 +1,16 @@
 <!-- Galeria de Mockups no Sidebar -->
+<script>
+// Helper para normalizar URLs de imagem
+if (typeof normalizeImageUrl === 'undefined') {
+    function normalizeImageUrl(url) {
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        if (url.startsWith('/')) return url;
+        return '/' + url;
+    }
+}
+</script>
+
 <div class="card mockup-gallery-card mb-5">
     <div class="card-header">
         <h3 class="card-title">
@@ -71,10 +83,12 @@ async function loadMockupGallery() {
             const dateStr = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' + 
                            date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
+            const thumbUrl = normalizeImageUrl(mockup.result_thumbnail_path || mockup.result_image_path);
+
             html += `
                 <div class="mockup-gallery-item" data-mockup-id="${mockup.id}">
                     <span class="mockup-badge badge-${mockup.generation_mode}">${modeLabel}</span>
-                    <img src="/${mockup.result_thumbnail_path || mockup.result_image_path}" 
+                    <img src="${thumbUrl}" 
                          alt="Mockup" 
                          onclick="viewMockup(${mockup.id})"
                          class="mockup-gallery-thumbnail">
@@ -147,11 +161,13 @@ async function viewMockup(mockupId) {
 
         infoHtml += '</div>';
 
+        const resultUrl = normalizeImageUrl(mockup.result_image_path);
+
         Swal.fire({
             title: 'Mockup Gerado',
             html: `
                 ${infoHtml}
-                <img src="/${mockup.result_image_path}" class="img-fluid rounded" style="max-width: 100%;">
+                <img src="${resultUrl}" class="img-fluid rounded" style="max-width: 100%;">
             `,
             width: '800px',
             showConfirmButton: true,
@@ -162,8 +178,9 @@ async function viewMockup(mockupId) {
             cancelButtonText: 'Fechar',
             preConfirm: () => {
                 // Download
+                const downloadUrl = normalizeImageUrl(mockup.result_image_path);
                 const link = document.createElement('a');
-                link.href = '/' + mockup.result_image_path;
+                link.href = downloadUrl;
                 link.download = 'mockup_' + mockupId + '.png';
                 link.click();
             },

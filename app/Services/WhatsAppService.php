@@ -1451,24 +1451,9 @@ class WhatsAppService
             Logger::quepasa("📱   from/cliente: " . ($from ?? 'NULL'));
             Logger::quepasa("📱 ==========================================");
 
-            // ✅ IMPORTANTE: Buscar ID correspondente em integration_accounts
-            // Campanhas usam integration_account_id, mas webhook usa whatsapp_accounts
-            // Precisamos ter ambos os IDs para buscar conversas corretamente
-            $integrationAccountId = null;
-            if (!empty($account['phone_number'])) {
-                $integrationAccount = \App\Helpers\Database::fetch(
-                    "SELECT id FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1",
-                    [$account['phone_number']]
-                );
-                if ($integrationAccount) {
-                    $integrationAccountId = $integrationAccount['id'];
-                    Logger::quepasa("processWebhook - Integration Account correspondente: ID={$integrationAccountId}");
-                } else {
-                    Logger::quepasa("processWebhook - Nenhum integration_account encontrado para phone={$account['phone_number']}");
-                }
-            }
-            // Guardar no array da conta para uso posterior
-            $account['integration_account_id'] = $integrationAccountId;
+            // ✅ UNIFICADO: $account já vem de integration_accounts, então $account['id'] É o integration_account_id
+            $account['integration_account_id'] = $account['id'];
+            Logger::quepasa("processWebhook - Usando integration_account_id={$account['id']} (direto)");
 
             // Atualizar chatid/wid se necessário
             $wid = $payload['wid'] ?? null;
@@ -2116,7 +2101,7 @@ class WhatsAppService
                         $conversationData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['id']
+                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null
                         ];
                         
                         // ✅ CORREÇÃO: Sempre incluir integration_account_id
@@ -2142,7 +2127,7 @@ class WhatsAppService
                         $fallbackData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['id'],
+                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
                             'status' => 'open'
                         ];
                         if (!empty($account['integration_account_id'])) {
@@ -2303,7 +2288,7 @@ class WhatsAppService
                         $sql = "SELECT DISTINCT c.*, MAX(conv.updated_at) as last_conversation 
                                 FROM contacts c
                                 INNER JOIN conversations conv ON conv.contact_id = c.id
-                                WHERE conv.whatsapp_account_id = :account_id
+                                WHERE conv.integration_account_id = :account_id
                                 AND c.whatsapp_id LIKE '%@lid'
                                 AND conv.updated_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
                                 GROUP BY c.id
@@ -2615,8 +2600,8 @@ class WhatsAppService
                     // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
                     if ($conversation) {
                         $updateFields = [];
-                        if (empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
-                            $updateFields['whatsapp_account_id'] = $account['id'];
+                        if (empty($conversation['whatsapp_account_id']) && !empty($account['whatsapp_id'])) {
+                            $updateFields['whatsapp_account_id'] = $account['whatsapp_id'];
                         }
                         if (empty($conversation['integration_account_id']) && !empty($account['integration_account_id'])) {
                             $updateFields['integration_account_id'] = $account['integration_account_id'];
@@ -2661,8 +2646,8 @@ class WhatsAppService
                     // ✅ Sincronizar IDs se a conversa foi encontrada mas faltam campos
                     if ($conversation && empty($conversation['is_merged'])) {
                         $updateFields = [];
-                        if (empty($conversation['whatsapp_account_id']) && !empty($account['id'])) {
-                            $updateFields['whatsapp_account_id'] = $account['id'];
+                        if (empty($conversation['whatsapp_account_id']) && !empty($account['whatsapp_id'])) {
+                            $updateFields['whatsapp_account_id'] = $account['whatsapp_id'];
                         }
                         if (empty($conversation['integration_account_id']) && !empty($account['integration_account_id'])) {
                             $updateFields['integration_account_id'] = $account['integration_account_id'];
@@ -2703,7 +2688,7 @@ class WhatsAppService
                     $conversationData = [
                         'contact_id' => $contact['id'],
                         'channel' => 'whatsapp',
-                        'whatsapp_account_id' => $account['id']
+                        'whatsapp_account_id' => $account['whatsapp_id'] ?? null
                     ];
                     
                     // ✅ CORREÇÃO: Sempre passar integration_account_id ao criar conversa
@@ -2735,7 +2720,7 @@ class WhatsAppService
                         $fallbackData = [
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['id'],
+                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
                             'status' => 'open'
                         ];
                         // ✅ CORREÇÃO: Também incluir integration_account_id no fallback
@@ -2841,8 +2826,10 @@ class WhatsAppService
                     $conversationData = [
                         'contact_id' => $contact['id'],
                         'channel' => 'whatsapp',
-                        'whatsapp_account_id' => $account['id']
+                        'integration_account_id' => $account['integration_account_id'] ?? $account['id'],
+                        'whatsapp_account_id' => $account['whatsapp_id'] ?? null
                     ];
+                    Logger::unificacao("[WEBHOOK] Criando conversa (incoming): contato={$contact['id']}, ia_id=" . ($conversationData['integration_account_id']) . ", wa_id=" . ($conversationData['whatsapp_account_id'] ?? 'NULL'));
                     
                     // Adicionar funil e estágio padrão da integração, se configurados
                     if (!empty($account['default_funnel_id'])) {
@@ -2866,7 +2853,8 @@ class WhatsAppService
                         $conversationId = \App\Models\Conversation::create([
                             'contact_id' => $contact['id'],
                             'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['id'],
+                            'integration_account_id' => $account['integration_account_id'] ?? $account['id'],
+                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
                             'status' => 'open'
                         ]);
                         $conversation = \App\Models\Conversation::find($conversationId);

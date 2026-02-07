@@ -11798,9 +11798,9 @@ function applyFilters() {
     });
     
     // Preservar ID da conversa selecionada se houver
-    const currentConversationId = urlParams.get('id');
-    if (currentConversationId) {
-        params.append('id', currentConversationId);
+    const activeConversationId = window.currentConversationId || urlParams.get('id');
+    if (activeConversationId) {
+        params.set('id', activeConversationId);
     }
     
     // Atualizar URL sem recarregar pígina
@@ -11959,9 +11959,10 @@ function refreshConversationList(params = null, append = false) {
             window.lastConversationListSignature = signature;
         }
         
-        // Obter ID da conversa selecionada da URL atual
+        // ✅ CORREÇÃO: Usar window.currentConversationId como fonte primária da conversa ativa
+        // Isso garante que ao trocar de aba no mobile, a conversa aberta continue marcada corretamente
         const urlParams = new URLSearchParams(window.location.search);
-        const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
+        const selectedConversationId = window.currentConversationId || (urlParams.get('id') ? parseInt(urlParams.get('id')) : null);
         
         // ✅ CORREÇÃO: Se não há conversas E é append, significa que chegou ao fim
         // Não apagar a lista existente, apenas indicar que não há mais
@@ -12010,6 +12011,17 @@ function refreshConversationList(params = null, append = false) {
         }
         conversationsList.dataset.loaded = '1';
         conversationsList.dataset.rendering = '0';
+        
+        // ✅ CORREÇÃO MOBILE: Garantir que a conversa aberta permaneça marcada como active
+        // Após re-render, reforçar o estado active baseado no currentConversationId global
+        if (window.currentConversationId) {
+            const currentActiveItem = conversationsList.querySelector(`[data-conversation-id="${window.currentConversationId}"]`);
+            if (currentActiveItem && !currentActiveItem.classList.contains('active')) {
+                // Remover active de qualquer outro item e aplicar no correto
+                conversationsList.querySelectorAll('.conversation-item.active').forEach(i => i.classList.remove('active'));
+                currentActiveItem.classList.add('active');
+            }
+        }
         
         // ✅ CORREÇÃO: Controlar flag de "tem mais conversas" (usa conversationPageSize = 50)
         conversationHasMore = conversations.length >= conversationPageSize;
@@ -19189,8 +19201,9 @@ function addConversationToList(conv) {
     }
 
     // Usar função consolidada para renderizar
+    // ✅ CORREÇÃO: Usar window.currentConversationId como fonte primária
     const urlParams = new URLSearchParams(window.location.search);
-    const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
+    const selectedConversationId = window.currentConversationId || (urlParams.get('id') ? parseInt(urlParams.get('id')) : null);
     const conversationHtml = renderConversationItemHtml(conv, selectedConversationId);
     
     // Adicionar ao topo da lista
@@ -21841,6 +21854,9 @@ function switchConversationTab(tabEl) {
     // Salvar aba ativa no localStorage
     localStorage.setItem('activeConversationTab', tagId || 'all');
     
+    // ✅ CORREÇÃO: Preservar conversa atualmente aberta
+    const preservedConversationId = window.currentConversationId;
+    
     // Aplicar filtro por tag
     const params = new URLSearchParams(window.location.search);
     
@@ -21848,6 +21864,11 @@ function switchConversationTab(tabEl) {
         params.set('tag_id', tagId);
     } else {
         params.delete('tag_id');
+    }
+    
+    // ✅ CORREÇÃO: Manter o ID da conversa aberta na URL
+    if (preservedConversationId) {
+        params.set('id', preservedConversationId);
     }
     
     // Sincronizar dropdown de filtro de tags
@@ -21866,7 +21887,8 @@ function switchConversationTab(tabEl) {
     // Resetar assinatura para forçar re-render
     window.lastConversationListSignature = null;
     
-    // Recarregar lista
+    // ✅ CORREÇÃO: NÃO alterar currentConversationId nem o chat ao trocar de aba
+    // O refreshConversationList vai preservar o estado active baseado em window.currentConversationId
     refreshConversationList(params);
 }
 

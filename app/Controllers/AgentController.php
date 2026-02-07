@@ -225,33 +225,29 @@ class AgentController
                 return;
             }
             
-            // Buscar contatos onde o agente é o agente principal
-            $contactAgents = \App\Helpers\Database::fetchAll(
-                "SELECT DISTINCT contact_id FROM contact_agents 
-                 WHERE agent_id = ?",
-                [$id]
-            );
-            
             $conversationsReassigned = 0;
             $contactAgentsUpdated = 0;
+            $processedContacts = []; // Rastrear contatos já processados (evita duplicatas)
             
-            // Distribuir conversas igualmente entre os agentes
+            // Distribuir conversas igualmente entre os agentes usando round-robin
             $numAgents = count($targetAgentIds);
             $agentIndex = 0;
             
             foreach ($conversations as $conversation) {
+                $conversationId = $conversation['id'];
+                $contactId = $conversation['contact_id'];
                 $targetAgentId = $targetAgentIds[$agentIndex];
                 
-                // Reatribuir conversa
-                \App\Models\Conversation::update($conversation['id'], [
+                // 1. Reatribuir conversa
+                \App\Models\Conversation::update($conversationId, [
                     'agent_id' => $targetAgentId,
                     'assigned_at' => date('Y-m-d H:i:s')
                 ]);
                 
-                // Registrar histórico de atribuição
+                // 2. Registrar histórico de atribuição
                 if (class_exists('\App\Models\ConversationAssignment')) {
                     \App\Models\ConversationAssignment::recordAssignment(
-                        $conversation['id'],
+                        $conversationId,
                         $targetAgentId,
                         \App\Helpers\Auth::id()
                     );
@@ -259,46 +255,45 @@ class AgentController
                 
                 $conversationsReassigned++;
                 
+                // 3. Atualizar agente do contato (MESMO agente que recebeu a conversa)
+                // ✅ GARANTIA: Conversa X → Agente Y, então Contato X → Agente Y
+                // Processar cada contato apenas UMA vez (pode ter múltiplas conversas do mesmo contato)
+                if (!in_array($contactId, $processedContacts)) {
+                    $processedContacts[] = $contactId;
+                    
+                    // Verificar se o agente antigo era o agente principal deste contato
+                    $wasPrimary = \App\Helpers\Database::fetch(
+                        "SELECT is_primary FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
+                        [$contactId, $id]
+                    );
+                    
+                    $isPrimary = ($wasPrimary && $wasPrimary['is_primary'] == 1) ? 1 : 0;
+                    
+                    // Verificar se já existe vínculo com o novo agente
+                    $exists = \App\Helpers\Database::fetch(
+                        "SELECT id FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
+                        [$contactId, $targetAgentId]
+                    );
+                    
+                    if (!$exists) {
+                        // Adicionar novo agente ao contato
+                        \App\Models\ContactAgent::create([
+                            'contact_id' => $contactId,
+                            'agent_id' => $targetAgentId,
+                            'is_primary' => $isPrimary,
+                            'priority' => 0,
+                            'auto_assign_on_reopen' => 1
+                        ]);
+                        $contactAgentsUpdated++;
+                    } else {
+                        // Atualizar se precisa ser primary
+                        if ($isPrimary) {
+                            \App\Models\ContactAgent::setPrimaryAgent($contactId, $targetAgentId);
+                        }
+                    }
+                }
+                
                 // Próximo agente (distribuição round-robin)
-                $agentIndex = ($agentIndex + 1) % $numAgents;
-            }
-            
-            // Reatribuir agentes de contatos
-            // Para cada contato, adicionar os novos agentes (mantendo a redistribuição round-robin)
-            $agentIndex = 0;
-            foreach ($contactAgents as $contactAgent) {
-                $contactId = $contactAgent['contact_id'];
-                $targetAgentId = $targetAgentIds[$agentIndex];
-                
-                // Verificar se já existe
-                $exists = \App\Helpers\Database::fetch(
-                    "SELECT id FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
-                    [$contactId, $targetAgentId]
-                );
-                
-                if (!$exists) {
-                    // Adicionar novo agente ao contato
-                    \App\Models\ContactAgent::create([
-                        'contact_id' => $contactId,
-                        'agent_id' => $targetAgentId,
-                        'is_primary' => 0,
-                        'priority' => 0,
-                        'auto_assign_on_reopen' => 1
-                    ]);
-                    $contactAgentsUpdated++;
-                }
-                
-                // Se o agente antigo era o principal, definir o novo como principal
-                $wasPrimary = \App\Helpers\Database::fetch(
-                    "SELECT is_primary FROM contact_agents WHERE contact_id = ? AND agent_id = ?",
-                    [$contactId, $id]
-                );
-                
-                if ($wasPrimary && $wasPrimary['is_primary'] == 1) {
-                    \App\Models\ContactAgent::setPrimaryAgent($contactId, $targetAgentId);
-                }
-                
-                // Próximo agente
                 $agentIndex = ($agentIndex + 1) % $numAgents;
             }
             

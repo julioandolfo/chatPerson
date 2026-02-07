@@ -125,6 +125,56 @@ if (isset($_GET['action']) && $_GET['action'] === 'clear_lock') {
     }
 }
 
+// ── Ação: Reset total de backlog (limpar tudo acumulado) ──
+if (isset($_GET['action']) && $_GET['action'] === 'reset_backlog') {
+    require_once __DIR__ . '/../config/bootstrap.php';
+    $db = \App\Helpers\Database::getInstance();
+    $results = [];
+    
+    // 1. Cancelar delays pendentes
+    try {
+        $stmt = $db->exec("UPDATE automation_delays SET status = 'cancelled', executed_at = NOW() WHERE status IN ('pending', 'executing')");
+        $results[] = "Delays pendentes cancelados";
+    } catch (\Throwable $e) { $results[] = "Delays: " . $e->getMessage(); }
+    
+    // 2. Limpar chatbot timeout de conversas (resetar metadata)
+    try {
+        $db->exec("UPDATE conversations SET metadata = JSON_REMOVE(
+            JSON_REMOVE(
+                JSON_REMOVE(
+                    JSON_REMOVE(
+                        JSON_REMOVE(
+                            JSON_REMOVE(metadata, '$.chatbot_active'),
+                        '$.chatbot_timeout_at'),
+                    '$.chatbot_timeout_action'),
+                '$.chatbot_timeout_node_id'),
+            '$.chatbot_automation_id'),
+        '$.chatbot_reconnect_current')
+        WHERE metadata IS NOT NULL AND JSON_EXTRACT(metadata, '$.chatbot_active') = true");
+        $results[] = "Chatbot timeouts ativos resetados";
+    } catch (\Throwable $e) { $results[] = "Chatbot: " . $e->getMessage(); }
+    
+    // 3. Limpar buffers de IA
+    $bufferDir = __DIR__ . '/../storage/ai_buffers/';
+    $bufferFiles = glob($bufferDir . 'buffer_*.json') ?: [];
+    $bufferCount = count($bufferFiles);
+    foreach ($bufferFiles as $f) { @unlink($f); }
+    $results[] = "{$bufferCount} buffer(s) de IA removidos";
+    
+    // 4. Limpar automation executions pendentes
+    try {
+        $db->exec("UPDATE automation_executions SET status = 'cancelled' WHERE status IN ('pending', 'running', 'waiting')");
+        $results[] = "Execuções de automação pendentes canceladas";
+    } catch (\Throwable $e) { $results[] = "Execuções: " . $e->getMessage(); }
+    
+    // 5. Limpar estado e histórico do cron
+    @unlink(__DIR__ . '/../storage/cache/jobs_state.json');
+    @unlink(__DIR__ . '/../storage/cache/cron_history.json');
+    $results[] = "Estado e histórico do cron limpos";
+    
+    $clearLockResult = ['success' => true, 'message' => "Reset completo:\n• " . implode("\n• ", $results)];
+}
+
 // ── Ação: Limpar histórico do cron ──
 if (isset($_GET['action']) && $_GET['action'] === 'clear_cron_history') {
     $cronHistFile = __DIR__ . '/../storage/cache/cron_history.json';
@@ -1235,6 +1285,15 @@ WHERE c.whatsapp_account_id IS NOT NULL
             </div>
             <?php endif; ?>
             
+            <!-- Botão de Reset Total -->
+            <div style="margin-top: 10px; margin-bottom: 10px;">
+                <a href="?tab=automacao&action=reset_backlog" 
+                   style="display: inline-block; background: #dc3545; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600;"
+                   onclick="return confirm('⚠️ RESET TOTAL DO BACKLOG\n\nIsso vai:\n• Cancelar todos os delays de automação pendentes\n• Resetar todos os chatbot timeouts ativos\n• Remover todos os buffers de IA\n• Cancelar execuções pendentes\n• Limpar estado e histórico do cron\n\nTem certeza?')">
+                    🔄 Reset Total do Backlog (Limpar tudo acumulado)
+                </a>
+            </div>
+
             <!-- Histórico detalhado (últimas 20 execuções) -->
             <details style="margin-top: 10px;">
                 <summary style="cursor: pointer; color: #9cdcfe; font-size: 13px; font-weight: bold;">📜 Histórico de Execuções (últimas <?= min(20, count($cronHistory)) ?> de <?= count($cronHistory) ?>)

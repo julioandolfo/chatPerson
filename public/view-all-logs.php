@@ -109,9 +109,16 @@ if ($activeTab === 'unificacao') {
 // ── Ação: Limpar lock do cron ──
 $clearLockResult = null;
 if (isset($_GET['action']) && $_GET['action'] === 'clear_lock') {
-    $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
-    if (file_exists($lockFile)) {
-        @unlink($lockFile);
+    // Tentar remover lock do shell (/tmp/) e lock legado (storage/cache/)
+    $lockFiles = ['/tmp/run_scheduled_jobs.lock', __DIR__ . '/../storage/cache/jobs.lock'];
+    $removed = false;
+    foreach ($lockFiles as $lockFile) {
+        if (file_exists($lockFile)) {
+            @unlink($lockFile);
+            $removed = true;
+        }
+    }
+    if ($removed) {
         $clearLockResult = ['success' => true, 'message' => 'Lock removido com sucesso'];
     } else {
         $clearLockResult = ['success' => true, 'message' => 'Lock já não existia'];
@@ -1189,13 +1196,19 @@ WHERE c.whatsapp_account_id IS NOT NULL
                 <p style="color: #d4d4d4; font-size: 13px; margin-top: 5px;">Última execução foi há <?= round($lastRunAgo / 60, 1) ?> minutos. O cron deveria rodar a cada ~1 minuto.</p>
                 <p style="color: #858585; font-size: 12px; margin-top: 5px;">Verifique: <code style="color: #ce9178;">crontab -l</code> deve conter algo como: <code style="color: #ce9178;">* * * * * php /caminho/public/run-scheduled-jobs.php</code></p>
                 <?php 
-                    $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
-                    if (file_exists($lockFile)):
-                        $lockAge = time() - filemtime($lockFile);
+                    $lockFiles = ['/tmp/run_scheduled_jobs.lock', __DIR__ . '/../storage/cache/jobs.lock'];
+                    $lockFound = false;
+                    foreach ($lockFiles as $lf) {
+                        if (file_exists($lf)):
+                            $lockAge = time() - filemtime($lf);
+                            $lockFound = true;
                 ?>
-                <p style="color: #dcdcaa; font-size: 12px; margin-top: 5px;">📁 Lock file existe (idade: <?= round($lockAge / 60, 1) ?> min). Se > 5 min, pode estar travado. 
+                <p style="color: #dcdcaa; font-size: 12px; margin-top: 5px;">📁 Lock file existe em <code style="color: #ce9178;"><?= $lf ?></code> (idade: <?= round($lockAge / 60, 1) ?> min). Se > 5 min, pode estar travado. 
                     <a href="?tab=automacao&action=clear_lock" style="color: #4ec9b0;" onclick="return confirm('Limpar arquivo de lock? Isso pode causar execuções duplicadas se o cron estiver realmente rodando.')">🔓 Limpar Lock</a>
                 </p>
+                <?php endif; } ?>
+                <?php if (!$lockFound): ?>
+                <p style="color: #6a9955; font-size: 12px; margin-top: 5px;">✅ Nenhum lock file ativo encontrado.</p>
                 <?php endif; ?>
             </div>
             <?php endif; ?>
@@ -1432,7 +1445,7 @@ WHERE c.whatsapp_account_id IS NOT NULL
                     <ol style="color: #d4d4d4; font-size: 13px; padding-left: 20px; line-height: 2;">
                         <li><strong style="color: #4ec9b0;">Cron não está rodando</strong> — Verifique se <code style="color: #ce9178;">run-scheduled-jobs.php</code> está configurado no cron</li>
                         <li><strong style="color: #4ec9b0;">Erro no ChatbotTimeoutJob</strong> — Verifique os logs de automação abaixo</li>
-                        <li><strong style="color: #4ec9b0;">Lock de jobs travado</strong> — O arquivo <code style="color: #ce9178;">storage/cache/jobs.lock</code> pode estar travado</li>
+                        <li><strong style="color: #4ec9b0;">Lock de jobs travado</strong> — O arquivo de lock (<code style="color: #ce9178;">/tmp/run_scheduled_jobs.lock</code>) pode estar travado</li>
                     </ol>
                 </div>
                 <?php endif; ?>

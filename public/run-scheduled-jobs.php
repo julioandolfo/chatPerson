@@ -84,39 +84,18 @@ function cronSaveHistory(): void
 }
 
 try {
-    // ✅ CRÍTICO: Usar arquivo de controle para evitar múltiplas execuções simultâneas
-    $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
-    
-    // Garantir que o diretório existe com permissões adequadas
-    $lockDir = dirname($lockFile);
-    if (!is_dir($lockDir)) {
-        @mkdir($lockDir, 0777, true);
-    }
-    
-    $lockHandle = @fopen($lockFile, 'c+');
-    if ($lockHandle === false) {
-        // Tentar corrigir permissões e recriar
-        @chmod($lockDir, 0777);
-        @unlink($lockFile);
-        $lockHandle = @fopen($lockFile, 'c+');
-        
-        if ($lockHandle === false) {
-            // Se ainda falhar, continuar SEM lock (melhor rodar sem lock do que não rodar)
-            echo "[" . date('Y-m-d H:i:s') . "] AVISO: Não foi possível criar arquivo de lock ({$lockFile}). Executando sem lock.\n";
-            error_log("run-scheduled-jobs: Não foi possível criar lock file: {$lockFile} - Permissão negada");
-            $lockHandle = null;
+    // ✅ Garantir que diretórios de storage existem
+    $storageDirs = [
+        $rootDir . '/storage/cache',
+        $rootDir . '/storage/logs',
+    ];
+    foreach ($storageDirs as $dir) {
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0777, true);
         }
     }
     
-    if ($lockHandle !== null && !flock($lockHandle, LOCK_EX | LOCK_NB)) {
-        echo "[" . date('Y-m-d H:i:s') . "] Jobs já em execução, pulando...\n";
-        fclose($lockHandle);
-        $lockHandle = null;
-        $cronStatus = 'skipped';
-        $cronError = 'Lock ativo - já em execução';
-        cronSaveHistory();
-        exit(0);
-    }
+    echo "[" . date('Y-m-d H:i:s') . "] Iniciando execução dos jobs...\n";
     
     // ✅ Arquivo de estado para controlar última execução de cada job
     $stateFile = __DIR__ . '/../storage/cache/jobs_state.json';
@@ -260,31 +239,20 @@ try {
     }
     
     // ✅ Salvar estado
-    file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
-    
-    // ✅ Liberar lock
-    if ($lockHandle !== null && is_resource($lockHandle)) {
-        flock($lockHandle, LOCK_UN);
-        fclose($lockHandle);
-    }
+    @file_put_contents($stateFile, json_encode($state, JSON_PRETTY_PRINT));
     
     // ✅ Salvar histórico do cron
     cronSaveHistory();
     
-    echo "[" . date('Y-m-d H:i:s') . "] Todos os jobs executados com sucesso\n";
+    $totalTime = round(microtime(true) - $cronRunStart, 2);
+    echo "[" . date('Y-m-d H:i:s') . "] ✅ Todos os jobs executados com sucesso em {$totalTime}s\n";
 } catch (\Throwable $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] ERRO: " . $e->getMessage() . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] ❌ ERRO: " . $e->getMessage() . "\n";
     error_log("Erro ao executar jobs agendados: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
     
     $cronStatus = 'error';
     $cronError = $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine();
     cronSaveHistory();
-    
-    // ✅ Liberar lock em caso de erro
-    if (isset($lockHandle) && $lockHandle !== null && is_resource($lockHandle)) {
-        @flock($lockHandle, LOCK_UN);
-        @fclose($lockHandle);
-    }
     
     exit(1);
 }

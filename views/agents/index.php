@@ -823,7 +823,7 @@ window.deleteAgent = function(agentId, agentName) {
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_reassign_conversations_form" class="form">
+            <form id="kt_modal_reassign_conversations_form" class="form" onsubmit="return handleReassignSubmit(event);">
                 <input type="hidden" name="agent_id" id="reassign_agent_id" />
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                     <div class="alert alert-warning d-flex align-items-center mb-7">
@@ -1207,6 +1207,92 @@ window.deleteAgent = function(agentId, agentName) {
     });
 };
 
+// Função global para submit de reatribuição de conversas
+window.handleReassignSubmit = function(e) {
+    e.preventDefault();
+    
+    var reassignForm = document.getElementById("kt_modal_reassign_conversations_form");
+    
+    // Validar que pelo menos um agente foi selecionado
+    var checkboxes = document.querySelectorAll(".reassign-agent-checkbox:checked");
+    var errorDiv = document.getElementById("reassign_agents_error");
+    
+    if (checkboxes.length === 0) {
+        errorDiv.textContent = "Selecione pelo menos um agente para redistribuição";
+        errorDiv.style.display = "block";
+        return false;
+    }
+    
+    errorDiv.style.display = "none";
+    
+    var agentId = document.getElementById("reassign_agent_id").value;
+    var formData = new FormData(reassignForm);
+    var numTargetAgents = checkboxes.length;
+    
+    // 1. Fechar modal de configuração
+    var configModalElement = document.getElementById("kt_modal_reassign_conversations");
+    var configModal = bootstrap.Modal.getInstance(configModalElement);
+    if (configModal) {
+        configModal.hide();
+    }
+    
+    // 2. Aguardar fechamento e mostrar modal de processamento
+    setTimeout(function() {
+        var processingModalElement = document.getElementById("kt_modal_reassign_processing");
+        var processingModal = new bootstrap.Modal(processingModalElement);
+        processingModal.show();
+        
+        document.getElementById("reassign_progress_text").textContent = "Redistribuindo conversas e contatos...";
+        
+        // 3. Fazer requisição
+        fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            // 4. Fechar modal de processamento
+            processingModal.hide();
+            
+            setTimeout(function() {
+                if (data.success) {
+                    // 5. Preencher dados do resultado
+                    document.getElementById("reassign_result_message").innerHTML = data.message || "Operação concluída com sucesso!";
+                    document.getElementById("reassign_conversations_count").textContent = data.conversations_reassigned || 0;
+                    document.getElementById("reassign_contacts_count").textContent = data.contact_agents_updated || 0;
+                    document.getElementById("reassign_agents_count").textContent = numTargetAgents;
+                    
+                    // Mostrar aviso se agente foi desativado
+                    var deactivatedNotice = document.getElementById("reassign_agent_deactivated_notice");
+                    if (data.agent_deactivated) {
+                        deactivatedNotice.style.display = "flex";
+                        deactivatedNotice.style.cssText = "display: flex !important;";
+                    } else {
+                        deactivatedNotice.style.display = "none";
+                        deactivatedNotice.style.cssText = "display: none !important;";
+                    }
+                    
+                    // 6. Mostrar modal de resultados
+                    var resultModal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_result"));
+                    resultModal.show();
+                } else {
+                    alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
+                }
+            }, 300);
+        })
+        .catch(function(error) {
+            processingModal.hide();
+            alert("Erro ao reatribuir conversas. Por favor, tente novamente.");
+            console.error(error);
+        });
+    }, 400);
+    
+    return false;
+};
+
 document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_agents_table");
     const searchInput = document.querySelector("[data-kt-filter=\"search\"]");
@@ -1503,87 +1589,7 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     };
     
-    // Form de reatribuição de conversas
-    const reassignForm = document.getElementById("kt_modal_reassign_conversations_form");
-    if (reassignForm) {
-        reassignForm.addEventListener("submit", function(e) {
-            e.preventDefault();
-            
-            // Validar que pelo menos um agente foi selecionado
-            const checkboxes = document.querySelectorAll(".reassign-agent-checkbox:checked");
-            const errorDiv = document.getElementById("reassign_agents_error");
-            
-            if (checkboxes.length === 0) {
-                errorDiv.textContent = "Selecione pelo menos um agente para redistribuição";
-                errorDiv.style.display = "block";
-                return;
-            }
-            
-            errorDiv.style.display = "none";
-            
-            // 1. Fechar modal de configuração
-            const configModal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_reassign_conversations"));
-            configModal.hide();
-            
-            // 2. Aguardar animação de fechamento e mostrar modal de processamento
-            const agentId = document.getElementById("reassign_agent_id").value;
-            const formData = new FormData(reassignForm);
-            
-            setTimeout(() => {
-                const processingModalElement = document.getElementById("kt_modal_reassign_processing");
-                const processingModal = new bootstrap.Modal(processingModalElement);
-                processingModal.show();
-                
-                const progressText = document.getElementById("reassign_progress_text");
-                progressText.textContent = "Redistribuindo conversas...";
-                
-                // 3. Fazer requisição
-                fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
-                    method: "POST",
-                    headers: {
-                        "X-Requested-With": "XMLHttpRequest"
-                    },
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    // 4. Fechar modal de processamento
-                    processingModal.hide();
-                
-                if (data.success) {
-                    // 5. Mostrar modal de resultados
-                    const resultModal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_result"));
-                    
-                    // Preencher dados do resultado
-                    document.getElementById("reassign_result_message").innerHTML = data.message || "Operação concluída com sucesso!";
-                    document.getElementById("reassign_conversations_count").textContent = data.conversations_reassigned || 0;
-                    document.getElementById("reassign_contacts_count").textContent = data.contact_agents_updated || 0;
-                    
-                    // Contar quantos agentes foram usados
-                    const targetAgents = document.querySelectorAll(".reassign-agent-checkbox:checked");
-                    document.getElementById("reassign_agents_count").textContent = targetAgents.length;
-                    
-                    // Mostrar aviso se agente foi desativado
-                    const deactivatedNotice = document.getElementById("reassign_agent_deactivated_notice");
-                    if (data.agent_deactivated) {
-                        deactivatedNotice.style.display = "flex";
-                    } else {
-                        deactivatedNotice.style.display = "none";
-                    }
-                    
-                    resultModal.show();
-                    } else {
-                        alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
-                    }
-                })
-                .catch(error => {
-                    processingModal.hide();
-                    alert("Erro ao reatribuir conversas. Por favor, tente novamente.");
-                    console.error(error);
-                });
-            }, 300);
-        });
-    }
+    // Nenhum listener de reatribuição aqui - tratado via função global handleReassignSubmit
 });
 </script>';
 ?>

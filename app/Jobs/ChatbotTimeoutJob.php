@@ -24,9 +24,12 @@ class ChatbotTimeoutJob
             Logger::automation("=== INICIANDO CHATBOT TIMEOUT JOB ===");
             
             // Buscar conversas com chatbot ativo e timeout configurado
+            // Usar CAST para garantir compatibilidade (true/1/"true"/"1")
             $conversations = \App\Helpers\Database::fetchAll(
-                "SELECT * FROM conversations WHERE status != 'closed' AND metadata IS NOT NULL AND JSON_EXTRACT(metadata, '$.chatbot_active') = true"
+                "SELECT * FROM conversations WHERE status != 'closed' AND metadata IS NOT NULL AND (JSON_EXTRACT(metadata, '$.chatbot_active') = true OR JSON_EXTRACT(metadata, '$.chatbot_active') = 'true' OR JSON_EXTRACT(metadata, '$.chatbot_active') = 1 OR JSON_EXTRACT(metadata, '$.chatbot_active') = '1')"
             );
+            
+            Logger::automation("  Encontradas " . count($conversations) . " conversa(s) com chatbot potencialmente ativo");
             
             $processedCount = 0;
             $chatbotActiveCount = 0;

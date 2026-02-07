@@ -410,12 +410,6 @@ ob_start();
     flex-shrink: 0;
 }
 
-.conversations-list-filters {
-    padding: 0;
-    border-bottom: 1px solid var(--bs-border-color);
-    flex-shrink: 0;
-}
-
 /* Grid de filtros: 2 colunas preenchendo toda a largura */
 .filters-grid {
     display: grid;
@@ -429,6 +423,44 @@ ob_start();
     font-size: 11.5px !important;
     padding: 4px 28px 4px 8px !important;
     height: 30px !important;
+}
+
+/* Painel de filtros (dropdown abaixo das abas) */
+.filters-panel {
+    background: var(--bs-body-bg);
+    border-bottom: 1px solid var(--bs-border-color);
+    padding: 10px 12px;
+    flex-shrink: 0;
+    animation: filterSlideDown 0.15s ease-out;
+}
+
+@keyframes filterSlideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Botão de filtro na barra de abas */
+.conversation-filter-btn {
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 6px !important;
+    padding: 0 !important;
+    color: var(--bs-gray-500);
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.conversation-filter-btn:hover {
+    color: var(--bs-primary);
+    background: var(--bs-gray-100);
+    border-color: var(--bs-border-color);
+}
+
+.conversation-filter-btn.filter-active {
+    color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.1);
+    border-color: var(--bs-primary);
 }
 
 .conversations-list-items {
@@ -567,6 +599,18 @@ body.dark-mode .conversation-tab-add:hover,
 [data-bs-theme="dark"] .conversation-tab-add:hover {
     color: var(--bs-primary);
     background: var(--bs-gray-800);
+}
+
+body.dark-mode .conversation-filter-btn:hover,
+[data-bs-theme="dark"] .conversation-filter-btn:hover {
+    background: var(--bs-gray-800);
+    border-color: var(--bs-gray-700);
+}
+
+body.dark-mode .filters-panel,
+[data-bs-theme="dark"] .filters-panel {
+    background: var(--bs-gray-900);
+    border-color: var(--bs-gray-700);
 }
 
 /* Submenu "Setar como" inline no dropdown */
@@ -2056,16 +2100,6 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         border-bottom: 1px solid var(--bs-border-color);
     }
     
-    .conversations-list-filters {
-        padding: 10px 15px;
-        position: sticky;
-        top: 0;
-        background: var(--bs-body-bg);
-        z-index: 99;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-    
     /* ürea de chat - full width em mobile */
     .chat-area {
         width: 100%;
@@ -2222,17 +2256,13 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         font-size: 12px;
     }
     
-    /* Filtros - scroll horizontal */
-    .conversations-list-filters .d-flex {
-        flex-wrap: nowrap;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding-bottom: 5px;
+    /* Filtros mobile */
+    .filters-panel {
+        padding: 8px 10px;
     }
-    
-    .conversations-list-filters select {
-        min-width: 120px;
-        flex-shrink: 0;
+    .filters-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 4px;
     }
 }
 
@@ -2565,158 +2595,152 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Filtros (Acordeon) -->
-        <div class="conversations-list-filters">
-            <div class="accordion accordion-flush" id="filtersAccordion">
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="filtersHeading">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#filtersCollapse" aria-expanded="false" aria-controls="filtersCollapse" style="padding: 8px 16px; font-size: 0.875rem;">
-                            <i class="ki-duotone ki-filter fs-6 me-2">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            <span class="fw-semibold">Filtros</span>
-                            <span class="badge badge-light-primary ms-2" id="activeFiltersCount" style="display: none;">0</span>
-                        </button>
-                    </h2>
-                    <div id="filtersCollapse" class="accordion-collapse collapse" aria-labelledby="filtersHeading" data-bs-parent="#filtersAccordion">
-                        <div class="accordion-body" style="padding: 8px 12px;">
-                            <div class="filters-grid">
-                                <select id="filter_status" class="form-select form-select-sm form-select-solid">
-                                    <option value="" <?= empty($filters['status']) && empty($filters['is_spam']) && empty($filters['unanswered']) ? 'selected' : '' ?>>Todas</option>
-                                    <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
-                                    <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
-                                    <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
-                                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>Spam</option>
-                                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>Não respondidas</option>
-                                </select>
-                                
-                                <select id="filter_channel" class="form-select form-select-sm form-select-solid">
-                                    <option value="">Canais</option>
-                                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
-                                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
-                                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
-                                    <option value="instagram_comment" <?= ($filters['channel'] ?? '') === 'instagram_comment' ? 'selected' : '' ?>>Instagram Coment.</option>
-                                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
-                                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
-                                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
-                                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>Email</option>
-                                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>Chat</option>
-                                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>Mercado Livre</option>
-                                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>WebChat</option>
-                                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>OLX</option>
-                                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>LinkedIn</option>
-                                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>Google Business</option>
-                                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>YouTube</option>
-                                </select>
-                                
-                                <?php if (!empty($departments)): ?>
-                                <select id="filter_department" class="form-select form-select-sm form-select-solid">
-                                    <option value="">Setores</option>
-                                    <?php foreach ($departments as $dept): ?>
-                                        <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($dept['name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
+        <!-- Barra unificada: Abas + Filtros -->
+        <div id="conversationTabsBar" class="conversation-tabs-bar">
+            <div class="d-flex align-items-end w-100">
+                <!-- Abas (scrollable) -->
+                <div class="d-flex align-items-center gap-0 overflow-auto hide-scrollbar flex-grow-1" id="conversationTabsList">
+                    <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                        <span class="tab-name">Todas</span>
+                        <?php if (!empty($conversations)): ?>
+                            <span class="tab-count"><?= count($conversations) ?></span>
+                        <?php endif; ?>
+                    </button>
+                    <?php if (!empty($userTabs)): ?>
+                        <?php foreach ($userTabs as $tab): ?>
+                            <button type="button" class="btn btn-sm conversation-tab" 
+                                    data-tab-id="<?= $tab['id'] ?>" 
+                                    data-tag-id="<?= $tab['tag_id'] ?>"
+                                    onclick="switchConversationTab(this)">
+                                <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
+                                <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
+                                <?php if (!empty($tab['conversation_count'])): ?>
+                                    <span class="tab-count"><?= $tab['conversation_count'] ?></span>
                                 <?php endif; ?>
-                                
-                                <?php if (!empty($tags)): ?>
-                                <select id="filter_tag" class="form-select form-select-sm form-select-solid">
-                                    <option value="">Tags</option>
-                                    <?php foreach ($tags as $tag): ?>
-                                        <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($tag['name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <?php endif; ?>
-                                
-                                <?php 
-                                $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
-                                $currentUserId = \App\Helpers\Auth::id();
-                                ?>
-                                <?php if ($canViewAllConversations || !empty($agents)): ?>
-                                <select id="filter_agent" class="form-select form-select-sm form-select-solid">
-                                    <option value="">Agentes</option>
-                                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>Não atribuídas</option>
-                                    <?php if ($canViewAllConversations && !empty($agents)): ?>
-                                        <?php foreach ($agents as $agent): ?>
-                                            <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
-                                                <?= htmlspecialchars($agent['name']) ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    <?php elseif (!$canViewAllConversations && $currentUserId): ?>
-                                        <?php 
-                                        $currentUser = \App\Models\User::find($currentUserId);
-                                        if ($currentUser): ?>
-                                            <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
-                                                Minhas conversas
-                                            </option>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                </select>
-                                <?php endif; ?>
-
-                                <select id="filter_funnel" class="form-select form-select-sm form-select-solid">
-                                    <option value="">Funil</option>
-                                </select>
-                                <select id="filter_stage" class="form-select form-select-sm form-select-solid" disabled>
-                                    <option value="">Etapa</option>
-                                </select>
-                            </div>
-                            <div class="d-flex align-items-center gap-2 mt-2">
-                                <button type="button" class="btn btn-sm btn-light-primary flex-grow-1" onclick="openAdvancedFilters()" title="Filtros Avançados">
-                                    <i class="ki-duotone ki-setting-2 fs-6 me-1">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Avançados
-                                </button>
-                                
-                                <?php if (!empty($filters['unanswered']) || !empty($filters['answered']) || !empty($filters['date_from']) || !empty($filters['date_to']) || isset($filters['pinned'])): ?>
-                                <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
-                                    <i class="ki-duotone ki-cross fs-6">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
+                            </button>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <button type="button" class="btn btn-sm btn-icon conversation-tab-add" title="Gerenciar abas" onclick="showManageTabsModal()">
+                        <i class="ki-duotone ki-plus fs-7">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </button>
+                </div>
+                <!-- Botão Filtros (abre dropdown) -->
+                <div class="flex-shrink-0 d-flex align-items-center" style="padding-bottom: 6px; margin-bottom: -2px;">
+                    <button type="button" class="btn btn-sm btn-icon conversation-filter-btn position-relative" 
+                            id="filterToggleBtn" onclick="toggleFiltersDropdown()" title="Filtros">
+                        <i class="ki-duotone ki-filter fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <span class="badge badge-sm badge-circle badge-danger position-absolute top-0 end-0 d-none" id="activeFiltersCount">0</span>
+                    </button>
                 </div>
             </div>
         </div>
-        
-        <!-- Barra de Abas de Conversas (por agente) -->
-        <div id="conversationTabsBar" class="conversation-tabs-bar">
-            <div class="d-flex align-items-center gap-0 overflow-auto hide-scrollbar" id="conversationTabsList">
-                <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
-                    <span class="tab-name">Todas</span>
-                    <?php if (!empty($conversations)): ?>
-                        <span class="tab-count"><?= count($conversations) ?></span>
-                    <?php endif; ?>
-                </button>
-                <?php if (!empty($userTabs)): ?>
-                    <?php foreach ($userTabs as $tab): ?>
-                        <button type="button" class="btn btn-sm conversation-tab" 
-                                data-tab-id="<?= $tab['id'] ?>" 
-                                data-tag-id="<?= $tab['tag_id'] ?>"
-                                onclick="switchConversationTab(this)">
-                            <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
-                            <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
-                            <?php if (!empty($tab['conversation_count'])): ?>
-                                <span class="tab-count"><?= $tab['conversation_count'] ?></span>
-                            <?php endif; ?>
-                        </button>
+
+        <!-- Painel de Filtros (dropdown oculto) -->
+        <div id="filtersPanel" class="filters-panel d-none">
+            <div class="filters-grid">
+                <select id="filter_status" class="form-select form-select-sm form-select-solid">
+                    <option value="" <?= empty($filters['status']) && empty($filters['is_spam']) && empty($filters['unanswered']) ? 'selected' : '' ?>>Todas</option>
+                    <option value="open" <?= ($filters['status'] ?? '') === 'open' ? 'selected' : '' ?>>Abertas</option>
+                    <option value="resolved" <?= ($filters['status'] ?? '') === 'resolved' ? 'selected' : '' ?>>Resolvidas</option>
+                    <option value="closed" <?= ($filters['status'] ?? '') === 'closed' ? 'selected' : '' ?>>Fechadas</option>
+                    <option value="spam" <?= !empty($filters['is_spam']) ? 'selected' : '' ?>>Spam</option>
+                    <option value="unanswered" <?= !empty($filters['unanswered']) ? 'selected' : '' ?>>Não respondidas</option>
+                </select>
+                
+                <select id="filter_channel" class="form-select form-select-sm form-select-solid">
+                    <option value="">Canais</option>
+                    <option value="whatsapp" <?= ($filters['channel'] ?? '') === 'whatsapp' ? 'selected' : '' ?>>WhatsApp</option>
+                    <option value="whatsapp_official" <?= ($filters['channel'] ?? '') === 'whatsapp_official' ? 'selected' : '' ?>>WhatsApp Oficial</option>
+                    <option value="instagram" <?= ($filters['channel'] ?? '') === 'instagram' ? 'selected' : '' ?>>Instagram</option>
+                    <option value="instagram_comment" <?= ($filters['channel'] ?? '') === 'instagram_comment' ? 'selected' : '' ?>>Instagram Coment.</option>
+                    <option value="facebook" <?= ($filters['channel'] ?? '') === 'facebook' ? 'selected' : '' ?>>Facebook</option>
+                    <option value="tiktok" <?= ($filters['channel'] ?? '') === 'tiktok' ? 'selected' : '' ?>>TikTok</option>
+                    <option value="telegram" <?= ($filters['channel'] ?? '') === 'telegram' ? 'selected' : '' ?>>Telegram</option>
+                    <option value="email" <?= ($filters['channel'] ?? '') === 'email' ? 'selected' : '' ?>>Email</option>
+                    <option value="chat" <?= ($filters['channel'] ?? '') === 'chat' ? 'selected' : '' ?>>Chat</option>
+                    <option value="mercadolivre" <?= ($filters['channel'] ?? '') === 'mercadolivre' ? 'selected' : '' ?>>Mercado Livre</option>
+                    <option value="webchat" <?= ($filters['channel'] ?? '') === 'webchat' ? 'selected' : '' ?>>WebChat</option>
+                    <option value="olx" <?= ($filters['channel'] ?? '') === 'olx' ? 'selected' : '' ?>>OLX</option>
+                    <option value="linkedin" <?= ($filters['channel'] ?? '') === 'linkedin' ? 'selected' : '' ?>>LinkedIn</option>
+                    <option value="google_business" <?= ($filters['channel'] ?? '') === 'google_business' ? 'selected' : '' ?>>Google Business</option>
+                    <option value="youtube" <?= ($filters['channel'] ?? '') === 'youtube' ? 'selected' : '' ?>>YouTube</option>
+                </select>
+                
+                <?php if (!empty($departments)): ?>
+                <select id="filter_department" class="form-select form-select-sm form-select-solid">
+                    <option value="">Setores</option>
+                    <?php foreach ($departments as $dept): ?>
+                        <option value="<?= $dept['id'] ?>" <?= ($filters['department_id'] ?? '') == $dept['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($dept['name']) ?>
+                        </option>
                     <?php endforeach; ?>
+                </select>
                 <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-icon conversation-tab-add" title="Gerenciar abas" onclick="showManageTabsModal()">
-                    <i class="ki-duotone ki-plus fs-7">
+                
+                <?php if (!empty($tags)): ?>
+                <select id="filter_tag" class="form-select form-select-sm form-select-solid">
+                    <option value="">Tags</option>
+                    <?php foreach ($tags as $tag): ?>
+                        <option value="<?= $tag['id'] ?>" <?= ($filters['tag_id'] ?? '') == $tag['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($tag['name']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php endif; ?>
+                
+                <?php 
+                $canViewAllConversations = \App\Helpers\Permission::can('conversations.view.all');
+                $currentUserId = \App\Helpers\Auth::id();
+                ?>
+                <?php if ($canViewAllConversations || !empty($agents)): ?>
+                <select id="filter_agent" class="form-select form-select-sm form-select-solid">
+                    <option value="">Agentes</option>
+                    <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>Não atribuídas</option>
+                    <?php if ($canViewAllConversations && !empty($agents)): ?>
+                        <?php foreach ($agents as $agent): ?>
+                            <option value="<?= $agent['id'] ?>" <?= ($filters['agent_id'] ?? '') == $agent['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($agent['name']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php elseif (!$canViewAllConversations && $currentUserId): ?>
+                        <?php 
+                        $currentUser = \App\Models\User::find($currentUserId);
+                        if ($currentUser): ?>
+                            <option value="<?= $currentUser['id'] ?>" <?= ($filters['agent_id'] ?? '') == $currentUser['id'] ? 'selected' : '' ?>>
+                                Minhas conversas
+                            </option>
+                        <?php endif; ?>
+                    <?php endif; ?>
+                </select>
+                <?php endif; ?>
+
+                <select id="filter_funnel" class="form-select form-select-sm form-select-solid">
+                    <option value="">Funil</option>
+                </select>
+                <select id="filter_stage" class="form-select form-select-sm form-select-solid" disabled>
+                    <option value="">Etapa</option>
+                </select>
+            </div>
+            <div class="d-flex align-items-center gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-light-primary flex-grow-1" onclick="openAdvancedFilters()" title="Filtros Avançados">
+                    <i class="ki-duotone ki-setting-2 fs-6 me-1">
                         <span class="path1"></span>
                         <span class="path2"></span>
                     </i>
+                    Avançados
+                </button>
+                <button type="button" class="btn btn-sm btn-light-danger" onclick="clearAllFilters()" title="Limpar Filtros">
+                    <i class="ki-duotone ki-cross fs-6">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Limpar
                 </button>
             </div>
         </div>
@@ -11186,6 +11210,7 @@ document.getElementById('kt_conversations_search')?.addEventListener('input', fu
 // Função para atualizar contador de filtros ativos (definir ANTES de usar)
 function updateActiveFiltersCount() {
     const countBadge = document.getElementById('activeFiltersCount');
+    const filterBtn = document.getElementById('filterToggleBtn');
     if (!countBadge) return;
     
     let count = 0;
@@ -11203,9 +11228,15 @@ function updateActiveFiltersCount() {
     
     if (count > 0) {
         countBadge.textContent = count;
-        countBadge.style.display = 'inline-block';
+        countBadge.classList.remove('d-none');
+        if (filterBtn) filterBtn.classList.add('filter-active');
     } else {
-        countBadge.style.display = 'none';
+        countBadge.classList.add('d-none');
+        // Só remove filter-active se o painel estiver fechado
+        const panel = document.getElementById('filtersPanel');
+        if (filterBtn && panel && panel.classList.contains('d-none')) {
+            filterBtn.classList.remove('filter-active');
+        }
     }
 }
 
@@ -11346,6 +11377,13 @@ function loadFunnelsFilter() {
 document.addEventListener('DOMContentLoaded', function() {
     loadFunnelsFilter();
     updateActiveFiltersCount(); // Atualizar contador inicial
+    
+    // Se houver filtros ativos, abrir o painel automaticamente
+    const activeCount = document.getElementById('activeFiltersCount');
+    if (activeCount && !activeCount.classList.contains('d-none')) {
+        const panel = document.getElementById('filtersPanel');
+        if (panel) panel.classList.remove('d-none');
+    }
     
     // Botão "Carregar mais" e scroll para carregar mais conversas
     const loadMoreBtn = document.getElementById('loadMoreConversationsBtn');
@@ -11755,6 +11793,22 @@ function formatTime(dateString) {
     if (diffDays < 7) return `${diffDays}d`;
     
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+// =============================================
+// TOGGLE DO PAINEL DE FILTROS
+// =============================================
+function toggleFiltersDropdown() {
+    const panel = document.getElementById('filtersPanel');
+    const btn = document.getElementById('filterToggleBtn');
+    
+    if (panel.classList.contains('d-none')) {
+        panel.classList.remove('d-none');
+        btn.classList.add('filter-active');
+    } else {
+        panel.classList.add('d-none');
+        btn.classList.remove('filter-active');
+    }
 }
 
 function openAdvancedFilters() {

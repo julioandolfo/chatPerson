@@ -106,6 +106,18 @@ if ($activeTab === 'unificacao') {
     }
 }
 
+// ── Ação: Limpar lock do cron ──
+$clearLockResult = null;
+if (isset($_GET['action']) && $_GET['action'] === 'clear_lock') {
+    $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
+    if (file_exists($lockFile)) {
+        @unlink($lockFile);
+        $clearLockResult = ['success' => true, 'message' => 'Lock removido com sucesso'];
+    } else {
+        $clearLockResult = ['success' => true, 'message' => 'Lock já não existia'];
+    }
+}
+
 // ── Ação: Corrigir conversas ──
 $fixResult = null;
 if (isset($_GET['action']) && $_GET['action'] === 'fix_conversations') {
@@ -1082,6 +1094,10 @@ WHERE c.whatsapp_account_id IS NOT NULL
         <?php elseif ($activeTab === 'automacao'): ?>
         <!-- ═══════════════ ABA AUTOMAÇÃO ═══════════════ -->
         
+        <?php if ($clearLockResult): ?>
+            <div class="alert alert-success">✅ <?= htmlspecialchars($clearLockResult['message']) ?></div>
+        <?php endif; ?>
+        
         <?php if (isset($automationData['error'])): ?>
             <div class="alert alert-error">❌ Erro ao carregar dados: <?= htmlspecialchars($automationData['error']) ?></div>
         <?php else: ?>
@@ -1090,6 +1106,156 @@ WHERE c.whatsapp_account_id IS NOT NULL
             <h1>🤖 Diagnóstico de Automações</h1>
             <p style="color: #858585; font-size: 13px;">Visualize todas as automações, suas configurações de contas/triggers e execuções recentes.</p>
         </header>
+        
+        <!-- Histórico do Cron -->
+        <?php
+            $cronHistoryFile = __DIR__ . '/../storage/cache/cron_history.json';
+            $cronHistory = [];
+            if (file_exists($cronHistoryFile)) {
+                $cronHistory = json_decode(file_get_contents($cronHistoryFile), true) ?: [];
+            }
+            
+            $lastRun = !empty($cronHistory) ? $cronHistory[0] : null;
+            $lastRunAgo = $lastRun ? (time() - strtotime($lastRun['started_at'])) : null;
+            $cronRunning = $lastRunAgo !== null && $lastRunAgo < 180; // Considerado ativo se rodou nos últimos 3 min
+            
+            // Contadores das últimas 50 execuções
+            $recentHistory = array_slice($cronHistory, 0, 50);
+            $cronErrors = 0;
+            $cronSkipped = 0;
+            $cronSuccess = 0;
+            foreach ($recentHistory as $ch) {
+                if (($ch['status'] ?? '') === 'error') $cronErrors++;
+                elseif (($ch['status'] ?? '') === 'skipped') $cronSkipped++;
+                else $cronSuccess++;
+            }
+        ?>
+        <div class="diag-section <?= $cronRunning ? 'success' : 'danger' ?>">
+            <h2>🕐 Status do Cron (run-scheduled-jobs.php)</h2>
+            
+            <div class="grid-4" style="margin-bottom: 15px;">
+                <div class="grid-card">
+                    <div class="label">Status</div>
+                    <?php if ($cronRunning): ?>
+                        <div class="big-number green" style="font-size: 24px;">ATIVO</div>
+                        <div class="label" style="color: #4ec9b0;">Última exec: <?= $lastRunAgo ?>s atrás</div>
+                    <?php elseif ($lastRun): ?>
+                        <div class="big-number red" style="font-size: 24px;">PARADO?</div>
+                        <div class="label" style="color: #f48771;">Última exec: <?= round($lastRunAgo / 60, 1) ?> min atrás</div>
+                    <?php else: ?>
+                        <div class="big-number red" style="font-size: 24px;">SEM DADOS</div>
+                        <div class="label" style="color: #f48771;">Nenhuma execução registrada</div>
+                    <?php endif; ?>
+                </div>
+                <div class="grid-card">
+                    <div class="label">Última Execução</div>
+                    <div style="color: #fff; font-size: 14px; font-weight: bold;">
+                        <?= $lastRun ? $lastRun['started_at'] : 'Nunca' ?>
+                    </div>
+                    <?php if ($lastRun): ?>
+                        <div class="label">Duração: <?= $lastRun['duration_s'] ?>s | Jobs: <?= $lastRun['jobs_count'] ?></div>
+                    <?php endif; ?>
+                </div>
+                <div class="grid-card">
+                    <div class="label">Últimas 50 exec.</div>
+                    <div class="big-number green" style="font-size: 20px;"><?= $cronSuccess ?> ok</div>
+                    <?php if ($cronErrors > 0): ?>
+                        <div class="label" style="color: #f48771;"><?= $cronErrors ?> erro(s)</div>
+                    <?php endif; ?>
+                    <?php if ($cronSkipped > 0): ?>
+                        <div class="label" style="color: #dcdcaa;"><?= $cronSkipped ?> skip(s)</div>
+                    <?php endif; ?>
+                </div>
+                <div class="grid-card">
+                    <div class="label">Último Status</div>
+                    <?php if ($lastRun): ?>
+                        <?php if ($lastRun['status'] === 'success'): ?>
+                            <span class="badge badge-ok" style="font-size: 14px;">SUCCESS</span>
+                        <?php elseif ($lastRun['status'] === 'error'): ?>
+                            <span class="badge badge-miss" style="font-size: 14px;">ERRO</span>
+                            <div class="label" style="color: #f48771; margin-top: 5px;"><?= htmlspecialchars(substr($lastRun['error'] ?? '', 0, 60)) ?></div>
+                        <?php elseif ($lastRun['status'] === 'skipped'): ?>
+                            <span class="badge badge-warn" style="font-size: 14px;">SKIP (LOCK)</span>
+                        <?php endif; ?>
+                    <?php else: ?>
+                        <span class="badge badge-na">N/A</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <?php if (!$cronRunning && $lastRunAgo !== null && $lastRunAgo > 300): ?>
+            <div style="background: rgba(244,135,113,0.1); border: 1px solid #f48771; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                <strong style="color: #f48771;">⚠️ O cron parece estar PARADO!</strong>
+                <p style="color: #d4d4d4; font-size: 13px; margin-top: 5px;">Última execução foi há <?= round($lastRunAgo / 60, 1) ?> minutos. O cron deveria rodar a cada ~1 minuto.</p>
+                <p style="color: #858585; font-size: 12px; margin-top: 5px;">Verifique: <code style="color: #ce9178;">crontab -l</code> deve conter algo como: <code style="color: #ce9178;">* * * * * php /caminho/public/run-scheduled-jobs.php</code></p>
+                <?php 
+                    $lockFile = __DIR__ . '/../storage/cache/jobs.lock';
+                    if (file_exists($lockFile)):
+                        $lockAge = time() - filemtime($lockFile);
+                ?>
+                <p style="color: #dcdcaa; font-size: 12px; margin-top: 5px;">📁 Lock file existe (idade: <?= round($lockAge / 60, 1) ?> min). Se > 5 min, pode estar travado. 
+                    <a href="?tab=automacao&action=clear_lock" style="color: #4ec9b0;" onclick="return confirm('Limpar arquivo de lock? Isso pode causar execuções duplicadas se o cron estiver realmente rodando.')">🔓 Limpar Lock</a>
+                </p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Histórico detalhado (últimas 20 execuções) -->
+            <details style="margin-top: 10px;">
+                <summary style="cursor: pointer; color: #9cdcfe; font-size: 13px; font-weight: bold;">📜 Histórico de Execuções (últimas <?= min(20, count($cronHistory)) ?> de <?= count($cronHistory) ?>)</summary>
+                <div style="margin-top: 10px; overflow-x: auto;">
+                    <?php if (empty($cronHistory)): ?>
+                        <p style="color: #858585; padding: 10px;">Nenhuma execução registrada ainda. O histórico será preenchido após a próxima execução do cron.</p>
+                    <?php else: ?>
+                    <table class="diag-table">
+                        <thead>
+                            <tr>
+                                <th>Início</th>
+                                <th>Duração</th>
+                                <th>Status</th>
+                                <th>Jobs</th>
+                                <th>Detalhes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach (array_slice($cronHistory, 0, 20) as $run): ?>
+                            <tr style="<?= ($run['status'] ?? '') === 'error' ? 'background: rgba(244,135,113,0.1);' : (($run['status'] ?? '') === 'skipped' ? 'background: rgba(220,220,170,0.05);' : '') ?>">
+                                <td style="white-space: nowrap; color: #858585; font-size: 12px;"><?= $run['started_at'] ?></td>
+                                <td style="text-align: center;"><?= $run['duration_s'] ?>s</td>
+                                <td>
+                                    <?php if (($run['status'] ?? '') === 'success'): ?>
+                                        <span class="badge badge-ok">OK</span>
+                                    <?php elseif (($run['status'] ?? '') === 'error'): ?>
+                                        <span class="badge badge-miss">ERRO</span>
+                                    <?php elseif (($run['status'] ?? '') === 'skipped'): ?>
+                                        <span class="badge badge-warn">SKIP</span>
+                                    <?php else: ?>
+                                        <span class="badge badge-na"><?= $run['status'] ?? '?' ?></span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="text-align: center;"><?= $run['jobs_count'] ?? 0 ?></td>
+                                <td style="font-size: 11px;">
+                                    <?php if (!empty($run['error'])): ?>
+                                        <span style="color: #f48771;"><?= htmlspecialchars(substr($run['error'], 0, 80)) ?></span>
+                                    <?php elseif (!empty($run['jobs'])): ?>
+                                        <?php foreach ($run['jobs'] as $job): ?>
+                                            <span style="color: <?= ($job['status'] ?? 'ok') === 'ok' ? '#4ec9b0' : '#f48771' ?>;">
+                                                <?= $job['job'] ?> (<?= $job['duration'] ?>s<?= ($job['status'] ?? 'ok') !== 'ok' ? ' ❌' : '' ?>)
+                                            </span>
+                                            <?php if ($job !== end($run['jobs'])): ?> | <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <span style="color: #555;">—</span>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php endif; ?>
+                </div>
+            </details>
+        </div>
         
         <!-- Resumo -->
         <div class="grid-4">

@@ -1405,6 +1405,52 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     color: #aaa;
 }
 
+/* Reaction picker popup */
+.reaction-picker {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 6px 8px;
+    display: flex;
+    gap: 2px;
+    z-index: 100;
+    animation: reactionPickerIn 0.15s ease-out;
+    white-space: nowrap;
+}
+@keyframes reactionPickerIn {
+    from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(4px); }
+    to { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+}
+.reaction-picker-emoji {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    cursor: pointer;
+    border-radius: 50%;
+    transition: transform 0.15s, background 0.15s;
+    border: none;
+    background: none;
+    padding: 0;
+}
+.reaction-picker-emoji:hover {
+    transform: scale(1.3);
+    background: rgba(0,0,0,0.06);
+}
+[data-theme="dark"] .reaction-picker {
+    background: #2b2b3d;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+[data-theme="dark"] .reaction-picker-emoji:hover {
+    background: rgba(255,255,255,0.1);
+}
+
 /* Reduzir padding quando contêm apenas íudio (manter background da bolha) */
 .message-bubble.audio-only {
     padding: 8px !important;
@@ -3508,6 +3554,14 @@ function getChannelInfo(channel) {
                                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                 <polyline points="9 10 4 15 9 20"></polyline>
                                                 <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
+                                            </svg>
+                                        </button>
+                                        <button class="message-actions-btn reaction-trigger-btn" onclick="toggleReactionPicker(event, <?= $msg['id'] ?? 0 ?>)" title="Reagir">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                                                <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                                                <line x1="15" y1="9" x2="15.01" y2="9"></line>
                                             </svg>
                                         </button>
                                         <button class="message-actions-btn" onclick="forwardMessage(<?= $msg['id'] ?? 0 ?>)" title="Encaminhar">
@@ -13625,6 +13679,14 @@ function addMessageToChat(message) {
                         <path d="M20 4v7a4 4 0 0 1-4 4H4"></path>
                     </svg>
                 </button>
+                <button class="message-actions-btn reaction-trigger-btn" onclick="toggleReactionPicker(event, ${msgId})" title="Reagir">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                        <line x1="9" y1="9" x2="9.01" y2="9"></line>
+                        <line x1="15" y1="9" x2="15.01" y2="9"></line>
+                    </svg>
+                </button>
                 <button class="message-actions-btn" onclick="forwardMessage(${msgId})" title="Encaminhar">
                     <i class="ki-duotone ki-arrow-right fs-6">
                         <span class="path1"></span>
@@ -17741,6 +17803,93 @@ function formatFileSize(bytes) {
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+/**
+ * Toggle do picker de reações para uma mensagem
+ */
+function toggleReactionPicker(event, messageId) {
+    event.stopPropagation();
+    
+    // Fechar picker anterior se existir
+    const existing = document.querySelector('.reaction-picker');
+    if (existing) {
+        const existingMsgId = existing.getAttribute('data-msg-id');
+        existing.remove();
+        if (existingMsgId == messageId) return; // Toggle off
+    }
+    
+    const btn = event.currentTarget;
+    const actionsDiv = btn.closest('.message-actions');
+    
+    const emojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+    
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+    picker.setAttribute('data-msg-id', messageId);
+    
+    emojis.forEach(emoji => {
+        const emojiBtn = document.createElement('button');
+        emojiBtn.className = 'reaction-picker-emoji';
+        emojiBtn.textContent = emoji;
+        emojiBtn.onclick = function(e) {
+            e.stopPropagation();
+            sendReaction(messageId, emoji);
+            picker.remove();
+        };
+        picker.appendChild(emojiBtn);
+    });
+    
+    actionsDiv.style.position = 'relative';
+    actionsDiv.appendChild(picker);
+    
+    // Fechar ao clicar fora
+    setTimeout(() => {
+        document.addEventListener('click', function closePicker(e) {
+            if (!picker.contains(e.target)) {
+                picker.remove();
+                document.removeEventListener('click', closePicker);
+            }
+        });
+    }, 10);
+}
+
+/**
+ * Enviar reação de agente para uma mensagem
+ */
+async function sendReaction(messageId, emoji) {
+    try {
+        const response = await fetch(`<?= \App\Helpers\Url::to('/conversations/messages') ?>/${messageId}/react`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emoji: emoji })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Atualizar reações na UI
+            const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (msgElement) {
+                // Remover reações antigas
+                const oldReactions = msgElement.querySelector('.message-reactions');
+                if (oldReactions) oldReactions.remove();
+                
+                // Renderizar novas reações
+                if (data.reactions && data.reactions.length > 0) {
+                    const reactionsHtml = renderReactionsHtml(data.reactions);
+                    const bubble = msgElement.querySelector('.message-bubble');
+                    if (bubble) {
+                        bubble.insertAdjacentHTML('afterend', reactionsHtml);
+                    }
+                }
+            }
+        } else {
+            console.error('[Reaction] Erro:', data.message);
+        }
+    } catch (err) {
+        console.error('[Reaction] Erro na requisição:', err);
+    }
 }
 
 /**

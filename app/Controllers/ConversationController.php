@@ -1175,6 +1175,138 @@ class ConversationController
     }
 
     /**
+     * Reagir a uma mensagem
+     */
+    public function reactToMessage(int $messageId): void
+    {
+        Permission::abortIfCannot('conversations.send');
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $emoji = $input['emoji'] ?? null;
+            
+            if (empty($emoji)) {
+                Response::json(['success' => false, 'message' => 'Emoji não informado']);
+                return;
+            }
+            
+            // Buscar mensagem
+            $message = \App\Models\Message::find($messageId);
+            if (!$message) {
+                Response::json(['success' => false, 'message' => 'Mensagem não encontrada']);
+                return;
+            }
+            
+            // Decodificar reações existentes
+            $reactions = [];
+            if (!empty($message['reactions'])) {
+                $reactions = is_string($message['reactions']) 
+                    ? json_decode($message['reactions'], true) ?? [] 
+                    : $message['reactions'];
+            }
+            
+            $agentId = \App\Helpers\Auth::id();
+            $agent = \App\Models\User::find($agentId);
+            $agentName = $agent['name'] ?? 'Agente';
+            
+            // Verificar se o agente já reagiu com o mesmo emoji (toggle: remover)
+            $existingIndex = null;
+            foreach ($reactions as $idx => $r) {
+                if (($r['sender_id'] ?? null) == $agentId && ($r['from'] ?? '') === 'agent') {
+                    if (($r['emoji'] ?? '') === $emoji) {
+                        $existingIndex = $idx;
+                    }
+                    break;
+                }
+            }
+            
+            if ($existingIndex !== null) {
+                // Remover reação (toggle off)
+                array_splice($reactions, $existingIndex, 1);
+            } else {
+                // Remover reação anterior do mesmo agente (só permite 1 por pessoa)
+                $reactions = array_values(array_filter($reactions, function($r) use ($agentId) {
+                    return !(($r['sender_id'] ?? null) == $agentId && ($r['from'] ?? '') === 'agent');
+                }));
+                
+                // Adicionar nova reação
+                $reactions[] = [
+                    'emoji' => $emoji,
+                    'from' => 'agent',
+                    'sender_id' => $agentId,
+                    'sender_name' => $agentName,
+                    'timestamp' => time()
+                ];
+            }
+            
+            // Salvar
+            \App\Helpers\Database::execute(
+                "UPDATE messages SET reactions = ? WHERE id = ?",
+                [json_encode($reactions, JSON_UNESCAPED_UNICODE), $messageId]
+            );
+            
+            // Tentar enviar reação ao WhatsApp (best effort)
+            try {
+                $conversation = \App\Models\Conversation::find($message['conversation_id']);
+                if ($conversation && $conversation['channel'] === 'whatsapp' && !empty($message['external_id'])) {
+                    $accountId = $conversation['integration_account_id'] ?? null;
+                    $contact = \App\Models\Contact::find($conversation['contact_id']);
+                    
+                    if ($accountId && $contact) {
+                        $phone = $contact['phone'] ?? '';
+                        $account = \App\Models\IntegrationAccount::find($accountId);
+                        
+                        if ($account && !empty($account['quepasa_token'])) {
+                            $apiUrl = rtrim($account['api_url'], '/');
+                            $chatId = $contact['whatsapp_id'] ?? ($phone . '@s.whatsapp.net');
+                            
+                            // Enviar reação via Quepasa API
+                            $payload = [
+                                'chatid' => $chatId,
+                                'text' => $existingIndex !== null ? '' : $emoji, // Vazio para remover
+                                'inreply' => $message['external_id'],
+                                'inreaction' => true
+                            ];
+                            
+                            $ch = curl_init("{$apiUrl}/send");
+                            curl_setopt_array($ch, [
+                                CURLOPT_POST => true,
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 10,
+                                CURLOPT_HTTPHEADER => [
+                                    'Accept: application/json',
+                                    'Content-Type: application/json',
+                                    'X-QUEPASA-TOKEN: ' . $account['quepasa_token'],
+                                    'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'] ?? ''),
+                                    'X-QUEPASA-CHATID: ' . $chatId
+                                ],
+                                CURLOPT_POSTFIELDS => json_encode($payload),
+                                CURLOPT_SSL_VERIFYPEER => false
+                            ]);
+                            
+                            $result = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            curl_close($ch);
+                            
+                            \App\Helpers\Logger::info("Reaction sent to WhatsApp: messageId={$messageId}, emoji={$emoji}, httpCode={$httpCode}");
+                        }
+                    }
+                }
+            } catch (\Exception $e) {
+                // Não falhar se o envio ao WhatsApp não funcionar
+                \App\Helpers\Logger::info("Reaction WhatsApp send failed (non-critical): " . $e->getMessage());
+            }
+            
+            Response::json([
+                'success' => true,
+                'reactions' => $reactions
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()]);
+        }
+    }
+    
+    /**
      * Encaminhar mensagem
      */
     public function forwardMessage(int $id): void

@@ -123,6 +123,7 @@ Router::post('/coaching/mark-viewed', [RealtimeCoachingController::class, 'markA
 Router::post('/coaching/feedback', [RealtimeCoachingController::class, 'provideFeedback'], ['Authentication']); // Feedback (útil/não)
 
 Router::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage'], ['Authentication']);
+Router::post('/conversations/messages/{messageId}/react', [ConversationController::class, 'reactToMessage'], ['Authentication']);
 Router::post('/conversations/{id}/forward', [ConversationController::class, 'forwardMessage'], ['Authentication']);
 
 // Analytics

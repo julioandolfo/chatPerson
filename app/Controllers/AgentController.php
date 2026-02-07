@@ -240,8 +240,7 @@ class AgentController
                 
                 // 1. Reatribuir conversa
                 \App\Models\Conversation::update($conversationId, [
-                    'agent_id' => $targetAgentId,
-                    'assigned_at' => date('Y-m-d H:i:s')
+                    'agent_id' => $targetAgentId
                 ]);
                 
                 // 2. Registrar histórico de atribuição

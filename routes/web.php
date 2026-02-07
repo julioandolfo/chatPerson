@@ -179,6 +179,7 @@ Router::post('/api/conversations/{id}/mockups/generate', [MockupController::clas
 Router::post('/api/conversations/{id}/mockups/save-canvas', [MockupController::class, 'saveCanvas'], ['Authentication']);
 Router::get('/api/conversations/{id}/mockups', [MockupController::class, 'list'], ['Authentication']);
 Router::get('/api/conversations/{id}/images', [MockupController::class, 'getConversationImages'], ['Authentication']);
+Router::post('/api/conversations/{id}/upload-temp-image', [MockupController::class, 'uploadTempImage'], ['Authentication']);
 Router::get('/api/mockups/{id}', [MockupController::class, 'get'], ['Authentication']);
 Router::post('/api/mockups/{id}/send-message', [MockupController::class, 'sendAsMessage'], ['Authentication']);
 Router::delete('/api/mockups/{id}', [MockupController::class, 'delete'], ['Authentication']);

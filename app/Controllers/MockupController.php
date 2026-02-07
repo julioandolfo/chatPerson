@@ -653,6 +653,71 @@ class MockupController
     }
 
     /**
+     * Upload temporário de imagem (produto/logo)
+     * POST /api/conversations/{id}/upload-temp-image
+     */
+    public function uploadTempImage(int $conversationId): void
+    {
+        $config = $this->prepareJsonResponse();
+        
+        try {
+            $userId = Auth::id();
+            if (!$userId) {
+                Response::json(['error' => 'Não autenticado'], 401);
+                return;
+            }
+
+            if (empty($_FILES['product']) && empty($_FILES['logo'])) {
+                Response::json(['error' => 'Arquivo não enviado'], 400);
+                return;
+            }
+
+            $file = $_FILES['product'] ?? $_FILES['logo'];
+
+            // Validar tipo
+            $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+            if (!in_array($file['type'], $allowedTypes)) {
+                Response::json(['error' => 'Tipo de arquivo não permitido. Use: JPG, PNG, GIF ou WEBP'], 400);
+                return;
+            }
+
+            // Validar tamanho (máx 10MB)
+            if ($file['size'] > 10 * 1024 * 1024) {
+                Response::json(['error' => 'Arquivo muito grande (máx 10MB)'], 400);
+                return;
+            }
+
+            // Salvar arquivo temporário
+            $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $filename = 'temp_' . uniqid() . '_' . time() . '.' . $extension;
+            $savePath = "assets/media/attachments/temp/{$filename}";
+            $fullPath = $_SERVER['DOCUMENT_ROOT'] . '/' . $savePath;
+
+            $dir = dirname($fullPath);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0777, true);
+            }
+
+            if (!move_uploaded_file($file['tmp_name'], $fullPath)) {
+                Response::json(['error' => 'Falha ao salvar arquivo'], 500);
+                return;
+            }
+
+            Response::json([
+                'success' => true,
+                'path' => $savePath,
+                'url' => '/' . $savePath,
+                'filename' => $filename
+            ]);
+
+        } catch (\Exception $e) {
+            Response::json(['error' => $e->getMessage()], 500);
+        } finally {
+            $this->restoreAfterJsonResponse($config);
+        }
+    }
+
+    /**
      * Buscar imagens da conversa (para seleção de produto/logo)
      * GET /api/conversations/{id}/images
      */

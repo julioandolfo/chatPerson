@@ -207,6 +207,40 @@
     }
 }
 
+/* Tabs customizadas */
+#mockupStep2 .nav-tabs {
+    border-bottom: 2px solid #e4e6ef;
+}
+
+#mockupStep2 .nav-tabs .nav-link {
+    color: #7e8299;
+    border: none;
+    padding: 12px 20px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+#mockupStep2 .nav-tabs .nav-link:hover {
+    color: #009ef7;
+    background: rgba(0, 158, 247, 0.05);
+}
+
+#mockupStep2 .nav-tabs .nav-link.active {
+    color: #009ef7;
+    border-bottom: 3px solid #009ef7;
+    background: transparent;
+}
+
+#mockupStep2 .tab-content {
+    padding-top: 20px;
+}
+
+/* Upload buttons */
+.btn-light-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 158, 247, 0.2);
+}
+
 /* Animations */
 @keyframes fadeIn {
     from {
@@ -221,6 +255,21 @@
 
 .mockup-gallery-item {
     animation: fadeIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.mockup-image-card {
+    animation: slideIn 0.3s ease;
 }
 
 /* Badge personalizado */

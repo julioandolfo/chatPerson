@@ -34,7 +34,12 @@
                     <h4 class="mb-4">🎁 Etapa 1/3: Selecione o Produto</h4>
 
                     <div class="mb-4">
-                        <label class="form-label fw-bold">Imagens da Conversa</label>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <label class="form-label fw-bold mb-0">Imagens da Conversa</label>
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="uploadNewProduct()">
+                                <i class="fas fa-upload me-1"></i> Upload Produto
+                            </button>
+                        </div>
                         <div class="row" id="mockupProductImages">
                             <div class="col-12 text-center py-5">
                                 <div class="spinner-border text-primary" role="status">
@@ -46,7 +51,7 @@
 
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        Selecione a imagem do produto que será usado no mockup
+                        Selecione uma imagem da conversa ou faça upload de um novo produto
                     </div>
                 </div>
 
@@ -54,15 +59,45 @@
                 <div id="mockupStep2" class="d-none">
                     <h4 class="mb-4">🏢 Etapa 2/3: Configure a Logo</h4>
 
-                    <!-- Logos -->
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Logo do Cliente</label>
-                        <div class="d-flex align-items-center gap-2 flex-wrap" id="mockupLogoImages">
-                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <!-- Tabs: Logos vs Imagens -->
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-logos-saved" data-bs-toggle="tab" data-bs-target="#content-logos-saved" type="button" role="tab">
+                                <i class="fas fa-bookmark me-1"></i> Logos Salvas
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-logos-images" data-bs-toggle="tab" data-bs-target="#content-logos-images" type="button" role="tab" onclick="loadImagesForLogo()">
+                                <i class="fas fa-images me-1"></i> Imagens da Conversa
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content mb-4">
+                        <!-- Logos Salvas -->
+                        <div class="tab-pane fade show active" id="content-logos-saved" role="tabpanel">
+                            <label class="form-label fw-bold">Logos do Cliente</label>
+                            <div class="d-flex align-items-center gap-2 flex-wrap" id="mockupLogoImages">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                            </div>
+                            <button type="button" class="btn btn-light-primary btn-sm mt-2" onclick="uploadNewLogo()">
+                                <i class="fas fa-upload me-1"></i> Upload Nova Logo
+                            </button>
                         </div>
-                        <button type="button" class="btn btn-light-primary btn-sm mt-2" onclick="uploadNewLogo()">
-                            <i class="fas fa-upload me-1"></i> Upload Nova Logo
-                        </button>
+
+                        <!-- Imagens da Conversa -->
+                        <div class="tab-pane fade" id="content-logos-images" role="tabpanel">
+                            <label class="form-label fw-bold">Selecione imagem para usar como logo</label>
+                            <div class="alert alert-info alert-sm py-2 px-3 mb-3">
+                                <i class="fas fa-lightbulb me-1"></i>
+                                <small>Você pode usar qualquer imagem da conversa como logo do mockup</small>
+                            </div>
+                            <div class="row" id="mockupLogoImagesFromConversation">
+                                <div class="col-12 text-center py-3">
+                                    <div class="text-muted">Carregue esta aba para ver as imagens</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Configurações da Logo -->

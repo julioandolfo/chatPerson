@@ -244,19 +244,121 @@ function selectLogo(path, element) {
 }
 
 /**
+ * Upload de novo produto
+ */
+async function uploadNewProduct() {
+    const { value: file } = await Swal.fire({
+        title: 'Upload de Produto',
+        html: `
+            <input type="file" id="productFile" class="form-control mb-2" accept="image/*">
+            <small class="text-muted">Selecione uma imagem do produto/brinde</small>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Upload',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            const fileInput = document.getElementById('productFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                Swal.showValidationMessage('Selecione um arquivo');
+                return false;
+            }
+            return fileInput.files[0];
+        }
+    });
+
+    if (file) {
+        const formData = new FormData();
+        formData.append('product', file);
+
+        try {
+            Swal.fire({
+                title: 'Enviando...',
+                html: 'Aguarde enquanto fazemos upload do produto',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Upload temporário (vamos salvar na pasta temp da conversa)
+            const response = await fetch(`/api/conversations/${mockupWizard.conversationId}/upload-temp-image`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (!data.success) {
+                throw new Error(data.error || 'Erro ao fazer upload');
+            }
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Sucesso!',
+                text: 'Produto enviado com sucesso',
+                timer: 2000,
+                showConfirmButton: false
+            });
+
+            // Definir como produto selecionado
+            mockupWizard.selectedProduct = data.path;
+
+            // Adicionar visualmente à galeria
+            const container = document.getElementById('mockupProductImages');
+            const col = document.createElement('div');
+            col.className = 'col-md-3 col-sm-4 col-6 mb-3';
+            
+            const imgUrl = normalizeImageUrl(data.url || data.path);
+            
+            col.innerHTML = `
+                <div class="card mockup-image-card border-success border-3" onclick="selectProductImage('${data.path}', this)">
+                    <div class="card-body p-2 text-center">
+                        <img src="${imgUrl}" class="img-fluid rounded" style="max-height: 120px; object-fit: cover;">
+                        <div class="mt-2 text-success small">
+                            <i class="fas fa-check-circle me-1"></i>
+                            Upload Recente
+                        </div>
+                        <div class="mockup-image-check">
+                            <i class="fas fa-check-circle text-success fs-2"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Inserir no início da galeria
+            container.insertBefore(col, container.firstChild);
+
+        } catch (error) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro',
+                text: error.message
+            });
+        }
+    }
+}
+
+/**
  * Upload de nova logo
  */
 async function uploadNewLogo() {
     const { value: file } = await Swal.fire({
         title: 'Upload de Logo',
-        input: 'file',
-        inputAttributes: {
-            accept: 'image/*',
-            'aria-label': 'Faça upload da logo'
-        },
+        html: `
+            <input type="file" id="logoFile" class="form-control mb-2" accept="image/*">
+            <small class="text-muted">Selecione uma imagem da logo do cliente</small>
+        `,
         showCancelButton: true,
         confirmButtonText: 'Upload',
-        cancelButtonText: 'Cancelar'
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            const fileInput = document.getElementById('logoFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                Swal.showValidationMessage('Selecione um arquivo');
+                return false;
+            }
+            return fileInput.files[0];
+        }
     });
 
     if (file) {
@@ -264,6 +366,15 @@ async function uploadNewLogo() {
         formData.append('logo', file);
 
         try {
+            Swal.fire({
+                title: 'Enviando...',
+                html: 'Aguarde enquanto fazemos upload da logo',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
             const response = await fetch(`/api/conversations/${mockupWizard.conversationId}/logos/upload`, {
                 method: 'POST',
                 body: formData
@@ -294,6 +405,96 @@ async function uploadNewLogo() {
             });
         }
     }
+}
+
+/**
+ * Carregar imagens da conversa para usar como logo
+ */
+async function loadImagesForLogo() {
+    const container = document.getElementById('mockupLogoImagesFromConversation');
+    
+    // Mostrar loading
+    container.innerHTML = `
+        <div class="col-12 text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/api/conversations/${mockupWizard.conversationId}/images`);
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'Erro ao carregar imagens');
+        }
+
+        container.innerHTML = '';
+
+        if (data.data.length === 0) {
+            container.innerHTML = '<div class="col-12"><div class="alert alert-info">Nenhuma imagem encontrada nesta conversa.</div></div>';
+            return;
+        }
+
+        data.data.forEach(img => {
+            const col = document.createElement('div');
+            col.className = 'col-md-3 col-sm-4 col-6 mb-3';
+            
+            const imgUrl = normalizeImageUrl(img.url || img.path);
+            
+            col.innerHTML = `
+                <div class="card mockup-image-card" onclick="selectLogoFromImage('${img.path}', this)">
+                    <div class="card-body p-2 text-center">
+                        <img src="${imgUrl}" class="img-fluid rounded" style="max-height: 120px; object-fit: cover;">
+                        <div class="mt-2 text-muted small">${img.sender_name}</div>
+                        <div class="mockup-image-check d-none">
+                            <i class="fas fa-check-circle text-success fs-2"></i>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(col);
+        });
+
+    } catch (error) {
+        console.error('Erro:', error);
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    ${error.message}
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Selecionar imagem da conversa como logo
+ */
+function selectLogoFromImage(path, element) {
+    // Remover seleção anterior
+    document.querySelectorAll('#mockupLogoImagesFromConversation .mockup-image-card').forEach(card => {
+        card.classList.remove('border-success', 'border-3');
+        card.querySelector('.mockup-image-check').classList.add('d-none');
+    });
+
+    // Adicionar seleção
+    element.classList.add('border-success', 'border-3');
+    element.querySelector('.mockup-image-check').classList.remove('d-none');
+
+    mockupWizard.selectedLogo = path;
+
+    updateLogoPreview();
+
+    Swal.fire({
+        icon: 'success',
+        title: 'Logo Selecionada!',
+        text: 'Imagem selecionada como logo. Configure o posicionamento abaixo.',
+        timer: 2000,
+        showConfirmButton: false
+    });
 }
 
 /**

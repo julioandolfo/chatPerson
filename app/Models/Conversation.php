@@ -81,9 +81,10 @@ class Conversation extends Model
         // Ordenar já com o mesmo critério usado no frontend:
         // 1) Fixadas primeiro
         // 2) Dentro das fixadas, usar pinned_at DESC
-        // 3) Demais conversas por updated_at DESC
-        // 4) Critério de desempate: ID DESC (conversas mais recentes primeiro)
-        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, c.pinned_at DESC, c.updated_at DESC, c.id DESC";
+        // 3) Demais conversas por last_message_at DESC (última mensagem recebida)
+        // 4) Fallback: updated_at DESC
+        // 5) Critério de desempate: ID DESC (conversas mais recentes primeiro)
+        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         
         return Database::fetchAll($sql, $params);
     }
@@ -456,15 +457,15 @@ class Conversation extends Model
             $orderDir = !empty($filters['order_dir']) && strtoupper($filters['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
             
             if ($orderBy === 'pinned') {
-                $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, c.updated_at DESC, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
             } elseif ($orderBy === 'last_message') {
                 $sql .= " ORDER BY c.pinned DESC, last_message_at {$orderDir}, c.id DESC";
             } else {
                 $sql .= " ORDER BY c.pinned DESC, c.{$orderBy} {$orderDir}, c.id DESC";
             }
         } else {
-            // Ordenação padrão: pinned primeiro, depois updated_at, depois ID (critério de desempate)
-            $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, c.updated_at DESC, c.id DESC";
+            // Ordenação padrão: pinned primeiro, depois last_message_at (última mensagem recebida), depois updated_at, depois ID
+            $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         }
         
         // Paginação

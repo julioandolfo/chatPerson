@@ -426,9 +426,13 @@ ob_start();
    ABAS DE CONVERSAS
    ============================================ */
 .conversation-tabs-bar {
-    border-bottom: 1px solid var(--bs-border-color);
     flex-shrink: 0;
     background: var(--bs-body-bg);
+    padding: 0 8px;
+    padding-top: 6px;
+    /* Linha inferior que conecta as abas com a lista */
+    border-bottom: 2px solid var(--bs-primary);
+    position: relative;
 }
 
 .hide-scrollbar::-webkit-scrollbar {
@@ -443,27 +447,36 @@ ob_start();
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 5px 12px;
-    border-radius: 20px;
+    padding: 6px 14px;
+    /* Apenas cantos superiores arredondados */
+    border-radius: 8px 8px 0 0;
     font-size: 12px;
     font-weight: 500;
     color: var(--bs-gray-600);
     background: transparent;
     border: 1px solid transparent;
-    transition: all 0.2s ease;
+    border-bottom: none;
+    transition: all 0.15s ease;
     white-space: nowrap;
     cursor: pointer;
+    margin-bottom: -2px; /* Para sobrepor a borda inferior */
+    position: relative;
+    z-index: 1;
 }
 
 .conversation-tab:hover {
     background: var(--bs-gray-200);
     color: var(--bs-gray-800);
+    border-color: var(--bs-border-color);
+    border-bottom: none;
 }
 
 .conversation-tab.active {
     background: var(--bs-primary);
     color: #fff;
     border-color: var(--bs-primary);
+    border-bottom: 2px solid var(--bs-primary);
+    z-index: 2;
 }
 
 .conversation-tab .tab-color-dot {
@@ -487,7 +500,7 @@ ob_start();
     border-radius: 9px;
     font-size: 10px;
     font-weight: 600;
-    background: rgba(0,0,0,0.15);
+    background: rgba(0,0,0,0.1);
     color: inherit;
 }
 
@@ -497,10 +510,21 @@ ob_start();
 }
 
 .conversation-tab-add {
-    width: 28px !important;
-    height: 28px !important;
-    border-radius: 50% !important;
+    width: 26px !important;
+    height: 26px !important;
+    border-radius: 6px 6px 0 0 !important;
     padding: 0 !important;
+    margin-bottom: -2px;
+    color: var(--bs-gray-500);
+    background: transparent;
+    border: 1px dashed var(--bs-border-color);
+    border-bottom: none;
+}
+
+.conversation-tab-add:hover {
+    color: var(--bs-primary);
+    background: var(--bs-gray-100);
+    border-color: var(--bs-primary);
 }
 
 /* Dark mode */
@@ -508,12 +532,26 @@ body.dark-mode .conversation-tab:hover,
 [data-bs-theme="dark"] .conversation-tab:hover {
     background: var(--bs-gray-800);
     color: var(--bs-gray-300);
+    border-color: var(--bs-gray-700);
 }
 
 body.dark-mode .conversation-tab.active,
 [data-bs-theme="dark"] .conversation-tab.active {
     background: var(--bs-primary);
     color: #fff;
+    border-color: var(--bs-primary);
+}
+
+body.dark-mode .conversation-tab-add,
+[data-bs-theme="dark"] .conversation-tab-add {
+    border-color: var(--bs-gray-700);
+    color: var(--bs-gray-500);
+}
+
+body.dark-mode .conversation-tab-add:hover,
+[data-bs-theme="dark"] .conversation-tab-add:hover {
+    color: var(--bs-primary);
+    background: var(--bs-gray-800);
 }
 
 /* Submenu "Setar como" inline no dropdown */
@@ -527,6 +565,11 @@ body.dark-mode .conversation-tab.active,
 body.dark-mode .set-as-submenu,
 [data-bs-theme="dark"] .set-as-submenu {
     background: var(--bs-gray-800);
+}
+
+/* Modal de gerenciamento de abas - altura mínima */
+.swal2-html-container-tabs {
+    min-height: 400px !important;
 }
 
 .conversation-item {
@@ -2507,35 +2550,6 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Barra de Abas de Conversas (por agente) -->
-        <div id="conversationTabsBar" class="conversation-tabs-bar" style="padding: 0 12px;">
-            <div class="d-flex align-items-center gap-1 overflow-auto hide-scrollbar" id="conversationTabsList" style="white-space: nowrap; padding: 8px 0;">
-                <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
-                    <span class="tab-name">Todas</span>
-                </button>
-                <?php if (!empty($userTabs)): ?>
-                    <?php foreach ($userTabs as $tab): ?>
-                        <button type="button" class="btn btn-sm conversation-tab" 
-                                data-tab-id="<?= $tab['id'] ?>" 
-                                data-tag-id="<?= $tab['tag_id'] ?>"
-                                onclick="switchConversationTab(this)">
-                            <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
-                            <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
-                            <?php if (!empty($tab['conversation_count'])): ?>
-                                <span class="tab-count"><?= $tab['conversation_count'] ?></span>
-                            <?php endif; ?>
-                        </button>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-                <button type="button" class="btn btn-sm btn-icon btn-light-primary conversation-tab-add" title="Gerenciar abas" onclick="showManageTabsModal()">
-                    <i class="ki-duotone ki-plus fs-7">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </button>
-            </div>
-        </div>
-        
         <!-- Filtros (Acordeon) -->
         <div class="conversations-list-filters">
             <div class="accordion accordion-flush" id="filtersAccordion">
@@ -2660,6 +2674,35 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
+        <!-- Barra de Abas de Conversas (por agente) -->
+        <div id="conversationTabsBar" class="conversation-tabs-bar">
+            <div class="d-flex align-items-center gap-0 overflow-auto hide-scrollbar" id="conversationTabsList">
+                <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                    <span class="tab-name">Todas</span>
+                </button>
+                <?php if (!empty($userTabs)): ?>
+                    <?php foreach ($userTabs as $tab): ?>
+                        <button type="button" class="btn btn-sm conversation-tab" 
+                                data-tab-id="<?= $tab['id'] ?>" 
+                                data-tag-id="<?= $tab['tag_id'] ?>"
+                                onclick="switchConversationTab(this)">
+                            <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
+                            <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
+                            <?php if (!empty($tab['conversation_count'])): ?>
+                                <span class="tab-count"><?= $tab['conversation_count'] ?></span>
+                            <?php endif; ?>
+                        </button>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                <button type="button" class="btn btn-sm btn-icon conversation-tab-add" title="Gerenciar abas" onclick="showManageTabsModal()">
+                    <i class="ki-duotone ki-plus fs-7">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
+            </div>
+        </div>
+
         <!-- Lista de conversas -->
         <div class="conversations-list-items">
                 <?php if (empty($conversations)): ?>
@@ -7522,17 +7565,20 @@ function sortConversationList() {
         const items = Array.from(list.children);
         if (items.length === 0) return;
         
-        // Ordenar: pinned primeiro, depois updatedAt desc, depois ID desc (critêrio de desempate)
+        // Ordenar: pinned primeiro, depois last_message_at desc, depois ID desc (desempate)
         items.sort((a, b) => {
             const pinnedA = a.classList?.contains('pinned') ? 1 : 0;
             const pinnedB = b.classList?.contains('pinned') ? 1 : 0;
             if (pinnedA !== pinnedB) return pinnedB - pinnedA;
             
-            const dateA = Date.parse(a.dataset?.updatedAt || '') || 0;
-            const dateB = Date.parse(b.dataset?.updatedAt || '') || 0;
+            // Usar last-message-at (mais preciso) com fallback para updated-at
+            const dateStrA = a.dataset?.lastMessageAt || a.dataset?.updatedAt || '';
+            const dateStrB = b.dataset?.lastMessageAt || b.dataset?.updatedAt || '';
+            const dateA = Date.parse(dateStrA) || 0;
+            const dateB = Date.parse(dateStrB) || 0;
             if (dateA !== dateB) return dateB - dateA;
             
-            // Critêrio de desempate: ID da conversa (maior primeiro = mais recente)
+            // Critério de desempate: ID da conversa (maior primeiro = mais recente)
             const idA = parseInt(a.dataset?.conversationId) || 0;
             const idB = parseInt(b.dataset?.conversationId) || 0;
             return idB - idA;
@@ -21246,7 +21292,7 @@ async function refreshConversationTabs() {
             });
             
             html += `
-                <button type="button" class="btn btn-sm btn-icon btn-light-primary conversation-tab-add" 
+                <button type="button" class="btn btn-sm btn-icon conversation-tab-add" 
                         title="Gerenciar abas" onclick="showManageTabsModal()">
                     <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i>
                 </button>`;
@@ -21307,7 +21353,7 @@ async function showManageTabsModal() {
                                    oninput="filterManageTabsTags(this.value)">
                         </div>
                     </div>
-                    <div id="manageTabsTagsList" style="max-height: 300px; overflow-y: auto;">
+                    <div id="manageTabsTagsList" style="max-height: 450px; overflow-y: auto;">
                         ${tagsListHtml}
                     </div>
                     <hr class="my-3">
@@ -21321,8 +21367,11 @@ async function showManageTabsModal() {
                 </div>`,
             showConfirmButton: false,
             showCloseButton: true,
-            width: 500,
-            customClass: { popup: isDarkMode ? 'swal2-dark' : '' }
+            width: 520,
+            customClass: { 
+                popup: isDarkMode ? 'swal2-dark' : '',
+                htmlContainer: 'swal2-html-container-tabs'
+            }
         });
     } catch (error) {
         console.error('Erro ao abrir gerenciador de abas:', error);

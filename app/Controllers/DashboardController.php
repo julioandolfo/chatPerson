@@ -378,6 +378,9 @@ class DashboardController
             // Métricas de fallback de IA
             $fallbackStats = \App\Services\AIFallbackMonitoringService::getFallbackStats($dateFrom, $dateTo);
             
+            // ✨ NOVO: Estatísticas do Assistente IA
+            $assistantStats = self::getAIAssistantStats($dateFrom, $dateTo);
+            
             Response::view('dashboard/ai-dashboard', [
                 'stats' => $generalStats,
                 'aiMetrics' => $aiMetrics,
@@ -385,6 +388,7 @@ class DashboardController
                 'comparison' => $comparison,
                 'slaCompliance' => $slaCompliance,
                 'fallbackStats' => $fallbackStats,
+                'assistantStats' => $assistantStats,
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);
@@ -399,9 +403,164 @@ class DashboardController
                 'aiAgentsRanking' => [],
                 'comparison' => ['ai' => [], 'human' => []],
                 'slaCompliance' => ['general' => [], 'ai' => [], 'human' => []],
+                'assistantStats' => [],
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo
             ]);
+        }
+    }
+
+    /**
+     * Obter estatísticas do Assistente IA
+     */
+    private static function getAIAssistantStats(string $dateFrom, string $dateTo): array
+    {
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Calcular dias para o período
+            $days = max(1, ceil((strtotime($dateTo) - strtotime($dateFrom)) / 86400));
+            
+            // Estatísticas gerais
+            $generalSql = "SELECT 
+                            COUNT(*) as total_uses,
+                            SUM(tokens_used) as total_tokens,
+                            SUM(cost) as total_cost,
+                            AVG(execution_time_ms) as avg_execution_time,
+                            SUM(CASE WHEN success = 1 THEN 1 ELSE 0 END) as successful_uses,
+                            SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) as failed_uses,
+                            COUNT(DISTINCT user_id) as unique_users,
+                            COUNT(DISTINCT conversation_id) as unique_conversations
+                        FROM ai_assistant_logs
+                        WHERE created_at BETWEEN ? AND ?";
+            
+            $stmt = $db->prepare($generalSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $general = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            // Taxa de sucesso
+            $totalUses = (int)($general['total_uses'] ?? 0);
+            $successRate = $totalUses > 0 ? (((int)$general['successful_uses'] / $totalUses) * 100) : 0;
+            
+            // Estatísticas por funcionalidade
+            $featuresSql = "SELECT 
+                                l.feature_key,
+                                f.name as feature_name,
+                                COUNT(*) as uses,
+                                SUM(l.tokens_used) as tokens,
+                                SUM(l.cost) as cost,
+                                AVG(l.execution_time_ms) as avg_time,
+                                SUM(CASE WHEN l.success = 1 THEN 1 ELSE 0 END) as successful,
+                                SUM(CASE WHEN l.success = 0 THEN 1 ELSE 0 END) as failed
+                            FROM ai_assistant_logs l
+                            LEFT JOIN ai_assistant_features f ON l.feature_key = f.feature_key
+                            WHERE l.created_at BETWEEN ? AND ?
+                            GROUP BY l.feature_key, f.name
+                            ORDER BY uses DESC
+                            LIMIT 10";
+            
+            $stmt = $db->prepare($featuresSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $byFeature = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Estatísticas por agente especializado
+            $agentsSql = "SELECT 
+                            a.id,
+                            a.name,
+                            a.model,
+                            COUNT(*) as uses,
+                            SUM(l.tokens_used) as tokens,
+                            SUM(l.cost) as cost,
+                            AVG(l.execution_time_ms) as avg_time
+                        FROM ai_assistant_logs l
+                        INNER JOIN ai_agents a ON l.ai_agent_id = a.id
+                        WHERE l.created_at BETWEEN ? AND ?
+                        AND a.agent_type = 'assistant'
+                        GROUP BY a.id, a.name, a.model
+                        ORDER BY uses DESC
+                        LIMIT 10";
+            
+            $stmt = $db->prepare($agentsSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $byAgent = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Uso ao longo do tempo (últimos 7 dias)
+            $timelineSql = "SELECT 
+                                DATE(created_at) as date,
+                                COUNT(*) as uses,
+                                SUM(tokens_used) as tokens,
+                                SUM(cost) as cost
+                            FROM ai_assistant_logs
+                            WHERE created_at BETWEEN ? AND ?
+                            GROUP BY DATE(created_at)
+                            ORDER BY date ASC";
+            
+            $stmt = $db->prepare($timelineSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $timeline = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Top usuários
+            $topUsersSql = "SELECT 
+                                u.id,
+                                u.name,
+                                COUNT(*) as uses,
+                                SUM(l.cost) as total_cost
+                            FROM ai_assistant_logs l
+                            INNER JOIN users u ON l.user_id = u.id
+                            WHERE l.created_at BETWEEN ? AND ?
+                            GROUP BY u.id, u.name
+                            ORDER BY uses DESC
+                            LIMIT 10";
+            
+            $stmt = $db->prepare($topUsersSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $topUsers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Custo por modelo
+            $costByModelSql = "SELECT 
+                                    a.model,
+                                    COUNT(*) as uses,
+                                    SUM(l.tokens_used) as tokens,
+                                    SUM(l.cost) as cost
+                                FROM ai_assistant_logs l
+                                INNER JOIN ai_agents a ON l.ai_agent_id = a.id
+                                WHERE l.created_at BETWEEN ? AND ?
+                                GROUP BY a.model
+                                ORDER BY cost DESC";
+            
+            $stmt = $db->prepare($costByModelSql);
+            $stmt->execute([$dateFrom, $dateTo]);
+            $costByModel = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            
+            return [
+                'general' => [
+                    'total_uses' => $totalUses,
+                    'total_tokens' => (int)($general['total_tokens'] ?? 0),
+                    'total_cost' => (float)($general['total_cost'] ?? 0),
+                    'avg_execution_time' => (float)($general['avg_execution_time'] ?? 0),
+                    'successful_uses' => (int)($general['successful_uses'] ?? 0),
+                    'failed_uses' => (int)($general['failed_uses'] ?? 0),
+                    'success_rate' => round($successRate, 2),
+                    'unique_users' => (int)($general['unique_users'] ?? 0),
+                    'unique_conversations' => (int)($general['unique_conversations'] ?? 0),
+                    'avg_cost_per_use' => $totalUses > 0 ? round((float)($general['total_cost'] ?? 0) / $totalUses, 4) : 0
+                ],
+                'by_feature' => $byFeature,
+                'by_agent' => $byAgent,
+                'timeline' => $timeline,
+                'top_users' => $topUsers,
+                'cost_by_model' => $costByModel
+            ];
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error('[Dashboard AI] Erro ao obter estatísticas do Assistente IA: ' . $e->getMessage());
+            return [
+                'general' => [],
+                'by_feature' => [],
+                'by_agent' => [],
+                'timeline' => [],
+                'top_users' => [],
+                'cost_by_model' => []
+            ];
         }
     }
 

@@ -21,10 +21,31 @@ class DALLEService
      */
     private static function getApiKey(): ?string
     {
-        $apiKey = Setting::get('openai_api_key');
-        if (empty($apiKey)) {
-            $apiKey = getenv('OPENAI_API_KEY') ?: null;
+        // Restaurar error_reporting temporariamente para que a query funcione
+        $oldErrorReporting = error_reporting();
+        error_reporting(E_ALL & ~E_DEPRECATED & ~E_STRICT & ~E_NOTICE);
+        
+        try {
+            $apiKey = Setting::get('openai_api_key');
+            
+            if (empty($apiKey)) {
+                // Fallback: buscar diretamente no banco
+                $setting = \App\Helpers\Database::fetch(
+                    "SELECT `value` FROM settings WHERE `key` = 'openai_api_key' LIMIT 1"
+                );
+                $apiKey = $setting['value'] ?? null;
+            }
+            
+            if (empty($apiKey)) {
+                // Fallback: variáveis de ambiente
+                $apiKey = $_ENV['OPENAI_API_KEY'] ?? getenv('OPENAI_API_KEY') ?: null;
+            }
+        } catch (\Exception $e) {
+            error_log('[DALLEService] Erro ao buscar API Key: ' . $e->getMessage());
+            $apiKey = null;
         }
+        
+        error_reporting($oldErrorReporting);
         return $apiKey;
     }
 

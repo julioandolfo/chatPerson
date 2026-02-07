@@ -56,8 +56,17 @@ function showMockupGeneratorModal() {
     mockupWizard.generationMode = 'ai';
     mockupWizard.logoDragData = null;
 
-    const modal = new bootstrap.Modal(document.getElementById('kt_modal_mockup_generator'));
+    const modalEl = document.getElementById('kt_modal_mockup_generator');
+    const modal = new bootstrap.Modal(modalEl);
     modal.show();
+
+    // Garantir z-index acima do header (z-index: 1100)
+    setTimeout(() => {
+        modalEl.style.zIndex = '1300';
+        const backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) backdrop.style.zIndex = '1299';
+    }, 50);
+
     loadMockupStep1();
 }
 
@@ -321,7 +330,10 @@ function updateLogoConfig(field, value) {
     }
 }
 
-// ==================== CANVAS POSICIONAL (Drag & Drop) ====================
+// ==================== CANVAS POSICIONAL (Drag, Drop & Resize) ====================
+
+// Variáveis do canvas posicional (escopo isolado)
+let _canvasState = { isDragging: false, isResizing: false, resizeCorner: '', offsetX: 0, offsetY: 0, startW: 0, startH: 0, startX: 0, startY: 0, startMouseX: 0, startMouseY: 0 };
 
 function initPositionCanvas() {
     const container = document.getElementById('mockupPositionCanvas');
@@ -335,79 +347,179 @@ function initPositionCanvas() {
 
     container.innerHTML = `
         <img src="${productUrl}" id="positionProductImg" style="max-width: 100%; max-height: 350px; display: block; margin: 0 auto; user-select: none;" draggable="false">
-        <img src="${logoUrl}" id="positionLogoImg" class="position-logo" draggable="false"
-             style="position: absolute; width: 20%; cursor: grab; top: 50%; left: 50%; transform: translate(-50%, -50%); user-select: none; z-index: 10;">
+        <div id="positionLogoWrapper" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; cursor: grab; user-select: none;">
+            <img src="${logoUrl}" id="positionLogoImg" draggable="false"
+                 style="width: 100%; height: 100%; display: block; user-select: none; pointer-events: none;">
+            <!-- Resize handles -->
+            <div class="resize-handle resize-handle-tl" data-corner="tl" style="position:absolute;top:-5px;left:-5px;width:12px;height:12px;background:#009ef7;border:2px solid #fff;border-radius:2px;cursor:nw-resize;z-index:20;"></div>
+            <div class="resize-handle resize-handle-tr" data-corner="tr" style="position:absolute;top:-5px;right:-5px;width:12px;height:12px;background:#009ef7;border:2px solid #fff;border-radius:2px;cursor:ne-resize;z-index:20;"></div>
+            <div class="resize-handle resize-handle-bl" data-corner="bl" style="position:absolute;bottom:-5px;left:-5px;width:12px;height:12px;background:#009ef7;border:2px solid #fff;border-radius:2px;cursor:sw-resize;z-index:20;"></div>
+            <div class="resize-handle resize-handle-br" data-corner="br" style="position:absolute;bottom:-5px;right:-5px;width:12px;height:12px;background:#009ef7;border:2px solid #fff;border-radius:2px;cursor:se-resize;z-index:20;"></div>
+        </div>
     `;
 
-    // Setup drag
-    const logoEl = document.getElementById('positionLogoImg');
-    if (logoEl) {
-        let isDragging = false;
-        let offsetX = 0, offsetY = 0;
+    const wrapper = document.getElementById('positionLogoWrapper');
+    const logoImg = document.getElementById('positionLogoImg');
+    if (!wrapper) return;
 
-        logoEl.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            const rect = logoEl.getBoundingClientRect();
-            offsetX = e.clientX - rect.left;
-            offsetY = e.clientY - rect.top;
-            logoEl.style.cursor = 'grabbing';
+    // Definir tamanho inicial do wrapper com base na imagem
+    logoImg.onload = () => {
+        const containerRect = container.getBoundingClientRect();
+        const initialWidth = containerRect.width * 0.20; // 20% do container
+        const ratio = logoImg.naturalHeight / logoImg.naturalWidth;
+        wrapper.style.width = initialWidth + 'px';
+        wrapper.style.height = (initialWidth * ratio) + 'px';
+        _saveDragData(wrapper, container);
+    };
+
+    // Cleanup: remover listeners anteriores clonando o document trick não funciona,
+    // então usamos flags de estado
+    _canvasState = { isDragging: false, isResizing: false, resizeCorner: '', offsetX: 0, offsetY: 0, startW: 0, startH: 0, startX: 0, startY: 0, startMouseX: 0, startMouseY: 0 };
+
+    // --- DRAG (mover) ---
+    wrapper.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('resize-handle')) return; // não arrastar quando redimensionar
+        _canvasState.isDragging = true;
+        const rect = wrapper.getBoundingClientRect();
+        _canvasState.offsetX = e.clientX - rect.left;
+        _canvasState.offsetY = e.clientY - rect.top;
+        wrapper.style.cursor = 'grabbing';
+        e.preventDefault();
+    });
+
+    // --- RESIZE ---
+    wrapper.querySelectorAll('.resize-handle').forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
             e.preventDefault();
+            _canvasState.isResizing = true;
+            _canvasState.resizeCorner = handle.dataset.corner;
+            _canvasState.startW = wrapper.offsetWidth;
+            _canvasState.startH = wrapper.offsetHeight;
+            _canvasState.startX = wrapper.offsetLeft;
+            _canvasState.startY = wrapper.offsetTop;
+            _canvasState.startMouseX = e.clientX;
+            _canvasState.startMouseY = e.clientY;
         });
+    });
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            const containerRect = container.getBoundingClientRect();
-            let x = e.clientX - containerRect.left - offsetX;
-            let y = e.clientY - containerRect.top - offsetY;
-            // Limites
-            x = Math.max(0, Math.min(x, containerRect.width - logoEl.offsetWidth));
-            y = Math.max(0, Math.min(y, containerRect.height - logoEl.offsetHeight));
-            logoEl.style.left = x + 'px';
-            logoEl.style.top = y + 'px';
-            logoEl.style.transform = 'none';
-            // Salvar posição relativa
-            mockupWizard.logoDragData = {
-                xPercent: ((x + logoEl.offsetWidth / 2) / containerRect.width * 100).toFixed(1),
-                yPercent: ((y + logoEl.offsetHeight / 2) / containerRect.height * 100).toFixed(1)
-            };
-        });
+    // --- Global mouse move ---
+    const onMouseMove = (e) => {
+        const containerRect = container.getBoundingClientRect();
 
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                logoEl.style.cursor = 'grab';
+        if (_canvasState.isDragging) {
+            let x = e.clientX - containerRect.left - _canvasState.offsetX;
+            let y = e.clientY - containerRect.top - _canvasState.offsetY;
+            x = Math.max(0, Math.min(x, containerRect.width - wrapper.offsetWidth));
+            y = Math.max(0, Math.min(y, containerRect.height - wrapper.offsetHeight));
+            wrapper.style.left = x + 'px';
+            wrapper.style.top = y + 'px';
+            wrapper.style.transform = 'none';
+            _saveDragData(wrapper, container);
+        }
+
+        if (_canvasState.isResizing) {
+            const dx = e.clientX - _canvasState.startMouseX;
+            const dy = e.clientY - _canvasState.startMouseY;
+            const ratio = _canvasState.startH / _canvasState.startW;
+            const minSize = 30;
+
+            let newW = _canvasState.startW;
+            let newH = _canvasState.startH;
+            let newX = _canvasState.startX;
+            let newY = _canvasState.startY;
+
+            if (_canvasState.resizeCorner === 'br') {
+                newW = Math.max(minSize, _canvasState.startW + dx);
+                newH = newW * ratio;
+            } else if (_canvasState.resizeCorner === 'bl') {
+                newW = Math.max(minSize, _canvasState.startW - dx);
+                newH = newW * ratio;
+                newX = _canvasState.startX + (_canvasState.startW - newW);
+            } else if (_canvasState.resizeCorner === 'tr') {
+                newW = Math.max(minSize, _canvasState.startW + dx);
+                newH = newW * ratio;
+                newY = _canvasState.startY + (_canvasState.startH - newH);
+            } else if (_canvasState.resizeCorner === 'tl') {
+                newW = Math.max(minSize, _canvasState.startW - dx);
+                newH = newW * ratio;
+                newX = _canvasState.startX + (_canvasState.startW - newW);
+                newY = _canvasState.startY + (_canvasState.startH - newH);
             }
-        });
 
-        // Touch support
-        logoEl.addEventListener('touchstart', (e) => {
-            isDragging = true;
-            const touch = e.touches[0];
-            const rect = logoEl.getBoundingClientRect();
-            offsetX = touch.clientX - rect.left;
-            offsetY = touch.clientY - rect.top;
+            // Limites do container
+            newX = Math.max(0, newX);
+            newY = Math.max(0, newY);
+            if (newX + newW > containerRect.width) newW = containerRect.width - newX;
+            newH = newW * ratio;
+
+            wrapper.style.width = newW + 'px';
+            wrapper.style.height = newH + 'px';
+            wrapper.style.left = newX + 'px';
+            wrapper.style.top = newY + 'px';
+            wrapper.style.transform = 'none';
+            _saveDragData(wrapper, container);
+        }
+    };
+
+    const onMouseUp = () => {
+        if (_canvasState.isDragging) {
+            _canvasState.isDragging = false;
+            wrapper.style.cursor = 'grab';
+        }
+        _canvasState.isResizing = false;
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // --- TOUCH SUPPORT ---
+    wrapper.addEventListener('touchstart', (e) => {
+        if (e.target.classList.contains('resize-handle')) return;
+        _canvasState.isDragging = true;
+        const touch = e.touches[0];
+        const rect = wrapper.getBoundingClientRect();
+        _canvasState.offsetX = touch.clientX - rect.left;
+        _canvasState.offsetY = touch.clientY - rect.top;
+        e.preventDefault();
+    }, { passive: false });
+
+    wrapper.querySelectorAll('.resize-handle').forEach(handle => {
+        handle.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
             e.preventDefault();
-        }, { passive: false });
-
-        document.addEventListener('touchmove', (e) => {
-            if (!isDragging) return;
+            _canvasState.isResizing = true;
+            _canvasState.resizeCorner = handle.dataset.corner;
+            _canvasState.startW = wrapper.offsetWidth;
+            _canvasState.startH = wrapper.offsetHeight;
+            _canvasState.startX = wrapper.offsetLeft;
+            _canvasState.startY = wrapper.offsetTop;
             const touch = e.touches[0];
-            const containerRect = container.getBoundingClientRect();
-            let x = touch.clientX - containerRect.left - offsetX;
-            let y = touch.clientY - containerRect.top - offsetY;
-            x = Math.max(0, Math.min(x, containerRect.width - logoEl.offsetWidth));
-            y = Math.max(0, Math.min(y, containerRect.height - logoEl.offsetHeight));
-            logoEl.style.left = x + 'px';
-            logoEl.style.top = y + 'px';
-            logoEl.style.transform = 'none';
-            mockupWizard.logoDragData = {
-                xPercent: ((x + logoEl.offsetWidth / 2) / containerRect.width * 100).toFixed(1),
-                yPercent: ((y + logoEl.offsetHeight / 2) / containerRect.height * 100).toFixed(1)
-            };
+            _canvasState.startMouseX = touch.clientX;
+            _canvasState.startMouseY = touch.clientY;
         }, { passive: false });
+    });
 
-        document.addEventListener('touchend', () => { isDragging = false; });
-    }
+    document.addEventListener('touchmove', (e) => {
+        if (!_canvasState.isDragging && !_canvasState.isResizing) return;
+        const touch = e.touches[0];
+        // Simular mouse event
+        onMouseMove({ clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => {} });
+    }, { passive: false });
+
+    document.addEventListener('touchend', onMouseUp);
+}
+
+function _saveDragData(wrapper, container) {
+    const containerRect = container.getBoundingClientRect();
+    const wrapperLeft = parseFloat(wrapper.style.left) || 0;
+    const wrapperTop = parseFloat(wrapper.style.top) || 0;
+    mockupWizard.logoDragData = {
+        xPercent: ((wrapperLeft + wrapper.offsetWidth / 2) / containerRect.width * 100).toFixed(1),
+        yPercent: ((wrapperTop + wrapper.offsetHeight / 2) / containerRect.height * 100).toFixed(1),
+        widthPercent: (wrapper.offsetWidth / containerRect.width * 100).toFixed(1),
+        heightPercent: (wrapper.offsetHeight / containerRect.height * 100).toFixed(1)
+    };
 }
 
 // ==================== ETAPA 3: Gerar ====================
@@ -446,9 +558,9 @@ function generateDefaultPrompt() {
 
     let positionInfo = positionLabels[mockupWizard.logoConfig.position] || 'centralizada';
     
-    // Se o usuário arrastou no canvas, incluir posição personalizada
+    // Se o usuário arrastou/redimensionou no canvas, incluir posição e tamanho personalizados
     if (mockupWizard.logoDragData) {
-        positionInfo = `posição personalizada (${mockupWizard.logoDragData.xPercent}% horizontal, ${mockupWizard.logoDragData.yPercent}% vertical)`;
+        positionInfo = `posição personalizada (${mockupWizard.logoDragData.xPercent}% horizontal, ${mockupWizard.logoDragData.yPercent}% vertical), tamanho: ${mockupWizard.logoDragData.widthPercent}% da largura do produto`;
     }
 
     const prompt = `Crie um mockup fotorrealista profissional do produto com as seguintes especificações:
@@ -485,7 +597,7 @@ function displayMockupSummary() {
 
     let posText = positionLabels[mockupWizard.logoConfig.position] || 'Centralizado';
     if (mockupWizard.logoDragData) {
-        posText = 'Posição personalizada (arrastada no canvas)';
+        posText = `Personalizada (${mockupWizard.logoDragData.xPercent}% x ${mockupWizard.logoDragData.yPercent}%, largura: ${mockupWizard.logoDragData.widthPercent}%)`;
     }
 
     document.getElementById('mockupSummary').innerHTML = `

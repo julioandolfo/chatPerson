@@ -310,15 +310,11 @@ class AgentController
                 ]);
             }
             
-            // Registrar atividade
-            if (class_exists('\App\Services\ActivityService')) {
-                \App\Services\ActivityService::log(
-                    'agent_conversations_reassigned',
-                    "TODAS as conversas ({$conversationsReassigned} total, incluindo histórico) do agente {$agent['name']} foram reatribuídas para " . count($targetAgentIds) . " agente(s)",
-                    null,
-                    $id,
-                    'agent'
-                );
+            // Registrar log da operação
+            try {
+                \App\Helpers\Logger::info("Reatribuição: TODAS as conversas ({$conversationsReassigned} total) do agente {$agent['name']} (ID:{$id}) foram reatribuídas para " . count($targetAgentIds) . " agente(s). Contatos atualizados: {$contactAgentsUpdated}");
+            } catch (\Exception $logError) {
+                // Não impedir sucesso por causa de log
             }
             
             Response::json([

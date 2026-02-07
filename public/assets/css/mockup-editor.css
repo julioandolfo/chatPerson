@@ -2,6 +2,16 @@
  * Estilos para o Gerador de Mockup
  */
 
+/* Modal deve ficar ACIMA do header (#kt_header z-index: 1100) */
+#kt_modal_mockup_generator {
+    z-index: 1300 !important;
+}
+
+#kt_modal_mockup_generator ~ .modal-backdrop,
+#kt_modal_mockup_generator + .modal-backdrop {
+    z-index: 1299 !important;
+}
+
 /* Galeria de Mockups no Sidebar */
 .mockup-gallery {
     padding: 15px;
@@ -153,18 +163,31 @@
     border-radius: 0 0 8px 8px;
 }
 
-#mockupPositionCanvas img.position-logo {
-    cursor: grab;
-    user-select: none;
-    -webkit-user-drag: none;
-    border: 2px dashed rgba(0, 158, 247, 0.4);
+/* Wrapper da logo arrastável/redimensionável */
+#positionLogoWrapper {
+    border: 2px dashed rgba(0, 158, 247, 0.5);
     border-radius: 4px;
     padding: 2px;
+    transition: border-color 0.2s;
 }
 
-#mockupPositionCanvas img.position-logo:active {
-    cursor: grabbing;
+#positionLogoWrapper:hover {
     border-color: #009ef7;
+}
+
+#positionLogoWrapper:active {
+    border-color: #0056b3;
+}
+
+/* Handles de redimensionamento */
+.resize-handle {
+    opacity: 0.7;
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.resize-handle:hover {
+    opacity: 1;
+    transform: scale(1.3);
 }
 
 /* Canvas Container */

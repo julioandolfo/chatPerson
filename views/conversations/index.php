@@ -12242,6 +12242,8 @@ function fixModalZIndex() {
     
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
+        // Não remover z-index de modais que precisam ficar acima do header
+        if (modal.id === 'kt_modal_mockup_generator' || modal.id === 'kt_modal_image_lightbox') return;
         modal.style.removeProperty('z-index');
         const dialog = modal.querySelector('.modal-dialog');
         if (dialog) dialog.style.removeProperty('z-index');

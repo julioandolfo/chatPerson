@@ -1,5 +1,5 @@
 <!-- Modal Gerador de Mockup -->
-<div class="modal fade" id="kt_modal_mockup_generator" tabindex="-1" aria-hidden="true">
+<div class="modal fade" id="kt_modal_mockup_generator" tabindex="-1" aria-hidden="true" style="z-index: 1300 !important;">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">

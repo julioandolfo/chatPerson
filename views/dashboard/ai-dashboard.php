@@ -290,6 +290,273 @@ ob_start();
 </div>
 <!--end::Row-->
 
+<!--begin::Row - Estatísticas do Assistente IA-->
+<?php
+$assistantGeneral = $assistantStats['general'] ?? [];
+$hasAssistantData = !empty($assistantGeneral) && ($assistantGeneral['total_uses'] ?? 0) > 0;
+?>
+
+<?php if ($hasAssistantData): ?>
+<div class="row g-5 mb-5">
+    <div class="col-12">
+        <div class="card bg-light-success">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title fw-bold">
+                    <i class="ki-duotone ki-abstract-26 fs-2x text-success me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    🎯 Assistente IA - Copiloto do Agente
+                </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-lg badge-light-success fs-5">
+                        <?= number_format($assistantGeneral['total_uses'] ?? 0) ?> usos
+                    </span>
+                </div>
+            </div>
+            <div class="card-body pt-5">
+                <!-- Cards de métricas principais -->
+                <div class="row g-5 mb-7">
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card bg-white h-100">
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <div class="text-center mb-3">
+                                    <i class="ki-duotone ki-check-circle fs-3x text-success">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                    </i>
+                                </div>
+                                <div class="text-center">
+                                    <div class="fs-2 fw-bold text-gray-900 mb-1">
+                                        <?= number_format($assistantGeneral['success_rate'] ?? 0, 1) ?>%
+                                    </div>
+                                    <div class="fs-6 fw-semibold text-gray-500">Taxa de Sucesso</div>
+                                    <div class="fs-8 text-muted mt-1">
+                                        <?= number_format($assistantGeneral['successful_uses'] ?? 0) ?> sucessos / 
+                                        <?= number_format($assistantGeneral['failed_uses'] ?? 0) ?> falhas
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card bg-white h-100">
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <div class="text-center mb-3">
+                                    <i class="ki-duotone ki-dollar fs-3x text-success">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </div>
+                                <div class="text-center">
+                                    <div class="fs-2 fw-bold text-gray-900 mb-1">
+                                        $<?= number_format($assistantGeneral['total_cost'] ?? 0, 4) ?>
+                                    </div>
+                                    <div class="fs-6 fw-semibold text-gray-500">Custo Total</div>
+                                    <div class="fs-8 text-muted mt-1">
+                                        $<?= number_format($assistantGeneral['avg_cost_per_use'] ?? 0, 4) ?> por uso
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card bg-white h-100">
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <div class="text-center mb-3">
+                                    <i class="ki-duotone ki-data fs-3x text-primary">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </div>
+                                <div class="text-center">
+                                    <div class="fs-2 fw-bold text-gray-900 mb-1">
+                                        <?= number_format($assistantGeneral['total_tokens'] ?? 0) ?>
+                                    </div>
+                                    <div class="fs-6 fw-semibold text-gray-500">Tokens Utilizados</div>
+                                    <div class="fs-8 text-muted mt-1">
+                                        <?= number_format(($assistantGeneral['total_tokens'] ?? 0) / max(1, $assistantGeneral['total_uses'] ?? 1), 0) ?> por uso
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card bg-white h-100">
+                            <div class="card-body d-flex flex-column justify-content-center">
+                                <div class="text-center mb-3">
+                                    <i class="ki-duotone ki-timer fs-3x text-warning">
+                                        <span class="path1"></span>
+                                        <span class="path2"></span>
+                                        <span class="path3"></span>
+                                    </i>
+                                </div>
+                                <div class="text-center">
+                                    <div class="fs-2 fw-bold text-gray-900 mb-1">
+                                        <?= number_format($assistantGeneral['avg_execution_time'] ?? 0, 0) ?>ms
+                                    </div>
+                                    <div class="fs-6 fw-semibold text-gray-500">Tempo Médio</div>
+                                    <div class="fs-8 text-muted mt-1">
+                                        Por requisição
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estatísticas por funcionalidade -->
+                <div class="separator my-5"></div>
+                <h4 class="fw-bold mb-5">📊 Uso por Funcionalidade</h4>
+                <div class="table-responsive">
+                    <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                        <thead>
+                            <tr class="fw-bold text-muted">
+                                <th class="min-w-200px">Funcionalidade</th>
+                                <th class="min-w-100px text-center">Usos</th>
+                                <th class="min-w-100px text-center">Taxa Sucesso</th>
+                                <th class="min-w-100px text-end">Tokens</th>
+                                <th class="min-w-100px text-end">Custo</th>
+                                <th class="min-w-100px text-end">Tempo Médio</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $byFeature = $assistantStats['by_feature'] ?? [];
+                            if (empty($byFeature)):
+                            ?>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted py-5">
+                                        Nenhum dado disponível para o período selecionado
+                                    </td>
+                                </tr>
+                            <?php else: ?>
+                                <?php foreach ($byFeature as $feature): 
+                                    $totalUses = (int)($feature['uses'] ?? 0);
+                                    $successful = (int)($feature['successful'] ?? 0);
+                                    $successRate = $totalUses > 0 ? (($successful / $totalUses) * 100) : 0;
+                                ?>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="symbol symbol-45px me-3">
+                                                <div class="symbol-label bg-light-primary">
+                                                    <i class="ki-duotone ki-abstract-26 fs-2x text-primary">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex flex-column">
+                                                <span class="fw-bold text-gray-800"><?= htmlspecialchars($feature['feature_name'] ?? $feature['feature_key']) ?></span>
+                                                <span class="text-muted fs-8"><?= htmlspecialchars($feature['feature_key']) ?></span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-light-primary fs-6"><?= number_format($totalUses) ?></span>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge badge-<?= $successRate >= 95 ? 'success' : ($successRate >= 80 ? 'warning' : 'danger') ?>">
+                                            <?= number_format($successRate, 1) ?>%
+                                        </span>
+                                    </td>
+                                    <td class="text-end fw-semibold"><?= number_format($feature['tokens'] ?? 0) ?></td>
+                                    <td class="text-end fw-semibold text-success">$<?= number_format($feature['cost'] ?? 0, 4) ?></td>
+                                    <td class="text-end fw-semibold"><?= number_format($feature['avg_time'] ?? 0, 0) ?>ms</td>
+                                </tr>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Agentes especializados -->
+                <?php if (!empty($assistantStats['by_agent'])): ?>
+                <div class="separator my-5"></div>
+                <h4 class="fw-bold mb-5">🤖 Agentes Especializados</h4>
+                <div class="row g-5">
+                    <?php foreach ($assistantStats['by_agent'] as $agent): ?>
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card bg-light-primary h-100">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="symbol symbol-50px me-3">
+                                        <div class="symbol-label bg-white">
+                                            <i class="ki-duotone ki-robot fs-2x text-primary">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <div class="fw-bold text-gray-900 fs-6"><?= htmlspecialchars($agent['name']) ?></div>
+                                        <div class="text-muted fs-8"><?= htmlspecialchars($agent['model']) ?></div>
+                                    </div>
+                                </div>
+                                <div class="separator my-3"></div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-gray-600 fs-7">Usos:</span>
+                                    <span class="fw-bold"><?= number_format($agent['uses']) ?></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-gray-600 fs-7">Tokens:</span>
+                                    <span class="fw-bold"><?= number_format($agent['tokens']) ?></span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-gray-600 fs-7">Custo:</span>
+                                    <span class="fw-bold text-success">$<?= number_format($agent['cost'], 4) ?></span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span class="text-gray-600 fs-7">Tempo médio:</span>
+                                    <span class="fw-bold"><?= number_format($agent['avg_time'], 0) ?>ms</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+                <!-- Top usuários -->
+                <?php if (!empty($assistantStats['top_users'])): ?>
+                <div class="separator my-5"></div>
+                <h4 class="fw-bold mb-5">👥 Top Usuários do Assistente</h4>
+                <div class="row g-5">
+                    <?php foreach (array_slice($assistantStats['top_users'], 0, 5) as $index => $user): ?>
+                    <div class="col-md-4">
+                        <div class="d-flex align-items-center">
+                            <div class="symbol symbol-circle symbol-45px me-3">
+                                <div class="symbol-label fs-3 fw-bold bg-light-primary text-primary">
+                                    #<?= $index + 1 ?>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold text-gray-900"><?= htmlspecialchars($user['name']) ?></div>
+                                <div class="text-muted fs-7">
+                                    <?= number_format($user['uses']) ?> usos • 
+                                    $<?= number_format($user['total_cost'], 4) ?>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+                
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+<!--end::Row-->
+
 <!--begin::Row - Métricas de Fallback de IA-->
 <?php if (isset($fallbackStats)): ?>
 <div class="row g-5 mb-5">

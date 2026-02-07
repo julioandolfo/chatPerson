@@ -169,7 +169,16 @@ window.handleReassignSubmit = function(e) {
         })
         .then(function(response) {
             console.log("[Reassign] Resposta recebida, status:", response.status);
-            return response.json();
+            return response.text().then(function(text) {
+                console.log("[Reassign] Resposta raw:", text.substring(0, 500));
+                try {
+                    return JSON.parse(text);
+                } catch(parseErr) {
+                    console.error("[Reassign] Erro ao parsear JSON:", parseErr);
+                    console.error("[Reassign] Resposta completa:", text);
+                    throw new Error("Resposta inválida do servidor: " + text.substring(0, 200));
+                }
+            });
         })
         .then(function(data) {
             console.log("[Reassign] Dados:", data);

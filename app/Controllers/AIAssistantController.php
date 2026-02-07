@@ -614,18 +614,47 @@ class AIAssistantController
                 }
             }
             
-            // 3. Verificar se há agentes disponíveis
+            // 3. Verificar se há agentes disponíveis (com criação automática)
             $availableAgents = \App\Models\AIAgent::getAvailableAgents();
             if (empty($availableAgents)) {
-                $issues[] = [
-                    'type' => 'no_agents',
-                    'severity' => 'error',
-                    'title' => 'Nenhum agente de IA disponível',
-                    'message' => 'Não há agentes de IA habilitados e disponíveis no sistema.',
-                    'action' => 'configure_agents',
-                    'action_url' => \App\Helpers\Url::to('/ai-agents')
-                ];
-            } else {
+                // Tentar criar agentes especializados automaticamente
+                try {
+                    \App\Helpers\Logger::info('[Assistente IA] Nenhum agente encontrado. Tentando criar agentes especializados automaticamente...');
+                    
+                    // Executar seed de agentes especializados
+                    require_once __DIR__ . '/../../database/seeds/006_create_ai_assistant_specialized_agents.php';
+                    seed_ai_assistant_specialized_agents();
+                    
+                    // Verificar novamente
+                    $availableAgents = \App\Models\AIAgent::getAvailableAgents();
+                    
+                    if (empty($availableAgents)) {
+                        $issues[] = [
+                            'type' => 'no_agents',
+                            'severity' => 'error',
+                            'title' => 'Nenhum agente de IA disponível',
+                            'message' => 'Não foi possível criar agentes automaticamente. Configure manualmente em Agentes de IA.',
+                            'action' => 'configure_agents',
+                            'action_url' => \App\Helpers\Url::to('/ai-agents')
+                        ];
+                    } else {
+                        \App\Helpers\Logger::info('[Assistente IA] Agentes especializados criados automaticamente com sucesso!');
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error('[Assistente IA] Erro ao criar agentes automaticamente: ' . $e->getMessage());
+                    $issues[] = [
+                        'type' => 'no_agents',
+                        'severity' => 'error',
+                        'title' => 'Nenhum agente de IA disponível',
+                        'message' => 'Não há agentes de IA habilitados no sistema e não foi possível criá-los automaticamente.',
+                        'action' => 'configure_agents',
+                        'action_url' => \App\Helpers\Url::to('/ai-agents')
+                    ];
+                }
+            }
+            
+            // Se há agentes disponíveis, verificar contexto da conversa
+            if (!empty($availableAgents)) {
                 // Se há conversa, verificar se há agente para ela
                 if ($conversationId) {
                     $context = AIAgentSelectorService::buildContext($conversationId);

@@ -262,6 +262,15 @@ class ConversationController
                 }
             }
             
+            // Carregar abas personalizadas do agente
+            $userTabs = [];
+            try {
+                $userTabs = \App\Models\UserConversationTab::getByUserWithCounts($userId);
+            } catch (\Exception $e) {
+                // Tabela pode não existir ainda - ignorar
+                error_log("Erro ao carregar abas do usuário: " . $e->getMessage());
+            }
+
             Response::view('conversations/index', [
                 'conversations' => $conversations,
                 'agents' => $agents,
@@ -273,7 +282,8 @@ class ConversationController
                 'selectedConversation' => $selectedConversation,
                 'selectedConversationId' => $selectedConversationId,
                 'accessRestricted' => $accessRestricted,
-                'accessInfo' => $accessInfo
+                'accessInfo' => $accessInfo,
+                'userTabs' => $userTabs
             ]);
         } catch (\Exception $e) {
             // Log do erro para debug

@@ -2449,12 +2449,59 @@ function openNodeConfig(nodeId) {
                     </div>
                 </div>
                 
+                <div class="separator my-5"></div>
+                <h4 class="fw-bold mb-4">⏱️ Comportamento de Inatividade</h4>
+                
                 <div class="fv-row mb-7">
-                    <label class="fw-semibold fs-6 mb-2">Tempo de Espera (segundos)</label>
-                    <input type="number" name="chatbot_timeout" class="form-control form-control-solid" value="300" min="10" max="3600" />
-                    <div class="form-text">Tempo máximo para aguardar resposta do usuário</div>
+                    <label class="fw-semibold fs-6 mb-2">Modo de Inatividade</label>
+                    <select name="chatbot_inactivity_mode" id="kt_chatbot_inactivity_mode" class="form-select form-select-solid" onchange="toggleInactivityMode()">
+                        <option value="timeout">Timeout Simples (ação única após tempo)</option>
+                        <option value="reconnect">Tentativas de Reconexão (múltiplas mensagens antes da ação final)</option>
+                    </select>
+                    <div class="form-text">Escolha como o chatbot deve reagir quando o usuário não responde</div>
                 </div>
                 
+                <!-- === MODO TIMEOUT SIMPLES === -->
+                <div id="kt_timeout_simple_container">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Tempo de Espera (segundos)</label>
+                        <input type="number" name="chatbot_timeout" class="form-control form-control-solid" value="300" min="10" max="86400" />
+                        <div class="form-text">Tempo máximo para aguardar resposta do usuário</div>
+                    </div>
+                </div>
+                
+                <!-- === MODO RECONEXÃO === -->
+                <div id="kt_reconnect_container" style="display: none;">
+                    <div class="alert alert-light-info d-flex align-items-center p-5 mb-7">
+                        <i class="ki-duotone ki-information fs-2x text-info me-4">
+                            <span class="path1"></span><span class="path2"></span><span class="path3"></span>
+                        </i>
+                        <div class="d-flex flex-column">
+                            <h4 class="mb-1 text-dark">Como funciona a reconexão</h4>
+                            <span>O chatbot envia mensagens de acompanhamento em intervalos configuráveis para tentar reengajar o usuário. Se o usuário responder a qualquer momento, o fluxo normal continua. Após todas as tentativas, a ação final é executada.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Tempo antes da 1ª tentativa (segundos)</label>
+                        <input type="number" name="chatbot_reconnect_first_delay" class="form-control form-control-solid" value="120" min="10" max="86400" />
+                        <div class="form-text">Tempo de inatividade antes de enviar a primeira mensagem de reconexão</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Tentativas de Reconexão</label>
+                        <div id="kt_reconnect_attempts_list">
+                            <!-- Será preenchido dinamicamente -->
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addReconnectAttempt()">
+                            <i class="ki-duotone ki-plus fs-2"></i>
+                            Adicionar Tentativa
+                        </button>
+                        <div class="form-text mt-2">Cada tentativa envia uma mensagem diferente. Configure o intervalo entre cada tentativa.</div>
+                    </div>
+                </div>
+                
+                <!-- === AÇÃO FINAL (compartilhada) === -->
                 <div class="fv-row mb-7">
                     <label class="fw-semibold fs-6 mb-2">Ação ao Timeout</label>
                     <select name="chatbot_timeout_action" id="kt_chatbot_timeout_action" class="form-select form-select-solid" onchange="toggleTimeoutNodeSelect()">
@@ -2464,6 +2511,7 @@ function openNodeConfig(nodeId) {
                         <option value="close">Encerrar Conversa</option>
                         <option value="go_to_node">Seguir para Nó Específico</option>
                     </select>
+                    <div class="form-text" id="kt_timeout_action_hint">Ação executada quando o tempo de espera expirar</div>
                 </div>
                 
                 <div class="fv-row mb-7" id="kt_chatbot_timeout_node_container" style="display: none;">
@@ -2769,6 +2817,27 @@ function openNodeConfig(nodeId) {
             // Mostrar/ocultar campo de nó de timeout se necessário
             if (typeof toggleTimeoutNodeSelect === 'function') {
                 toggleTimeoutNodeSelect();
+            }
+            
+            // Restaurar modo de inatividade e tentativas de reconexão
+            const inactivityMode = node.node_data.chatbot_inactivity_mode || 'timeout';
+            const inactivitySelect = document.getElementById('kt_chatbot_inactivity_mode');
+            if (inactivitySelect) {
+                inactivitySelect.value = inactivityMode;
+                toggleInactivityMode();
+            }
+            
+            // Restaurar dados de reconexão
+            if (inactivityMode === 'reconnect') {
+                const firstDelay = node.node_data.chatbot_reconnect_first_delay;
+                if (firstDelay) {
+                    const firstDelayInput = document.querySelector('input[name="chatbot_reconnect_first_delay"]');
+                    if (firstDelayInput) firstDelayInput.value = firstDelay;
+                }
+                
+                if (node.node_data.chatbot_reconnect_attempts && Array.isArray(node.node_data.chatbot_reconnect_attempts)) {
+                    loadReconnectAttempts(node.node_data.chatbot_reconnect_attempts);
+                }
             }
             
             // Preencher opções do menu (se existirem)
@@ -3808,6 +3877,30 @@ document.addEventListener("DOMContentLoaded", function() {
                     console.log('Opções combinadas:', combined);
                     nodeData.chatbot_options = combined;
                 }
+                
+                // Coletar dados de reconexão
+                const inactivityMode = nodeData.chatbot_inactivity_mode || 'timeout';
+                nodeData.chatbot_inactivity_mode = inactivityMode;
+                
+                if (inactivityMode === 'reconnect') {
+                    const messageInputs = Array.from(document.querySelectorAll('textarea[name="reconnect_attempt_message[]"]'));
+                    const delayInputs = Array.from(document.querySelectorAll('input[name="reconnect_attempt_delay[]"]'));
+                    const attempts = [];
+                    
+                    messageInputs.forEach(function(inp, idx) {
+                        const message = (inp.value || '').trim();
+                        const delay = parseInt(delayInputs[idx]?.value || '120');
+                        if (message) {
+                            attempts.push({ message: message, delay: delay });
+                        }
+                    });
+                    
+                    nodeData.chatbot_reconnect_attempts = attempts;
+                    // O timeout total é calculado no backend (first_delay + soma dos delays das tentativas)
+                    console.log('Tentativas de reconexão:', attempts);
+                } else {
+                    nodeData.chatbot_reconnect_attempts = [];
+                }
             }
             
             // Tratamento específico para AI Agent: coletar intents
@@ -4325,6 +4418,101 @@ window.toggleTimeoutNodeSelect = function toggleTimeoutNodeSelect() {
         timeoutNodeContainer.style.display = 'block';
     } else {
         timeoutNodeContainer.style.display = 'none';
+    }
+};
+
+// === FUNÇÕES DE RECONEXÃO ===
+
+window.toggleInactivityMode = function toggleInactivityMode() {
+    const modeSelect = document.getElementById('kt_chatbot_inactivity_mode');
+    const timeoutSimple = document.getElementById('kt_timeout_simple_container');
+    const reconnectContainer = document.getElementById('kt_reconnect_container');
+    const actionHint = document.getElementById('kt_timeout_action_hint');
+    
+    if (!modeSelect) return;
+    
+    const mode = modeSelect.value;
+    
+    if (mode === 'reconnect') {
+        if (timeoutSimple) timeoutSimple.style.display = 'none';
+        if (reconnectContainer) reconnectContainer.style.display = 'block';
+        if (actionHint) actionHint.textContent = 'Ação executada após todas as tentativas de reconexão falharem';
+        
+        // Garantir pelo menos uma tentativa
+        const list = document.getElementById('kt_reconnect_attempts_list');
+        if (list && list.children.length === 0) {
+            addReconnectAttempt({ message: 'Olá! Ainda está aí? Posso te ajudar com algo mais?', delay: 120 });
+        }
+    } else {
+        if (timeoutSimple) timeoutSimple.style.display = 'block';
+        if (reconnectContainer) reconnectContainer.style.display = 'none';
+        if (actionHint) actionHint.textContent = 'Ação executada quando o tempo de espera expirar';
+    }
+};
+
+window.addReconnectAttempt = function addReconnectAttempt(data = {}) {
+    const list = document.getElementById('kt_reconnect_attempts_list');
+    if (!list) return;
+    
+    const index = list.children.length;
+    const message = data.message || '';
+    const delay = data.delay || 120;
+    
+    const item = document.createElement('div');
+    item.className = 'card card-bordered mb-3 reconnect-attempt-item';
+    item.innerHTML = `
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0 text-primary">Tentativa ${index + 1}</h5>
+                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeReconnectAttempt(this)" title="Remover tentativa">
+                    <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+            </div>
+            <div class="fv-row mb-3">
+                <label class="fw-semibold fs-7 mb-1">Mensagem de Reconexão</label>
+                <textarea name="reconnect_attempt_message[]" class="form-control form-control-solid" rows="2" placeholder="Ex: Olá! Notei que você não respondeu. Posso te ajudar?">${message}</textarea>
+            </div>
+            <div class="fv-row">
+                <label class="fw-semibold fs-7 mb-1">Intervalo até próxima ação (segundos)</label>
+                <input type="number" name="reconnect_attempt_delay[]" class="form-control form-control-solid" value="${delay}" min="10" max="86400" />
+                <div class="form-text">Tempo após esta tentativa até a próxima tentativa ou ação final</div>
+            </div>
+        </div>
+    `;
+    list.appendChild(item);
+    updateReconnectAttemptNumbers();
+};
+
+window.removeReconnectAttempt = function removeReconnectAttempt(button) {
+    const item = button.closest('.reconnect-attempt-item');
+    if (item) {
+        item.remove();
+        updateReconnectAttemptNumbers();
+    }
+};
+
+window.updateReconnectAttemptNumbers = function updateReconnectAttemptNumbers() {
+    const list = document.getElementById('kt_reconnect_attempts_list');
+    if (!list) return;
+    const items = list.querySelectorAll('.reconnect-attempt-item');
+    items.forEach((item, idx) => {
+        const title = item.querySelector('h5');
+        if (title) title.textContent = `Tentativa ${idx + 1}`;
+    });
+};
+
+window.loadReconnectAttempts = function loadReconnectAttempts(attempts) {
+    const list = document.getElementById('kt_reconnect_attempts_list');
+    if (!list) return;
+    list.innerHTML = '';
+    
+    if (Array.isArray(attempts) && attempts.length > 0) {
+        attempts.forEach(attempt => {
+            addReconnectAttempt({
+                message: attempt.message || '',
+                delay: attempt.delay || 120
+            });
+        });
     }
 };
 

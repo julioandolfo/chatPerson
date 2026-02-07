@@ -1056,6 +1056,18 @@ class AutomationService
      * @param int|array $conversationOrId ID da conversa ou array da conversa já carregado
      * @return string Mensagem com variáveis substituídas
      */
+    public static function processVariablesPublic(string $message, $conversationOrId): string
+    {
+        return self::processVariables($message, $conversationOrId);
+    }
+
+    /**
+     * Processar variáveis em uma mensagem (interno)
+     *
+     * @param string $message Mensagem com variáveis
+     * @param int|array $conversationOrId ID da conversa ou array da conversa já carregado
+     * @return string Mensagem com variáveis substituídas
+     */
     private static function processVariables(string $message, $conversationOrId): string
     {
         // Se recebeu int, buscar conversa; se array, usar diretamente
@@ -1977,8 +1989,44 @@ class AutomationService
             $currentMetadata = json_decode($conversation['metadata'] ?? '{}', true);
             $currentMetadata['chatbot_active'] = true;
             $currentMetadata['chatbot_type'] = $chatbotType;
-            $currentMetadata['chatbot_timeout_at'] = time() + $timeout;
             $currentMetadata['chatbot_timeout_action'] = $timeoutAction;
+            
+            // Modo de inatividade: timeout simples ou reconexão
+            $inactivityMode = $nodeData['chatbot_inactivity_mode'] ?? 'timeout';
+            $currentMetadata['chatbot_inactivity_mode'] = $inactivityMode;
+            
+            if ($inactivityMode === 'reconnect') {
+                // Modo reconexão: configurar tentativas
+                $reconnectFirstDelay = (int)($nodeData['chatbot_reconnect_first_delay'] ?? 120);
+                $reconnectAttempts = $nodeData['chatbot_reconnect_attempts'] ?? [];
+                
+                // Normalizar tentativas
+                $normalizedAttempts = [];
+                if (is_array($reconnectAttempts)) {
+                    foreach ($reconnectAttempts as $attempt) {
+                        if (is_array($attempt) && !empty($attempt['message'])) {
+                            $normalizedAttempts[] = [
+                                'message' => $attempt['message'],
+                                'delay' => (int)($attempt['delay'] ?? 120)
+                            ];
+                        }
+                    }
+                }
+                
+                $currentMetadata['chatbot_reconnect_first_delay'] = $reconnectFirstDelay;
+                $currentMetadata['chatbot_reconnect_attempts'] = $normalizedAttempts;
+                $currentMetadata['chatbot_reconnect_current'] = 0; // Índice da próxima tentativa
+                $currentMetadata['chatbot_timeout_at'] = time() + $reconnectFirstDelay; // Primeiro timeout = first_delay
+                
+                \App\Helpers\Logger::automation("    Modo RECONEXÃO ativado: {$reconnectFirstDelay}s para 1ª tentativa, " . count($normalizedAttempts) . " tentativa(s) configurada(s)");
+            } else {
+                // Modo timeout simples (padrão)
+                $currentMetadata['chatbot_timeout_at'] = time() + $timeout;
+                $currentMetadata['chatbot_reconnect_attempts'] = [];
+                $currentMetadata['chatbot_reconnect_current'] = 0;
+                
+                \App\Helpers\Logger::automation("    Modo TIMEOUT SIMPLES: {$timeout}s");
+            }
             // Normalizar opções para formato [{text, target_node_id, keywords}]
             $normalizedOptions = [];
             if (!empty($options) && is_array($options)) {

@@ -226,6 +226,63 @@ if ($activeTab === 'automacao') {
             $waById[$wa['id']] = $wa;
         }
         
+        // 5. Conversas com chatbot ativo (timeout pendente/expirado)
+        $chatbotTimeouts = $db->query("
+            SELECT c.id as conv_id, c.status, c.metadata, c.contact_id,
+                   ct.name as contact_name, ct.phone as contact_phone,
+                   COALESCE(ia.name, wa.name) as account_name,
+                   c.updated_at
+            FROM conversations c
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            LEFT JOIN integration_accounts ia ON c.integration_account_id = ia.id
+            LEFT JOIN whatsapp_accounts wa ON c.whatsapp_account_id = wa.id AND c.integration_account_id IS NULL
+            WHERE c.status != 'closed'
+              AND c.metadata IS NOT NULL
+              AND c.metadata LIKE '%chatbot_active%'
+            ORDER BY c.updated_at DESC
+            LIMIT 100
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        // Filtrar e enriquecer só os que têm chatbot_active = true
+        $activeChatbots = [];
+        $now = time();
+        foreach ($chatbotTimeouts as $row) {
+            $meta = json_decode($row['metadata'] ?? '{}', true);
+            if (!empty($meta['chatbot_active'])) {
+                $timeoutAt = $meta['chatbot_timeout_at'] ?? null;
+                $remaining = $timeoutAt ? ($timeoutAt - $now) : null;
+                $inactivityMode = $meta['chatbot_inactivity_mode'] ?? 'timeout';
+                $reconnectAttempts = $meta['chatbot_reconnect_attempts'] ?? [];
+                $reconnectCurrent = (int)($meta['chatbot_reconnect_current'] ?? 0);
+                $reconnectTotal = count($reconnectAttempts);
+                
+                $activeChatbots[] = [
+                    'conv_id' => $row['conv_id'],
+                    'status' => $row['status'],
+                    'contact_name' => $row['contact_name'],
+                    'contact_phone' => $row['contact_phone'],
+                    'account_name' => $row['account_name'],
+                    'chatbot_type' => $meta['chatbot_type'] ?? '?',
+                    'chatbot_timeout_at' => $timeoutAt,
+                    'timeout_at_formatted' => $timeoutAt ? date('d/m/Y H:i:s', $timeoutAt) : 'N/A',
+                    'remaining_seconds' => $remaining,
+                    'is_expired' => $remaining !== null && $remaining <= 0,
+                    'expired_ago' => ($remaining !== null && $remaining <= 0) ? abs($remaining) : null,
+                    'timeout_action' => $meta['chatbot_timeout_action'] ?? 'nothing',
+                    'timeout_node_id' => $meta['chatbot_timeout_node_id'] ?? null,
+                    'automation_id' => $meta['chatbot_automation_id'] ?? null,
+                    'chatbot_node_id' => $meta['chatbot_node_id'] ?? null,
+                    'invalid_attempts' => $meta['chatbot_invalid_attempts'] ?? 0,
+                    'max_attempts' => $meta['chatbot_max_attempts'] ?? 3,
+                    'inactivity_mode' => $inactivityMode,
+                    'reconnect_current' => $reconnectCurrent,
+                    'reconnect_total' => $reconnectTotal,
+                    'reconnect_attempts' => $reconnectAttempts,
+                    'updated_at' => $row['updated_at'],
+                ];
+            }
+        }
+        
         $automationData = [
             'automations' => $automations,
             'recentExecutions' => $recentExecutions,
@@ -238,6 +295,7 @@ if ($activeTab === 'automacao') {
             'totalFailedToday' => $totalFailedToday,
             'iaById' => $iaById,
             'waById' => $waById,
+            'activeChatbots' => $activeChatbots,
         ];
     } catch (\Exception $e) {
         $automationData = ['error' => $e->getMessage()];
@@ -1063,6 +1121,156 @@ WHERE c.whatsapp_account_id IS NOT NULL
                 <div class="label">Falhas Total</div>
                 <div class="big-number <?= $automationData['totalFailed'] > 0 ? 'red' : 'green' ?>"><?= $automationData['totalFailed'] ?></div>
             </div>
+        </div>
+        
+        <!-- Chatbot Timeouts Ativos -->
+        <?php $activeChatbots = $automationData['activeChatbots'] ?? []; ?>
+        <div class="diag-section <?= !empty($activeChatbots) ? (count(array_filter($activeChatbots, fn($c) => $c['is_expired'])) > 0 ? 'danger' : 'warning') : 'success' ?>">
+            <h2>⏰ Chatbot Timeouts Ativos (<?= count($activeChatbots) ?>)</h2>
+            <p style="color: #858585; font-size: 12px; margin-bottom: 15px;">
+                Conversas com chatbot aguardando resposta do contato. Se um timeout expirou e a ação não foi executada, há um problema no processamento.
+                <br><strong style="color: #dcdcaa;">Dica:</strong> O <code style="color: #ce9178;">ChatbotTimeoutJob</code> roda a cada execução do cron (~1 min). Se houver timeouts expirados persistentes, verifique se o cron está rodando.
+            </p>
+            
+            <?php if (empty($activeChatbots)): ?>
+                <p style="color: #4ec9b0;">Nenhum chatbot ativo no momento. Todos os timeouts foram processados.</p>
+            <?php else: ?>
+                <?php 
+                    $expiredCount = count(array_filter($activeChatbots, fn($c) => $c['is_expired']));
+                    $pendingCount = count($activeChatbots) - $expiredCount;
+                ?>
+                <div class="grid-4" style="margin-bottom: 15px;">
+                    <div class="grid-card">
+                        <div class="label">Chatbots Ativos</div>
+                        <div class="big-number blue"><?= count($activeChatbots) ?></div>
+                    </div>
+                    <div class="grid-card">
+                        <div class="label">Aguardando (timer ativo)</div>
+                        <div class="big-number green"><?= $pendingCount ?></div>
+                    </div>
+                    <div class="grid-card">
+                        <div class="label">EXPIRADOS (não processados!)</div>
+                        <div class="big-number <?= $expiredCount > 0 ? 'red' : 'green' ?>"><?= $expiredCount ?></div>
+                    </div>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                <table class="diag-table">
+                    <thead>
+                        <tr>
+                            <th>Conv ID</th>
+                            <th>Contato</th>
+                            <th>Conta</th>
+                            <th>Modo</th>
+                            <th>Reconexão</th>
+                            <th>Próximo Evento</th>
+                            <th>Status Timer</th>
+                            <th>Ação Final</th>
+                            <th>Nó Destino</th>
+                            <th>Automação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($activeChatbots as $cb): ?>
+                        <tr style="<?= $cb['is_expired'] ? 'background: rgba(244,135,113,0.1);' : '' ?>">
+                            <td><strong>#<?= $cb['conv_id'] ?></strong></td>
+                            <td>
+                                <?= htmlspecialchars($cb['contact_name'] ?? '?') ?>
+                                <?php if (!empty($cb['contact_phone'])): ?>
+                                    <br><small style="color: #858585;"><?= $cb['contact_phone'] ?></small>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= htmlspecialchars($cb['account_name'] ?? '?') ?></td>
+                            <td>
+                                <?php if ($cb['inactivity_mode'] === 'reconnect'): ?>
+                                    <span class="badge" style="background: #c586c0; color: #fff;">🔄 Reconexão</span>
+                                <?php else: ?>
+                                    <span class="badge" style="background: #007acc; color: #fff;">⏱️ Timeout</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($cb['inactivity_mode'] === 'reconnect'): ?>
+                                    <span style="color: #c586c0; font-weight: bold;">
+                                        <?= $cb['reconnect_current'] ?>/<?= $cb['reconnect_total'] ?>
+                                    </span>
+                                    <?php if ($cb['reconnect_current'] < $cb['reconnect_total']): ?>
+                                        <br><small style="color: #4ec9b0;">Próxima: #<?= $cb['reconnect_current'] + 1 ?></small>
+                                    <?php else: ?>
+                                        <br><small style="color: #dcdcaa;">Todas enviadas</small>
+                                    <?php endif; ?>
+                                    <?php if (!empty($cb['reconnect_attempts'])): ?>
+                                        <br><small style="color: #858585;" title="<?php foreach ($cb['reconnect_attempts'] as $i => $a) { echo 'Tentativa ' . ($i+1) . ': ' . htmlspecialchars(substr($a['message'], 0, 40)) . ' (' . $a['delay'] . 's)\n'; } ?>">
+                                            ver detalhes ℹ️
+                                        </small>
+                                    <?php endif; ?>
+                                <?php else: ?>
+                                    <span style="color: #555;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="white-space: nowrap;">
+                                <?= $cb['timeout_at_formatted'] ?>
+                                <?php if ($cb['is_expired']): ?>
+                                    <br><small style="color: #f48771; font-weight: bold;">Expirou há <?= round($cb['expired_ago'] / 60, 1) ?> min</small>
+                                <?php elseif ($cb['remaining_seconds'] !== null): ?>
+                                    <br><small style="color: #4ec9b0;">Faltam <?= round($cb['remaining_seconds'] / 60, 1) ?> min</small>
+                                <?php endif; ?>
+                                <?php if ($cb['inactivity_mode'] === 'reconnect' && $cb['reconnect_current'] < $cb['reconnect_total']): ?>
+                                    <br><small style="color: #c586c0;">→ Enviar tentativa #<?= $cb['reconnect_current'] + 1 ?></small>
+                                <?php elseif ($cb['inactivity_mode'] === 'reconnect' && $cb['reconnect_current'] >= $cb['reconnect_total']): ?>
+                                    <br><small style="color: #dcdcaa;">→ Ação final</small>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($cb['is_expired']): ?>
+                                    <span class="badge badge-miss">EXPIRADO</span>
+                                <?php else: ?>
+                                    <span class="badge badge-ok">ATIVO</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php 
+                                $actionLabels = [
+                                    'go_to_node' => '🔄 Seguir para Nó',
+                                    'assign_agent' => '👤 Atribuir Agente',
+                                    'send_message' => '💬 Enviar Mensagem',
+                                    'close' => '🔒 Encerrar',
+                                    'nothing' => '⚪ Nada'
+                                ];
+                                ?>
+                                <span style="color: #dcdcaa;"><?= $actionLabels[$cb['timeout_action']] ?? $cb['timeout_action'] ?></span>
+                            </td>
+                            <td>
+                                <?php if ($cb['timeout_node_id']): ?>
+                                    <span class="badge badge-ok">ID: <?= $cb['timeout_node_id'] ?></span>
+                                <?php else: ?>
+                                    <span style="color: #555;">—</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($cb['automation_id']): ?>
+                                    <span class="badge" style="background: #007acc; color: #fff;">#<?= $cb['automation_id'] ?></span>
+                                <?php else: ?>
+                                    <span class="badge badge-miss">SEM ID!</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                </div>
+                
+                <?php if ($expiredCount > 0): ?>
+                <div style="background: rgba(244,135,113,0.1); border: 1px solid #f48771; border-radius: 6px; padding: 12px; margin-top: 15px;">
+                    <strong style="color: #f48771;">⚠️ Existem <?= $expiredCount ?> timeout(s) expirado(s) que NÃO foram processados!</strong>
+                    <p style="color: #d4d4d4; font-size: 13px; margin-top: 8px;">Possíveis causas:</p>
+                    <ol style="color: #d4d4d4; font-size: 13px; padding-left: 20px; line-height: 2;">
+                        <li><strong style="color: #4ec9b0;">Cron não está rodando</strong> — Verifique se <code style="color: #ce9178;">run-scheduled-jobs.php</code> está configurado no cron</li>
+                        <li><strong style="color: #4ec9b0;">Erro no ChatbotTimeoutJob</strong> — Verifique os logs de automação abaixo</li>
+                        <li><strong style="color: #4ec9b0;">Lock de jobs travado</strong> — O arquivo <code style="color: #ce9178;">storage/cache/jobs.lock</code> pode estar travado</li>
+                    </ol>
+                </div>
+                <?php endif; ?>
+            <?php endif; ?>
         </div>
         
         <!-- Lista de Automações -->

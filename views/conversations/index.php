@@ -422,6 +422,113 @@ ob_start();
     overflow-x: visible; /* Permitir que dropdowns não sejam cortados */
 }
 
+/* ============================================
+   ABAS DE CONVERSAS
+   ============================================ */
+.conversation-tabs-bar {
+    border-bottom: 1px solid var(--bs-border-color);
+    flex-shrink: 0;
+    background: var(--bs-body-bg);
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.conversation-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--bs-gray-600);
+    background: transparent;
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.conversation-tab:hover {
+    background: var(--bs-gray-200);
+    color: var(--bs-gray-800);
+}
+
+.conversation-tab.active {
+    background: var(--bs-primary);
+    color: #fff;
+    border-color: var(--bs-primary);
+}
+
+.conversation-tab .tab-color-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.conversation-tab.active .tab-color-dot {
+    border: 1.5px solid rgba(255,255,255,0.7);
+}
+
+.conversation-tab .tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    background: rgba(0,0,0,0.15);
+    color: inherit;
+}
+
+.conversation-tab.active .tab-count {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+.conversation-tab-add {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+}
+
+/* Dark mode */
+body.dark-mode .conversation-tab:hover,
+[data-bs-theme="dark"] .conversation-tab:hover {
+    background: var(--bs-gray-800);
+    color: var(--bs-gray-300);
+}
+
+body.dark-mode .conversation-tab.active,
+[data-bs-theme="dark"] .conversation-tab.active {
+    background: var(--bs-primary);
+    color: #fff;
+}
+
+/* Submenu "Setar como" inline no dropdown */
+.set-as-submenu {
+    border-top: 1px solid var(--bs-border-color);
+    background: var(--bs-gray-100);
+    margin: 0 -8px;
+    padding: 8px 12px !important;
+}
+
+body.dark-mode .set-as-submenu,
+[data-bs-theme="dark"] .set-as-submenu {
+    background: var(--bs-gray-800);
+}
+
 .conversation-item {
     padding: 15px 20px;
     border-bottom: 1px solid var(--bs-border-color);
@@ -2400,86 +2507,32 @@ function getChannelInfo(channel) {
             </div>
         </div>
         
-        <!-- Barra de AçÁes em Massa (oculta por padrão) -->
-        <div id="bulkActionsBar" class="bulk-actions-bar d-none mb-3 p-3 bg-light-primary rounded">
-            <div class="d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="fw-semibold text-primary" id="bulkSelectionCount">0 conversas selecionadas</span>
-                    <button type="button" class="btn btn-sm btn-light" onclick="selectAllConversations()">
-                        <i class="ki-duotone ki-check-square fs-6 me-1">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Selecionar todas
-                    </button>
-                    <button type="button" class="btn btn-sm btn-light" onclick="clearBulkSelection()">
-                        <i class="ki-duotone ki-cross fs-6 me-1">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Limpar
-                    </button>
-                </div>
-                <div class="d-flex align-items-center gap-2">
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="ki-duotone ki-profile-user fs-6 me-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Atribuir
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end" style="z-index: 10000;">
-                            <?php if (!empty($agents)): ?>
-                                <?php foreach ($agents as $agent): ?>
-                                    <li>
-                                        <a class="dropdown-item text-gray-800" href="#" onclick="event.preventDefault(); bulkAssignAgent(<?= $agent['id'] ?>, '<?= htmlspecialchars($agent['name'], ENT_QUOTES) ?>');">
-                                            <?= htmlspecialchars($agent['name']) ?>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <li><span class="dropdown-item-text text-muted">Nenhum agente disponível</span></li>
+        <!-- Barra de Abas de Conversas (por agente) -->
+        <div id="conversationTabsBar" class="conversation-tabs-bar" style="padding: 0 12px;">
+            <div class="d-flex align-items-center gap-1 overflow-auto hide-scrollbar" id="conversationTabsList" style="white-space: nowrap; padding: 8px 0;">
+                <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                    <span class="tab-name">Todas</span>
+                </button>
+                <?php if (!empty($userTabs)): ?>
+                    <?php foreach ($userTabs as $tab): ?>
+                        <button type="button" class="btn btn-sm conversation-tab" 
+                                data-tab-id="<?= $tab['id'] ?>" 
+                                data-tag-id="<?= $tab['tag_id'] ?>"
+                                onclick="switchConversationTab(this)">
+                            <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
+                            <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
+                            <?php if (!empty($tab['conversation_count'])): ?>
+                                <span class="tab-count"><?= $tab['conversation_count'] ?></span>
                             <?php endif; ?>
-                        </ul>
-                    </div>
-                    <div class="dropdown">
-                        <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <i class="ki-duotone ki-tag fs-6 me-1">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                            </i>
-                            Adicionar Tag
                         </button>
-                        <ul class="dropdown-menu">
-                            <?php if (!empty($tags)): ?>
-                                <?php foreach ($tags as $tag): ?>
-                                    <li>
-                                        <a class="dropdown-item" href="#" onclick="event.preventDefault(); bulkAddTag(<?= $tag['id'] ?>, '<?= htmlspecialchars($tag['name'], ENT_QUOTES) ?>');">
-                                            <span class="badge badge-sm" style="background-color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>20; color: <?= htmlspecialchars($tag['color'] ?? '#009ef7') ?>;">
-                                                <?= htmlspecialchars($tag['name']) ?>
-                                            </span>
-                                        </a>
-                                    </li>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </ul>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-warning" onclick="bulkCloseConversations()">
-                        <i class="ki-duotone ki-cross-circle fs-6 me-1">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Fechar
-                    </button>
-                    <button type="button" class="btn btn-sm btn-info" onclick="bulkReopenConversations()">
-                        <i class="ki-duotone ki-arrow-right fs-6 me-1">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Reabrir
-                    </button>
-                </div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                <button type="button" class="btn btn-sm btn-icon btn-light-primary conversation-tab-add" title="Gerenciar abas" onclick="showManageTabsModal()">
+                    <i class="ki-duotone ki-plus fs-7">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </button>
             </div>
         </div>
         
@@ -2663,13 +2716,6 @@ function getChannelInfo(channel) {
                          data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
-                            <!-- Checkbox para seleção em massa -->
-                            <div class="flex-shrink-0 d-flex align-items-center">
-                                <label class="form-check form-check-custom form-check-solid">
-                                    <input class="form-check-input conversation-checkbox" type="checkbox" value="<?= $conv['id'] ?>" 
-                                           onclick="event.stopPropagation(); toggleBulkSelection();">
-                                </label>
-                            </div>
                             <!-- Avatar -->
                             <div class="symbol symbol-45px flex-shrink-0">
                                 <?php
@@ -2772,6 +2818,19 @@ function getChannelInfo(channel) {
                                                     <span class="path2"></span>
                                                 </i>
                                                 Agendar Lembrete
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li class="dropdown-submenu">
+                                            <a class="dropdown-item d-flex align-items-center justify-content-between" href="#" onclick="event.stopPropagation(); event.preventDefault(); toggleSetAsSubmenu(this, <?= $conv['id'] ?>);">
+                                                <span>
+                                                    <i class="ki-duotone ki-tag fs-7 me-2 text-info">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                    </i>
+                                                    Setar como
+                                                </span>
+                                                <i class="ki-duotone ki-right fs-8 ms-2"><span class="path1"></span><span class="path2"></span></i>
                                             </a>
                                         </li>
                                     </ul>
@@ -7393,6 +7452,16 @@ function ensureActionsDropdown(conversationItem, pinned, conversationId, preserv
                         Agendar Lembrete
                     </a>
                 </li>
+                <li><hr class="dropdown-divider"></li>
+                <li class="dropdown-submenu">
+                    <a class="dropdown-item d-flex align-items-center justify-content-between" href="#" onclick="event.stopPropagation(); event.preventDefault(); toggleSetAsSubmenu(this, ${conversationId});">
+                        <span>
+                            <i class="ki-duotone ki-tag fs-7 me-2 text-info"><span class="path1"></span><span class="path2"></span></i>
+                            Setar como
+                        </span>
+                        <i class="ki-duotone ki-right fs-8 ms-2"><span class="path1"></span><span class="path2"></span></i>
+                    </a>
+                </li>
             </ul>
         </div>
     `;
@@ -11090,6 +11159,20 @@ document.getElementById('filter_department')?.addEventListener('change', functio
     updateActiveFiltersCount();
 });
 document.getElementById('filter_tag')?.addEventListener('change', function() {
+    // Sincronizar aba ativa com filtro de tag
+    const tagId = this.value;
+    document.querySelectorAll('.conversation-tab').forEach(t => t.classList.remove('active'));
+    if (tagId) {
+        const matchingTab = document.querySelector(`.conversation-tab[data-tag-id="${tagId}"]`);
+        if (matchingTab) {
+            matchingTab.classList.add('active');
+            localStorage.setItem('activeConversationTab', tagId);
+        }
+    } else {
+        const allTab = document.querySelector('.conversation-tab[data-tab-id="all"]');
+        if (allTab) allTab.classList.add('active');
+        localStorage.setItem('activeConversationTab', 'all');
+    }
     applyFilters();
     updateActiveFiltersCount();
 });
@@ -11486,163 +11569,10 @@ function refreshConversationList(params = null, append = false) {
             }
         }
         
-        // Renderizar conversas
+        // Renderizar conversas usando função consolidada
         let html = '';
         conversations.forEach(conv => {
-            const channelInfo = getChannelInfo(conv.channel);
-            const channelIcon = channelInfo.icon;
-            const channelName = channelInfo.name;
-            
-            const isActive = selectedConversationId == conv.id;
-            const nameRaw = conv.contact_name || 'NN';
-            const maxName = 22;
-            const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
-            const parts = nameRaw.split(' ');
-            const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-            
-            const lastMessage = conv.last_message || '';
-            const maxCharsPreview = 37;
-            const lastMessagePreview = lastMessage.length > maxCharsPreview ? lastMessage.substring(0, maxCharsPreview) + '...' : lastMessage;
-            
-            const unreadCount = conv.unread_count || 0;
-            const pinned = conv.pinned || 0;
-            
-            // Tags
-            let tagsHtml = '';
-            if (conv.tags_data) {
-                const tags = conv.tags_data.split('|||');
-                tags.slice(0, 2).forEach(tagStr => {
-                    const [tagId, tagName, tagColor] = tagStr.split(':');
-                    if (tagName) {
-                        tagsHtml += `<span class="badge badge-sm" style="background-color: ${tagColor || '#009ef7'}20; color: ${tagColor || '#009ef7'};">${escapeHtml(tagName)}</span>`;
-                    }
-                });
-            }
-            
-    const avatarHtml = conv.contact_avatar
-        ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
-        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
-
-            const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
-            const lastContactAt = conv.last_contact_message_at || '';
-            const lastAgentAt = conv.last_agent_message_at || '';
-            const createdAt = conv.created_at || '';
-            const lastMessageAt = conv.last_message_at || conv.updated_at || '';
-
-            html += `
-                <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
-                     data-conversation-id="${conv.id}"
-                     data-status="${escapeHtml(conv.status || 'open')}"
-                     data-created-at="${escapeHtml(createdAt)}"
-                     data-first-response-at="${escapeHtml(firstResponseAt)}"
-                     data-last-message-at="${escapeHtml(lastMessageAt)}"
-                     data-last-contact-message-at="${escapeHtml(lastContactAt)}"
-                     data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
-                     data-agent-id="${escapeHtml(conv.agent_id || '')}"
-                     data-updated-at="${lastMessageAt || new Date().toISOString()}"
-                     data-onclick="selectConversation">
-                    <div class="d-flex gap-3 w-100">
-                        <!-- Checkbox para seleção em massa -->
-                        <div class="flex-shrink-0 d-flex align-items-center">
-                            <label class="form-check form-check-custom form-check-solid">
-                                <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
-                                       onclick="event.stopPropagation(); toggleBulkSelection();">
-                            </label>
-                        </div>
-                        <div class="symbol symbol-45px flex-shrink-0">
-                            ${avatarHtml}
-                        </div>
-                        <div class="flex-grow-1 min-w-0">
-                            <div class="conversation-item-header">
-                                <div class="conversation-item-name d-flex align-items-center gap-2">
-                                    ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
-                                    ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">⚠️ SPAM</span>' : ''}
-                                    ${escapeHtml(name)}
-                                </div>
-                    <div class="conversation-item-time d-flex align-items-center gap-2">
-                        ${formatTime(conv.last_message_at || conv.updated_at)}
-                        <div class="dropdown conversation-item-actions">
-                            <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
-                                    data-bs-toggle="dropdown" 
-                                    aria-expanded="false"
-                                    onclick="event.stopPropagation();">
-                                <i class="ki-duotone ki-setting-2 text-muted">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                    <span class="path3"></span>
-                                    <span class="path4"></span>
-                                    <span class="path5"></span>
-                                </i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'}); return false;">
-                                        <i class="ki-duotone ki-pin fs-7 me-2 ${pinned ? 'text-warning' : ''}">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        ${pinned ? 'Desfixar' : 'Fixar'}
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conv.id}); return false;">
-                                        <i class="ki-duotone ki-check fs-7 me-2 text-success">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        Marcar como Lido
-                                    </a>
-                                </li>
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conv.id}); return false;">
-                                        <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        Marcar como Não Lido
-                                    </a>
-                                </li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li>
-                                    <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conv.id}); return false;">
-                                        <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        Agendar Lembrete
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
-                            </div>
-                            <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
-                                        ${conv.search_match_type ? `
-                                <div class="conversation-item-search-match mt-1">
-                                    <span class="badge badge-sm badge-light-info">
-                                        <i class="ki-duotone ki-magnifier fs-7 me-1">
-                                            <span class="path1"></span>
-                                            <span class="path2"></span>
-                                        </i>
-                                        ${conv.search_match_type === 'name' ? 'Nome' : 
-                                          conv.search_match_type === 'phone' ? 'Telefone' : 
-                                          conv.search_match_type === 'email' ? 'Email' : 
-                                          conv.search_match_type === 'tag' ? 'Tag' :
-                                          conv.search_match_type === 'participant' ? 'Participante' :
-                                          'Mensagem'}: 
-                                        <span class="fw-semibold">${escapeHtml((conv.search_match_text || '').substring(0, 40))}${(conv.search_match_text || '').length > 40 ? '...' : ''}</span>
-                                    </span>
-                                </div>
-                            ` : ''}
-                            <div class="conversation-item-meta">
-                                <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
-                                <span class="conversation-item-tags d-flex gap-1 flex-wrap">${tagsHtml}</span>
-                                ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            html += renderConversationItemHtml(conv, selectedConversationId);
         });
         
         // Renderização (suporta append para "Carregar mais")
@@ -18103,8 +18033,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.conversation-item').forEach(item => {
         item.addEventListener('click', function(e) {
             // Se não for clique em checkbox ou botão de ação
-            if (!e.target.closest('.conversation-checkbox') && 
-                !e.target.closest('.conversation-item-actions') &&
+            if (!e.target.closest('.conversation-item-actions') &&
                 !e.target.closest('.dropdown')) {
                 const conversationId = this.getAttribute('data-conversation-id');
                 if (conversationId && isMobile()) {
@@ -18240,9 +18169,10 @@ if (typeof window.wsClient !== 'undefined') {
             // Remover badge se existir (mensagem já foi marcada como lida no backend)
             if (badge) badge.remove();
         } else {
-            // Se não é a conversa atual, atualizar lista completa após um delay para garantir sincronização
+            // Se não é a conversa atual, atualizar lista completa e contagens das abas
             setTimeout(() => {
                 refreshConversationBadges();
+                refreshConversationTabs();
             }, 1000);
         }
     });
@@ -18598,149 +18528,10 @@ function addConversationToList(conv) {
         conversationsList.innerHTML = '';
     }
 
-    // Preparar dados da conversa
-    const channelInfo = getChannelInfo(conv.channel || 'chat');
-    const channelIcon = channelInfo.icon;
-    const channelName = channelInfo.name;
-    
+    // Usar função consolidada para renderizar
     const urlParams = new URLSearchParams(window.location.search);
     const selectedConversationId = urlParams.get('id') ? parseInt(urlParams.get('id')) : null;
-    const isActive = selectedConversationId == conv.id;
-    
-    const nameRaw = conv.contact_name || 'NN';
-    const maxName = 22;
-    const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
-    const parts = nameRaw.split(' ');
-    const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
-    
-    const lastMessage = conv.last_message || '';
-    const maxCharsPreview = 37;
-    const lastMessagePreview = lastMessage.length > maxCharsPreview ? lastMessage.substring(0, maxCharsPreview) + '...' : lastMessage;
-    
-    const unreadCount = conv.unread_count || 0;
-    const pinned = conv.pinned || 0;
-    
-    // Tags
-    let tagsHtml = '';
-    if (conv.tags_data) {
-        const tags = conv.tags_data.split('|||');
-        tags.slice(0, 2).forEach(tagStr => {
-            const [tagId, tagName, tagColor] = tagStr.split(':');
-            if (tagName) {
-                tagsHtml += `<span class="badge badge-sm" style="background-color: ${tagColor || '#009ef7'}20; color: ${tagColor || '#009ef7'};">${escapeHtml(tagName)}</span>`;
-            }
-        });
-    }
-    
-    // Calcular campos de SLA / datas
-    const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
-    const lastContactAt = conv.last_contact_message_at || '';
-    const lastAgentAt = conv.last_agent_message_at || '';
-    const createdAt = conv.created_at || '';
-    const lastMessageAt = conv.last_message_at || conv.updated_at || '';
-    const lastMessageFromAgent = lastAgentAt && (!lastContactAt || new Date(lastAgentAt) >= new Date(lastContactAt));
-    
-    // Criar HTML do item
-    const avatarHtml = conv.contact_avatar
-        ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
-        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
-
-    const conversationHtml = `
-        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
-             data-conversation-id="${conv.id}"
-             data-status="${escapeHtml(conv.status || 'open')}"
-             data-created-at="${escapeHtml(createdAt)}"
-             data-first-response-at="${escapeHtml(firstResponseAt)}"
-             data-last-message-at="${escapeHtml(lastMessageAt)}"
-             data-last-contact-message-at="${escapeHtml(lastContactAt)}"
-             data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
-             data-agent-id="${escapeHtml(conv.agent_id || '')}"
-             data-updated-at="${lastMessageAt || new Date().toISOString()}"
-             data-onclick="selectConversation">
-            <div class="d-flex gap-3 w-100">
-                <!-- Checkbox para seleção em massa -->
-                <div class="flex-shrink-0 d-flex align-items-center">
-                    <label class="form-check form-check-custom form-check-solid">
-                        <input class="form-check-input conversation-checkbox" type="checkbox" value="${conv.id}" 
-                               onclick="event.stopPropagation(); toggleBulkSelection();">
-                    </label>
-                </div>
-                <div class="symbol symbol-45px flex-shrink-0">
-                    ${avatarHtml}
-                </div>
-                <div class="flex-grow-1 min-w-0">
-                    <div class="conversation-item-header">
-                        <div class="conversation-item-name d-flex align-items-center gap-2">
-                            ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
-                            ${escapeHtml(name)}
-                        </div>
-                        <div class="conversation-item-time d-flex align-items-center gap-2">
-                            ${formatTime(conv.last_message_at || conv.updated_at)}
-                            <div class="dropdown conversation-item-actions">
-                                <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
-                                        data-bs-toggle="dropdown" 
-                                        aria-expanded="false"
-                                        onclick="event.stopPropagation();">
-                                    <i class="ki-duotone ki-setting-2 text-muted">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                        <span class="path3"></span>
-                                        <span class="path4"></span>
-                                        <span class="path5"></span>
-                                    </i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
-                                    <li>
-                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'}); return false;">
-                                            <i class="ki-duotone ki-pin fs-7 me-2 ${pinned ? 'text-warning' : ''}">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            ${pinned ? 'Desfixar' : 'Fixar'}
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conv.id}); return false;">
-                                            <i class="ki-duotone ki-check fs-7 me-2 text-success">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            Marcar como Lido
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conv.id}); return false;">
-                                            <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            Marcar como Não Lido
-                                        </a>
-                                    </li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conv.id}); return false;">
-                                            <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary">
-                                                <span class="path1"></span>
-                                                <span class="path2"></span>
-                                            </i>
-                                            Agendar Lembrete
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
-                        <div class="conversation-item-meta">
-                            <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
-                            <span class="conversation-item-tags d-flex gap-1 flex-wrap">${tagsHtml}</span>
-                            ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
-                        </div>
-                </div>
-            </div>
-        </div>
-    `;
+    const conversationHtml = renderConversationItemHtml(conv, selectedConversationId);
     
     // Adicionar ao topo da lista
     conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
@@ -21073,258 +20864,669 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ============================================
-// AÇòES EM MASSA
+// SISTEMA DE ABAS DE CONVERSAS
 // ============================================
 
-// Obter conversas selecionadas
-function getSelectedConversations() {
-    const checkboxes = document.querySelectorAll('.conversation-checkbox:checked');
-    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+// Cache das tags carregadas
+window._allTagsCache = null;
+window._allTagsCacheTime = 0;
+
+/**
+ * Função consolidada para renderizar um item de conversa (usada por refreshConversationList e addConversationToList)
+ */
+function renderConversationItemHtml(conv, selectedConversationId) {
+    const channelInfo = getChannelInfo(conv.channel || 'chat');
+    const channelIcon = channelInfo.icon;
+    const channelName = channelInfo.name;
+    
+    const isActive = selectedConversationId == conv.id;
+    const nameRaw = conv.contact_name || 'NN';
+    const maxName = 22;
+    const name = nameRaw.length > maxName ? nameRaw.substring(0, maxName) + '...' : nameRaw;
+    const parts = nameRaw.split(' ');
+    const initials = (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+    
+    const lastMessage = conv.last_message || '';
+    const maxCharsPreview = 37;
+    const lastMessagePreview = lastMessage.length > maxCharsPreview ? lastMessage.substring(0, maxCharsPreview) + '...' : lastMessage;
+    
+    const unreadCount = conv.unread_count || 0;
+    const pinned = conv.pinned || 0;
+    
+    // Tags
+    let tagsHtml = '';
+    if (conv.tags_data) {
+        const tags = conv.tags_data.split('|||');
+        tags.slice(0, 2).forEach(tagStr => {
+            const [tagId, tagName, tagColor] = tagStr.split(':');
+            if (tagName) {
+                tagsHtml += `<span class="badge badge-sm" style="background-color: ${tagColor || '#009ef7'}20; color: ${tagColor || '#009ef7'};">${escapeHtml(tagName)}</span>`;
+            }
+        });
+    }
+    
+    const avatarHtml = conv.contact_avatar
+        ? `<div class="symbol-label"><img src="${escapeHtml(conv.contact_avatar)}" alt="${escapeHtml(name)}" class="h-45px w-45px rounded" style="object-fit: cover;"></div>`
+        : `<div class="symbol-label bg-light-primary text-primary fw-bold">${initials}</div>`;
+
+    const firstResponseAt = conv.first_response_at_calc || conv.first_response_at || '';
+    const lastContactAt = conv.last_contact_message_at || '';
+    const lastAgentAt = conv.last_agent_message_at || '';
+    const createdAt = conv.created_at || '';
+    const lastMessageAt = conv.last_message_at || conv.updated_at || '';
+
+    // Search match (se existir)
+    let searchMatchHtml = '';
+    if (conv.search_match_type) {
+        const matchLabel = conv.search_match_type === 'name' ? 'Nome' : 
+                          conv.search_match_type === 'phone' ? 'Telefone' : 
+                          conv.search_match_type === 'email' ? 'Email' : 
+                          conv.search_match_type === 'tag' ? 'Tag' :
+                          conv.search_match_type === 'participant' ? 'Participante' : 'Mensagem';
+        searchMatchHtml = `
+            <div class="conversation-item-search-match mt-1">
+                <span class="badge badge-sm badge-light-info">
+                    <i class="ki-duotone ki-magnifier fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>
+                    ${matchLabel}: 
+                    <span class="fw-semibold">${escapeHtml((conv.search_match_text || '').substring(0, 40))}${(conv.search_match_text || '').length > 40 ? '...' : ''}</span>
+                </span>
+            </div>`;
+    }
+
+    return `
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
+             data-conversation-id="${conv.id}"
+             data-status="${escapeHtml(conv.status || 'open')}"
+             data-created-at="${escapeHtml(createdAt)}"
+             data-first-response-at="${escapeHtml(firstResponseAt)}"
+             data-last-message-at="${escapeHtml(lastMessageAt)}"
+             data-last-contact-message-at="${escapeHtml(lastContactAt)}"
+             data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
+             data-agent-id="${escapeHtml(conv.agent_id || '')}"
+             data-updated-at="${lastMessageAt || new Date().toISOString()}"
+             data-onclick="selectConversation">
+            <div class="d-flex gap-3 w-100">
+                <div class="symbol symbol-45px flex-shrink-0">
+                    ${avatarHtml}
+                </div>
+                <div class="flex-grow-1 min-w-0">
+                    <div class="conversation-item-header">
+                        <div class="conversation-item-name d-flex align-items-center gap-2">
+                            ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
+                            ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">SPAM</span>' : ''}
+                            ${escapeHtml(name)}
+                        </div>
+                        <div class="conversation-item-time d-flex align-items-center gap-2">
+                            ${formatTime(conv.last_message_at || conv.updated_at)}
+                            <div class="dropdown conversation-item-actions">
+                                <button type="button" class="btn btn-sm btn-icon btn-light p-0" 
+                                        data-bs-toggle="dropdown" 
+                                        aria-expanded="false"
+                                        onclick="event.stopPropagation();">
+                                    <i class="ki-duotone ki-setting-2 text-muted">
+                                        <span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span>
+                                    </i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end" data-conversation-id="${conv.id}">
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); togglePin(${conv.id}, ${pinned ? 'true' : 'false'}); return false;">
+                                            <i class="ki-duotone ki-pin fs-7 me-2 ${pinned ? 'text-warning' : ''}"><span class="path1"></span><span class="path2"></span></i>
+                                            ${pinned ? 'Desfixar' : 'Fixar'}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsRead(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-check fs-7 me-2 text-success"><span class="path1"></span><span class="path2"></span></i>
+                                            Marcar como Lido
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); markConversationAsUnread(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-eye-slash fs-7 me-2 text-danger"><span class="path1"></span><span class="path2"></span></i>
+                                            Marcar como Não Lido
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="event.stopPropagation(); showReminderModal(${conv.id}); return false;">
+                                            <i class="ki-duotone ki-notification-bing fs-7 me-2 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                                            Agendar Lembrete
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li class="dropdown-submenu">
+                                        <a class="dropdown-item d-flex align-items-center justify-content-between" href="#" onclick="event.stopPropagation(); event.preventDefault(); toggleSetAsSubmenu(this, ${conv.id});">
+                                            <span>
+                                                <i class="ki-duotone ki-tag fs-7 me-2 text-info"><span class="path1"></span><span class="path2"></span></i>
+                                                Setar como
+                                            </span>
+                                            <i class="ki-duotone ki-right fs-8 ms-2"><span class="path1"></span><span class="path2"></span></i>
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="conversation-item-preview">${escapeHtml(lastMessagePreview || 'Sem mensagens')}</div>
+                    ${searchMatchHtml}
+                    <div class="conversation-item-meta">
+                        <span class="conversation-item-channel">${channelIcon} ${channelName}</span>
+                        <span class="conversation-item-tags d-flex gap-1 flex-wrap">${tagsHtml}</span>
+                        ${unreadCount > 0 ? `<span class="conversation-item-badge">${unreadCount}</span>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
-// Atualizar contador e barra de açÁes
-function toggleBulkSelection() {
-    const selected = getSelectedConversations();
-    const bulkBar = document.getElementById('bulkActionsBar');
-    const countEl = document.getElementById('bulkSelectionCount');
+/**
+ * Alternar submenu "Setar como" no dropdown do gear icon
+ */
+function toggleSetAsSubmenu(triggerEl, conversationId) {
+    // Remover submenu anterior se existir
+    const existingSubmenu = triggerEl.closest('ul').querySelector('.set-as-submenu');
+    if (existingSubmenu) {
+        existingSubmenu.remove();
+        return;
+    }
+
+    // Criar submenu inline
+    const submenuContainer = document.createElement('div');
+    submenuContainer.className = 'set-as-submenu px-3 py-2';
+    submenuContainer.style.cssText = 'max-height: 250px; overflow-y: auto;';
+    submenuContainer.innerHTML = `
+        <div class="d-flex align-items-center justify-content-center py-2">
+            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+            <span class="ms-2 fs-7 text-muted">Carregando tags...</span>
+        </div>
+    `;
     
-    if (bulkBar && countEl) {
-        if (selected.length > 0) {
-            bulkBar.classList.remove('d-none');
-            countEl.textContent = `${selected.length} conversa${selected.length > 1 ? 's' : ''} selecionada${selected.length > 1 ? 's' : ''}`;
+    // Inserir após o item "Setar como"
+    triggerEl.closest('li').after(submenuContainer);
+
+    // Carregar tags
+    loadTagsForSetAs(submenuContainer, conversationId);
+}
+
+/**
+ * Carregar tags para o submenu "Setar como"
+ */
+async function loadTagsForSetAs(container, conversationId) {
+    try {
+        // Usar cache se disponível (5 min)
+        const now = Date.now();
+        if (window._allTagsCache && (now - window._allTagsCacheTime) < 300000) {
+            renderSetAsSubmenu(container, window._allTagsCache, conversationId);
+            return;
+        }
+
+        const response = await fetch('<?= \App\Helpers\Url::to("/tags/all") ?>', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.tags) {
+            window._allTagsCache = data.tags;
+            window._allTagsCacheTime = now;
+            renderSetAsSubmenu(container, data.tags, conversationId);
         } else {
-            bulkBar.classList.add('d-none');
-        }
-    }
-}
-
-// Selecionar todas as conversas
-function selectAllConversations() {
-    document.querySelectorAll('.conversation-checkbox').forEach(cb => {
-        cb.checked = true;
-    });
-    toggleBulkSelection();
-}
-
-// Limpar seleção
-function clearBulkSelection() {
-    document.querySelectorAll('.conversation-checkbox').forEach(cb => {
-        cb.checked = false;
-    });
-    toggleBulkSelection();
-}
-
-// Atribuir conversas a agente
-async function bulkAssignAgent(agentId, agentName) {
-    const selected = getSelectedConversations();
-    if (selected.length === 0) {
-        alert('Selecione pelo menos uma conversa');
-        return;
-    }
-    
-    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
-                       document.body.classList.contains('dark-mode') ||
-                       window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (!confirm(`Atribuir ${selected.length} conversa(s) para ${agentName}?`)) {
-        return;
-    }
-    
-    try {
-        const promises = selected.map(id => 
-            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/assign`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify({ agent_id: agentId })
-            }).then(r => r.json())
-        );
-        
-        const results = await Promise.all(promises);
-        const success = results.filter(r => r.success).length;
-        const failed = results.filter(r => !r.success).length;
-        
-        Swal.fire({
-            icon: success > 0 ? 'success' : 'error',
-            title: success > 0 ? 'Sucesso!' : 'Erro',
-            text: `${success} conversa(s) atribuída(s) com sucesso${failed > 0 ? `. ${failed} falharam.` : '.'}`,
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
-        
-        clearBulkSelection();
-        if (typeof refreshConversationList === 'function') {
-            const urlParams = new URLSearchParams(window.location.search);
-            refreshConversationList(urlParams);
+            container.innerHTML = '<div class="text-muted fs-7 py-2">Erro ao carregar tags</div>';
         }
     } catch (error) {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao atribuir conversas',
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
+        console.error('Erro ao carregar tags:', error);
+        container.innerHTML = '<div class="text-danger fs-7 py-2">Erro ao carregar</div>';
     }
 }
 
-// Adicionar tag em massa
-async function bulkAddTag(tagId, tagName) {
-    const selected = getSelectedConversations();
-    if (selected.length === 0) {
-        alert('Selecione pelo menos uma conversa');
-        return;
+/**
+ * Renderizar o submenu com a lista de tags
+ */
+function renderSetAsSubmenu(container, tags, conversationId) {
+    let html = '<div class="fs-8 fw-semibold text-muted mb-2">Selecione a tag:</div>';
+    
+    if (tags.length === 0) {
+        html += '<div class="text-muted fs-7 py-1">Nenhuma tag disponível</div>';
+    } else {
+        tags.forEach(tag => {
+            html += `
+                <a href="#" class="d-flex align-items-center gap-2 py-1 px-2 rounded text-gray-800 text-hover-primary" 
+                   style="text-decoration: none; font-size: 12px;"
+                   onclick="event.preventDefault(); event.stopPropagation(); setConversationTag(${conversationId}, ${tag.id}, '${escapeHtml(tag.name)}', '${escapeHtml(tag.color || '#009ef7')}');">
+                    <span class="rounded-circle d-inline-block" style="width: 10px; height: 10px; background-color: ${escapeHtml(tag.color || '#009ef7')};"></span>
+                    ${escapeHtml(tag.name)}
+                </a>`;
+        });
     }
     
-    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
-                       document.body.classList.contains('dark-mode') ||
-                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    html += `<hr class="my-2">
+        <a href="#" class="d-flex align-items-center gap-2 py-1 px-2 rounded text-primary fw-semibold" 
+           style="text-decoration: none; font-size: 12px;"
+           onclick="event.preventDefault(); event.stopPropagation(); showCreateTabModal(${conversationId});">
+            <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i>
+            Criar nova aba
+        </a>`;
     
+    container.innerHTML = html;
+}
+
+/**
+ * Setar tag na conversa e adicionar como aba se ainda não for
+ */
+async function setConversationTag(conversationId, tagId, tagName, tagColor) {
     try {
-        const promises = selected.map(id => 
-            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/tags`, {
+        // Fechar dropdown
+        document.querySelectorAll('.dropdown-menu.show').forEach(m => {
+            const dropdown = bootstrap.Dropdown.getInstance(m.previousElementSibling) || 
+                           bootstrap.Dropdown.getOrCreateInstance(m.previousElementSibling);
+            if (dropdown) dropdown.hide();
+        });
+
+        // Adicionar tag à conversa
+        const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/tags`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ tag_id: tagId })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Adicionar como aba do usuário (se não for)
+            await fetch('<?= \App\Helpers\Url::to("/conversation-tabs") ?>', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
+                headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 body: JSON.stringify({ tag_id: tagId })
-            }).then(r => r.json())
-        );
-        
-        const results = await Promise.all(promises);
-        const success = results.filter(r => r.success).length;
-        const failed = results.filter(r => !r.success).length;
-        
-        Swal.fire({
-            icon: success > 0 ? 'success' : 'error',
-            title: success > 0 ? 'Sucesso!' : 'Erro',
-            text: `Tag "${tagName}" adicionada em ${success} conversa(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
-        
-        clearBulkSelection();
-        if (typeof refreshConversationList === 'function') {
-            const urlParams = new URLSearchParams(window.location.search);
-            refreshConversationList(urlParams);
+            });
+
+            // Atualizar abas e lista
+            await refreshConversationTabs();
+            
+            // Atualizar tags visíveis no item da conversa
+            const convItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+            if (convItem) {
+                const tagsContainer = convItem.querySelector('.conversation-item-tags');
+                if (tagsContainer) {
+                    const badge = document.createElement('span');
+                    badge.className = 'badge badge-sm';
+                    badge.style.cssText = `background-color: ${tagColor}20; color: ${tagColor};`;
+                    badge.textContent = tagName;
+                    tagsContainer.appendChild(badge);
+                }
+            }
+
+            // Toast de sucesso
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Tag "${tagName}" adicionada`, showConfirmButton: false, timer: 2000 });
+            }
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message || 'Erro ao setar tag', showConfirmButton: false, timer: 3000 });
+            }
         }
     } catch (error) {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao adicionar tag',
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
+        console.error('Erro ao setar tag:', error);
     }
 }
 
-// Fechar conversas em massa
-async function bulkCloseConversations() {
-    const selected = getSelectedConversations();
-    if (selected.length === 0) {
-        alert('Selecione pelo menos uma conversa');
-        return;
+/**
+ * Alternar aba ativa na listagem de conversas
+ */
+function switchConversationTab(tabEl) {
+    // Atualizar estado visual
+    document.querySelectorAll('.conversation-tab').forEach(t => t.classList.remove('active'));
+    tabEl.classList.add('active');
+    
+    const tagId = tabEl.dataset.tagId;
+    
+    // Salvar aba ativa no localStorage
+    localStorage.setItem('activeConversationTab', tagId || 'all');
+    
+    // Aplicar filtro por tag
+    const params = new URLSearchParams(window.location.search);
+    
+    if (tagId) {
+        params.set('tag_id', tagId);
+    } else {
+        params.delete('tag_id');
     }
     
-    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
-                       document.body.classList.contains('dark-mode') ||
-                       window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Sincronizar dropdown de filtro de tags
+    const filterTag = document.getElementById('filter_tag');
+    if (filterTag) {
+        filterTag.value = tagId || '';
+    }
     
-    if (!confirm(`Fechar ${selected.length} conversa(s)?`)) {
+    // Resetar paginação
+    params.delete('offset');
+    
+    // Atualizar URL sem recarregar
+    const newUrl = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+    window.history.replaceState({}, '', newUrl);
+    
+    // Resetar assinatura para forçar re-render
+    window.lastConversationListSignature = null;
+    
+    // Recarregar lista
+    refreshConversationList(params);
+}
+
+/**
+ * Atualizar abas via API (recarrega contagens)
+ */
+async function refreshConversationTabs() {
+    try {
+        const response = await fetch('<?= \App\Helpers\Url::to("/conversation-tabs") ?>', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+        
+        if (data.success && data.tabs) {
+            const tabsList = document.getElementById('conversationTabsList');
+            if (!tabsList) return;
+            
+            const activeTab = localStorage.getItem('activeConversationTab') || 'all';
+            
+            // Preservar botão "Todas" e botão "+"
+            let html = `
+                <button type="button" class="btn btn-sm conversation-tab ${activeTab === 'all' ? 'active' : ''}" 
+                        data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                    <span class="tab-name">Todas</span>
+                </button>`;
+            
+            data.tabs.forEach(tab => {
+                const isActive = activeTab === String(tab.tag_id);
+                html += `
+                    <button type="button" class="btn btn-sm conversation-tab ${isActive ? 'active' : ''}" 
+                            data-tab-id="${tab.id}" data-tag-id="${tab.tag_id}"
+                            onclick="switchConversationTab(this)">
+                        <span class="tab-color-dot" style="background-color: ${escapeHtml(tab.tag_color || '#009ef7')};"></span>
+                        <span class="tab-name">${escapeHtml(tab.tag_name)}</span>
+                        ${tab.conversation_count > 0 ? `<span class="tab-count">${tab.conversation_count}</span>` : ''}
+                    </button>`;
+            });
+            
+            html += `
+                <button type="button" class="btn btn-sm btn-icon btn-light-primary conversation-tab-add" 
+                        title="Gerenciar abas" onclick="showManageTabsModal()">
+                    <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i>
+                </button>`;
+            
+            tabsList.innerHTML = html;
+        }
+    } catch (error) {
+        console.error('Erro ao atualizar abas:', error);
+    }
+}
+
+/**
+ * Modal para gerenciar abas (adicionar/remover)
+ */
+async function showManageTabsModal() {
+    try {
+        // Carregar tags disponíveis e abas atuais
+        const [tagsRes, tabsRes] = await Promise.all([
+            fetch('<?= \App\Helpers\Url::to("/tags/all") ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } }),
+            fetch('<?= \App\Helpers\Url::to("/conversation-tabs") ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
+        ]);
+        
+        const tagsData = await tagsRes.json();
+        const tabsData = await tabsRes.json();
+        
+        const allTags = tagsData.success ? tagsData.tags : [];
+        const userTabs = tabsData.success ? tabsData.tabs : [];
+        const tabTagIds = userTabs.map(t => t.tag_id);
+        
+        const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        
+        let tagsListHtml = '';
+        allTags.forEach(tag => {
+            const isTab = tabTagIds.includes(tag.id);
+            tagsListHtml += `
+                <div class="d-flex align-items-center justify-content-between py-2 px-3 rounded mb-1 ${isTab ? 'bg-light-primary' : 'bg-hover-light'}">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="rounded-circle d-inline-block" style="width: 12px; height: 12px; background-color: ${escapeHtml(tag.color || '#009ef7')};"></span>
+                        <span class="fw-semibold">${escapeHtml(tag.name)}</span>
+                        ${tag.description ? `<span class="text-muted fs-8">${escapeHtml(tag.description)}</span>` : ''}
+                    </div>
+                    <button type="button" class="btn btn-sm ${isTab ? 'btn-light-danger' : 'btn-light-primary'}" 
+                            onclick="toggleTabTag(${tag.id}, ${isTab}, this)">
+                        ${isTab ? '<i class="ki-duotone ki-cross fs-7"><span class="path1"></span><span class="path2"></span></i> Remover' : '<i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Adicionar'}
+                    </button>
+                </div>`;
+        });
+        
+        Swal.fire({
+            title: 'Gerenciar Abas',
+            html: `
+                <div class="text-start">
+                    <p class="text-muted fs-7 mb-3">Selecione quais tags deseja usar como abas na listagem de conversas.</p>
+                    <div class="mb-3">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text"><i class="ki-duotone ki-magnifier fs-7"><span class="path1"></span><span class="path2"></span></i></span>
+                            <input type="text" class="form-control form-control-sm" placeholder="Filtrar tags..." 
+                                   oninput="filterManageTabsTags(this.value)">
+                        </div>
+                    </div>
+                    <div id="manageTabsTagsList" style="max-height: 300px; overflow-y: auto;">
+                        ${tagsListHtml}
+                    </div>
+                    <hr class="my-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <input type="text" id="newTabTagName" class="form-control form-control-sm" placeholder="Nova aba (nome da tag)">
+                        <input type="color" id="newTabTagColor" class="form-control form-control-sm form-control-color" value="#009EF7" style="width: 40px; padding: 2px;">
+                        <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="createNewTabFromModal()">
+                            <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Criar
+                        </button>
+                    </div>
+                </div>`,
+            showConfirmButton: false,
+            showCloseButton: true,
+            width: 500,
+            customClass: { popup: isDarkMode ? 'swal2-dark' : '' }
+        });
+    } catch (error) {
+        console.error('Erro ao abrir gerenciador de abas:', error);
+    }
+}
+
+/**
+ * Filtrar tags no modal de gerenciamento
+ */
+function filterManageTabsTags(search) {
+    const container = document.getElementById('manageTabsTagsList');
+    if (!container) return;
+    const items = container.querySelectorAll('.d-flex.align-items-center.justify-content-between');
+    items.forEach(item => {
+        const name = item.querySelector('.fw-semibold')?.textContent || '';
+        item.style.display = name.toLowerCase().includes(search.toLowerCase()) ? '' : 'none';
+    });
+}
+
+/**
+ * Toggle tag como aba (adicionar/remover)
+ */
+async function toggleTabTag(tagId, isCurrentlyTab, btnEl) {
+    try {
+        btnEl.disabled = true;
+        
+        const url = isCurrentlyTab 
+            ? '<?= \App\Helpers\Url::to("/conversation-tabs/remove") ?>'
+            : '<?= \App\Helpers\Url::to("/conversation-tabs") ?>';
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ tag_id: tagId })
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            // Atualizar botão no modal
+            const container = btnEl.closest('.d-flex.align-items-center.justify-content-between');
+            if (isCurrentlyTab) {
+                container.classList.remove('bg-light-primary');
+                btnEl.className = 'btn btn-sm btn-light-primary';
+                btnEl.innerHTML = '<i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Adicionar';
+                btnEl.onclick = function() { toggleTabTag(tagId, false, this); };
+            } else {
+                container.classList.add('bg-light-primary');
+                btnEl.className = 'btn btn-sm btn-light-danger';
+                btnEl.innerHTML = '<i class="ki-duotone ki-cross fs-7"><span class="path1"></span><span class="path2"></span></i> Remover';
+                btnEl.onclick = function() { toggleTabTag(tagId, true, this); };
+            }
+            
+            // Atualizar barra de abas
+            await refreshConversationTabs();
+        }
+        
+        btnEl.disabled = false;
+    } catch (error) {
+        console.error('Erro ao alternar aba:', error);
+        btnEl.disabled = false;
+    }
+}
+
+/**
+ * Criar nova tag + aba a partir do modal de gerenciamento
+ */
+async function createNewTabFromModal() {
+    const nameInput = document.getElementById('newTabTagName');
+    const colorInput = document.getElementById('newTabTagColor');
+    
+    if (!nameInput || !nameInput.value.trim()) {
+        nameInput?.focus();
         return;
     }
     
     try {
-        const promises = selected.map(id => 
-            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/close`, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            }).then(r => r.json())
-        );
-        
-        const results = await Promise.all(promises);
-        const success = results.filter(r => r.success).length;
-        const failed = results.filter(r => !r.success).length;
-        
-        Swal.fire({
-            icon: success > 0 ? 'success' : 'error',
-            title: success > 0 ? 'Sucesso!' : 'Erro',
-            text: `${success} conversa(s) fechada(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
-            colorScheme: isDarkMode ? 'dark' : 'light'
+        const response = await fetch('<?= \App\Helpers\Url::to("/conversation-tabs/create") ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ 
+                name: nameInput.value.trim(), 
+                color: colorInput?.value || '#009EF7' 
+            })
         });
+        const data = await response.json();
         
-        clearBulkSelection();
-        if (typeof refreshConversationList === 'function') {
-            const urlParams = new URLSearchParams(window.location.search);
-            refreshConversationList(urlParams);
+        if (data.success) {
+            // Invalidar cache de tags
+            window._allTagsCache = null;
+            
+            // Fechar modal e reabrir atualizado
+            Swal.close();
+            await refreshConversationTabs();
+            
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: `Aba "${nameInput.value.trim()}" criada!`, showConfirmButton: false, timer: 2000 });
+        } else {
+            Swal.fire({ toast: true, position: 'top-end', icon: 'error', title: data.message || 'Erro ao criar aba', showConfirmButton: false, timer: 3000 });
         }
     } catch (error) {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao fechar conversas',
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
+        console.error('Erro ao criar aba:', error);
     }
 }
 
-// Reabrir conversas em massa
-async function bulkReopenConversations() {
-    const selected = getSelectedConversations();
-    if (selected.length === 0) {
-        alert('Selecione pelo menos uma conversa');
-        return;
-    }
+/**
+ * Modal de criação rápida de aba (a partir do "Setar como" no gear icon)
+ */
+function showCreateTabModal(conversationId) {
+    // Fechar dropdown
+    document.querySelectorAll('.dropdown-menu.show').forEach(m => {
+        const dropdown = bootstrap.Dropdown.getInstance(m.previousElementSibling);
+        if (dropdown) dropdown.hide();
+    });
+
+    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark';
     
-    const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark' || 
-                       document.body.classList.contains('dark-mode') ||
-                       window.matchMedia('(prefers-color-scheme: dark)').matches;
-    
-    if (!confirm(`Reabrir ${selected.length} conversa(s)?`)) {
-        return;
-    }
-    
-    try {
-        const promises = selected.map(id => 
-            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${id}/reopen`, {
-                method: 'POST',
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
+    Swal.fire({
+        title: 'Criar Nova Aba',
+        html: `
+            <div class="text-start">
+                <div class="mb-3">
+                    <label class="form-label fs-7">Nome da aba (tag)</label>
+                    <input type="text" id="quickTabName" class="form-control form-control-sm" placeholder="Ex: Urgente, VIP, Aguardando...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fs-7">Cor</label>
+                    <input type="color" id="quickTabColor" class="form-control form-control-sm form-control-color" value="#009EF7" style="width: 60px;">
+                </div>
+            </div>`,
+        confirmButtonText: 'Criar e Setar',
+        showCancelButton: true,
+        cancelButtonText: 'Cancelar',
+        customClass: { popup: isDarkMode ? 'swal2-dark' : '' },
+        preConfirm: async () => {
+            const name = document.getElementById('quickTabName')?.value?.trim();
+            const color = document.getElementById('quickTabColor')?.value || '#009EF7';
+            
+            if (!name) {
+                Swal.showValidationMessage('Nome é obrigatório');
+                return false;
+            }
+            
+            try {
+                const response = await fetch('<?= \App\Helpers\Url::to("/conversation-tabs/create") ?>', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    body: JSON.stringify({ name, color, conversation_id: conversationId })
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    Swal.showValidationMessage(data.message || 'Erro ao criar');
+                    return false;
                 }
-            }).then(r => r.json())
-        );
-        
-        const results = await Promise.all(promises);
-        const success = results.filter(r => r.success).length;
-        const failed = results.filter(r => !r.success).length;
-        
-        Swal.fire({
-            icon: success > 0 ? 'success' : 'error',
-            title: success > 0 ? 'Sucesso!' : 'Erro',
-            text: `${success} conversa(s) reaberta(s)${failed > 0 ? `. ${failed} falharam.` : '.'}`,
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
-        
-        clearBulkSelection();
-        if (typeof refreshConversationList === 'function') {
+                return data;
+            } catch (error) {
+                Swal.showValidationMessage('Erro de conexão');
+                return false;
+            }
+        }
+    }).then(async (result) => {
+        if (result.isConfirmed && result.value) {
+            window._allTagsCache = null;
+            await refreshConversationTabs();
+            
+            // Atualizar tags visíveis no item
+            const tag = result.value.tag;
+            if (tag) {
+                const convItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
+                if (convItem) {
+                    const tagsContainer = convItem.querySelector('.conversation-item-tags');
+                    if (tagsContainer) {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge badge-sm';
+                        badge.style.cssText = `background-color: ${tag.color || '#009ef7'}20; color: ${tag.color || '#009ef7'};`;
+                        badge.textContent = tag.name;
+                        tagsContainer.appendChild(badge);
+                    }
+                }
+            }
+            
+            // Recarregar lista
             const urlParams = new URLSearchParams(window.location.search);
             refreshConversationList(urlParams);
         }
-    } catch (error) {
-        console.error('Erro:', error);
-        Swal.fire({
-            icon: 'error',
-            title: 'Erro',
-            text: 'Erro ao reabrir conversas',
-            colorScheme: isDarkMode ? 'dark' : 'light'
-        });
-    }
+    });
 }
+
+// ============================================
+// RESTAURAR ABA ATIVA NO CARREGAMENTO
+// ============================================
+document.addEventListener('DOMContentLoaded', function() {
+    const savedTab = localStorage.getItem('activeConversationTab');
+    if (savedTab && savedTab !== 'all') {
+        const tabBtn = document.querySelector(`.conversation-tab[data-tag-id="${savedTab}"]`);
+        if (tabBtn) {
+            switchConversationTab(tabBtn);
+        }
+    }
+    
+    // Atualizar contagens das abas a cada 60 segundos
+    setInterval(() => {
+        refreshConversationTabs();
+    }, 60000);
+});
 
 // Formulírio de edição de contato
 const editContactForm = document.getElementById('editContactForm');

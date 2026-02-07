@@ -941,6 +941,135 @@ window.deleteAgent = function(agentId, agentName) {
 <?php endif; ?>
 <!--end::Modal - Reatribuir Conversas-->
 
+<!--begin::Modal - Processando Reatribuição-->
+<div class="modal fade" id="kt_modal_reassign_processing" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-body text-center py-15">
+                <div class="mb-5">
+                    <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                        <span class="visually-hidden">Processando...</span>
+                    </div>
+                </div>
+                <h3 class="fw-bold text-gray-800 mb-3">Processando Reatribuição</h3>
+                <div class="text-muted fs-6">
+                    <div class="mb-2">Aguarde enquanto redistribuímos as conversas...</div>
+                    <div class="text-gray-700 fw-semibold" id="reassign_progress_text">Iniciando processo...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal - Processando Reatribuição-->
+
+<!--begin::Modal - Resultado da Reatribuição-->
+<div class="modal fade" id="kt_modal_reassign_result" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-check-circle fs-2x text-success me-2">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Reatribuição Concluída
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-6 mb-7">
+                    <i class="ki-duotone ki-check-circle fs-2tx text-success me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    <div class="d-flex flex-stack flex-grow-1">
+                        <div class="fw-semibold">
+                            <h4 class="text-gray-900 fw-bold mb-3">Operação realizada com sucesso!</h4>
+                            <div class="fs-6 text-gray-700" id="reassign_result_message">
+                                <!-- Mensagem será inserida via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="separator my-7"></div>
+                
+                <div class="row g-5">
+                    <div class="col-md-4">
+                        <div class="card card-flush border-0 bg-light-primary">
+                            <div class="card-body text-center py-8">
+                                <i class="ki-duotone ki-message-text-2 fs-3x text-primary mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div class="fs-2x fw-bold text-primary" id="reassign_conversations_count">0</div>
+                                <div class="fs-7 text-gray-600 fw-semibold">Conversas Redistribuídas</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card card-flush border-0 bg-light-info">
+                            <div class="card-body text-center py-8">
+                                <i class="ki-duotone ki-profile-user fs-3x text-info mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                    <span class="path4"></span>
+                                </i>
+                                <div class="fs-2x fw-bold text-info" id="reassign_contacts_count">0</div>
+                                <div class="fs-7 text-gray-600 fw-semibold">Contatos Atualizados</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card card-flush border-0 bg-light-warning">
+                            <div class="card-body text-center py-8">
+                                <i class="ki-duotone ki-user-tick fs-3x text-warning mb-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                    <span class="path3"></span>
+                                </i>
+                                <div class="fs-2x fw-bold text-warning" id="reassign_agents_count">0</div>
+                                <div class="fs-7 text-gray-600 fw-semibold">Agentes Envolvidos</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="reassign_agent_deactivated_notice" class="alert alert-warning d-flex align-items-center mt-7" style="display: none !important;">
+                    <i class="ki-duotone ki-shield-cross fs-2x text-warning me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h5 class="mb-1">Agente Desativado</h5>
+                        <span>O agente foi marcado como inativo conforme solicitado.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer flex-center">
+                <button type="button" class="btn btn-primary" onclick="location.reload()">
+                    <i class="ki-duotone ki-arrow-circle-right fs-3 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                    Atualizar Página
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal - Resultado da Reatribuição-->
+
 <?php 
 $content = ob_get_clean(); 
 $scripts = '
@@ -1392,42 +1521,67 @@ document.addEventListener("DOMContentLoaded", function() {
             
             errorDiv.style.display = "none";
             
-            const submitBtn = document.getElementById("kt_modal_reassign_conversations_submit");
-            submitBtn.setAttribute("data-kt-indicator", "on");
-            submitBtn.disabled = true;
+            // 1. Fechar modal de configuração
+            const configModal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_reassign_conversations"));
+            configModal.hide();
             
+            // 2. Aguardar animação de fechamento e mostrar modal de processamento
             const agentId = document.getElementById("reassign_agent_id").value;
             const formData = new FormData(reassignForm);
             
-            fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
-                method: "POST",
-                headers: {
-                    "X-Requested-With": "XMLHttpRequest"
-                },
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                submitBtn.removeAttribute("data-kt-indicator");
-                submitBtn.disabled = false;
+            setTimeout(() => {
+                const processingModalElement = document.getElementById("kt_modal_reassign_processing");
+                const processingModal = new bootstrap.Modal(processingModalElement);
+                processingModal.show();
+                
+                const progressText = document.getElementById("reassign_progress_text");
+                progressText.textContent = "Redistribuindo conversas...";
+                
+                // 3. Fazer requisição
+                fetch("' . \App\Helpers\Url::to('/agents') . '/" + agentId + "/reassign-conversations", {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // 4. Fechar modal de processamento
+                    processingModal.hide();
                 
                 if (data.success) {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_reassign_conversations"));
-                    modal.hide();
+                    // 5. Mostrar modal de resultados
+                    const resultModal = new bootstrap.Modal(document.getElementById("kt_modal_reassign_result"));
                     
-                    // Mostrar mensagem de sucesso
-                    alert(data.message || "Conversas reatribuídas com sucesso!");
-                    location.reload();
-                } else {
-                    alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
-                }
-            })
-            .catch(error => {
-                submitBtn.removeAttribute("data-kt-indicator");
-                submitBtn.disabled = false;
-                alert("Erro ao reatribuir conversas");
-                console.error(error);
-            });
+                    // Preencher dados do resultado
+                    document.getElementById("reassign_result_message").innerHTML = data.message || "Operação concluída com sucesso!";
+                    document.getElementById("reassign_conversations_count").textContent = data.conversations_reassigned || 0;
+                    document.getElementById("reassign_contacts_count").textContent = data.contact_agents_updated || 0;
+                    
+                    // Contar quantos agentes foram usados
+                    const targetAgents = document.querySelectorAll(".reassign-agent-checkbox:checked");
+                    document.getElementById("reassign_agents_count").textContent = targetAgents.length;
+                    
+                    // Mostrar aviso se agente foi desativado
+                    const deactivatedNotice = document.getElementById("reassign_agent_deactivated_notice");
+                    if (data.agent_deactivated) {
+                        deactivatedNotice.style.display = "flex";
+                    } else {
+                        deactivatedNotice.style.display = "none";
+                    }
+                    
+                    resultModal.show();
+                    } else {
+                        alert("Erro: " + (data.message || "Erro ao reatribuir conversas"));
+                    }
+                })
+                .catch(error => {
+                    processingModal.hide();
+                    alert("Erro ao reatribuir conversas. Por favor, tente novamente.");
+                    console.error(error);
+                });
+            }, 300);
         });
     }
 });

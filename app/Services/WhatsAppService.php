@@ -242,6 +242,77 @@ class WhatsAppService
     }
     
     /**
+     * Parsear conteúdo vCard diretamente (quando baixado via API)
+     */
+    private static function parseVCardContent(string $vcardContent, string $displayNameFallback = ''): array
+    {
+        $result = [
+            'display_name' => $displayNameFallback,
+            'phones' => [],
+            'emails' => [],
+            'organization' => '',
+            'vcard_raw' => $vcardContent
+        ];
+        
+        // Extrair FN (Full Name)
+        if (preg_match('/FN[;:](.+)/i', $vcardContent, $matches)) {
+            $fn = trim($matches[1]);
+            if (!empty($fn)) {
+                $result['display_name'] = $fn;
+            }
+        }
+        
+        // Extrair N (Name structured) como fallback
+        if (empty($result['display_name']) && preg_match('/^N[;:](.+)/mi', $vcardContent, $matches)) {
+            $parts = explode(';', trim($matches[1]));
+            $name = trim(($parts[1] ?? '') . ' ' . ($parts[0] ?? ''));
+            if (!empty(trim($name))) {
+                $result['display_name'] = trim($name);
+            }
+        }
+        
+        // Extrair telefones
+        if (preg_match_all('/(?:item\d+\.)?TEL[^:]*:([^\r\n]+)/i', $vcardContent, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $phone = trim($match[1]);
+                if (!empty($phone)) {
+                    $waid = '';
+                    if (preg_match('/waid=(\d+)/i', $match[0], $waidMatch)) {
+                        $waid = $waidMatch[1];
+                    }
+                    $result['phones'][] = [
+                        'number' => $phone,
+                        'waid' => $waid,
+                        'formatted' => self::formatPhoneForDisplay($phone)
+                    ];
+                }
+            }
+        }
+        
+        // Extrair emails
+        if (preg_match_all('/EMAIL[^:]*:([^\r\n]+)/i', $vcardContent, $matches)) {
+            foreach ($matches[1] as $email) {
+                $email = trim($email);
+                if (!empty($email)) {
+                    $result['emails'][] = $email;
+                }
+            }
+        }
+        
+        // Extrair organização
+        if (preg_match('/ORG[;:](.+)/i', $vcardContent, $matches)) {
+            $result['organization'] = trim($matches[1], "; \t\n\r\0\x0B");
+        }
+        
+        // Se ainda não tem nome, usar fallback
+        if (empty($result['display_name'])) {
+            $result['display_name'] = $displayNameFallback ?: 'Contato';
+        }
+        
+        return $result;
+    }
+    
+    /**
      * Formatar número de telefone para exibição
      */
     private static function formatPhoneForDisplay(string $phone): string
@@ -3315,16 +3386,103 @@ class WhatsAppService
             
             // ═══════════════════════════════════════════════════════════════
             // TRATAMENTO DE CONTATO COMPARTILHADO (vCard)
-            // O Quepasa envia type=contact com attachment contendo vCard
-            // Extraímos nome e telefone do vCard para exibição visual
+            // O Quepasa NÃO inclui o conteúdo do vCard no JSON do webhook
+            // (campo content tem tag json:"-" no Go). Precisamos BAIXAR
+            // o attachment .vcf via API para extrair telefone/email.
             // ═══════════════════════════════════════════════════════════════
             if ($messageType === 'contact') {
                 Logger::quepasa("processWebhook - 📇 CONTATO COMPARTILHADO detectado: displayName='{$message}'");
                 
-                // Extrair dados do vCard do attachment
+                // Primeiro, tentar encontrar vCard no payload (fallback)
                 $vcardData = self::parseVCardFromPayload($quepasaData, $payload);
                 
-                if (!empty($vcardData)) {
+                // Se não encontrou vCard no payload, BAIXAR via API do Quepasa
+                if (empty($vcardData['vcard_raw'])) {
+                    Logger::quepasa("processWebhook - 📇 vCard não encontrado no payload, tentando baixar via API...");
+                    
+                    $messageWid = $payload['id'] ?? $messageId;
+                    $apiUrl = rtrim($account['api_url'], '/');
+                    
+                    $messageIdOnly = $messageWid;
+                    if (strpos($messageIdOnly, '@') !== false) {
+                        $messageIdOnly = explode('@', $messageIdOnly)[0];
+                    }
+                    
+                    $endpoints = [
+                        "/attachment/{$messageWid}",
+                        "/attachment/{$messageIdOnly}",
+                        "/download/{$messageWid}",
+                        "/download/{$messageIdOnly}",
+                        "/messages/{$messageWid}/download",
+                        "/messages/{$messageIdOnly}/download",
+                        "/{$messageWid}/download",
+                        "/{$messageIdOnly}/download"
+                    ];
+                    
+                    $vcardDownloaded = false;
+                    foreach ($endpoints as $endpoint) {
+                        $downloadUrl = $apiUrl . $endpoint;
+                        Logger::quepasa("processWebhook - 📇 Tentando baixar vCard: {$downloadUrl}");
+                        
+                        $ch = curl_init($downloadUrl);
+                        $headers = [
+                            'Accept: */*',
+                            'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
+                            'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                        ];
+                        
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_TIMEOUT => 15,
+                            CURLOPT_HTTPHEADER => $headers,
+                            CURLOPT_FOLLOWLOCATION => true,
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false
+                        ]);
+                        
+                        $vcardRaw = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                        curl_close($ch);
+                        
+                        Logger::quepasa("processWebhook - 📇 Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($vcardRaw ?? '') . " bytes");
+                        
+                        if ($httpCode === 200 && $vcardRaw && strlen($vcardRaw) > 10) {
+                            // Verificar se é vCard válido (não é JSON de erro)
+                            $isJson = @json_decode($vcardRaw);
+                            
+                            if (strpos($vcardRaw, 'BEGIN:VCARD') !== false) {
+                                // É um vCard direto
+                                Logger::quepasa("processWebhook - ✅ vCard baixado com sucesso: " . strlen($vcardRaw) . " bytes");
+                                $vcardData = self::parseVCardContent($vcardRaw, $message);
+                                $vcardDownloaded = true;
+                                break;
+                            } elseif ($isJson === null && (
+                                strpos($contentType, 'text') !== false ||
+                                strpos($contentType, 'vcard') !== false ||
+                                strpos($contentType, 'octet-stream') !== false ||
+                                empty($contentType)
+                            )) {
+                                // Tentar decodificar como base64
+                                $decoded = base64_decode($vcardRaw, true);
+                                if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
+                                    Logger::quepasa("processWebhook - ✅ vCard (base64) baixado com sucesso");
+                                    $vcardData = self::parseVCardContent($decoded, $message);
+                                    $vcardDownloaded = true;
+                                    break;
+                                }
+                                // Pode ser o conteúdo do vCard sem BEGIN:VCARD (raro)
+                                Logger::quepasa("processWebhook - ⚠️ Conteúdo baixado não parece ser vCard: " . substr($vcardRaw, 0, 200));
+                            }
+                        }
+                    }
+                    
+                    if (!$vcardDownloaded) {
+                        Logger::quepasa("processWebhook - ⚠️ Não foi possível baixar o vCard via API");
+                    }
+                }
+                
+                if (!empty($vcardData) && (!empty($vcardData['phones']) || !empty($vcardData['vcard_raw']))) {
                     // Salvar como attachment do tipo 'contact' com dados estruturados
                     $contactAttachment = [
                         'type' => 'contact',
@@ -3342,10 +3500,19 @@ class WhatsAppService
                         $message = $vcardData['display_name'] ?? 'Contato compartilhado';
                     }
                     
-                    Logger::quepasa("processWebhook - ✅ vCard parsed: " . json_encode($contactAttachment, JSON_UNESCAPED_UNICODE));
+                    Logger::quepasa("processWebhook - ✅ vCard parsed com dados: " . json_encode($contactAttachment, JSON_UNESCAPED_UNICODE));
                 } else {
-                    // Fallback: não conseguiu parsear vCard, manter como texto
-                    Logger::quepasa("processWebhook - ⚠️ Não foi possível extrair dados do vCard, mantendo como texto");
+                    // Fallback: não conseguiu parsear vCard, criar attachment mínimo com nome
+                    Logger::quepasa("processWebhook - ⚠️ vCard sem dados de telefone, criando attachment mínimo");
+                    $contactAttachment = [
+                        'type' => 'contact',
+                        'display_name' => $message ?: 'Contato compartilhado',
+                        'phones' => [],
+                        'emails' => [],
+                        'organization' => '',
+                        'vcard_raw' => ''
+                    ];
+                    $attachments = [$contactAttachment];
                     if (empty($message)) {
                         $message = 'Contato compartilhado';
                     }

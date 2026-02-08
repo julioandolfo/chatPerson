@@ -1245,7 +1245,7 @@ class ConversationController
                 [json_encode($reactions, JSON_UNESCAPED_UNICODE), $messageId]
             );
             
-            // Tentar enviar reação ao WhatsApp (best effort)
+            // Tentar enviar reação ao WhatsApp (best effort - chega como reply com emoji)
             try {
                 $conversation = \App\Models\Conversation::find($message['conversation_id']);
                 if ($conversation && $conversation['channel'] === 'whatsapp' && !empty($message['external_id'])) {
@@ -1263,9 +1263,8 @@ class ConversationController
                             // Enviar reação via Quepasa API
                             $payload = [
                                 'chatid' => $chatId,
-                                'text' => $existingIndex !== null ? '' : $emoji, // Vazio para remover
+                                'text' => $existingIndex !== null ? '' : $emoji,
                                 'inreply' => $message['external_id'],
-                                'inreaction' => true
                             ];
                             
                             $ch = curl_init("{$apiUrl}/send");

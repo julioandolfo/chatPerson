@@ -1417,7 +1417,7 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     padding: 6px 8px;
     display: flex;
     gap: 2px;
-    z-index: 100;
+    z-index: 9999;
     animation: reactionPickerIn 0.15s ease-out;
     white-space: nowrap;
 }

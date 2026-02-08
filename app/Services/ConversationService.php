@@ -1408,7 +1408,10 @@ class ConversationService
         $attachmentsData = [];
         if (!empty($attachments)) {
             foreach ($attachments as $attachment) {
-                if (is_array($attachment) && isset($attachment['path'])) {
+                if (is_array($attachment) && (
+                    isset($attachment['path']) || 
+                    (isset($attachment['type']) && in_array($attachment['type'], ['contact', 'location']))
+                )) {
                     $attachmentsData[] = $attachment;
                 }
             }

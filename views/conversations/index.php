@@ -1407,23 +1407,20 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 /* Reaction picker popup */
 .reaction-picker {
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
+    position: fixed;
     background: #fff;
     border-radius: 24px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     padding: 6px 8px;
     display: flex;
     gap: 2px;
-    z-index: 9999;
+    z-index: 99999;
     animation: reactionPickerIn 0.15s ease-out;
     white-space: nowrap;
 }
 @keyframes reactionPickerIn {
-    from { opacity: 0; transform: translateX(-50%) scale(0.8) translateY(4px); }
-    to { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+    from { opacity: 0; transform: scale(0.8) translateY(4px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
 }
 .reaction-picker-emoji {
     width: 36px;
@@ -17832,7 +17829,6 @@ function toggleReactionPicker(event, messageId) {
     }
     
     const btn = event.currentTarget;
-    const actionsDiv = btn.closest('.message-actions');
     
     const emojis = ['👍', '👎', '❤️', '🔥', '😂', '😮', '😢', '😍', '🎉', '🤔', '👏', '🙏', '💯', '✅', '👀'];
     
@@ -17852,8 +17848,22 @@ function toggleReactionPicker(event, messageId) {
         picker.appendChild(emojiBtn);
     });
     
-    actionsDiv.style.position = 'relative';
-    actionsDiv.appendChild(picker);
+    // Adicionar ao body com position fixed para evitar overflow:hidden dos containers
+    document.body.appendChild(picker);
+    
+    // Posicionar com base no botão clicado
+    const btnRect = btn.getBoundingClientRect();
+    const pickerWidth = picker.offsetWidth;
+    let left = btnRect.left + (btnRect.width / 2) - (pickerWidth / 2);
+    let top = btnRect.top - picker.offsetHeight - 6;
+    
+    // Garantir que não saia da tela
+    if (left < 8) left = 8;
+    if (left + pickerWidth > window.innerWidth - 8) left = window.innerWidth - pickerWidth - 8;
+    if (top < 8) top = btnRect.bottom + 6; // Se não cabe acima, colocar abaixo
+    
+    picker.style.left = left + 'px';
+    picker.style.top = top + 'px';
     
     // Fechar ao clicar fora
     setTimeout(() => {

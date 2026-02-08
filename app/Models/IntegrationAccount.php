@@ -29,7 +29,10 @@ class IntegrationAccount extends Model
         'new_conv_limit_enabled',
         'new_conv_limit_count',
         'new_conv_limit_period',
-        'new_conv_limit_period_value'
+        'new_conv_limit_period_value',
+        // Campos Native WhatsApp (Baileys) + Proxy
+        'proxy_host', 'proxy_user', 'proxy_pass',
+        'native_session_id', 'native_service_url'
     ];
     protected bool $timestamps = true;
 

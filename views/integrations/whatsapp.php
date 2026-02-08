@@ -142,6 +142,17 @@ ob_start();
                                         <span class="fs-8">Usando funil/etapa padrão do sistema</span>
                                     </div>
                                     <?php endif; ?>
+                                    <?php if (!empty($account['proxy_host'])): ?>
+                                    <div class="separator separator-dashed my-3"></div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <i class="ki-duotone ki-shield fs-5 text-primary me-2">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                        </i>
+                                        <span class="text-muted fw-semibold fs-7 me-2">Proxy:</span>
+                                        <span class="badge badge-light-primary fs-8"><?= htmlspecialchars($account['proxy_host']) ?></span>
+                                    </div>
+                                    <?php endif; ?>
                                     <?php if (!empty($account['wavoip_enabled'])): ?>
                                     <div class="separator separator-dashed my-3"></div>
                                     <div class="d-flex align-items-center mb-2">
@@ -262,28 +273,82 @@ ob_start();
                     </div>
                     <div class="fv-row mb-7">
                         <label class="required fw-semibold fs-6 mb-2">Provider</label>
-                        <select name="provider" id="kt_provider_select" class="form-select form-select-solid" required>
+                        <select name="provider" id="kt_provider_select" class="form-select form-select-solid" required onchange="toggleProviderFields(this.value)">
                             <option value="quepasa" selected>Quepasa API</option>
+                            <option value="native">WhatsApp Nativo (Baileys)</option>
                             <option value="evolution" disabled>Evolution API (Em breve)</option>
                         </select>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">URL da API</label>
-                        <input type="url" name="api_url" class="form-control form-control-solid" 
-                               placeholder="https://whats.seudominio.com" required />
-                        <div class="form-text">URL base da sua instalação Quepasa (ex: https://whats.seudominio.com)</div>
+                    
+                    <!-- Campos Quepasa -->
+                    <div id="kt_quepasa_fields">
+                        <div class="fv-row mb-7">
+                            <label class="required fw-semibold fs-6 mb-2">URL da API</label>
+                            <input type="url" name="api_url" class="form-control form-control-solid" 
+                                   placeholder="https://whats.seudominio.com" />
+                            <div class="form-text">URL base da sua instalação Quepasa (ex: https://whats.seudominio.com)</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="required fw-semibold fs-6 mb-2">Quepasa User</label>
+                            <input type="text" name="quepasa_user" class="form-control form-control-solid" 
+                                   placeholder="julio" />
+                            <div class="form-text">Identificador do usuário (X-QUEPASA-USER). Ex: julio, personizi, etc.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Track ID</label>
+                            <input type="text" name="quepasa_trackid" class="form-control form-control-solid" 
+                                   placeholder="meu-sistema" />
+                            <div class="form-text">ID para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
+                        </div>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Quepasa User</label>
-                        <input type="text" name="quepasa_user" class="form-control form-control-solid" 
-                               placeholder="julio" required />
-                        <div class="form-text">Identificador do usuário (X-QUEPASA-USER). Ex: julio, personizi, etc.</div>
-                    </div>
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Track ID</label>
-                        <input type="text" name="quepasa_trackid" class="form-control form-control-solid" 
-                               placeholder="meu-sistema" />
-                        <div class="form-text">ID para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
+                    
+                    <!-- Campos Native (Baileys) -->
+                    <div id="kt_native_fields" style="display: none;">
+                        <div class="alert alert-info d-flex align-items-center p-5 mb-7">
+                            <i class="ki-duotone ki-shield-tick fs-2x text-info me-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold">Conexão Nativa</span>
+                                <span class="fs-7">Conecta diretamente ao WhatsApp sem depender de servidor externo. Requer o Baileys Service rodando localmente.</span>
+                            </div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL do Baileys Service</label>
+                            <input type="text" name="native_service_url" class="form-control form-control-solid" 
+                                   value="http://127.0.0.1:3100" placeholder="http://127.0.0.1:3100" />
+                            <div class="form-text">URL do microserviço Baileys (padrão: http://127.0.0.1:3100)</div>
+                        </div>
+                        
+                        <div class="separator separator-dashed my-5"></div>
+                        <h5 class="fw-bold mb-4">
+                            <i class="ki-duotone ki-shield fs-4 text-primary me-2"><span class="path1"></span><span class="path2"></span></i>
+                            Proxy (Opcional)
+                        </h5>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Endereço do Proxy</label>
+                            <input type="text" name="proxy_host" class="form-control form-control-solid" 
+                                   placeholder="socks5://proxy.exemplo.com:1080" />
+                            <div class="form-text">Formato: socks5://host:porta ou http://host:porta. Deixe vazio para usar IP local.</div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-6">
+                                <label class="fw-semibold fs-6 mb-2">Usuário do Proxy</label>
+                                <input type="text" name="proxy_user" class="form-control form-control-solid" placeholder="user" />
+                            </div>
+                            <div class="col-6">
+                                <label class="fw-semibold fs-6 mb-2">Senha do Proxy</label>
+                                <input type="password" name="proxy_pass" class="form-control form-control-solid" placeholder="******" />
+                            </div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <button type="button" class="btn btn-sm btn-light-primary" onclick="testProxy()">
+                                <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                Testar Proxy
+                            </button>
+                            <span id="kt_proxy_test_result" class="ms-3 fs-7"></span>
+                        </div>
                     </div>
                     
                     <div class="separator separator-dashed my-7"></div>
@@ -552,6 +617,37 @@ ob_start();
                     </div>
                     <!--end::Limite de Novas Conversas-->
                     
+                    <!--begin::Proxy Config (Native only)-->
+                    <div id="kt_edit_proxy_section" style="display: none;">
+                        <div class="separator separator-dashed my-5"></div>
+                        <h5 class="fw-bold mb-4">
+                            <i class="ki-duotone ki-shield fs-4 text-primary me-2"><span class="path1"></span><span class="path2"></span></i>
+                            Configuração de Proxy
+                        </h5>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL do Baileys Service</label>
+                            <input type="text" name="native_service_url" id="kt_edit_whatsapp_native_url" class="form-control form-control-solid" 
+                                   placeholder="http://127.0.0.1:3100" />
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Endereço do Proxy</label>
+                            <input type="text" name="proxy_host" id="kt_edit_whatsapp_proxy_host" class="form-control form-control-solid" 
+                                   placeholder="socks5://proxy.exemplo.com:1080" />
+                            <div class="form-text">Formato: socks5://host:porta ou http://host:porta. Deixe vazio para IP local.</div>
+                        </div>
+                        <div class="row mb-7">
+                            <div class="col-6">
+                                <label class="fw-semibold fs-6 mb-2">Usuário do Proxy</label>
+                                <input type="text" name="proxy_user" id="kt_edit_whatsapp_proxy_user" class="form-control form-control-solid" placeholder="user" />
+                            </div>
+                            <div class="col-6">
+                                <label class="fw-semibold fs-6 mb-2">Senha do Proxy</label>
+                                <input type="password" name="proxy_pass" id="kt_edit_whatsapp_proxy_pass" class="form-control form-control-solid" placeholder="******" />
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Proxy Config-->
+                    
                     <div class="separator separator-dashed my-5"></div>
                     
                     <div class="fv-row mb-7">
@@ -660,6 +756,66 @@ $scripts = '
 let currentAccountId = null;
 let qrCodeStatusInterval = null;
 
+// Toggle campos de provider (Quepasa vs Native)
+function toggleProviderFields(provider) {
+    const quepasaFields = document.getElementById("kt_quepasa_fields");
+    const nativeFields = document.getElementById("kt_native_fields");
+    
+    if (provider === "native") {
+        if (quepasaFields) quepasaFields.style.display = "none";
+        if (nativeFields) nativeFields.style.display = "block";
+        // Remover required dos campos Quepasa
+        quepasaFields.querySelectorAll("input").forEach(i => i.removeAttribute("required"));
+    } else {
+        if (quepasaFields) quepasaFields.style.display = "block";
+        if (nativeFields) nativeFields.style.display = "none";
+    }
+}
+
+// Testar proxy
+function testProxy() {
+    const proxyHost = document.querySelector("input[name=proxy_host]")?.value;
+    const proxyUser = document.querySelector("input[name=proxy_user]")?.value;
+    const proxyPass = document.querySelector("input[name=proxy_pass]")?.value;
+    const resultSpan = document.getElementById("kt_proxy_test_result");
+    
+    if (!proxyHost) {
+        resultSpan.innerHTML = "<span class=\"text-warning\">Informe o endereço do proxy</span>";
+        return;
+    }
+    
+    resultSpan.innerHTML = "<span class=\"spinner-border spinner-border-sm me-2\"></span>Testando...";
+    
+    // Montar proxy string com auth se necessário
+    let proxyString = proxyHost;
+    if (proxyUser) {
+        const url = new URL(proxyHost.startsWith("http") || proxyHost.startsWith("socks") ? proxyHost : "socks5://" + proxyHost);
+        url.username = proxyUser;
+        url.password = proxyPass || "";
+        proxyString = url.toString();
+    }
+    
+    // Obter native_service_url
+    const serviceUrl = document.querySelector("input[name=native_service_url]")?.value || "http://127.0.0.1:3100";
+    
+    fetch(serviceUrl + "/proxy/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proxy: proxyString })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            resultSpan.innerHTML = "<span class=\"text-success\">✅ " + (data.message || "Proxy funcionando") + "</span>";
+        } else {
+            resultSpan.innerHTML = "<span class=\"text-danger\">❌ " + (data.message || "Falha na conexão") + "</span>";
+        }
+    })
+    .catch(err => {
+        resultSpan.innerHTML = "<span class=\"text-danger\">❌ Baileys Service não está acessível</span>";
+    });
+}
+
 // Carregar etapas do funil
 function loadFunnelStages(funnelId, targetSelectId, callback) {
     const stageSelect = document.getElementById(targetSelectId);
@@ -721,6 +877,18 @@ function editAccount(account) {
         "disconnected": "❌ Desconectado"
     };
     statusDisplay.textContent = statusLabels[account.status] || account.status || "Desconhecido";
+    
+    // Mostrar/ocultar seção de proxy baseado no provider
+    const proxySection = document.getElementById("kt_edit_proxy_section");
+    if (account.provider === "native") {
+        proxySection.style.display = "block";
+        document.getElementById("kt_edit_whatsapp_native_url").value = account.native_service_url || "http://127.0.0.1:3100";
+        document.getElementById("kt_edit_whatsapp_proxy_host").value = account.proxy_host || "";
+        document.getElementById("kt_edit_whatsapp_proxy_user").value = account.proxy_user || "";
+        document.getElementById("kt_edit_whatsapp_proxy_pass").value = ""; // Não exibir senha
+    } else {
+        proxySection.style.display = "none";
+    }
     
     // Preencher campos de limite de novas conversas
     const limitEnabled = account.new_conv_limit_enabled == 1 || account.new_conv_limit_enabled === true;

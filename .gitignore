@@ -24,6 +24,12 @@ Thumbs.db
 # Dependências (se usar Composer)
 vendor/
 
+# Node.js
+node_modules/
+whatsapp-service/media/
+whatsapp-service/src/store/*/
+whatsapp-service/logs/
+
 
 # Uploads
 public/uploads/

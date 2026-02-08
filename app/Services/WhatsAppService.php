@@ -328,6 +328,263 @@ class WhatsAppService
         return $phone;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // PROVIDER NATIVE (Baileys Service) - Métodos de integração
+    // ═══════════════════════════════════════════════════════════════
+    
+    /**
+     * Chamada HTTP ao Baileys Service local
+     */
+    private static function nativeApiCall(array $account, string $method, string $endpoint, array $data = [], int $timeout = 15): array
+    {
+        $baseUrl = $account['native_service_url'] ?? 'http://127.0.0.1:3100';
+        $url = rtrim($baseUrl, '/') . $endpoint;
+        $apiToken = $account['api_token'] ?? $account['quepasa_token'] ?? '';
+        
+        $ch = curl_init($url);
+        $headers = [
+            'Content-Type: application/json',
+            'Accept: application/json',
+            'X-API-Token: ' . $apiToken,
+        ];
+        
+        $curlOpts = [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeout,
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_SSL_VERIFYPEER => false,
+        ];
+        
+        if (strtoupper($method) === 'POST') {
+            $curlOpts[CURLOPT_POST] = true;
+            $curlOpts[CURLOPT_POSTFIELDS] = json_encode($data);
+        }
+        
+        curl_setopt_array($ch, $curlOpts);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        curl_close($ch);
+        
+        if ($error) {
+            Logger::quepasa("nativeApiCall - cURL error: {$error} (url: {$url})");
+            return ['success' => false, 'message' => "Connection failed: {$error}", 'httpCode' => 0];
+        }
+        
+        $result = json_decode($response, true) ?? [];
+        $result['httpCode'] = $httpCode;
+        
+        return $result;
+    }
+    
+    /**
+     * Obter QR Code via Baileys Service (provider native)
+     */
+    private static function getQRCodeNative(array $account): ?array
+    {
+        $sessionId = $account['native_session_id'] ?? ('session_' . $account['id']);
+        Logger::quepasa("getQRCodeNative - Obtendo QR para sessão: {$sessionId}");
+        
+        // Garantir que a sessão está iniciada
+        $proxyConfig = null;
+        if (!empty($account['proxy_host'])) {
+            $proxyConfig = $account['proxy_host'];
+            if (!empty($account['proxy_user'])) {
+                // Inserir auth na URL do proxy
+                $parsed = parse_url($proxyConfig);
+                $scheme = ($parsed['scheme'] ?? 'socks5') . '://';
+                $auth = $account['proxy_user'] . ':' . ($account['proxy_pass'] ?? '') . '@';
+                $host = ($parsed['host'] ?? '') . ':' . ($parsed['port'] ?? 1080);
+                $proxyConfig = $scheme . $auth . $host;
+            }
+        }
+        
+        // Iniciar sessão se não existir
+        $startData = [
+            'trackId' => $account['quepasa_trackid'] ?? $account['name'] ?? $sessionId,
+            'phoneNumber' => $account['phone_number'] ?? null,
+        ];
+        if ($proxyConfig) {
+            $startData['proxy'] = $proxyConfig;
+        }
+        
+        $startResult = self::nativeApiCall($account, 'POST', "/sessions/{$sessionId}/start", $startData);
+        Logger::quepasa("getQRCodeNative - Start session result: " . json_encode($startResult));
+        
+        // Salvar session_id se ainda não existir
+        if (empty($account['native_session_id'])) {
+            \App\Helpers\Database::execute(
+                "UPDATE integration_accounts SET native_session_id = ? WHERE id = ?",
+                [$sessionId, $account['id']]
+            );
+        }
+        
+        // Aguardar um pouco para o QR ser gerado
+        usleep(2000000); // 2 segundos
+        
+        // Obter QR code
+        $qrResult = self::nativeApiCall($account, 'GET', "/sessions/{$sessionId}/qrcode?format=png");
+        
+        if (!empty($qrResult['qr'])) {
+            Logger::quepasa("getQRCodeNative - QR Code obtido com sucesso");
+            return [
+                'qrCode' => $qrResult['qr'],
+                'status' => $qrResult['status'] ?? 'qr_ready',
+                'sessionId' => $sessionId,
+            ];
+        }
+        
+        if (($qrResult['status'] ?? '') === 'connected') {
+            return [
+                'status' => 'connected',
+                'message' => 'Já conectado',
+                'sessionId' => $sessionId,
+            ];
+        }
+        
+        Logger::quepasa("getQRCodeNative - QR não disponível: " . json_encode($qrResult));
+        return [
+            'status' => $qrResult['status'] ?? 'waiting',
+            'message' => $qrResult['message'] ?? 'QR code ainda não disponível, tente novamente',
+            'sessionId' => $sessionId,
+        ];
+    }
+    
+    /**
+     * Verificar status da conexão via Baileys Service (provider native)
+     */
+    public static function getConnectionStatusNative(array $account): array
+    {
+        $sessionId = $account['native_session_id'] ?? ('session_' . $account['id']);
+        
+        $result = self::nativeApiCall($account, 'GET', "/sessions/{$sessionId}/status");
+        
+        if ($result['httpCode'] === 0) {
+            return [
+                'connected' => false,
+                'status' => 'error',
+                'message' => 'Baileys Service não está rodando',
+                'provider' => 'native',
+            ];
+        }
+        
+        $connected = ($result['status'] ?? '') === 'connected';
+        $phoneNumber = $result['phoneNumber'] ?? null;
+        
+        // Atualizar status no banco
+        $newStatus = $connected ? 'active' : 'disconnected';
+        if ($account['status'] !== $newStatus) {
+            \App\Helpers\Database::execute(
+                "UPDATE integration_accounts SET status = ?, last_connection_check = NOW(), last_connection_result = ? WHERE id = ?",
+                [$newStatus, $connected ? 'connected' : 'disconnected', $account['id']]
+            );
+        }
+        
+        return [
+            'connected' => $connected,
+            'status' => $result['status'] ?? 'unknown',
+            'phoneNumber' => $phoneNumber,
+            'chatId' => $result['chatid'] ?? null,
+            'provider' => 'native',
+            'sessionId' => $sessionId,
+        ];
+    }
+    
+    /**
+     * Enviar mensagem via Baileys Service (provider native)
+     * Suporta texto, mídia (imagem, vídeo, áudio, documento), reações e replies
+     */
+    public static function sendMessageNative(int $accountId, string $to, string $message, array $options = []): array
+    {
+        Logger::quepasa("sendMessageNative - Iniciando envio: accountId={$accountId}, to={$to}");
+        
+        $account = IntegrationAccount::find($accountId);
+        if (!$account) {
+            throw new \InvalidArgumentException('Conta não encontrada');
+        }
+        
+        $sessionId = $account['native_session_id'] ?? ('session_' . $account['id']);
+        
+        // Normalizar chatId
+        $chatId = $to;
+        if (!str_contains($chatId, '@')) {
+            try {
+                $contact = \App\Models\Contact::findByPhoneNormalized($to);
+                if ($contact && !empty($contact['whatsapp_id'])) {
+                    $chatId = $contact['whatsapp_id'];
+                } else {
+                    $chatId = $to . '@s.whatsapp.net';
+                }
+            } catch (\Throwable $e) {
+                $chatId = $to . '@s.whatsapp.net';
+            }
+        }
+        
+        // Verificar se tem mídia para enviar
+        $hasMedia = !empty($options['media_url']) || !empty($options['media_path']) || !empty($options['media_base64']);
+        
+        if ($hasMedia) {
+            // Enviar mídia via endpoint send-media
+            $data = [
+                'chatid' => $chatId,
+                'caption' => $message,
+                'mimetype' => $options['media_mime'] ?? $options['mimetype'] ?? 'application/octet-stream',
+                'filename' => $options['media_name'] ?? $options['filename'] ?? 'file',
+            ];
+            
+            if (!empty($options['media_url'])) {
+                $data['url'] = $options['media_url'];
+            } elseif (!empty($options['media_path'])) {
+                $data['localPath'] = $options['media_path'];
+            } elseif (!empty($options['media_base64'])) {
+                $data['base64'] = $options['media_base64'];
+            }
+            
+            if (!empty($options['inreply'])) {
+                $data['inreply'] = $options['inreply'];
+            }
+            
+            $result = self::nativeApiCall($account, 'POST', "/sessions/{$sessionId}/send-media", $data, 60);
+        } else {
+            // Enviar texto simples
+            $data = [
+                'chatid' => $chatId,
+                'text' => $message,
+            ];
+            
+            if (!empty($options['inreply'])) {
+                $data['inreply'] = $options['inreply'];
+            }
+            
+            // Enviar como reação
+            if (!empty($options['reaction'])) {
+                $data['reaction'] = true;
+                $data['inreply'] = $options['inreply'] ?? '';
+            }
+            
+            $result = self::nativeApiCall($account, 'POST', "/sessions/{$sessionId}/send", $data, 30);
+        }
+        
+        if (!($result['success'] ?? false)) {
+            $errorMsg = $result['message'] ?? 'Erro desconhecido ao enviar mensagem';
+            Logger::quepasa("sendMessageNative - Erro: {$errorMsg}");
+            throw new \Exception($errorMsg);
+        }
+        
+        Logger::quepasa("sendMessageNative - ✅ Mensagem enviada: " . json_encode($result['result'] ?? []));
+        
+        return [
+            'success' => true,
+            'messageId' => $result['result']['id'] ?? null,
+            'chatId' => $chatId,
+        ];
+    }
+    
+    // ═══════════════════════════════════════════════════════════════
+    // FIM PROVIDER NATIVE
+    // ═══════════════════════════════════════════════════════════════
+
     /**
      * Normalizar número de telefone do WhatsApp
      * Remove sufixos como @s.whatsapp.net, @lid, @c.us, @g.us, etc.
@@ -368,18 +625,23 @@ class WhatsAppService
      */
     public static function createAccount(array $data): int
     {
-        $errors = \App\Helpers\Validator::validate($data, [
+        $provider = $data['provider'] ?? 'quepasa';
+        
+        $rules = [
             'name' => 'required|string|max:255',
             'phone_number' => 'required|string',
-            'provider' => 'required|string|in:quepasa,evolution',
-            'api_url' => 'required|string|max:500',
-            'quepasa_user' => 'nullable|string|max:255',
-            'quepasa_trackid' => 'nullable|string|max:255',
-            'api_key' => 'nullable|string|max:255',
-            'instance_id' => 'nullable|string|max:255',
+            'provider' => 'required|string|in:quepasa,evolution,native',
             'default_funnel_id' => 'nullable|integer',
             'default_stage_id' => 'nullable|integer'
-        ]);
+        ];
+        
+        // Campos obrigatórios variam por provider
+        if ($provider === 'quepasa') {
+            $rules['api_url'] = 'required|string|max:500';
+            $rules['quepasa_user'] = 'nullable|string|max:255';
+        }
+        
+        $errors = \App\Helpers\Validator::validate($data, $rules);
 
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . json_encode($errors));
@@ -394,24 +656,46 @@ class WhatsAppService
         $data['status'] = 'inactive';
         $data['config'] = json_encode($data['config'] ?? []);
 
-        // Se for Quepasa e não tiver quepasa_user, usar um padrão
-        if ($data['provider'] === 'quepasa' && empty($data['quepasa_user'])) {
-            $data['quepasa_user'] = strtolower(str_replace(' ', '_', $data['name']));
-        }
+        if ($provider === 'native') {
+            // Provider Native (Baileys)
+            $data['native_service_url'] = $data['native_service_url'] ?? 'http://127.0.0.1:3100';
+            $data['native_session_id'] = 'session_' . time() . '_' . substr(md5($data['phone_number']), 0, 8);
+            $data['proxy_host'] = $data['proxy_host'] ?? null;
+            $data['proxy_user'] = $data['proxy_user'] ?? null;
+            $data['proxy_pass'] = $data['proxy_pass'] ?? null;
+            
+            // Gerar trackid para identificar nos webhooks
+            if (empty($data['quepasa_trackid'])) {
+                $data['quepasa_trackid'] = $data['native_session_id'];
+            }
+            
+            // Token para autenticação com o Baileys Service
+            if (empty($data['quepasa_token'])) {
+                $data['quepasa_token'] = self::generateQuepasaToken();
+            }
+            
+            // URL padrão do Baileys local
+            if (empty($data['api_url'])) {
+                $data['api_url'] = $data['native_service_url'];
+            }
+        } else {
+            // Provider Quepasa
+            if ($data['provider'] === 'quepasa' && empty($data['quepasa_user'])) {
+                $data['quepasa_user'] = strtolower(str_replace(' ', '_', $data['name']));
+            }
 
-        // Se não tiver trackid, usar o nome da conta
-        if (empty($data['quepasa_trackid'])) {
-            $data['quepasa_trackid'] = $data['name'];
-        }
+            if (empty($data['quepasa_trackid'])) {
+                $data['quepasa_trackid'] = $data['name'];
+            }
 
-        // Token obrigatória para identificar o servidor na Quepasa
-        if (empty($data['quepasa_token'])) {
-            $data['quepasa_token'] = self::generateQuepasaToken();
+            if (empty($data['quepasa_token'])) {
+                $data['quepasa_token'] = self::generateQuepasaToken();
+            }
         }
 
         $accountId = IntegrationAccount::createWhatsApp($data);
-        Logger::quepasa("createAccount - Conta criada em integration_accounts: ID={$accountId}");
-        Logger::unificacao("[CRUD] createAccount: Conta WhatsApp criada IA#{$accountId} ({$data['name']}, phone={$data['phone_number']})");
+        Logger::quepasa("createAccount - Conta criada em integration_accounts: ID={$accountId}, provider={$provider}");
+        Logger::unificacao("[CRUD] createAccount: Conta WhatsApp criada IA#{$accountId} ({$data['name']}, phone={$data['phone_number']}, provider={$provider})");
         
         return $accountId;
     }
@@ -428,9 +712,14 @@ class WhatsAppService
             throw new \InvalidArgumentException('Conta não encontrada');
         }
 
+        // Rotear para provider correto
+        if ($account['provider'] === 'native') {
+            return self::getQRCodeNative($account);
+        }
+        
         if ($account['provider'] !== 'quepasa') {
             Logger::quepasa("getQRCode - Provider inválido: {$account['provider']}");
-            throw new \InvalidArgumentException('QR Code disponível apenas para Quepasa');
+            throw new \InvalidArgumentException('QR Code disponível apenas para Quepasa ou Native');
         }
 
         try {
@@ -608,6 +897,11 @@ class WhatsAppService
         $account = IntegrationAccount::find($accountId);
         if (!$account) {
             throw new \InvalidArgumentException('Conta não encontrada');
+        }
+        
+        // Rotear para provider native (Baileys)
+        if ($account['provider'] === 'native') {
+            return self::getConnectionStatusNative($account);
         }
 
         // Se forçar verificação real, usar método dedicado
@@ -1076,7 +1370,7 @@ class WhatsAppService
     }
 
     /**
-     * Enviar mensagem via WhatsApp (Quepasa self-hosted)
+     * Enviar mensagem via WhatsApp (Quepasa self-hosted ou Native Baileys)
      * Endpoint: POST /send
      */
     public static function sendMessage(int $accountId, string $to, string $message, array $options = []): array
@@ -1091,6 +1385,12 @@ class WhatsAppService
             Logger::quepasa("sendMessage - ERRO: Conta não encontrada: {$accountId}");
             Logger::unificacao("[WHATSAPP_SEND] ❌ ERRO: accountId={$accountId} não encontrado em integration_accounts!");
             throw new \InvalidArgumentException('Conta não encontrada');
+        }
+        
+        // Rotear para provider native (Baileys)
+        if ($account['provider'] === 'native') {
+            Logger::quepasa("sendMessage - Roteando para Native (Baileys): accountId={$accountId}");
+            return self::sendMessageNative($accountId, $to, $message, $options);
         }
         
         Logger::quepasa("sendMessage - ✅ Conta encontrada: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}");
@@ -1656,11 +1956,22 @@ class WhatsAppService
             $account = null;
             $accountFoundBy = 'nenhum'; // Para rastrear como a conta foi encontrada
             
+            // Detectar se é webhook do provider native
+            $isNativeSource = ($payload['source'] ?? '') === 'native';
+            $nativeSessionId = $payload['sessionId'] ?? null;
+            
             // 1. Tentar por trackid
             Logger::quepasa("🔍 Tentativa 1: Buscando por trackid='{$trackid}'");
             if ($trackid) {
                 $accounts = IntegrationAccount::whereWhatsApp('quepasa_trackid', '=', $trackid);
                 $account = !empty($accounts) ? $accounts[0] : null;
+                
+                // Se não encontrou por trackid do Quepasa, tentar por native_session_id
+                if (!$account && $isNativeSource && $nativeSessionId) {
+                    $accounts = IntegrationAccount::whereWhatsApp('native_session_id', '=', $nativeSessionId);
+                    $account = !empty($accounts) ? $accounts[0] : null;
+                }
+                
                 if ($account) {
                     $accountFoundBy = 'trackid';
                     Logger::quepasa("✅ Conta encontrada por trackid: {$trackid} -> ID={$account['id']}, Nome={$account['name']}");

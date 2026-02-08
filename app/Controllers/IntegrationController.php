@@ -129,15 +129,29 @@ class IntegrationController
             
             $qrData = WhatsAppService::getQRCode($id);
             
+            // Provider native retorna 'qrCode', Quepasa retorna 'qrcode'
+            $qrImage = $qrData['qrcode'] ?? $qrData['qrCode'] ?? $qrData['base64'] ?? null;
+            
+            // Se status é 'connected', já está conectado
+            if (($qrData['status'] ?? '') === 'connected') {
+                Response::json([
+                    'success' => true,
+                    'status' => 'connected',
+                    'message' => $qrData['message'] ?? 'Já conectado',
+                    'qrcode' => null
+                ]);
+                return;
+            }
+            
             // Verificar se os dados foram retornados corretamente
-            if (empty($qrData) || empty($qrData['qrcode'])) {
-                throw new \Exception('QR Code não foi gerado corretamente');
+            if (empty($qrImage)) {
+                throw new \Exception($qrData['message'] ?? 'QR Code não foi gerado corretamente');
             }
             
             Response::json([
                 'success' => true,
-                'qrcode' => $qrData['qrcode'],
-                'base64' => $qrData['base64'] ?? null,
+                'qrcode' => $qrImage,
+                'base64' => $qrImage,
                 'expires_in' => $qrData['expires_in'] ?? 60
             ]);
         } catch (\Exception $e) {
@@ -285,6 +299,12 @@ class IntegrationController
                 'api_key' => 'nullable|string|max:255',
                 'instance_id' => 'nullable|string|max:255',
                 'status' => 'nullable|string|in:active,inactive,disconnected',
+                // Campos Native (Baileys) + Proxy
+                'proxy_host' => 'nullable|string|max:500',
+                'proxy_user' => 'nullable|string|max:255',
+                'proxy_pass' => 'nullable|string|max:255',
+                'native_session_id' => 'nullable|string|max:255',
+                'native_service_url' => 'nullable|string|max:500',
                 // Campos de limite de novas conversas
                 'new_conv_limit_enabled' => 'nullable',
                 'new_conv_limit_count' => 'nullable|integer|min:1|max:1000',

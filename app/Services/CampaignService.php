@@ -97,7 +97,7 @@ class CampaignService
         $data['daily_limit_per_account'] = !empty($data['daily_limit_per_account']) ? (int)$data['daily_limit_per_account'] : null;
         
         // Intervalo aleatório
-        $data['random_interval_enabled'] = !empty($data['random_interval_enabled']) && $data['random_interval_enabled'] !== '0';
+        $data['random_interval_enabled'] = (!empty($data['random_interval_enabled']) && $data['random_interval_enabled'] !== '0') ? 1 : 0;
         $data['random_interval_min'] = (int)($data['random_interval_min'] ?? 30);
         $data['random_interval_max'] = (int)($data['random_interval_max'] ?? 120);
         
@@ -110,7 +110,7 @@ class CampaignService
         $data['sent_this_hour'] = 0;
         
         // Geração de mensagem com IA
-        $data['ai_message_enabled'] = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
+        $data['ai_message_enabled'] = (!empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0') ? 1 : 0;
         $data['ai_message_prompt'] = $data['ai_message_prompt'] ?? null;
         $data['ai_temperature'] = isset($data['ai_temperature']) ? (float)$data['ai_temperature'] : 0.7;
         
@@ -121,13 +121,13 @@ class CampaignService
         }
         
         // Execução de automações
-        $data['execute_automations'] = !empty($data['execute_automations']) && $data['execute_automations'] !== '0';
+        $data['execute_automations'] = (!empty($data['execute_automations']) && $data['execute_automations'] !== '0') ? 1 : 0;
         
         // Filtros de contatos
-        $data['skip_duplicates'] = !empty($data['skip_duplicates']) && $data['skip_duplicates'] !== '0';
-        $data['skip_recent_conversations'] = !empty($data['skip_recent_conversations']) && $data['skip_recent_conversations'] !== '0';
+        $data['skip_duplicates'] = (!empty($data['skip_duplicates']) && $data['skip_duplicates'] !== '0') ? 1 : 0;
+        $data['skip_recent_conversations'] = (!empty($data['skip_recent_conversations']) && $data['skip_recent_conversations'] !== '0') ? 1 : 0;
         $data['skip_recent_hours'] = (int)($data['skip_recent_hours'] ?? 24);
-        $data['respect_blacklist'] = !empty($data['respect_blacklist']) && $data['respect_blacklist'] !== '0';
+        $data['respect_blacklist'] = (!empty($data['respect_blacklist']) && $data['respect_blacklist'] !== '0') ? 1 : 0;
         
         // Criar campanha
         $campaignId = Campaign::create($data);

@@ -706,7 +706,7 @@ try {
                     WHERE c.contact_id = ? 
                       AND c.channel = 'whatsapp' 
                       AND c.status IN ('open', 'pending')
-                      AND wa.status = 'active'
+                      AND ia.status = 'active'
                     ORDER BY c.updated_at DESC
                     LIMIT 1
                 ");

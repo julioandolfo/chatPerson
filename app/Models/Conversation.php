@@ -226,6 +226,19 @@ class Conversation extends Model
             $params[] = $filters['funnel_stage_id'];
         }
         
+        // Filtro por condições de aba avançada (tab_conditions)
+        if (!empty($filters['tab_conditions']) && is_array($filters['tab_conditions'])) {
+            $tc = $filters['tab_conditions'];
+            $matchType = $tc['match_type'] ?? 'AND';
+            
+            list($tabWhere, $tabParams) = \App\Models\UserConversationTab::buildConditionsSQL($tc, $matchType);
+            
+            if (!empty($tabWhere)) {
+                $sql .= " AND ({$tabWhere})";
+                $params = array_merge($params, $tabParams);
+            }
+        }
+
         // Busca avançada (nome, telefone, email, mensagens, tags, participantes)
         $searchTerm = null;
         if (!empty($filters['search'])) {

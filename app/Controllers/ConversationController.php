@@ -101,6 +101,23 @@ class ConversationController
             'offset' => $_GET['offset'] ?? 0
         ];
 
+        // Resolver tab_id em condições de filtro da aba avançada
+        if (!empty($_GET['tab_id'])) {
+            try {
+                $tab = \App\Models\UserConversationTab::findTab((int) $_GET['tab_id']);
+                if ($tab && (int)$tab['user_id'] === $userId) {
+                    $tabFilters = \App\Models\UserConversationTab::getTabFilters($tab);
+                    $filters = array_merge($filters, $tabFilters);
+                    // Remover tag_id/tag_ids individuais se tab_conditions os contém
+                    if (!empty($tabFilters['tab_conditions'])) {
+                        unset($filters['tag_id'], $filters['tag_ids']);
+                    }
+                }
+            } catch (\Exception $e) {
+                // Ignorar erro - usar filtros normais
+            }
+        }
+
         // Remover filtros vazios (exceto pinned que pode ser false e arrays que podem estar vazios)
         $filters = array_filter($filters, function($value, $key) {
             if ($key === 'pinned') {
@@ -113,7 +130,7 @@ class ConversationController
                 return $value !== null && trim($value) !== ''; // Manter busca mesmo se tiver espaços
             }
             // Manter arrays mesmo se vazios (serão processados depois)
-            if (in_array($key, ['channels', 'tag_ids', 'whatsapp_account_ids', 'agent_ids']) && is_array($value)) {
+            if (in_array($key, ['channels', 'tag_ids', 'whatsapp_account_ids', 'agent_ids', 'tab_conditions']) && is_array($value)) {
                 return true; // Manter arrays para processamento
             }
             return $value !== null && $value !== '';

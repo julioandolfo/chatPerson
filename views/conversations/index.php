@@ -573,6 +573,68 @@ ob_start();
     scrollbar-width: none;
 }
 
+/* Container scrollável das abas */
+.tabs-scroll-container {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+}
+.tabs-scroll-container::-webkit-scrollbar {
+    display: none;
+}
+
+/* Setas de navegação das abas */
+.tabs-scroll-btn {
+    width: 22px !important;
+    min-width: 22px !important;
+    height: 26px !important;
+    padding: 0 !important;
+    border-radius: 4px !important;
+    color: var(--bs-gray-500);
+    background: transparent;
+    border: none;
+    flex-shrink: 0;
+    margin-bottom: -2px;
+    transition: all 0.15s ease;
+    z-index: 3;
+}
+.tabs-scroll-btn:hover {
+    color: var(--bs-primary);
+    background: var(--bs-gray-100);
+}
+body.dark-mode .tabs-scroll-btn:hover,
+[data-bs-theme="dark"] .tabs-scroll-btn:hover {
+    background: var(--bs-gray-800);
+    color: var(--bs-primary);
+}
+
+/* Indicador de conversas aguardando resposta (bolinha pulsante) */
+.tab-awaiting-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #f64e60;
+    flex-shrink: 0;
+    animation: tabAwaitingPulse 2s ease-in-out infinite;
+}
+.conversation-tab.active .tab-awaiting-dot {
+    background: #fff;
+    animation: tabAwaitingPulseWhite 2s ease-in-out infinite;
+}
+@keyframes tabAwaitingPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+@keyframes tabAwaitingPulseWhite {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.6; transform: scale(0.8); }
+}
+
 .conversation-tab {
     display: inline-flex;
     align-items: center;
@@ -2792,9 +2854,14 @@ function getChannelInfo(channel) {
         <!-- Barra unificada: Abas + Filtros -->
         <div id="conversationTabsBar" class="conversation-tabs-bar">
             <div class="d-flex align-items-end w-100">
+                <!-- Seta esquerda -->
+                <button type="button" class="btn btn-sm btn-icon tabs-scroll-btn tabs-scroll-left d-none" 
+                        id="tabsScrollLeft" onclick="scrollTabs('left')" title="Rolar abas">
+                    <i class="ki-duotone ki-left fs-7"><span class="path1"></span><span class="path2"></span></i>
+                </button>
                 <!-- Abas (scrollable) -->
-                <div class="d-flex align-items-center gap-0 overflow-auto hide-scrollbar flex-grow-1" id="conversationTabsList">
-                    <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                <div class="tabs-scroll-container flex-grow-1" id="conversationTabsList">
+                    <button type="button" class="btn btn-sm conversation-tab active" data-tab-id="all" data-tag-id="" data-advanced="0" onclick="switchConversationTab(this)">
                         <span class="tab-name">Todas</span>
                         <?php if (!empty($conversations)): ?>
                             <span class="tab-count"><?= count($conversations) ?></span>
@@ -2802,14 +2869,33 @@ function getChannelInfo(channel) {
                     </button>
                     <?php if (!empty($userTabs)): ?>
                         <?php foreach ($userTabs as $tab): ?>
+                            <?php
+                                $tabConditions = !empty($tab['conditions']) ? json_decode($tab['conditions'], true) : null;
+                                $hasConditions = $tabConditions && (
+                                    (!empty($tabConditions['tag_ids']) && count($tabConditions['tag_ids']) > 0) ||
+                                    (!empty($tabConditions['funnel_ids']) && count($tabConditions['funnel_ids']) > 0) ||
+                                    (!empty($tabConditions['funnel_stage_ids']) && count($tabConditions['funnel_stage_ids']) > 0) ||
+                                    (!empty($tabConditions['department_ids']) && count($tabConditions['department_ids']) > 0)
+                                );
+                                $isAdvanced = $hasConditions ? '1' : '0';
+                                $tabDisplayName = $tab['name'] ?? $tab['tag_name'] ?? 'Sem nome';
+                                $tabDisplayColor = $tab['color'] ?? $tab['tag_color'] ?? '#009ef7';
+                            ?>
                             <button type="button" class="btn btn-sm conversation-tab" 
                                     data-tab-id="<?= $tab['id'] ?>" 
-                                    data-tag-id="<?= $tab['tag_id'] ?>"
+                                    data-tag-id="<?= $tab['tag_id'] ?? '' ?>"
+                                    data-advanced="<?= $isAdvanced ?>"
                                     onclick="switchConversationTab(this)">
-                                <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tab['tag_color'] ?? '#009ef7') ?>;"></span>
-                                <span class="tab-name"><?= htmlspecialchars($tab['tag_name']) ?></span>
+                                <span class="tab-color-dot" style="background-color: <?= htmlspecialchars($tabDisplayColor) ?>;"></span>
+                                <span class="tab-name"><?= htmlspecialchars($tabDisplayName) ?></span>
+                                <?php if ($hasConditions): ?>
+                                    <i class="ki-duotone ki-filter fs-9 ms-1 opacity-50"><span class="path1"></span><span class="path2"></span></i>
+                                <?php endif; ?>
                                 <?php if (!empty($tab['conversation_count'])): ?>
                                     <span class="tab-count"><?= $tab['conversation_count'] ?></span>
+                                <?php endif; ?>
+                                <?php if (!empty($tab['awaiting_count'])): ?>
+                                    <span class="tab-awaiting-dot" title="<?= $tab['awaiting_count'] ?> aguardando resposta"></span>
                                 <?php endif; ?>
                             </button>
                         <?php endforeach; ?>
@@ -2821,6 +2907,11 @@ function getChannelInfo(channel) {
                         </i>
                     </button>
                 </div>
+                <!-- Seta direita -->
+                <button type="button" class="btn btn-sm btn-icon tabs-scroll-btn tabs-scroll-right d-none" 
+                        id="tabsScrollRight" onclick="scrollTabs('right')" title="Rolar abas">
+                    <i class="ki-duotone ki-right fs-7"><span class="path1"></span><span class="path2"></span></i>
+                </button>
                 <!-- Botão Filtros (abre dropdown) -->
                 <div class="flex-shrink-0 d-flex align-items-center" style="padding-bottom: 6px; margin-bottom: -2px;">
                     <button type="button" class="btn btn-sm btn-icon conversation-filter-btn position-relative" 
@@ -12139,6 +12230,57 @@ function formatTime(dateString) {
     
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
+
+// =============================================
+// SCROLL DE ABAS (setas de navegação)
+// =============================================
+function scrollTabs(direction) {
+    const container = document.getElementById('conversationTabsList');
+    if (!container) return;
+    const scrollAmount = 120;
+    if (direction === 'left') {
+        container.scrollLeft -= scrollAmount;
+    } else {
+        container.scrollLeft += scrollAmount;
+    }
+    // Atualizar visibilidade das setas após scroll
+    setTimeout(updateTabsScrollArrows, 150);
+}
+
+function updateTabsScrollArrows() {
+    const container = document.getElementById('conversationTabsList');
+    const leftBtn = document.getElementById('tabsScrollLeft');
+    const rightBtn = document.getElementById('tabsScrollRight');
+    if (!container || !leftBtn || !rightBtn) return;
+    
+    const hasOverflow = container.scrollWidth > container.clientWidth + 2;
+    const atStart = container.scrollLeft <= 2;
+    const atEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 2;
+    
+    if (hasOverflow && !atStart) {
+        leftBtn.classList.remove('d-none');
+    } else {
+        leftBtn.classList.add('d-none');
+    }
+    
+    if (hasOverflow && !atEnd) {
+        rightBtn.classList.remove('d-none');
+    } else {
+        rightBtn.classList.add('d-none');
+    }
+}
+
+// Inicializar observador de scroll das abas
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('conversationTabsList');
+    if (container) {
+        container.addEventListener('scroll', updateTabsScrollArrows);
+        // Verificar ao redimensionar
+        window.addEventListener('resize', updateTabsScrollArrows);
+        // Verificação inicial com delay para DOM estar pronto
+        setTimeout(updateTabsScrollArrows, 300);
+    }
+});
 
 // =============================================
 // TOGGLE DO PAINEL DE FILTROS
@@ -21860,20 +22002,30 @@ function switchConversationTab(tabEl) {
     tabEl.classList.add('active');
     
     const tagId = tabEl.dataset.tagId;
+    const tabId = tabEl.dataset.tabId;
+    const isAdvanced = tabEl.dataset.advanced === '1';
     
-    // Salvar aba ativa no localStorage
-    localStorage.setItem('activeConversationTab', tagId || 'all');
+    // Salvar aba ativa no localStorage (usar tab_id para abas avançadas)
+    localStorage.setItem('activeConversationTab', tabId || 'all');
     
     // ✅ CORREÇÃO: Preservar conversa atualmente aberta
     const preservedConversationId = window.currentConversationId;
     
-    // Aplicar filtro por tag
+    // Aplicar filtros
     const params = new URLSearchParams(window.location.search);
     
-    if (tagId) {
-        params.set('tag_id', tagId);
-    } else {
-        params.delete('tag_id');
+    // Limpar filtros de aba anteriores
+    params.delete('tag_id');
+    params.delete('tab_id');
+    
+    if (tabId && tabId !== 'all') {
+        if (isAdvanced) {
+            // Aba avançada: passar tab_id para o backend resolver as condições
+            params.set('tab_id', tabId);
+        } else if (tagId) {
+            // Aba simples: usar tag_id diretamente (compatibilidade + performance)
+            params.set('tag_id', tagId);
+        }
     }
     
     // ✅ CORREÇÃO: Manter o ID da conversa aberta na URL
@@ -21881,10 +22033,10 @@ function switchConversationTab(tabEl) {
         params.set('id', preservedConversationId);
     }
     
-    // Sincronizar dropdown de filtro de tags
+    // Sincronizar dropdown de filtro de tags (apenas para abas simples)
     const filterTag = document.getElementById('filter_tag');
     if (filterTag) {
-        filterTag.value = tagId || '';
+        filterTag.value = (!isAdvanced && tagId) ? tagId : '';
     }
     
     // Resetar paginação
@@ -21913,29 +22065,51 @@ async function refreshConversationTabs() {
         const data = await response.json();
         
         if (data.success && data.tabs) {
+            // Armazenar dados das abas globalmente para uso em switchConversationTab
+            window.userTabsData = data.tabs;
+            window.tabsFunnels = data.funnels || [];
+            window.tabsDepartments = data.departments || [];
+            
             const tabsList = document.getElementById('conversationTabsList');
             if (!tabsList) return;
             
             const activeTab = localStorage.getItem('activeConversationTab') || 'all';
             
             const totalCount = data.total_count || 0;
+            const totalAwaitingCount = data.total_awaiting_count || 0;
             
             let html = `
                 <button type="button" class="btn btn-sm conversation-tab ${activeTab === 'all' ? 'active' : ''}" 
-                        data-tab-id="all" data-tag-id="" onclick="switchConversationTab(this)">
+                        data-tab-id="all" data-tag-id="" data-advanced="0" onclick="switchConversationTab(this)">
                     <span class="tab-name">Todas</span>
                     ${totalCount > 0 ? `<span class="tab-count">${totalCount}</span>` : ''}
+                    ${totalAwaitingCount > 0 ? `<span class="tab-awaiting-dot" title="${totalAwaitingCount} aguardando resposta"></span>` : ''}
                 </button>`;
             
             data.tabs.forEach(tab => {
-                const isActive = activeTab === String(tab.tag_id);
+                const isActive = activeTab === String(tab.id);
+                const awaitingCount = parseInt(tab.awaiting_count) || 0;
+                const conditions = tab.conditions ? (typeof tab.conditions === 'string' ? JSON.parse(tab.conditions) : tab.conditions) : null;
+                const hasConditions = conditions && (
+                    (conditions.tag_ids && conditions.tag_ids.length > 0) ||
+                    (conditions.funnel_ids && conditions.funnel_ids.length > 0) ||
+                    (conditions.funnel_stage_ids && conditions.funnel_stage_ids.length > 0) ||
+                    (conditions.department_ids && conditions.department_ids.length > 0)
+                );
+                const isAdvanced = hasConditions ? '1' : '0';
+                const tabName = tab.name || tab.tag_name || 'Sem nome';
+                const tabColor = tab.color || tab.tag_color || '#009ef7';
+                
                 html += `
                     <button type="button" class="btn btn-sm conversation-tab ${isActive ? 'active' : ''}" 
-                            data-tab-id="${tab.id}" data-tag-id="${tab.tag_id}"
+                            data-tab-id="${tab.id}" data-tag-id="${tab.tag_id || ''}"
+                            data-advanced="${isAdvanced}"
                             onclick="switchConversationTab(this)">
-                        <span class="tab-color-dot" style="background-color: ${escapeHtml(tab.tag_color || '#009ef7')};"></span>
-                        <span class="tab-name">${escapeHtml(tab.tag_name)}</span>
+                        <span class="tab-color-dot" style="background-color: ${escapeHtml(tabColor)};"></span>
+                        <span class="tab-name">${escapeHtml(tabName)}</span>
+                        ${hasConditions ? '<i class="ki-duotone ki-filter fs-9 ms-1 opacity-50"><span class="path1"></span><span class="path2"></span></i>' : ''}
                         ${tab.conversation_count > 0 ? `<span class="tab-count">${tab.conversation_count}</span>` : ''}
+                        ${awaitingCount > 0 ? `<span class="tab-awaiting-dot" title="${awaitingCount} aguardando resposta"></span>` : ''}
                     </button>`;
             });
             
@@ -21946,6 +22120,9 @@ async function refreshConversationTabs() {
                 </button>`;
             
             tabsList.innerHTML = html;
+            
+            // Atualizar setas de scroll após re-render
+            setTimeout(updateTabsScrollArrows, 100);
         }
     } catch (error) {
         console.error('Erro ao atualizar abas:', error);
@@ -21955,9 +22132,9 @@ async function refreshConversationTabs() {
 /**
  * Modal para gerenciar abas (adicionar/remover)
  */
-async function showManageTabsModal() {
+async function showManageTabsModal(editTabId = null) {
     try {
-        // Carregar tags disponíveis e abas atuais
+        // Carregar tags disponíveis e abas atuais (inclui funis e departamentos)
         const [tagsRes, tabsRes] = await Promise.all([
             fetch('<?= \App\Helpers\Url::to("/tags/all") ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } }),
             fetch('<?= \App\Helpers\Url::to("/conversation-tabs") ?>', { headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } })
@@ -21968,10 +22145,80 @@ async function showManageTabsModal() {
         
         const allTags = tagsData.success ? tagsData.tags : [];
         const userTabs = tabsData.success ? tabsData.tabs : [];
-        const tabTagIds = userTabs.map(t => t.tag_id);
+        const funnels = tabsData.funnels || [];
+        const departments = tabsData.departments || [];
+        
+        // Salvar dados globalmente para uso nas subfunções
+        window._modalAllTags = allTags;
+        window._modalUserTabs = userTabs;
+        window._modalFunnels = funnels;
+        window._modalDepartments = departments;
         
         const isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark';
         
+        // Se editTabId, abrir diretamente no modo avançado
+        if (editTabId) {
+            const tabToEdit = userTabs.find(t => t.id == editTabId);
+            if (tabToEdit) {
+                _showAdvancedTabForm(tabToEdit, allTags, funnels, departments, isDarkMode);
+                return;
+            }
+        }
+        
+        // === VISTA PRINCIPAL: Lista de abas existentes + toggle rápido de tags ===
+        let existingTabsHtml = '';
+        if (userTabs.length > 0) {
+            existingTabsHtml = '<div class="mb-3"><label class="form-label fw-bold fs-7">Suas abas atuais</label>';
+            userTabs.forEach(tab => {
+                const conditions = tab.conditions ? (typeof tab.conditions === 'string' ? JSON.parse(tab.conditions) : tab.conditions) : null;
+                const hasConditions = conditions && (
+                    (conditions.tag_ids && conditions.tag_ids.length > 0) ||
+                    (conditions.funnel_ids && conditions.funnel_ids.length > 0) ||
+                    (conditions.funnel_stage_ids && conditions.funnel_stage_ids.length > 0) ||
+                    (conditions.department_ids && conditions.department_ids.length > 0)
+                );
+                const tabName = tab.name || tab.tag_name || 'Sem nome';
+                const tabColor = tab.color || tab.tag_color || '#009ef7';
+                const matchLabel = (tab.match_type === 'OR') ? 'OU' : 'E';
+                
+                let conditionsSummary = '';
+                if (hasConditions) {
+                    const parts = [];
+                    if (conditions.tag_ids && conditions.tag_ids.length) parts.push(`${conditions.tag_ids.length} tag(s)`);
+                    if (conditions.funnel_ids && conditions.funnel_ids.length) parts.push(`${conditions.funnel_ids.length} funil(is)`);
+                    if (conditions.funnel_stage_ids && conditions.funnel_stage_ids.length) parts.push(`${conditions.funnel_stage_ids.length} etapa(s)`);
+                    if (conditions.department_ids && conditions.department_ids.length) parts.push(`${conditions.department_ids.length} depto(s)`);
+                    conditionsSummary = `<span class="text-muted fs-9">${parts.join(' ' + matchLabel + ' ')}</span>`;
+                } else if (tab.tag_name) {
+                    conditionsSummary = `<span class="text-muted fs-9">Tag: ${escapeHtml(tab.tag_name)}</span>`;
+                }
+                
+                existingTabsHtml += `
+                    <div class="d-flex align-items-center justify-content-between py-2 px-3 rounded mb-1 bg-light-primary">
+                        <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+                            <span class="rounded-circle d-inline-block flex-shrink-0" style="width: 12px; height: 12px; background-color: ${escapeHtml(tabColor)};"></span>
+                            <div class="min-w-0">
+                                <div class="fw-semibold text-truncate">${escapeHtml(tabName)}</div>
+                                ${conditionsSummary}
+                            </div>
+                        </div>
+                        <div class="d-flex gap-1 flex-shrink-0 ms-2">
+                            <button type="button" class="btn btn-sm btn-icon btn-light-warning" 
+                                    onclick="Swal.close(); showManageTabsModal(${tab.id})" title="Editar">
+                                <i class="ki-duotone ki-pencil fs-7"><span class="path1"></span><span class="path2"></span></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-icon btn-light-danger" 
+                                    onclick="_removeTabFromModal(${tab.id})" title="Remover">
+                                <i class="ki-duotone ki-cross fs-7"><span class="path1"></span><span class="path2"></span></i>
+                            </button>
+                        </div>
+                    </div>`;
+            });
+            existingTabsHtml += '</div><hr class="my-2">';
+        }
+        
+        // Tags rápidas (toggle)
+        const tabTagIds = userTabs.filter(t => t.tag_id).map(t => parseInt(t.tag_id));
         let tagsListHtml = '';
         allTags.forEach(tag => {
             const isTab = tabTagIds.includes(tag.id);
@@ -21993,7 +22240,13 @@ async function showManageTabsModal() {
             title: 'Gerenciar Abas',
             html: `
                 <div class="text-start">
-                    <p class="text-muted fs-7 mb-3">Selecione quais tags deseja usar como abas na listagem de conversas.</p>
+                    ${existingTabsHtml}
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label fw-bold fs-7 mb-0">Abas rápidas por tag</label>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="Swal.close(); _showAdvancedTabForm(null, window._modalAllTags, window._modalFunnels, window._modalDepartments)">
+                            <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Aba avançada
+                        </button>
+                    </div>
                     <div class="mb-3">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text"><i class="ki-duotone ki-magnifier fs-7"><span class="path1"></span><span class="path2"></span></i></span>
@@ -22001,12 +22254,12 @@ async function showManageTabsModal() {
                                    oninput="filterManageTabsTags(this.value)">
                         </div>
                     </div>
-                    <div id="manageTabsTagsList" style="max-height: 450px; overflow-y: auto;">
+                    <div id="manageTabsTagsList" style="max-height: 300px; overflow-y: auto;">
                         ${tagsListHtml}
                     </div>
                     <hr class="my-3">
                     <div class="d-flex align-items-center gap-2">
-                        <input type="text" id="newTabTagName" class="form-control form-control-sm" placeholder="Nova aba (nome da tag)">
+                        <input type="text" id="newTabTagName" class="form-control form-control-sm" placeholder="Nova aba rápida (nome da tag)">
                         <input type="color" id="newTabTagColor" class="form-control form-control-sm form-control-color" value="#009EF7" style="width: 40px; padding: 2px;">
                         <button type="button" class="btn btn-sm btn-primary text-nowrap" onclick="createNewTabFromModal()">
                             <i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Criar
@@ -22015,7 +22268,7 @@ async function showManageTabsModal() {
                 </div>`,
             showConfirmButton: false,
             showCloseButton: true,
-            width: 520,
+            width: 620,
             customClass: { 
                 popup: isDarkMode ? 'swal2-dark' : '',
                 htmlContainer: 'swal2-html-container-tabs'
@@ -22023,6 +22276,357 @@ async function showManageTabsModal() {
         });
     } catch (error) {
         console.error('Erro ao abrir gerenciador de abas:', error);
+    }
+}
+
+/**
+ * Remover aba a partir do modal principal
+ */
+async function _removeTabFromModal(tabId) {
+    try {
+        const response = await fetch('<?= \App\Helpers\Url::to("/conversation-tabs/remove") ?>', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ tab_id: tabId })
+        });
+        const data = await response.json();
+        if (data.success) {
+            await refreshConversationTabs();
+            Swal.close();
+            showManageTabsModal();
+        }
+    } catch (error) {
+        console.error('Erro ao remover aba:', error);
+    }
+}
+
+/**
+ * Formulário avançado de criação/edição de aba
+ */
+function _showAdvancedTabForm(tabToEdit = null, allTags = [], funnels = [], departments = [], isDarkMode = null) {
+    if (isDarkMode === null) {
+        isDarkMode = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+    }
+    
+    const isEditing = tabToEdit !== null;
+    const title = isEditing ? 'Editar Aba' : 'Criar Aba Avançada';
+    
+    // Parse condições existentes
+    let existingConditions = {};
+    if (isEditing && tabToEdit.conditions) {
+        existingConditions = typeof tabToEdit.conditions === 'string' 
+            ? JSON.parse(tabToEdit.conditions) 
+            : tabToEdit.conditions;
+    }
+    
+    // Todos os tag_ids selecionados (da coluna tag_id + conditions.tag_ids)
+    let selectedTagIds = [];
+    if (isEditing) {
+        if (tabToEdit.tag_id) selectedTagIds.push(parseInt(tabToEdit.tag_id));
+        if (existingConditions.tag_ids) {
+            existingConditions.tag_ids.forEach(id => {
+                if (!selectedTagIds.includes(parseInt(id))) selectedTagIds.push(parseInt(id));
+            });
+        }
+    }
+    
+    const selectedFunnelIds = existingConditions.funnel_ids || [];
+    const selectedStageIds = existingConditions.funnel_stage_ids || [];
+    const selectedDeptIds = existingConditions.department_ids || [];
+    const matchType = (isEditing && tabToEdit.match_type) || 'AND';
+    const tabName = (isEditing ? (tabToEdit.name || tabToEdit.tag_name || '') : '');
+    const tabColor = (isEditing ? (tabToEdit.color || tabToEdit.tag_color || '#009EF7') : '#009EF7');
+    
+    // Tags checkboxes
+    let tagsCheckboxes = '';
+    allTags.forEach(tag => {
+        const checked = selectedTagIds.includes(tag.id) ? 'checked' : '';
+        tagsCheckboxes += `
+            <label class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1 bg-hover-light cursor-pointer" style="cursor:pointer">
+                <input type="checkbox" class="form-check-input adv-tab-tag" value="${tag.id}" ${checked}>
+                <span class="rounded-circle d-inline-block" style="width: 10px; height: 10px; background-color: ${escapeHtml(tag.color || '#009ef7')};"></span>
+                <span class="fs-7">${escapeHtml(tag.name)}</span>
+            </label>`;
+    });
+    
+    // Funis dropdown (multi-select com checkboxes)
+    let funnelsCheckboxes = '';
+    funnels.forEach(f => {
+        const checked = selectedFunnelIds.includes(f.id) || selectedFunnelIds.includes(String(f.id)) ? 'checked' : '';
+        funnelsCheckboxes += `
+            <label class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1 bg-hover-light cursor-pointer" style="cursor:pointer">
+                <input type="checkbox" class="form-check-input adv-tab-funnel" value="${f.id}" ${checked} 
+                       onchange="_onAdvFunnelChange()">
+                <span class="fs-7">${escapeHtml(f.name)}</span>
+            </label>`;
+    });
+    
+    // Departamentos checkboxes
+    let deptsCheckboxes = '';
+    departments.forEach(d => {
+        const checked = selectedDeptIds.includes(d.id) || selectedDeptIds.includes(String(d.id)) ? 'checked' : '';
+        deptsCheckboxes += `
+            <label class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1 bg-hover-light cursor-pointer" style="cursor:pointer">
+                <input type="checkbox" class="form-check-input adv-tab-dept" value="${d.id}" ${checked}>
+                <span class="fs-7">${escapeHtml(d.name)}</span>
+            </label>`;
+    });
+
+    Swal.fire({
+        title: title,
+        html: `
+            <div class="text-start" id="advancedTabForm">
+                <!-- Nome e Cor -->
+                <div class="row mb-3">
+                    <div class="col-9">
+                        <label class="form-label fw-bold fs-7">Nome da aba <span class="text-danger">*</span></label>
+                        <input type="text" id="advTabName" class="form-control form-control-sm" placeholder="Ex: Orçamento Urgente" value="${escapeHtml(tabName)}">
+                    </div>
+                    <div class="col-3">
+                        <label class="form-label fw-bold fs-7">Cor</label>
+                        <input type="color" id="advTabColor" class="form-control form-control-sm form-control-color w-100" value="${escapeHtml(tabColor)}">
+                    </div>
+                </div>
+                
+                <!-- Match Type -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-7">Modo de combinação</label>
+                    <div class="d-flex gap-3">
+                        <label class="form-check d-flex align-items-center gap-2 cursor-pointer" style="cursor:pointer">
+                            <input type="radio" name="advMatchType" value="AND" class="form-check-input" ${matchType === 'AND' ? 'checked' : ''}>
+                            <div>
+                                <span class="fw-semibold fs-7">E (AND)</span>
+                                <div class="text-muted fs-9">Conversa deve atender TODAS as condições</div>
+                            </div>
+                        </label>
+                        <label class="form-check d-flex align-items-center gap-2 cursor-pointer" style="cursor:pointer">
+                            <input type="radio" name="advMatchType" value="OR" class="form-check-input" ${matchType === 'OR' ? 'checked' : ''}>
+                            <div>
+                                <span class="fw-semibold fs-7">OU (OR)</span>
+                                <div class="text-muted fs-9">Conversa aparece se atender QUALQUER condição</div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Tags -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-7">Tags</label>
+                    <div class="input-group input-group-sm mb-1">
+                        <span class="input-group-text"><i class="ki-duotone ki-magnifier fs-7"><span class="path1"></span><span class="path2"></span></i></span>
+                        <input type="text" class="form-control form-control-sm" placeholder="Filtrar tags..." 
+                               oninput="_filterAdvCheckboxes(this.value, '.adv-tab-tag')">
+                    </div>
+                    <div style="max-height: 160px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 6px; padding: 4px;">
+                        ${tagsCheckboxes || '<div class="text-muted fs-8 p-2">Nenhuma tag disponível</div>'}
+                    </div>
+                </div>
+                
+                <!-- Funis -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-7">Funis</label>
+                    <div style="max-height: 120px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 6px; padding: 4px;">
+                        ${funnelsCheckboxes || '<div class="text-muted fs-8 p-2">Nenhum funil disponível</div>'}
+                    </div>
+                </div>
+                
+                <!-- Etapas do funil (carregadas dinamicamente) -->
+                <div class="mb-3" id="advStagesContainer" style="${selectedFunnelIds.length > 0 ? '' : 'display:none'}">
+                    <label class="form-label fw-bold fs-7">Etapas do funil</label>
+                    <div id="advStagesList" style="max-height: 120px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 6px; padding: 4px;">
+                        <div class="text-muted fs-8 p-2">Selecione um funil para ver as etapas</div>
+                    </div>
+                </div>
+                
+                <!-- Departamentos -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold fs-7">Departamentos</label>
+                    <div style="max-height: 120px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 6px; padding: 4px;">
+                        ${deptsCheckboxes || '<div class="text-muted fs-8 p-2">Nenhum departamento disponível</div>'}
+                    </div>
+                </div>
+                
+                ${isEditing ? `<input type="hidden" id="advTabEditId" value="${tabToEdit.id}">` : ''}
+            </div>`,
+        showCancelButton: true,
+        confirmButtonText: isEditing ? '<i class="ki-duotone ki-check fs-7"><span class="path1"></span><span class="path2"></span></i> Salvar' : '<i class="ki-duotone ki-plus fs-7"><span class="path1"></span><span class="path2"></span></i> Criar aba',
+        cancelButtonText: '<i class="ki-duotone ki-arrow-left fs-7"><span class="path1"></span><span class="path2"></span></i> Voltar',
+        showCloseButton: true,
+        width: 620,
+        customClass: { 
+            popup: isDarkMode ? 'swal2-dark' : '',
+            htmlContainer: 'swal2-html-container-tabs',
+            confirmButton: 'btn btn-primary btn-sm',
+            cancelButton: 'btn btn-light btn-sm'
+        },
+        preConfirm: () => _saveAdvancedTab(),
+        didOpen: () => {
+            // Se editando e tinha funis selecionados, carregar etapas
+            if (selectedFunnelIds.length > 0) {
+                _onAdvFunnelChange(selectedStageIds);
+            }
+        }
+    }).then(result => {
+        if (result.dismiss === Swal.DismissReason.cancel) {
+            // Voltar para lista principal
+            showManageTabsModal();
+        }
+    });
+}
+
+/**
+ * Filtrar checkboxes no formulário avançado
+ */
+function _filterAdvCheckboxes(search, selector) {
+    const checkboxes = document.querySelectorAll(selector);
+    checkboxes.forEach(cb => {
+        const label = cb.closest('label');
+        const text = label?.textContent || '';
+        label.style.display = text.toLowerCase().includes(search.toLowerCase()) ? '' : 'none';
+    });
+}
+
+/**
+ * Quando funil é selecionado/desmarcado, carregar etapas
+ */
+async function _onAdvFunnelChange(preSelectedStageIds = []) {
+    const checked = document.querySelectorAll('.adv-tab-funnel:checked');
+    const container = document.getElementById('advStagesContainer');
+    const stagesList = document.getElementById('advStagesList');
+    
+    if (checked.length === 0) {
+        container.style.display = 'none';
+        stagesList.innerHTML = '<div class="text-muted fs-8 p-2">Selecione um funil para ver as etapas</div>';
+        return;
+    }
+    
+    container.style.display = '';
+    stagesList.innerHTML = '<div class="text-muted fs-8 p-2"><span class="spinner-border spinner-border-sm"></span> Carregando etapas...</div>';
+    
+    try {
+        let allStages = [];
+        for (const cb of checked) {
+            const funnelId = cb.value;
+            const res = await fetch(`<?= \App\Helpers\Url::to("/conversation-tabs/funnel-stages") ?>?funnel_id=${funnelId}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.success && data.stages) {
+                // Buscar nome do funil
+                const funnel = (window._modalFunnels || []).find(f => f.id == funnelId);
+                const funnelName = funnel ? funnel.name : `Funil ${funnelId}`;
+                data.stages.forEach(s => {
+                    s._funnel_name = funnelName;
+                    allStages.push(s);
+                });
+            }
+        }
+        
+        if (allStages.length === 0) {
+            stagesList.innerHTML = '<div class="text-muted fs-8 p-2">Nenhuma etapa encontrada</div>';
+            return;
+        }
+        
+        // Converter preSelectedStageIds para ints
+        const selectedIds = (Array.isArray(preSelectedStageIds) ? preSelectedStageIds : []).map(id => parseInt(id));
+        
+        let html = '';
+        allStages.forEach(stage => {
+            const isChecked = selectedIds.includes(stage.id) || selectedIds.includes(parseInt(stage.id)) ? 'checked' : '';
+            const isSystem = stage.is_system_stage ? ' (sistema)' : '';
+            html += `
+                <label class="d-flex align-items-center gap-2 py-1 px-2 rounded mb-1 bg-hover-light cursor-pointer" style="cursor:pointer">
+                    <input type="checkbox" class="form-check-input adv-tab-stage" value="${stage.id}" ${isChecked}>
+                    <span class="fs-7">${escapeHtml(stage.name)}${isSystem}</span>
+                    <span class="text-muted fs-9">(${escapeHtml(stage._funnel_name)})</span>
+                </label>`;
+        });
+        
+        stagesList.innerHTML = html;
+    } catch (error) {
+        stagesList.innerHTML = '<div class="text-danger fs-8 p-2">Erro ao carregar etapas</div>';
+        console.error('Erro ao carregar etapas:', error);
+    }
+}
+
+/**
+ * Salvar aba avançada (criar ou atualizar)
+ */
+async function _saveAdvancedTab() {
+    const nameInput = document.getElementById('advTabName');
+    const colorInput = document.getElementById('advTabColor');
+    const editIdInput = document.getElementById('advTabEditId');
+    const isEditing = editIdInput && editIdInput.value;
+    
+    const name = nameInput?.value?.trim();
+    if (!name) {
+        Swal.showValidationMessage('Nome da aba é obrigatório');
+        return false;
+    }
+    
+    const color = colorInput?.value || '#009EF7';
+    const matchType = document.querySelector('input[name="advMatchType"]:checked')?.value || 'AND';
+    
+    // Coletar condições
+    const tagIds = Array.from(document.querySelectorAll('.adv-tab-tag:checked')).map(cb => parseInt(cb.value));
+    const funnelIds = Array.from(document.querySelectorAll('.adv-tab-funnel:checked')).map(cb => parseInt(cb.value));
+    const stageIds = Array.from(document.querySelectorAll('.adv-tab-stage:checked')).map(cb => parseInt(cb.value));
+    const deptIds = Array.from(document.querySelectorAll('.adv-tab-dept:checked')).map(cb => parseInt(cb.value));
+    
+    // Validar: precisa ter pelo menos uma condição
+    if (tagIds.length === 0 && funnelIds.length === 0 && stageIds.length === 0 && deptIds.length === 0) {
+        Swal.showValidationMessage('Selecione pelo menos uma condição (tag, funil, etapa ou departamento)');
+        return false;
+    }
+    
+    // Definir tag_id principal (primeira tag selecionada, ou null)
+    const primaryTagId = tagIds.length > 0 ? tagIds[0] : null;
+    
+    // Conditions JSON (todas as condições)
+    const conditions = {
+        tag_ids: tagIds,
+        funnel_ids: funnelIds,
+        funnel_stage_ids: stageIds,
+        department_ids: deptIds
+    };
+    
+    try {
+        const url = isEditing
+            ? '<?= \App\Helpers\Url::to("/conversation-tabs/update") ?>'
+            : '<?= \App\Helpers\Url::to("/conversation-tabs") ?>';
+        
+        const body = {
+            name: name,
+            color: color,
+            tag_id: primaryTagId,
+            conditions: conditions,
+            match_type: matchType
+        };
+        
+        if (isEditing) {
+            body.tab_id = parseInt(editIdInput.value);
+        }
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify(body)
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            window._allTagsCache = null;
+            await refreshConversationTabs();
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: isEditing ? 'Aba atualizada!' : `Aba "${name}" criada!`, showConfirmButton: false, timer: 2000 });
+            return true;
+        } else {
+            Swal.showValidationMessage(data.message || 'Erro ao salvar aba');
+            return false;
+        }
+    } catch (error) {
+        console.error('Erro ao salvar aba avançada:', error);
+        Swal.showValidationMessage('Erro de conexão');
+        return false;
     }
 }
 
@@ -22040,7 +22644,7 @@ function filterManageTabsTags(search) {
 }
 
 /**
- * Toggle tag como aba (adicionar/remover)
+ * Toggle tag como aba (adicionar/remover) - modo rápido
  */
 async function toggleTabTag(tagId, isCurrentlyTab, btnEl) {
     try {
@@ -22084,7 +22688,7 @@ async function toggleTabTag(tagId, isCurrentlyTab, btnEl) {
 }
 
 /**
- * Criar nova tag + aba a partir do modal de gerenciamento
+ * Criar nova tag + aba a partir do modal de gerenciamento (modo rápido)
  */
 async function createNewTabFromModal() {
     const nameInput = document.getElementById('newTabTagName');

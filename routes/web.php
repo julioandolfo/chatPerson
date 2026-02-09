@@ -643,9 +643,11 @@ Router::get('/conversations/{id}/tags', [TagController::class, 'getByConversatio
 // Rotas de Abas de Conversas (por agente)
 Router::get('/conversation-tabs', [TagController::class, 'getUserTabs'], ['Authentication']);
 Router::post('/conversation-tabs', [TagController::class, 'addTab'], ['Authentication']);
+Router::post('/conversation-tabs/update', [TagController::class, 'updateTab'], ['Authentication']);
 Router::post('/conversation-tabs/remove', [TagController::class, 'removeTab'], ['Authentication']);
 Router::post('/conversation-tabs/reorder', [TagController::class, 'reorderTabs'], ['Authentication']);
 Router::post('/conversation-tabs/create', [TagController::class, 'createTagAndTab'], ['Authentication']);
+Router::get('/conversation-tabs/funnel-stages', [TagController::class, 'getFunnelStages'], ['Authentication']);
 
 // Rotas de Agentes de IA em Conversas
 Router::get('/conversations/{id}/ai-status', [ConversationController::class, 'getAIStatus'], ['Authentication']);

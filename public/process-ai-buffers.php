@@ -89,62 +89,91 @@ $skipped = 0;
 
 foreach ($bufferFiles as $bufferFile) {
     try {
-        // Ler dados do buffer
-        $bufferData = json_decode(@file_get_contents($bufferFile), true);
-        
-        if (!$bufferData) {
-            Logger::aiTools("[BUFFER PROCESSOR] Arquivo de buffer inválido: " . basename($bufferFile));
-            @unlink($bufferFile);
-            continue;
-        }
-        
         // Extrair ID da conversa do nome do arquivo (buffer_123.json)
         $conversationId = (int)str_replace(['buffer_', '.json'], '', basename($bufferFile));
-        $agentId = $bufferData['agent_id'] ?? null;
-        $messages = $bufferData['messages'] ?? [];
-        $expiresAt = $bufferData['expires_at'] ?? 0;
         
-        if (!$conversationId || !$agentId || empty($messages)) {
-            Logger::aiTools("[BUFFER PROCESSOR] Dados incompletos no buffer: convId={$conversationId}, agentId={$agentId}, msgs=" . count($messages));
-            @unlink($bufferFile);
-            continue;
-        }
-        
-        // Verificar se a conversa e o agente ainda existem
-        $conversation = Conversation::find($conversationId);
-        if (empty($conversation) || empty($conversation['contact_id'])) {
-            Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: conversa inexistente ou sem contato (convId={$conversationId})");
-            @unlink($bufferFile);
-            continue;
-        }
-        $agentModel = AIAgent::find($agentId);
-        if (empty($agentModel) || empty($agentModel['enabled'])) {
-            Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: agente inexistente/inativo (agentId={$agentId}, convId={$conversationId})");
-            @unlink($bufferFile);
-            continue;
-        }
-        
-        // Verificar se já passou o tempo de expiração
-        if ($expiresAt > $now) {
+        // ✅ LOCK EXCLUSIVO NÃO-BLOQUEANTE para evitar processamento duplicado
+        $lockFile = $bufferDir . 'lock_' . $conversationId . '.lock';
+        $lockFp = fopen($lockFile, 'c');
+        if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+            Logger::aiTools("[BUFFER PROCESSOR] ⏭️ Outro processador já trata conv={$conversationId}, pulando");
+            if ($lockFp) fclose($lockFp);
             $skipped++;
-            continue; // Ainda não expirou
+            continue;
         }
         
-        // Agrupar mensagens
-        $groupedMessage = implode("\n\n", array_map(function($msg) {
-            return $msg['content'];
-        }, $messages));
-        
-        // Processar mensagem
-        Logger::aiTools("[BUFFER PROCESSOR] Processando buffer expirado: conv={$conversationId}, agent={$agentId}, msgs=" . count($messages) . ", groupedLen=" . strlen($groupedMessage));
-        
-        AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
-        
-        Logger::aiTools("[BUFFER PROCESSOR] ✅ Buffer processado com sucesso: conv={$conversationId}");
-        
-        // Remover arquivo de buffer
-        @unlink($bufferFile);
-        $processed++;
+        try {
+            // Re-verificar se buffer ainda existe após adquirir lock
+            if (!file_exists($bufferFile)) {
+                Logger::aiTools("[BUFFER PROCESSOR] Buffer já processado por outro processo: conv={$conversationId}");
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue;
+            }
+            
+            // Ler dados do buffer
+            $bufferData = json_decode(@file_get_contents($bufferFile), true);
+            
+            if (!$bufferData) {
+                Logger::aiTools("[BUFFER PROCESSOR] Arquivo de buffer inválido: " . basename($bufferFile));
+                @unlink($bufferFile);
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue;
+            }
+            
+            $agentId = $bufferData['agent_id'] ?? null;
+            $messages = $bufferData['messages'] ?? [];
+            $expiresAt = $bufferData['expires_at'] ?? 0;
+            
+            if (!$conversationId || !$agentId || empty($messages)) {
+                Logger::aiTools("[BUFFER PROCESSOR] Dados incompletos no buffer: convId={$conversationId}, agentId={$agentId}, msgs=" . count($messages));
+                @unlink($bufferFile);
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue;
+            }
+            
+            // Verificar se a conversa e o agente ainda existem
+            $conversation = Conversation::find($conversationId);
+            if (empty($conversation) || empty($conversation['contact_id'])) {
+                Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: conversa inexistente ou sem contato (convId={$conversationId})");
+                @unlink($bufferFile);
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue;
+            }
+            $agentModel = AIAgent::find($agentId);
+            if (empty($agentModel) || empty($agentModel['enabled'])) {
+                Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: agente inexistente/inativo (agentId={$agentId}, convId={$conversationId})");
+                @unlink($bufferFile);
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue;
+            }
+            
+            // Verificar se já passou o tempo de expiração
+            if ($expiresAt > $now) {
+                $skipped++;
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                continue; // Ainda não expirou
+            }
+            
+            // Agrupar mensagens
+            $groupedMessage = implode("\n\n", array_map(function($msg) {
+                return $msg['content'];
+            }, $messages));
+            
+            // Processar mensagem
+            Logger::aiTools("[BUFFER PROCESSOR] Processando buffer expirado: conv={$conversationId}, agent={$agentId}, msgs=" . count($messages) . ", groupedLen=" . strlen($groupedMessage));
+            
+            // ✅ DELETAR buffer ANTES de processar (evita que outro processador pegue o mesmo)
+            @unlink($bufferFile);
+            
+            AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
+            
+            Logger::aiTools("[BUFFER PROCESSOR] ✅ Buffer processado com sucesso: conv={$conversationId}");
+            
+            $processed++;
+            
+        } finally {
+            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+        }
         
     } catch (\Throwable $e) {
         Logger::aiTools("[BUFFER PROCESSOR ERROR] Erro ao processar " . basename($bufferFile) . ": " . $e->getMessage());

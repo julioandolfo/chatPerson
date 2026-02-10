@@ -187,6 +187,12 @@ class Conversation extends Model
             $params[] = $filters['department_id'];
         }
         
+        // Filtro por contato
+        if (!empty($filters['contact_id'])) {
+            $sql .= " AND c.contact_id = ?";
+            $params[] = (int)$filters['contact_id'];
+        }
+        
         // Filtro por tags (suporta array para multi-select)
         if (!empty($filters['tag_ids']) && is_array($filters['tag_ids'])) {
             $placeholders = implode(',', array_fill(0, count($filters['tag_ids']), '?'));

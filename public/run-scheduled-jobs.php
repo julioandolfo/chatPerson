@@ -170,7 +170,7 @@ try {
     
     // ========== JOBS CRÍTICOS (a cada execução) ==========
     
-    // ✅ Processar buffers de IA (CRÍTICO - executar sempre)
+    // ✅ Processar buffers de IA (CRÍTICO - executar sempre, com LOCK para evitar duplicação)
     cronRunJob('AIBuffers', function() {
         $bufferDir = dirname(__DIR__) . '/storage/ai_buffers/';
         if (!is_dir($bufferDir)) { @mkdir($bufferDir, 0755, true); }
@@ -179,31 +179,53 @@ try {
         
         $now = time();
         foreach ($bufferFiles as $bufferFile) {
+            $lockFp = null;
             try {
-                $bufferData = json_decode(@file_get_contents($bufferFile), true);
-                if (!$bufferData) { @unlink($bufferFile); continue; }
-                
                 $conversationId = (int)str_replace(['buffer_', '.json'], '', basename($bufferFile));
+                
+                // ✅ LOCK EXCLUSIVO NÃO-BLOQUEANTE para evitar processamento duplicado
+                $lockFile = $bufferDir . 'lock_' . $conversationId . '.lock';
+                $lockFp = fopen($lockFile, 'c');
+                if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+                    if ($lockFp) fclose($lockFp);
+                    continue; // Outro processador já está tratando
+                }
+                
+                // Re-verificar se buffer ainda existe após adquirir lock
+                if (!file_exists($bufferFile)) {
+                    flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+                    continue;
+                }
+                
+                $bufferData = json_decode(@file_get_contents($bufferFile), true);
+                if (!$bufferData) { @unlink($bufferFile); flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile); continue; }
+                
                 $agentId = $bufferData['agent_id'] ?? null;
                 $messages = $bufferData['messages'] ?? [];
                 $expiresAt = $bufferData['expires_at'] ?? 0;
                 
-                if (!$conversationId || !$agentId || empty($messages)) { @unlink($bufferFile); continue; }
+                if (!$conversationId || !$agentId || empty($messages)) { @unlink($bufferFile); flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile); continue; }
                 
                 $conversation = \App\Models\Conversation::find($conversationId);
-                if (empty($conversation) || empty($conversation['contact_id'])) { @unlink($bufferFile); continue; }
+                if (empty($conversation) || empty($conversation['contact_id'])) { @unlink($bufferFile); flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile); continue; }
                 
                 $agentModel = \App\Models\AIAgent::find($agentId);
-                if (empty($agentModel) || empty($agentModel['enabled'])) { @unlink($bufferFile); continue; }
+                if (empty($agentModel) || empty($agentModel['enabled'])) { @unlink($bufferFile); flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile); continue; }
                 
-                if ($expiresAt > $now) { continue; } // Ainda não expirou
+                if ($expiresAt > $now) { flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile); continue; } // Ainda não expirou
                 
                 $groupedMessage = implode("\n\n", array_map(fn($msg) => $msg['content'], $messages));
-                \App\Services\AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
+                
+                // ✅ DELETAR buffer ANTES de processar
                 @unlink($bufferFile);
+                
+                \App\Services\AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
+                
+                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
             } catch (\Throwable $e) {
                 \App\Helpers\Logger::aiTools("[BUFFER ERROR] " . basename($bufferFile) . ": " . $e->getMessage());
                 @unlink($bufferFile);
+                if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
             }
         }
     }, 30);

@@ -43,13 +43,30 @@ if (!file_exists($bufferFile)) {
     exit(0);
 }
 
+// ✅ LOCK EXCLUSIVO NÃO-BLOQUEANTE para evitar processamento duplicado
+$lockFile = $bufferDir . 'lock_' . $conversationId . '.lock';
+$lockFp = fopen($lockFile, 'c');
+if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+    Logger::aiTools("[BUFFER BG] ⏭️ Outro processador já está tratando este buffer, saindo: conv={$conversationId}");
+    if ($lockFp) fclose($lockFp);
+    exit(0);
+}
+
 try {
+    // Re-verificar se buffer ainda existe após adquirir lock
+    if (!file_exists($bufferFile)) {
+        Logger::aiTools("[BUFFER BG] Buffer já foi processado por outro processo: conv={$conversationId}");
+        flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+        exit(0);
+    }
+    
     // Ler dados do buffer
     $bufferData = json_decode(file_get_contents($bufferFile), true);
     
     if (!$bufferData) {
         Logger::aiTools("[BUFFER BG ERROR] Buffer inválido: conv={$conversationId}");
         @unlink($bufferFile);
+        flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
         exit(1);
     }
     
@@ -61,6 +78,7 @@ try {
     if (!$agentId || empty($messages)) {
         Logger::aiTools("[BUFFER BG ERROR] Dados incompletos: conv={$conversationId}");
         @unlink($bufferFile);
+        flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
         exit(1);
     }
     
@@ -68,6 +86,8 @@ try {
     if ($expiresAt > $now) {
         $remaining = $expiresAt - $now;
         Logger::aiTools("[BUFFER BG] Timer renovado, aguardando mais {$remaining}s: conv={$conversationId}");
+        // Liberar lock antes de dormir (permitir que bufferMessage escreva)
+        flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
         // Reagendar
         sleep($remaining);
         // Reprocessar (recursivo)
@@ -82,20 +102,22 @@ try {
     
     Logger::aiTools("[BUFFER BG] Processando " . count($messages) . " mensagens agrupadas: conv={$conversationId}");
     
+    // ✅ DELETAR buffer ANTES de processar (evita que outro processador pegue o mesmo)
+    @unlink($bufferFile);
+    
     // Processar
     AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
     
     Logger::aiTools("[BUFFER BG] ✅ Processamento concluído: conv={$conversationId}");
     
-    // Remover buffer
-    @unlink($bufferFile);
-    
+    flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
     exit(0);
     
 } catch (\Exception $e) {
     Logger::aiTools("[BUFFER BG ERROR] Erro: " . $e->getMessage());
     Logger::aiTools("[BUFFER BG ERROR] Stack: " . $e->getTraceAsString());
     @unlink($bufferFile);
+    flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
     exit(1);
 }
 

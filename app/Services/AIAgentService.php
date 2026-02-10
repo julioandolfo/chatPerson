@@ -619,7 +619,7 @@ class AIAgentService
             ? json_decode($agent['settings'], true) 
             : ($agent['settings'] ?? []);
         
-        $contextTimer = (int)($settings['context_timer_seconds'] ?? 5); // Padrão: 5 segundos
+        $contextTimer = (int)($settings['context_timer_seconds'] ?? 10); // Padrão: 10 segundos
         
         // Se timer for 0, processar imediatamente (sem buffer)
         if ($contextTimer <= 0) {
@@ -635,51 +635,74 @@ class AIAgentService
         
         $now = time();
         
-        // Ler buffer existente (se houver)
-        $bufferData = [];
-        if (file_exists($bufferFile)) {
-            $content = file_get_contents($bufferFile);
-            $bufferData = json_decode($content, true) ?? [];
+        // ✅ LOCK EXCLUSIVO para escrita atômica (evita race condition entre webhooks simultâneos)
+        $lockFp = fopen($lockFile, 'c');
+        if (!$lockFp) {
+            \App\Helpers\Logger::error("AIAgentService::bufferMessage - Não conseguiu abrir lock file, processando direto");
+            self::processMessage($conversationId, $agentId, $message);
+            return;
         }
         
-        // Inicializar se não existir
-        if (empty($bufferData)) {
-            $bufferData = [
-                'messages' => [],
-                'agent_id' => $agentId,
-                'timer_seconds' => $contextTimer,
-                'first_message_at' => $now,
-                'scheduled' => false
+        if (!flock($lockFp, LOCK_EX)) {
+            \App\Helpers\Logger::error("AIAgentService::bufferMessage - Não conseguiu adquirir lock, processando direto");
+            fclose($lockFp);
+            self::processMessage($conversationId, $agentId, $message);
+            return;
+        }
+        
+        try {
+            // Ler buffer existente (se houver) — dentro do lock
+            $bufferData = [];
+            if (file_exists($bufferFile)) {
+                $content = file_get_contents($bufferFile);
+                $bufferData = json_decode($content, true) ?? [];
+            }
+            
+            // Inicializar se não existir
+            if (empty($bufferData)) {
+                $bufferData = [
+                    'messages' => [],
+                    'agent_id' => $agentId,
+                    'timer_seconds' => $contextTimer,
+                    'first_message_at' => $now,
+                    'scheduled' => false
+                ];
+            }
+            
+            // Adicionar nova mensagem
+            $bufferData['messages'][] = [
+                'content' => $message,
+                'timestamp' => $now
             ];
+            
+            // ✅ CRÍTICO: Atualizar timestamp da última mensagem
+            $bufferData['last_message_at'] = $now;
+            $bufferData['expires_at'] = $now + $contextTimer;
+            
+            $wasScheduled = $bufferData['scheduled'] ?? false;
+            
+            // Se primeira vez, marcar como agendado
+            if (!$wasScheduled) {
+                $bufferData['scheduled'] = true;
+            }
+            
+            // Salvar buffer atualizado (atômico dentro do lock)
+            file_put_contents($bufferFile, json_encode($bufferData, JSON_UNESCAPED_UNICODE));
+            
+            $msgCount = count($bufferData['messages']);
+            
+            \App\Helpers\Logger::info("AIAgentService::bufferMessage - Buffer salvo (msgs: {$msgCount}, expires: " . date('H:i:s', $bufferData['expires_at']) . ", wasScheduled: " . ($wasScheduled ? 'SIM' : 'NÃO') . ")");
+        } finally {
+            // Sempre liberar o lock
+            flock($lockFp, LOCK_UN);
+            fclose($lockFp);
         }
         
-        // Adicionar nova mensagem
-        $bufferData['messages'][] = [
-            'content' => $message,
-            'timestamp' => $now
-        ];
-        
-        // ✅ CRÍTICO: Atualizar timestamp da última mensagem
-        $bufferData['last_message_at'] = $now;
-        $bufferData['expires_at'] = $now + $contextTimer;
-        
-        // Salvar buffer atualizado
-        file_put_contents($bufferFile, json_encode($bufferData, JSON_UNESCAPED_UNICODE));
-        
-        $msgCount = count($bufferData['messages']);
-        $wasScheduled = $bufferData['scheduled'] ?? false;
-        
-        \App\Helpers\Logger::info("AIAgentService::bufferMessage - Buffer salvo (msgs: {$msgCount}, expires: " . date('H:i:s', $bufferData['expires_at']) . ", wasScheduled: " . ($wasScheduled ? 'SIM' : 'NÃO') . ")");
-        
-        // Se já está agendado, apenas renovar o timer (não criar novo processamento)
+        // Se já estava agendado, apenas renovar o timer (não criar novo processamento)
         if ($wasScheduled) {
             \App\Helpers\Logger::info("AIAgentService::bufferMessage - ⏰ Timer RENOVADO (nova expiração: " . date('H:i:s', $bufferData['expires_at']) . ")");
             return;
         }
-        
-        // Marcar como agendado
-        $bufferData['scheduled'] = true;
-        file_put_contents($bufferFile, json_encode($bufferData, JSON_UNESCAPED_UNICODE));
         
         // Agendar processamento (apenas primeira vez)
         \App\Helpers\Logger::info("AIAgentService::bufferMessage - 🚀 Agendando NOVO processamento");

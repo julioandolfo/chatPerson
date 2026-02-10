@@ -29,27 +29,52 @@ $processed = 0;
 $waiting = 0;
 
 foreach ($bufferFiles as $bufferFile) {
+    $lockFp = null;
     try {
+        $conversationId = (int)str_replace(['buffer_', '.json'], '', basename($bufferFile));
+        
+        // ✅ LOCK EXCLUSIVO NÃO-BLOQUEANTE para evitar processamento duplicado
+        $lockFile = $bufferDir . 'lock_' . $conversationId . '.lock';
+        $lockFp = fopen($lockFile, 'c');
+        if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+            if ($lockFp) fclose($lockFp);
+            $lockFp = null;
+            $waiting++;
+            continue; // Outro processador já está tratando
+        }
+        
+        // Re-verificar se buffer ainda existe após adquirir lock
+        if (!file_exists($bufferFile)) {
+            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+            $lockFp = null;
+            continue;
+        }
+        
         $bufferData = json_decode(file_get_contents($bufferFile), true);
         
         if (!$bufferData) {
             @unlink($bufferFile);
+            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+            $lockFp = null;
             continue;
         }
         
-        $conversationId = (int)str_replace(['buffer_', '.json'], '', basename($bufferFile));
         $agentId = $bufferData['agent_id'] ?? null;
         $messages = $bufferData['messages'] ?? [];
         $expiresAt = $bufferData['expires_at'] ?? 0;
         
         if (!$conversationId || !$agentId || empty($messages)) {
             @unlink($bufferFile);
+            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+            $lockFp = null;
             continue;
         }
         
         // Verificar se expirou
         if ($expiresAt > $now) {
             $waiting++;
+            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+            $lockFp = null;
             continue;
         }
         
@@ -60,14 +85,19 @@ foreach ($bufferFiles as $bufferFile) {
         
         Logger::aiTools("[POLL] Processando buffer expirado: conv={$conversationId}, msgs=" . count($messages));
         
+        // ✅ DELETAR buffer ANTES de processar
+        @unlink($bufferFile);
+        
         AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
         
-        @unlink($bufferFile);
+        flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+        $lockFp = null;
         $processed++;
         
     } catch (\Exception $e) {
         Logger::aiTools("[POLL ERROR] " . $e->getMessage());
         @unlink($bufferFile);
+        if ($lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
     }
 }
 

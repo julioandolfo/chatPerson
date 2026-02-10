@@ -580,6 +580,49 @@
 /* O conteúdo principal automaticamente se ajusta quando o drawer está aberto/fechado */
 
 /* ============================================
+   TOOLTIPS - CORREÇÃO COMPLETA
+   ============================================ */
+
+/* Tooltips do Bootstrap - fundo escuro e texto claro no dark mode */
+[data-bs-theme="dark"] .tooltip {
+    --bs-tooltip-bg: rgba(0, 0, 0, 0.9);
+    --bs-tooltip-color: #F5F5F5;
+}
+
+[data-bs-theme="dark"] .tooltip .tooltip-inner {
+    background-color: rgba(0, 0, 0, 0.9) !important;
+    color: #F5F5F5 !important;
+}
+
+[data-bs-theme="dark"] .tooltip .tooltip-arrow::before {
+    border-top-color: rgba(0, 0, 0, 0.9) !important;
+    border-right-color: rgba(0, 0, 0, 0.9) !important;
+    border-bottom-color: rgba(0, 0, 0, 0.9) !important;
+    border-left-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* Garantir que o tooltip seja visível em todos os estados */
+[data-bs-theme="dark"] .bs-tooltip-top .tooltip-arrow::before,
+[data-bs-theme="dark"] .bs-tooltip-auto[data-popper-placement^="top"] .tooltip-arrow::before {
+    border-top-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+[data-bs-theme="dark"] .bs-tooltip-end .tooltip-arrow::before,
+[data-bs-theme="dark"] .bs-tooltip-auto[data-popper-placement^="right"] .tooltip-arrow::before {
+    border-right-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+[data-bs-theme="dark"] .bs-tooltip-bottom .tooltip-arrow::before,
+[data-bs-theme="dark"] .bs-tooltip-auto[data-popper-placement^="bottom"] .tooltip-arrow::before {
+    border-bottom-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+[data-bs-theme="dark"] .bs-tooltip-start .tooltip-arrow::before,
+[data-bs-theme="dark"] .bs-tooltip-auto[data-popper-placement^="left"] .tooltip-arrow::before {
+    border-left-color: rgba(0, 0, 0, 0.9) !important;
+}
+
+/* ============================================
    MENUS E DROPDOWNS - CORREÇÃO COMPLETA
    ============================================ */
 

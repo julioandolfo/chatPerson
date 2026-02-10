@@ -114,7 +114,16 @@ ob_start();
                                     $conversationsCount = \App\Models\Conversation::where('contact_id', '=', $contact['id']);
                                     $count = count($conversationsCount);
                                     ?>
-                                    <span class="badge badge-light-primary"><?= $count ?></span>
+                                    <?php if ($count > 0): ?>
+                                        <a href="<?= \App\Helpers\Url::to('/conversations?contact_id=' . $contact['id']) ?>" 
+                                           class="badge badge-light-primary text-hover-primary" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Clique para ver todas as conversas">
+                                            <?= $count ?>
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="badge badge-light-secondary"><?= $count ?></span>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="text-end">
                                     <?php
@@ -127,9 +136,26 @@ ob_start();
                                     );
                                     ?>
                                     
+                                    <?php if ($count > 0): ?>
+                                        <!-- Botão para ver histórico de conversas -->
+                                        <a href="<?= \App\Helpers\Url::to('/conversations?contact_id=' . $contact['id']) ?>" 
+                                           class="btn btn-icon btn-bg-light btn-active-color-info btn-sm me-1" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Ver histórico de conversas">
+                                            <i class="ki-duotone ki-message-text fs-2">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
+                                        </a>
+                                    <?php endif; ?>
+                                    
                                     <?php if ($openConversation): ?>
                                         <!-- Conversa aberta existe - botão para ir -->
-                                        <a href="<?= \App\Helpers\Url::to('/conversations?id=' . $openConversation['id']) ?>" class="btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1" data-bs-toggle="tooltip" title="Ir para Conversa">
+                                        <a href="<?= \App\Helpers\Url::to('/conversations?id=' . $openConversation['id']) ?>" 
+                                           class="btn btn-icon btn-bg-light btn-active-color-success btn-sm me-1" 
+                                           data-bs-toggle="tooltip" 
+                                           title="Ir para conversa aberta">
                                             <i class="ki-duotone ki-message-text-2 fs-2">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
@@ -141,7 +167,7 @@ ob_start();
                                         <button type="button" 
                                                 class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1" 
                                                 data-bs-toggle="tooltip" 
-                                                title="Iniciar Nova Conversa"
+                                                title="Iniciar nova conversa"
                                                 onclick="openNewConversationModal(<?= $contact['id'] ?>, '<?= htmlspecialchars(addslashes($contact['name'] ?? ''), ENT_QUOTES) ?>', '<?= htmlspecialchars($contact['phone'] ?? '', ENT_QUOTES) ?>')">
                                             <i class="ki-duotone ki-message-add fs-2">
                                                 <span class="path1"></span>
@@ -151,14 +177,21 @@ ob_start();
                                         </button>
                                     <?php endif; ?>
                                     
-                                    <a href="<?= \App\Helpers\Url::to('/contacts/' . $contact['id']) ?>" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1" data-bs-toggle="tooltip" title="Ver detalhes">
+                                    <a href="<?= \App\Helpers\Url::to('/contacts/' . $contact['id']) ?>" 
+                                       class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm me-1" 
+                                       data-bs-toggle="tooltip" 
+                                       title="Ver detalhes do contato">
                                         <i class="ki-duotone ki-eye fs-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>
                                             <span class="path3"></span>
                                         </i>
                                     </a>
-                                    <button type="button" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm" data-bs-toggle="tooltip" title="Editar" onclick="editContact(<?= $contact['id'] ?>)">
+                                    <button type="button" 
+                                            class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm" 
+                                            data-bs-toggle="tooltip" 
+                                            title="Editar contato" 
+                                            onclick="editContact(<?= $contact['id'] ?>)">
                                         <i class="ki-duotone ki-pencil fs-2">
                                             <span class="path1"></span>
                                             <span class="path2"></span>

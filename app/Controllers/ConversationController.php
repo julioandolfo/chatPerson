@@ -78,6 +78,7 @@ class ConversationController
             'channel' => $_GET['channel'] ?? null,
             'channels' => isset($_GET['channels']) && is_array($_GET['channels']) ? $_GET['channels'] : (!empty($_GET['channel']) ? [$_GET['channel']] : null),
             'search' => $_GET['search'] ?? null,
+            'contact_id' => !empty($_GET['contact_id']) ? (int)$_GET['contact_id'] : null,
             'agent_id' => isset($_GET['agent_id']) ? ($_GET['agent_id'] === '0' || $_GET['agent_id'] === 0 ? '0' : $_GET['agent_id']) : null,
             'agent_ids' => isset($_GET['agent_ids']) && is_array($_GET['agent_ids']) ? $_GET['agent_ids'] : (!empty($_GET['agent_id']) && $_GET['agent_id'] !== '0' ? [$_GET['agent_id']] : null),
             'department_id' => $_GET['department_id'] ?? null,
@@ -288,6 +289,12 @@ class ConversationController
                 error_log("Erro ao carregar abas do usuário: " . $e->getMessage());
             }
 
+            // Buscar dados do contato se estiver filtrando por contact_id
+            $filterContact = null;
+            if (!empty($filters['contact_id'])) {
+                $filterContact = \App\Models\Contact::find((int)$filters['contact_id']);
+            }
+
             Response::view('conversations/index', [
                 'conversations' => $conversations,
                 'agents' => $agents,
@@ -296,6 +303,7 @@ class ConversationController
                 'whatsappAccounts' => $whatsappAccounts ?? [],
                 'funnelsForNewConversation' => $funnelsForNewConversation ?? [],
                 'filters' => $filters,
+                'filterContact' => $filterContact,
                 'selectedConversation' => $selectedConversation,
                 'selectedConversationId' => $selectedConversationId,
                 'accessRestricted' => $accessRestricted,

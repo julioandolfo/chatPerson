@@ -2793,7 +2793,25 @@ function getChannelInfo(channel) {
 <!-- Cabeçalho com Mêtricas de SLA e Tempo de Resposta -->
 <div class="conversations-metrics-header" style="padding: 15px 20px; background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color); display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
     <div class="d-flex align-items-center gap-3">
-        <h2 class="mb-0 fw-bold fs-3">Conversas - Sistema Multiatendimento</h2>
+        <h2 class="mb-0 fw-bold fs-3">
+            Conversas - Sistema Multiatendimento
+            <?php if (!empty($filterContact)): ?>
+                <span class="badge badge-light-info fs-7 ms-3">
+                    <i class="ki-duotone ki-profile-user fs-5 me-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    Contato: <?= htmlspecialchars($filterContact['name']) ?>
+                    <a href="<?= \App\Helpers\Url::to('/conversations') ?>" class="text-hover-danger ms-2" title="Remover filtro">
+                        <i class="ki-duotone ki-cross fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                    </a>
+                </span>
+            <?php endif; ?>
+        </h2>
     </div>
     <div class="d-flex align-items-center gap-4 flex-wrap" id="agent-metrics-container" style="margin-left: auto;">
         <div class="d-flex align-items-center gap-2">
@@ -8149,10 +8167,10 @@ function startPolling(conversationId) {
         return;
     }
     
-    // Obter intervalo configurado (padrão: 30 segundos - mais eficiente que 3s)
+    // Obter intervalo configurado (padrão: 10 segundos)
     const pollingInterval_ms = (window.realtimeConfig && window.realtimeConfig.pollingInterval) 
-        ? Math.max(window.realtimeConfig.pollingInterval, 10000) // Mínimo 10 segundos
-        : 30000; // Padrão 30 segundos (recomendação de performance)
+        ? Math.max(window.realtimeConfig.pollingInterval, 5000) // Mínimo 5 segundos
+        : 10000; // Padrão 10 segundos
     
     console.log(`[Polling] Iniciando polling de mensagens a cada ${pollingInterval_ms/1000} segundos`);
     
@@ -19254,11 +19272,11 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
     // Apenas se WebSocket não estiver disponível ou se estiver em modo polling/auto
     if (!window.realtimeConfig || window.realtimeConfig.connectionType !== 'websocket') {
-        // Intervalo de 60 segundos (mais eficiente que 10s, badges não precisam ser tão tempo-real)
-        console.log('[Badges] Iniciando polling de badges a cada 60 segundos');
+        // Intervalo de 30 segundos para badges
+        console.log('[Badges] Iniciando polling de badges a cada 30 segundos');
         let conversationListUpdateInterval = setInterval(() => {
             refreshConversationBadges();
-        }, 60000); // 60 segundos ao invés de 10
+        }, 30000); // 30 segundos
     } else {
         console.log('[Badges] WebSocket ativo, polling de badges desabilitado');
     }
@@ -19283,11 +19301,11 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     }
     
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
-    // Intervalo de 60 segundos (mais eficiente que 10s)
-    console.log('[Badges] Iniciando polling de badges a cada 60 segundos (modo fallback)');
+    // Intervalo de 30 segundos
+    console.log('[Badges] Iniciando polling de badges a cada 30 segundos (modo fallback)');
     let conversationListUpdateInterval = setInterval(() => {
         refreshConversationBadges();
-    }, 60000); // 60 segundos ao invés de 10
+    }, 30000); // 30 segundos
 
     // Atualizar tempos relativos a cada 30 segundos (modo polling)
     let timeUpdateInterval = setInterval(() => {

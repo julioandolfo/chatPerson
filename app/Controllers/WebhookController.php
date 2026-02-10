@@ -16,7 +16,23 @@ use App\Models\Contact;
 class WebhookController
 {
     /**
-     * Log específico para webhooks
+     * ID único da request (para rastrear todo o fluxo de uma única chamada)
+     */
+    private static ?string $requestId = null;
+    
+    /**
+     * Gera ou retorna o REQUEST_ID único da request atual
+     */
+    private static function getRequestId(): string
+    {
+        if (self::$requestId === null) {
+            self::$requestId = substr(md5(uniqid(mt_rand(), true)), 0, 8);
+        }
+        return self::$requestId;
+    }
+    
+    /**
+     * Log específico para webhooks (com REQUEST_ID para rastreabilidade)
      */
     private static function log(string $message, string $level = 'INFO'): void
     {
@@ -27,9 +43,10 @@ class WebhookController
         
         $logFile = $logDir . '/webhook.log';
         $timestamp = date('Y-m-d H:i:s');
-        $logMessage = "[{$timestamp}] [{$level}] {$message}\n";
+        $reqId = self::getRequestId();
+        $logMessage = "[{$timestamp}] [{$level}] [RID:{$reqId}] {$message}\n";
         
-        file_put_contents($logFile, $logMessage, FILE_APPEND);
+        file_put_contents($logFile, $logMessage, FILE_APPEND | LOCK_EX);
         error_log($logMessage); // Também loga no error_log padrão
     }
     
@@ -121,17 +138,69 @@ class WebhookController
      */
     public function woocommerce(): void
     {
+        // Reset request ID para cada nova chamada
+        self::$requestId = null;
+        
+        // ══════════════════════════════════════════════════════════════
+        // LOG IMEDIATO: Registrar que a request chegou ANTES de tudo
+        // Se um webhook não aparece no log, o problema é antes do PHP
+        // ══════════════════════════════════════════════════════════════
+        $requestStartTime = microtime(true);
+        $clientIp = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $forwardedFor = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['HTTP_X_REAL_IP'] ?? null;
+        $realIp = $forwardedFor ? "{$clientIp} (forwarded: {$forwardedFor})" : $clientIp;
+        $requestMethod = $_SERVER['REQUEST_METHOD'] ?? 'unknown';
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+        $contentLength = $_SERVER['CONTENT_LENGTH'] ?? $_SERVER['HTTP_CONTENT_LENGTH'] ?? 'not-set';
+        $serverProtocol = $_SERVER['SERVER_PROTOCOL'] ?? 'unknown';
+        
+        self::log("══════════════════════════════════════════════════════════");
+        self::log("🔔 REQUEST RECEBIDA | IP: {$realIp} | Method: {$requestMethod} | Protocol: {$serverProtocol} | Content-Length: {$contentLength} | UA: {$userAgent}");
+        
         try {
-            // Log da requisição
+            // Ler payload
             $payload = file_get_contents('php://input');
+            $payloadSize = strlen($payload);
             $data = json_decode($payload, true);
+            $jsonError = json_last_error();
+            $jsonErrorMsg = json_last_error_msg();
             
-            self::log("=== WEBHOOK RECEBIDO ===");
-            self::log("Payload size: " . strlen($payload) . " bytes | " . self::summarizePayload($payload, 600));
+            self::log("📦 Payload recebido: {$payloadSize} bytes | JSON decode: " . ($jsonError === JSON_ERROR_NONE ? 'OK' : "ERRO ({$jsonErrorMsg})"));
             
-            // Caso seja apenas um ping do WooCommerce (webhook_id=XX) e não JSON
+            if ($payloadSize > 0 && $payloadSize <= 2000) {
+                self::log("📦 Payload completo: " . $payload);
+            } elseif ($payloadSize > 2000) {
+                self::log("📦 Payload preview (primeiros 1500 chars): " . substr($payload, 0, 1500) . "... [truncado, total: {$payloadSize} bytes]");
+            } else {
+                self::log("📦 Payload VAZIO (0 bytes)", 'WARNING');
+            }
+            
+            // Log de TODOS os headers recebidos (essencial para debug)
+            $headersRaw = function_exists('getallheaders') ? getallheaders() : self::getRequestHeaders();
+            $headers = self::normalizeHeaders($headersRaw);
+            
+            $headersList = [];
+            foreach ($headers as $k => $v) {
+                $headersList[] = "{$k}: {$v}";
+            }
+            self::log("📋 Headers (" . count($headers) . "): " . implode(' | ', $headersList));
+            
+            // Headers específicos do WooCommerce
+            $event = $headers['x-wc-webhook-event'] ?? null;
+            $source = $headers['x-wc-webhook-source'] ?? null;
+            $topic = $headers['x-wc-webhook-topic'] ?? null;
+            $webhookId = $headers['x-wc-webhook-id'] ?? null;
+            $deliveryId = $headers['x-wc-webhook-delivery-id'] ?? null;
+            $signature = $headers['x-wc-webhook-signature'] ?? null;
+            $contentType = $headers['content-type'] ?? '';
+            
+            self::log("🏷️ WooCommerce Headers: event={$event} | topic={$topic} | source={$source} | webhook_id={$webhookId} | delivery_id={$deliveryId} | signature=" . ($signature ? substr($signature, 0, 20) . '...' : 'null') . " | content-type={$contentType}");
+            
+            // ── Caso PING do WooCommerce ──
             if (stripos($payload, 'webhook_id=') === 0 && empty($data)) {
-                self::log("PING recebido (webhook_id), ignorando e retornando sucesso.", 'INFO');
+                self::log("🏓 PING recebido (webhook_id form-data), retornando sucesso.", 'INFO');
+                $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+                self::log("⏱️ Request finalizada em {$elapsed}ms (PING)");
                 Response::json([
                     'success' => true,
                     'message' => 'Ping recebido'
@@ -139,32 +208,31 @@ class WebhookController
                 return;
             }
             
+            // ── Payload vazio ou JSON inválido ──
             if (empty($data)) {
-                self::log("ERRO: Payload vazio ou inválido", 'ERROR');
+                $reason = $payloadSize === 0 ? 'body vazio (0 bytes)' : "JSON inválido (erro: {$jsonErrorMsg})";
+                self::log("❌ REJEITADO: Payload inválido - {$reason}", 'ERROR');
+                self::log("❌ Raw payload (até 500 chars): " . substr($payload, 0, 500), 'ERROR');
+                $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+                self::log("⏱️ Request finalizada em {$elapsed}ms (REJEITADA - payload inválido)");
                 Response::json([
                     'success' => false,
-                    'message' => 'Payload vazio'
+                    'message' => 'Payload vazio ou inválido'
                 ], 400);
                 return;
             }
             
-            // Headers do WooCommerce
-            $headersRaw = function_exists('getallheaders') ? getallheaders() : self::getRequestHeaders();
-            $headers = self::normalizeHeaders($headersRaw);
-            
-            $event = $headers['x-wc-webhook-event'] ?? null;
-            $source = $headers['x-wc-webhook-source'] ?? null;
             $orderId = $data['id'] ?? 'N/A';
-            $topic = $headers['x-wc-webhook-topic'] ?? null;
-            $contentType = $headers['content-type'] ?? '';
+            $orderNumber = $data['number'] ?? $orderId;
+            $orderStatus = $data['status'] ?? 'N/A';
             
-            self::log("Headers: event={$event} | topic={$topic} | source={$source} | content-type={$contentType}");
+            self::log("📝 Dados do pedido: ID={$orderId} | Number={$orderNumber} | Status={$orderStatus} | Event={$event}");
             
-            self::log("Event: {$event} | Source: {$source} | Order ID: {$orderId}");
-            
-            // Validar evento
+            // ── Validar evento ──
             if (!in_array(strtolower((string)$event), ['created', 'updated'])) {
-                self::log("Evento ignorado: {$event} (não é created/updated)", 'WARNING');
+                self::log("⏭️ Evento ignorado: '{$event}' (aceitos: created, updated) | topic={$topic} | Order #{$orderId}", 'WARNING');
+                $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+                self::log("⏱️ Request finalizada em {$elapsed}ms (EVENTO IGNORADO)");
                 Response::json([
                     'success' => true,
                     'message' => 'Evento ignorado: ' . $event
@@ -172,10 +240,13 @@ class WebhookController
                 return;
             }
             
-            // Processar pedido
+            // ── Processar pedido ──
+            self::log("🔄 Iniciando processamento do pedido #{$orderId} (evento: {$event})...");
             $result = self::processWooCommerceOrder($data, $source);
             
-            self::log("✅ Pedido #{$orderId} processado com sucesso: " . json_encode($result), 'SUCCESS');
+            $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+            self::log("✅ Pedido #{$orderId} processado com SUCESSO em {$elapsed}ms: " . json_encode($result), 'SUCCESS');
+            self::log("══════════════════════════════════════════════════════════");
             
             Response::json([
                 'success' => true,
@@ -185,12 +256,29 @@ class WebhookController
             ]);
             
         } catch (\Exception $e) {
-            self::log("❌ ERRO: " . $e->getMessage(), 'ERROR');
-            self::log("Stack trace: " . $e->getTraceAsString(), 'ERROR');
+            $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+            self::log("❌ ERRO EXCEPTION: " . $e->getMessage(), 'ERROR');
+            self::log("❌ Exception class: " . get_class($e) . " | File: " . $e->getFile() . ":" . $e->getLine(), 'ERROR');
+            self::log("❌ Stack trace: " . $e->getTraceAsString(), 'ERROR');
+            self::log("⏱️ Request finalizada em {$elapsed}ms (ERRO)", 'ERROR');
+            self::log("══════════════════════════════════════════════════════════");
             
             Response::json([
                 'success' => false,
                 'message' => 'Erro ao processar webhook: ' . $e->getMessage()
+            ], 500);
+        } catch (\Throwable $t) {
+            // Capturar até erros fatais do PHP
+            $elapsed = round((microtime(true) - $requestStartTime) * 1000, 2);
+            self::log("💀 ERRO FATAL (Throwable): " . $t->getMessage(), 'ERROR');
+            self::log("💀 Throwable class: " . get_class($t) . " | File: " . $t->getFile() . ":" . $t->getLine(), 'ERROR');
+            self::log("💀 Stack trace: " . $t->getTraceAsString(), 'ERROR');
+            self::log("⏱️ Request finalizada em {$elapsed}ms (ERRO FATAL)", 'ERROR');
+            self::log("══════════════════════════════════════════════════════════");
+            
+            Response::json([
+                'success' => false,
+                'message' => 'Erro fatal: ' . $t->getMessage()
             ], 500);
         }
     }

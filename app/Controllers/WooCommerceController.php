@@ -280,19 +280,19 @@ class WooCommerceController
             $ordersLimit = (int)($data['orders_limit'] ?? 100);
             $daysBack = (int)($data['days_back'] ?? 7);
             
-            // Validações
-            if ($ordersLimit < 1 || $ordersLimit > 500) {
+            // Validações (limite aumentado para suportar paginação completa)
+            if ($ordersLimit < 1 || $ordersLimit > 5000) {
                 Response::json([
                     'success' => false,
-                    'message' => 'Limite de pedidos deve ser entre 1 e 500'
+                    'message' => 'Limite de pedidos deve ser entre 1 e 5000'
                 ], 400);
                 return;
             }
             
-            if ($daysBack < 1 || $daysBack > 90) {
+            if ($daysBack < 1 || $daysBack > 365) {
                 Response::json([
                     'success' => false,
-                    'message' => 'Período deve ser entre 1 e 90 dias'
+                    'message' => 'Período deve ser entre 1 e 365 dias'
                 ], 400);
                 return;
             }
@@ -312,6 +312,7 @@ class WooCommerceController
             $ordersProcessed = 0;
             $newContacts = 0;
             $errors = [];
+            $pagesInfo = [];
             
             foreach ($integrations as $integration) {
                 try {
@@ -321,35 +322,96 @@ class WooCommerceController
                     $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
                     $cacheTtlMinutes = $integration['cache_ttl_minutes'] ?? 60;
                     
-                    // Buscar pedidos
                     $dateMin = date('Y-m-d', strtotime("-{$daysBack} days"));
-                    $url = rtrim($wcUrl, '/') . "/wp-json/wc/v3/orders?per_page={$ordersLimit}&orderby=date&order=desc&after={$dateMin}T00:00:00";
                     
-                    $ch = curl_init($url);
-                    curl_setopt_array($ch, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
-                        CURLOPT_TIMEOUT => 30,
-                        CURLOPT_CONNECTTIMEOUT => 10
-                    ]);
+                    // ═══ PAGINAÇÃO: WooCommerce API limita a 100 por página ═══
+                    $perPage = 100; // Máximo do WooCommerce
+                    $page = 1;
+                    $totalFetched = 0;
+                    $totalPages = null;
+                    $totalAvailable = null;
+                    $integrationOrders = [];
                     
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_close($ch);
-                    
-                    if ($httpCode !== 200) {
-                        $errors[] = "Integração #{$integration['id']}: HTTP {$httpCode}";
-                        continue;
+                    while ($totalFetched < $ordersLimit) {
+                        $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/orders?' . http_build_query([
+                            'per_page' => min($perPage, $ordersLimit - $totalFetched),
+                            'page' => $page,
+                            'orderby' => 'date',
+                            'order' => 'desc',
+                            'after' => $dateMin . 'T00:00:00'
+                        ]);
+                        
+                        $ch = curl_init($url);
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                            CURLOPT_TIMEOUT => 60,
+                            CURLOPT_CONNECTTIMEOUT => 15,
+                            CURLOPT_HEADER => true // Precisamos dos headers para paginação
+                        ]);
+                        
+                        $fullResponse = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+                        curl_close($ch);
+                        
+                        if ($httpCode !== 200) {
+                            $errors[] = "Integração #{$integration['id']}: HTTP {$httpCode} na página {$page}";
+                            break;
+                        }
+                        
+                        // Separar headers e body
+                        $responseHeaders = substr($fullResponse, 0, $headerSize);
+                        $responseBody = substr($fullResponse, $headerSize);
+                        
+                        // Extrair total de páginas e total de itens dos headers
+                        if ($totalPages === null) {
+                            if (preg_match('/X-WP-TotalPages:\s*(\d+)/i', $responseHeaders, $m)) {
+                                $totalPages = (int)$m[1];
+                            }
+                            if (preg_match('/X-WP-Total:\s*(\d+)/i', $responseHeaders, $m)) {
+                                $totalAvailable = (int)$m[1];
+                            }
+                        }
+                        
+                        $orders = json_decode($responseBody, true);
+                        
+                        if (!is_array($orders) || empty($orders)) {
+                            break; // Sem mais resultados
+                        }
+                        
+                        $integrationOrders = array_merge($integrationOrders, $orders);
+                        $totalFetched += count($orders);
+                        
+                        // Se retornou menos que o per_page, não há mais páginas
+                        if (count($orders) < $perPage) {
+                            break;
+                        }
+                        
+                        // Se atingiu o total de páginas disponíveis
+                        if ($totalPages !== null && $page >= $totalPages) {
+                            break;
+                        }
+                        
+                        $page++;
+                        
+                        // Pequena pausa para não sobrecarregar a API do WooCommerce
+                        if ($page > 1) {
+                            usleep(200000); // 200ms
+                        }
                     }
                     
-                    $orders = json_decode($response, true);
+                    $pagesInfo[] = [
+                        'integration_id' => $integration['id'],
+                        'integration_name' => $integration['name'] ?? '',
+                        'pages_fetched' => $page,
+                        'total_pages_available' => $totalPages,
+                        'total_orders_available' => $totalAvailable,
+                        'orders_fetched' => count($integrationOrders)
+                    ];
                     
-                    if (!is_array($orders)) {
-                        $errors[] = "Integração #{$integration['id']}: Resposta inválida";
-                        continue;
-                    }
-                    
-                    foreach ($orders as $order) {
+                    // Processar todos os pedidos coletados
+                    foreach ($integrationOrders as $order) {
                         // Extrair seller_id
                         $sellerId = null;
                         if (isset($order['meta_data']) && is_array($order['meta_data'])) {
@@ -372,7 +434,7 @@ class WooCommerceController
                                 $contactName = trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? ''));
                                 $contactName = !empty($contactName) ? $contactName : 'Cliente WooCommerce';
                                 
-                                // ✅ Normalizar telefone antes de salvar
+                                // Normalizar telefone antes de salvar
                                 $normalizedPhone = $customerPhone ? \App\Models\Contact::normalizePhoneNumber($customerPhone) : null;
                                 
                                 $contactId = \App\Models\Contact::create([
@@ -414,6 +476,7 @@ class WooCommerceController
                 'integrations_processed' => $integrationsProcessed,
                 'orders_processed' => $ordersProcessed,
                 'new_contacts' => $newContacts,
+                'pagination_info' => $pagesInfo,
                 'errors' => $errors
             ]);
             

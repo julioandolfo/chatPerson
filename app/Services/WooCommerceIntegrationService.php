@@ -615,30 +615,61 @@ class WooCommerceIntegrationService
                 $consumerSecret = $integration['consumer_secret'];
                 $metaKey = $integration['seller_meta_key'] ?? '_vendor_id';
                 
-                // Buscar pedidos com o meta_key do vendedor
-                $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/orders?per_page=100&orderby=date&order=desc';
+                // ═══ PAGINAÇÃO: WooCommerce API limita a 100 por página ═══
+                $perPage = 100;
+                $page = 1;
+                $maxPages = 50; // Limite de segurança
                 
-                // Adicionar filtro de data se fornecido
-                if ($dateFrom) {
-                    $url .= '&after=' . urlencode(date('c', strtotime($dateFrom)));
-                }
-                if ($dateTo) {
-                    $url .= '&before=' . urlencode(date('c', strtotime($dateTo)));
-                }
-                
-                $ch = curl_init($url);
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
-                    CURLOPT_TIMEOUT => 30
-                ]);
-                
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                
-                if ($httpCode === 200) {
-                    $orders = json_decode($response, true);
+                while ($page <= $maxPages) {
+                    $params = [
+                        'per_page' => $perPage,
+                        'page' => $page,
+                        'orderby' => 'date',
+                        'order' => 'desc'
+                    ];
+                    
+                    if ($dateFrom) {
+                        $params['after'] = date('c', strtotime($dateFrom));
+                    }
+                    if ($dateTo) {
+                        $params['before'] = date('c', strtotime($dateTo));
+                    }
+                    
+                    $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/orders?' . http_build_query($params);
+                    
+                    $ch = curl_init($url);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                        CURLOPT_TIMEOUT => 60,
+                        CURLOPT_CONNECTTIMEOUT => 15,
+                        CURLOPT_HEADER => true
+                    ]);
+                    
+                    $fullResponse = curl_exec($ch);
+                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+                    curl_close($ch);
+                    
+                    if ($httpCode !== 200) {
+                        break;
+                    }
+                    
+                    // Separar headers e body
+                    $responseHeaders = substr($fullResponse, 0, $headerSize);
+                    $responseBody = substr($fullResponse, $headerSize);
+                    
+                    // Extrair total de páginas dos headers
+                    $totalPages = null;
+                    if (preg_match('/X-WP-TotalPages:\s*(\d+)/i', $responseHeaders, $m)) {
+                        $totalPages = (int)$m[1];
+                    }
+                    
+                    $orders = json_decode($responseBody, true);
+                    
+                    if (!is_array($orders) || empty($orders)) {
+                        break;
+                    }
                     
                     // Filtrar pedidos do vendedor específico
                     foreach ($orders as $order) {
@@ -651,6 +682,21 @@ class WooCommerceIntegrationService
                             }
                         }
                     }
+                    
+                    // Se retornou menos que o per_page, não há mais páginas
+                    if (count($orders) < $perPage) {
+                        break;
+                    }
+                    
+                    // Se atingiu o total de páginas disponíveis
+                    if ($totalPages !== null && $page >= $totalPages) {
+                        break;
+                    }
+                    
+                    $page++;
+                    
+                    // Pequena pausa entre páginas
+                    usleep(200000); // 200ms
                 }
             } catch (\Exception $e) {
                 Logger::error("WooCommerceIntegrationService::getOrdersBySeller - Erro: " . $e->getMessage());

@@ -2816,15 +2816,15 @@ document.getElementById('goals-team-filter')?.addEventListener('change', functio
                 <div class="mb-7">
                     <label class="form-label fw-bold fs-6 required">Limite de Pedidos</label>
                     <input type="number" class="form-control form-control-solid" id="orders_limit" 
-                           value="100" min="1" max="500" placeholder="Ex: 100">
-                    <div class="form-text">Quantidade máxima de pedidos a sincronizar (máx: 500)</div>
+                           value="500" min="1" max="5000" placeholder="Ex: 500">
+                    <div class="form-text">Quantidade máxima de pedidos a sincronizar (máx: 5000). O sistema pagina automaticamente.</div>
                 </div>
                 
                 <div class="mb-7">
                     <label class="form-label fw-bold fs-6 required">Período (dias)</label>
                     <input type="number" class="form-control form-control-solid" id="days_back" 
-                           value="7" min="1" max="90" placeholder="Ex: 7">
-                    <div class="form-text">Buscar pedidos dos últimos X dias (máx: 90 dias)</div>
+                           value="30" min="1" max="365" placeholder="Ex: 30">
+                    <div class="form-text">Buscar pedidos dos últimos X dias (máx: 365 dias)</div>
                 </div>
                 
                 <div class="alert alert-warning d-flex align-items-center">
@@ -2834,7 +2834,7 @@ document.getElementById('goals-team-filter')?.addEventListener('change', functio
                         <span class="path3"></span>
                     </i>
                     <div class="d-flex flex-column">
-                        <span><strong>Atenção:</strong> Sincronizações com muitos pedidos podem levar alguns minutos. O sistema irá processar todas as integrações WooCommerce ativas.</span>
+                        <span><strong>Atenção:</strong> O sistema pagina automaticamente (100 pedidos por página). Sincronizações grandes podem levar alguns minutos. Todas as integrações WooCommerce ativas serão processadas.</span>
                     </div>
                 </div>
             </div>
@@ -3485,29 +3485,34 @@ function syncWooCommerceOrders() {
     const btnSync = document.getElementById("btn_sync_wc");
     
     // Validação
-    if (!ordersLimit || ordersLimit < 1 || ordersLimit > 500) {
+    if (!ordersLimit || ordersLimit < 1 || ordersLimit > 5000) {
         Swal.fire({
             icon: "warning",
             title: "Atenção",
-            text: "Limite de pedidos deve ser entre 1 e 500"
+            text: "Limite de pedidos deve ser entre 1 e 5000"
         });
         return;
     }
     
-    if (!daysBack || daysBack < 1 || daysBack > 90) {
+    if (!daysBack || daysBack < 1 || daysBack > 365) {
         Swal.fire({
             icon: "warning",
             title: "Atenção",
-            text: "Período deve ser entre 1 e 90 dias"
+            text: "Período deve ser entre 1 e 365 dias"
         });
         return;
     }
     
-    // Desabilitar botão e mostrar loading
+    // Desabilitar botão e mostrar loading com estimativa
     btnSync.disabled = true;
-    btnSync.innerHTML = "<span class=\"spinner-border spinner-border-sm me-2\"></span>Sincronizando...";
+    const pages = Math.ceil(ordersLimit / 100);
+    const estimatedTime = pages > 1 ? " (~" + Math.ceil(pages * 1.5) + "s)" : "";
+    btnSync.innerHTML = "<span class=\"spinner-border spinner-border-sm me-2\"></span>Sincronizando" + estimatedTime + "...";
     
-    // Fazer requisição
+    // Fazer requisição com timeout maior para paginação
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutos timeout
+    
     fetch("/api/woocommerce/sync-orders", {
         method: "POST",
         headers: {
@@ -3516,9 +3521,11 @@ function syncWooCommerceOrders() {
         body: JSON.stringify({
             orders_limit: parseInt(ordersLimit),
             days_back: parseInt(daysBack)
-        })
+        }),
+        signal: controller.signal
     })
     .then(async response => {
+        clearTimeout(timeoutId);
         const text = await response.text();
         try {
             return JSON.parse(text);
@@ -3535,6 +3542,18 @@ function syncWooCommerceOrders() {
         btnSync.innerHTML = "<i class=\"ki-duotone ki-arrows-circle fs-2\"><span class=\"path1\"></span><span class=\"path2\"></span></i> Sincronizar";
         
         if (data.success) {
+            // Montar informações de paginação
+            let paginationHtml = "";
+            if (data.pagination_info && data.pagination_info.length > 0) {
+                paginationHtml = '<hr class="my-3"><p class="mb-1"><strong>Detalhes por integração:</strong></p><ul class="mb-0">';
+                data.pagination_info.forEach(function(info) {
+                    var name = info.integration_name || ("#" + info.integration_id);
+                    var available = info.total_orders_available !== null ? info.total_orders_available : "?";
+                    paginationHtml += "<li>" + name + ": " + info.orders_fetched + " pedidos buscados (" + info.pages_fetched + " página(s), " + available + " disponíveis no WooCommerce)</li>";
+                });
+                paginationHtml += "</ul>";
+            }
+            
             Swal.fire({
                 icon: "success",
                 title: "Sucesso!",
@@ -3545,6 +3564,8 @@ function syncWooCommerceOrders() {
                         '<li>Pedidos processados: ' + (data.orders_processed || 0) + '</li>' +
                         '<li>Novos contatos: ' + (data.new_contacts || 0) + '</li>' +
                     '</ul>' +
+                    paginationHtml +
+                    (data.errors && data.errors.length > 0 ? '<hr class="my-3"><p class="text-danger mb-0"><strong>Erros:</strong> ' + data.errors.join(", ") + '</p>' : '') +
                 '</div>',
                 confirmButtonText: "Recarregar Dashboard"
             }).then((result) => {
@@ -3564,14 +3585,23 @@ function syncWooCommerceOrders() {
         }
     })
     .catch(error => {
+        clearTimeout(timeoutId);
         btnSync.disabled = false;
         btnSync.innerHTML = "<i class=\"ki-duotone ki-arrows-circle fs-2\"><span class=\"path1\"></span><span class=\"path2\"></span></i> Sincronizar";
         
-        Swal.fire({
-            icon: "error",
-            title: "Erro",
-            text: "Erro na comunicação com o servidor"
-        });
+        if (error.name === "AbortError") {
+            Swal.fire({
+                icon: "error",
+                title: "Timeout",
+                text: "A sincronização demorou demais. Tente com menos pedidos ou um período menor."
+            });
+        } else {
+            Swal.fire({
+                icon: "error",
+                title: "Erro",
+                text: "Erro na comunicação com o servidor"
+            });
+        }
         console.error("Erro:", error);
     });
 }

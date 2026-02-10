@@ -76,42 +76,102 @@ class WooCommerceSyncJob
         $ttlMinutes = $integration['cache_ttl_minutes'] ?? 60; // Padrão: 1 hora
         $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
         
-        // Buscar pedidos recentes (últimos 7 dias, máximo 100)
+        // Buscar pedidos recentes (últimos 7 dias)
         $dateFrom = date('Y-m-d', strtotime('-7 days')) . 'T00:00:00';
-        $url = $wcUrl . '/wp-json/wc/v3/orders?' . http_build_query([
-            'per_page' => 100,
-            'orderby' => 'date',
-            'order' => 'desc',
-            'after' => $dateFrom,
-            'status' => 'any' // Todos os status
-        ]);
         
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
-            CURLOPT_TIMEOUT => 60,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false
-        ]);
+        // ═══ PAGINAÇÃO: WooCommerce API limita a 100 por página ═══
+        $perPage = 100;
+        $page = 1;
+        $maxPages = 50; // Limite de segurança (5000 pedidos máx)
+        $allOrders = [];
         
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
+        echo "[WooCommerceSync]   Buscando pedidos com paginação (per_page={$perPage})...\n";
         
-        if ($httpCode !== 200) {
-            throw new \Exception("Erro ao buscar pedidos: HTTP {$httpCode}");
+        while ($page <= $maxPages) {
+            $url = $wcUrl . '/wp-json/wc/v3/orders?' . http_build_query([
+                'per_page' => $perPage,
+                'page' => $page,
+                'orderby' => 'date',
+                'order' => 'desc',
+                'after' => $dateFrom,
+                'status' => 'any'
+            ]);
+            
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_HEADER => true
+            ]);
+            
+            $fullResponse = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+            curl_close($ch);
+            
+            if ($httpCode !== 200) {
+                if ($page === 1) {
+                    throw new \Exception("Erro ao buscar pedidos: HTTP {$httpCode}");
+                }
+                echo "[WooCommerceSync]   Página {$page}: HTTP {$httpCode}, parando paginação.\n";
+                break;
+            }
+            
+            // Separar headers e body
+            $responseHeaders = substr($fullResponse, 0, $headerSize);
+            $responseBody = substr($fullResponse, $headerSize);
+            
+            // Extrair total de páginas dos headers
+            $totalPages = null;
+            $totalAvailable = null;
+            if (preg_match('/X-WP-TotalPages:\s*(\d+)/i', $responseHeaders, $m)) {
+                $totalPages = (int)$m[1];
+            }
+            if (preg_match('/X-WP-Total:\s*(\d+)/i', $responseHeaders, $m)) {
+                $totalAvailable = (int)$m[1];
+            }
+            
+            if ($page === 1 && $totalAvailable !== null) {
+                echo "[WooCommerceSync]   Total disponível no WooCommerce: {$totalAvailable} pedidos em {$totalPages} página(s)\n";
+            }
+            
+            $orders = json_decode($responseBody, true);
+            
+            if (!is_array($orders) || empty($orders)) {
+                break; // Sem mais resultados
+            }
+            
+            $allOrders = array_merge($allOrders, $orders);
+            echo "[WooCommerceSync]   Página {$page}: " . count($orders) . " pedidos (total acumulado: " . count($allOrders) . ")\n";
+            
+            // Se retornou menos que o per_page, não há mais páginas
+            if (count($orders) < $perPage) {
+                break;
+            }
+            
+            // Se atingiu o total de páginas disponíveis
+            if ($totalPages !== null && $page >= $totalPages) {
+                break;
+            }
+            
+            $page++;
+            
+            // Pequena pausa entre páginas para não sobrecarregar a API
+            usleep(200000); // 200ms
         }
         
-        $orders = json_decode($response, true);
-        
-        if (empty($orders)) {
+        if (empty($allOrders)) {
             return 0;
         }
         
+        echo "[WooCommerceSync]   Processando " . count($allOrders) . " pedidos...\n";
+        
         $syncedCount = 0;
         
-        foreach ($orders as $order) {
+        foreach ($allOrders as $order) {
             try {
                 // Extrair dados do pedido
                 $orderId = $order['id'];
@@ -139,13 +199,11 @@ class WooCommerceSyncJob
                     $contact = Contact::findByEmail($email);
                 }
                 if (!$contact && $phone) {
-                    // ✅ CORRIGIDO: Usar findByPhoneNormalized para busca robusta
                     $contact = Contact::findByPhoneNormalized(self::cleanPhone($phone));
                 }
                 
                 if (!$contact) {
                     // Criar contato se não existir
-                    // ✅ Normalizar telefone antes de salvar
                     $normalizedPhone = $phone ? Contact::normalizePhoneNumber(self::cleanPhone($phone)) : null;
                     
                     $contactData = [
@@ -171,7 +229,7 @@ class WooCommerceSyncJob
                     'order_status' => $orderStatus,
                     'order_total' => $orderTotal,
                     'order_date' => $orderDate,
-                    'seller_id' => $sellerId, // IMPORTANTE: Seller ID
+                    'seller_id' => $sellerId,
                     'expires_at' => $expiresAt
                 ];
                 

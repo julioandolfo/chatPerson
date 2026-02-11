@@ -1033,7 +1033,7 @@ class KanbanAgentService
                 // Tags e atribuição
                 'has_tag', 'no_tag', 'assigned_to', 'unassigned',
                 // Verificação de mensagens
-                'has_messages', 'has_agent_message', 'has_client_message', 'message_count',
+                'has_messages', 'has_agent_message', 'has_client_message', 'no_client_message', 'no_agent_message', 'message_count',
                 'last_message_content', 'last_agent_message_content', 'last_client_message_content', 'any_message_contains',
                 // Tempo/Idade
                 'conversation_age_hours'
@@ -1365,6 +1365,37 @@ class KanbanAgentService
                 }
                 return $hasClientMessage; // Default: retorna se tem
             
+            case 'no_client_message':
+                // Verificar se NÃO há nenhuma mensagem do cliente na conversa
+                $clientMsgCount = Database::fetchAll(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'contact'",
+                    [$conversation['id']]
+                );
+                $noClientMessage = !isset($clientMsgCount[0]['count']) || (int)$clientMsgCount[0]['count'] === 0;
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $noClientMessage : !$noClientMessage;
+                }
+                return $noClientMessage;
+            
+            case 'no_agent_message':
+                // Verificar se NÃO há nenhuma mensagem de AGENTE HUMANO na conversa
+                // Filtrar: apenas sender_type='agent' + sender_id > 0 (excluir chatbot/sistema) + message_type != 'note' (excluir mensagens internas)
+                $agentMsgCount = Database::fetchAll(
+                    "SELECT COUNT(*) as count FROM messages 
+                     WHERE conversation_id = ? 
+                     AND sender_type = 'agent'
+                     AND sender_id > 0
+                     AND message_type != 'note'",
+                    [$conversation['id']]
+                );
+                $noAgentMessage = !isset($agentMsgCount[0]['count']) || (int)$agentMsgCount[0]['count'] === 0;
+                if ($operator === 'equals') {
+                    return $value === 'true' ? $noAgentMessage : !$noAgentMessage;
+                }
+                return $noAgentMessage;
+            
             case 'last_message_content':
                 // Verificar conteúdo da última mensagem (qualquer remetente)
                 $lastMessage = Message::whereFirst('conversation_id', '=', $conversation['id'], 'ORDER BY created_at DESC');
@@ -1599,6 +1630,10 @@ class KanbanAgentService
             case 'change_status':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'change_status': alterando status da conversa {$conversation['id']} para " . ($config['status'] ?? 'N/A'));
                 return self::actionChangeStatus($conversation, $config);
+            
+            case 'close_conversation':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'close_conversation': encerrando conversa {$conversation['id']}");
+                return self::actionCloseConversation($conversation);
             
             default:
                 Logger::error("KanbanAgentService::executeSingleAction - Tipo de ação desconhecido: $type");
@@ -2279,6 +2314,46 @@ class KanbanAgentService
             'message' => "Status alterado de '{$oldStatus}' para '{$newStatus}'",
             'old_status' => $oldStatus,
             'new_status' => $newStatus
+        ];
+    }
+
+    /**
+     * Ação: Encerrar conversa (fechar)
+     */
+    private static function actionCloseConversation(array $conversation): array
+    {
+        $oldStatus = $conversation['status'] ?? 'open';
+        
+        // Se já está fechada, não fazer nada
+        if (in_array($oldStatus, ['closed', 'resolved'])) {
+            Logger::info("KanbanAgentService::actionCloseConversation - Conversa {$conversation['id']} já está encerrada (status: {$oldStatus})");
+            return [
+                'message' => "Conversa já estava encerrada (status: {$oldStatus})",
+                'old_status' => $oldStatus,
+                'new_status' => $oldStatus
+            ];
+        }
+        
+        // Encerrar a conversa
+        $updateData = [
+            'status' => 'closed',
+            'closed_at' => date('Y-m-d H:i:s')
+        ];
+        
+        Conversation::update($conversation['id'], $updateData);
+        
+        Logger::info("KanbanAgentService::actionCloseConversation - Conversa {$conversation['id']}: encerrada (status anterior: '{$oldStatus}')");
+        
+        // Notificar via WebSocket
+        self::notifyConversationChange($conversation['id'], 'status_changed', [
+            'old_status' => $oldStatus,
+            'new_status' => 'closed'
+        ]);
+        
+        return [
+            'message' => "Conversa encerrada (status anterior: '{$oldStatus}')",
+            'old_status' => $oldStatus,
+            'new_status' => 'closed'
         ];
     }
 

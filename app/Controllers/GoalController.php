@@ -142,9 +142,9 @@ class GoalController
                 $this->saveGoalConditions($goalId);
             }
             
-            Response::redirect('/goals', 'success', 'Meta criada com sucesso!');
+            Response::redirect('/goals?success=' . urlencode('Meta criada com sucesso!'));
         } catch (\Exception $e) {
-            Response::redirect('/goals/create', 'error', 'Erro ao criar meta: ' . $e->getMessage());
+            Response::redirect('/goals/create?error=' . urlencode('Erro ao criar meta: ' . $e->getMessage()));
         }
     }
     
@@ -159,7 +159,7 @@ class GoalController
         $goal = Goal::findWithDetails($id);
         
         if (!$goal) {
-            Response::redirect('/goals', 'error', 'Meta não encontrada');
+            Response::redirect('/goals?error=' . urlencode('Meta não encontrada'));
             return;
         }
         
@@ -211,7 +211,7 @@ class GoalController
         $goal = Goal::find($id);
         
         if (!$goal) {
-            Response::redirect('/goals', 'error', 'Meta não encontrada');
+            Response::redirect('/goals?error=' . urlencode('Meta não encontrada'));
             return;
         }
         
@@ -262,6 +262,12 @@ class GoalController
                 throw new \InvalidArgumentException('Selecione pelo menos um agente para a meta.');
             }
             
+            // Validar que a meta existe
+            $goal = Goal::find((int)$id);
+            if (!$goal) {
+                throw new \InvalidArgumentException('Meta não encontrada');
+            }
+            
             $data = [
                 'name' => Request::post('name'),
                 'description' => Request::post('description'),
@@ -272,7 +278,7 @@ class GoalController
                 'period_type' => Request::post('period_type'),
                 'start_date' => Request::post('start_date'),
                 'end_date' => Request::post('end_date'),
-                'is_active' => Request::post('is_active', '1') === '1' ? 1 : 0,
+                'is_active' => Request::post('is_active', '0') === '1' ? 1 : 0,
                 'is_stretch' => Request::post('is_stretch', '0') === '1' ? 1 : 0,
                 'priority' => Request::post('priority', 'medium'),
                 'notify_at_percentage' => Request::post('notify_at_percentage', 90),
@@ -293,31 +299,46 @@ class GoalController
                 'bonus_calculation_type' => Request::post('bonus_calculation_type', 'tiered')
             ];
             
+            // Validar datas
+            if (!empty($data['start_date']) && !empty($data['end_date'])) {
+                if (strtotime($data['end_date']) < strtotime($data['start_date'])) {
+                    throw new \InvalidArgumentException('Data final deve ser maior que data inicial');
+                }
+            }
+            
             Logger::info('Update meta - payload: ' . json_encode($data), 'goals.log');
-            Logger::info('Update meta - iniciando GoalService::update', 'goals.log');
 
-            GoalService::update($id, $data);
+            // 1. Atualizar dados da meta diretamente
+            Logger::info('Update meta - atualizando Goal::update', 'goals.log');
+            Goal::update((int)$id, $data);
 
-            Logger::info('Update meta - GoalService::update concluído', 'goals.log');
-
+            // 2. Salvar agentes
             if ($targetType === 'multi_agent') {
                 $this->saveGoalAgents((int)$id, $targetAgents);
             } else {
                 $this->deleteGoalAgents((int)$id);
             }
             
-            // Processar tiers de bônus (sempre, pois pode estar editando)
+            // 3. Processar tiers de bônus (sempre, pois pode estar editando)
             Logger::info('Update meta - chamando saveBonusTiers', 'goals.log');
             $this->saveBonusTiers((int)$id);
             
-            // Processar condições de bônus (se habilitadas)
+            // 4. Processar condições de bônus
             Logger::info('Update meta - chamando saveGoalConditions', 'goals.log');
             $this->saveGoalConditions((int)$id);
             
-            Response::redirect('/goals', 'success', 'Meta atualizada com sucesso!');
+            // 5. Recalcular progresso (não-fatal: se falhar, não impede o salvamento)
+            try {
+                GoalService::calculateProgress((int)$id);
+                Logger::info('Update meta - progresso recalculado com sucesso', 'goals.log');
+            } catch (\Exception $e) {
+                Logger::error('Update meta - erro ao recalcular progresso (não-fatal): ' . $e->getMessage(), 'goals.log');
+            }
+            
+            Response::redirect('/goals?success=' . urlencode('Meta atualizada com sucesso!'));
         } catch (\Exception $e) {
             Logger::error('Update meta - erro: ' . $e->getMessage(), 'goals.log');
-            Response::redirect('/goals/edit?id=' . Request::post('id'), 'error', 'Erro ao atualizar meta: ' . $e->getMessage());
+            Response::redirect('/goals/edit?id=' . Request::post('id') . '&error=' . urlencode('Erro ao atualizar meta: ' . $e->getMessage()));
         }
     }
     
@@ -332,9 +353,9 @@ class GoalController
             $id = Request::post('id');
             GoalService::delete($id);
             
-            Response::redirect('/goals', 'success', 'Meta deletada com sucesso!');
+            Response::redirect('/goals?success=' . urlencode('Meta deletada com sucesso!'));
         } catch (\Exception $e) {
-            Response::redirect('/goals', 'error', 'Erro ao deletar meta: ' . $e->getMessage());
+            Response::redirect('/goals?error=' . urlencode('Erro ao deletar meta: ' . $e->getMessage()));
         }
     }
     

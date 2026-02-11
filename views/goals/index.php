@@ -207,6 +207,26 @@ ob_start();
 </div>
 
 <script>
+// Exibir mensagens flash via query parameters
+(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const successMsg = urlParams.get('success');
+    const errorMsg = urlParams.get('error');
+    if (successMsg && typeof toastr !== 'undefined') {
+        toastr.success(successMsg);
+    }
+    if (errorMsg && typeof toastr !== 'undefined') {
+        toastr.error(errorMsg);
+    }
+    // Limpar query params de mensagem da URL sem recarregar
+    if (successMsg || errorMsg) {
+        urlParams.delete('success');
+        urlParams.delete('error');
+        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+        window.history.replaceState({}, '', newUrl);
+    }
+})();
+
 function filterGoals() {
     const targetType = document.getElementById('filter-target-type').value;
     const type = document.getElementById('filter-type').value;

@@ -478,6 +478,20 @@ async function loadSystemData() {
                     options: ['true', 'false'],
                     optionLabels: { 'true': 'Sim', 'false': 'Não' }
                 },
+                'no_client_message': {
+                    label: 'Não Tem Mensagem do Cliente',
+                    operators: ['equals'],
+                    valueType: 'select',
+                    options: ['true', 'false'],
+                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                },
+                'no_agent_message': {
+                    label: 'Não Tem Mensagem do Agente',
+                    operators: ['equals'],
+                    valueType: 'select',
+                    options: ['true', 'false'],
+                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                },
                 'last_message_content': {
                     label: 'Conteúdo da Última Mensagem',
                     operators: ['equals', 'not_equals', 'contains', 'not_contains', 'starts_with', 'ends_with', 'is_empty', 'is_not_empty'],
@@ -572,6 +586,10 @@ async function loadSystemData() {
                     label: 'Alterar Status',
                     icon: 'ki-check',
                     requiresConfig: true
+                },
+                'close_conversation': {
+                    label: 'Encerrar Conversa',
+                    icon: 'ki-cross-circle'
                 },
                 'create_summary': { 
                     label: 'Criar Resumo', 
@@ -972,6 +990,13 @@ function getActionConfigHTML(actionData, index) {
                     <option value="">Selecione um status...</option>
                     ${statusesOptions}
                 </select>
+            `;
+        case 'close_conversation':
+            return `
+                <div class="alert alert-warning d-flex align-items-center p-3 mb-0">
+                    <i class="ki-duotone ki-information fs-2x text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div>A conversa será encerrada automaticamente (status alterado para <strong>closed</strong>). Conversas já encerradas serão ignoradas.</div>
+                </div>
             `;
         case 'create_note':
             return `

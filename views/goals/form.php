@@ -618,6 +618,19 @@ ob_start();
 </div>
 
 <script>
+// Exibir mensagens flash via query parameters
+(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const successMsg = urlParams.get('success');
+    const errorMsg = urlParams.get('error');
+    if (successMsg && typeof toastr !== 'undefined') {
+        toastr.success(successMsg);
+    }
+    if (errorMsg && typeof toastr !== 'undefined') {
+        toastr.error(errorMsg);
+    }
+})();
+
 // Dados dos targets
 const targetsData = {
     individual: <?= json_encode($agents) ?>,

@@ -1374,9 +1374,7 @@ class KanbanAgentService
                     [$conversation['id']]
                 );
                 $noClientMessage = !isset($clientMsgCount[0]['count']) || (int)$clientMsgCount[0]['count'] === 0;
-                if ($operator === 'equals') {
-                    return $value === 'true' ? $noClientMessage : !$noClientMessage;
-                }
+                self::logInfo("no_client_message: conv_id={$conversation['id']}, result=" . ($noClientMessage ? 'TRUE' : 'FALSE'));
                 return $noClientMessage;
             
             case 'no_agent_message':
@@ -1391,9 +1389,7 @@ class KanbanAgentService
                     [$conversation['id']]
                 );
                 $noAgentMessage = !isset($agentMsgCount[0]['count']) || (int)$agentMsgCount[0]['count'] === 0;
-                if ($operator === 'equals') {
-                    return $value === 'true' ? $noAgentMessage : !$noAgentMessage;
-                }
+                self::logInfo("no_agent_message: conv_id={$conversation['id']}, result=" . ($noAgentMessage ? 'TRUE' : 'FALSE'));
                 return $noAgentMessage;
             
             case 'last_message_content':

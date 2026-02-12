@@ -481,16 +481,14 @@ async function loadSystemData() {
                 'no_client_message': {
                     label: 'Não Tem Mensagem do Cliente',
                     operators: ['equals'],
-                    valueType: 'select',
-                    options: ['true', 'false'],
-                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                    valueType: 'none',
+                    defaultValue: 'true'
                 },
                 'no_agent_message': {
                     label: 'Não Tem Mensagem do Agente',
                     operators: ['equals'],
-                    valueType: 'select',
-                    options: ['true', 'false'],
-                    optionLabels: { 'true': 'Sim', 'false': 'Não' }
+                    valueType: 'none',
+                    defaultValue: 'true'
                 },
                 'last_message_content': {
                     label: 'Conteúdo da Última Mensagem',
@@ -723,6 +721,16 @@ function addConditionUI(condition = null, index = null) {
 
 // Obter input de valor baseado no tipo
 function getConditionValueInput(conditionData, typeConfig) {
+    if (typeConfig.valueType === 'none') {
+        // Condição auto-explicativa, não precisa de valor
+        const defaultVal = typeConfig.defaultValue || 'true';
+        return `
+            <input type="hidden" class="condition-value" value="${defaultVal}">
+            <div class="form-control bg-light-primary border-primary text-primary fw-semibold text-center" style="pointer-events:none;">
+                Automático
+            </div>
+        `;
+    }
     if (typeConfig.valueType === 'select') {
         const options = typeConfig.options || [];
         const optionLabels = typeConfig.optionLabels || {};

@@ -3097,13 +3097,26 @@ function openNodeConfig(nodeId) {
                             
                             stageSelect.disabled = false;
                             
-                            // Pré-selecionar estágio se fornecido
+                            // Pré-selecionar estágio se fornecido (sem setTimeout para evitar race condition)
                             if (selectedStageId) {
                                 console.log('🎯 Pré-selecionando estágio:', selectedStageId);
-                                setTimeout(() => {
-                                    stageSelect.value = selectedStageId;
-                                    console.log('   Valor selecionado:', stageSelect.value);
-                                }, 50);
+                                const stageIdStr = String(selectedStageId);
+                                stageSelect.value = stageIdStr;
+                                
+                                // Verificar se o estágio foi encontrado na lista
+                                if (stageSelect.value !== stageIdStr) {
+                                    console.warn('⚠️ Estágio ID', selectedStageId, 'não encontrado na lista de estágios do funil!');
+                                    console.warn('   Opções disponíveis:', Array.from(stageSelect.options).map(o => ({value: o.value, text: o.textContent})));
+                                    
+                                    // Adicionar opção temporária para preservar o valor
+                                    const tempOption = document.createElement("option");
+                                    tempOption.value = stageIdStr;
+                                    tempOption.textContent = `⚠️ Estágio ID ${stageIdStr} (não encontrado - reselecione)`;
+                                    tempOption.style.color = '#e74c3c';
+                                    stageSelect.appendChild(tempOption);
+                                    stageSelect.value = stageIdStr;
+                                }
+                                console.log('   Valor selecionado:', stageSelect.value);
                             }
                         } else {
                             console.error("Nenhum estágio encontrado");
@@ -3876,6 +3889,15 @@ document.addEventListener("DOMContentLoaded", function() {
             formData.set('node_id', node.id);
             formData.set('node_type', node.node_type);
             
+            // Incluir selects desabilitados no FormData (ex: stage_id durante loading)
+            const disabledSelects = nodeConfigForm.querySelectorAll('select[name]:disabled');
+            disabledSelects.forEach(sel => {
+                if (!formData.has(sel.name)) {
+                    formData.set(sel.name, sel.value || '');
+                    console.log(`  ⚠️ Select desabilitado incluído no FormData: ${sel.name} = "${sel.value}"`);
+                }
+            });
+            
             // DEBUG: Mostrar TODOS os campos do FormData
             console.log('📋 FormData completo:');
             for (let [key, value] of formData.entries()) {
@@ -3974,12 +3996,38 @@ document.addEventListener("DOMContentLoaded", function() {
                 });
             }
             
-            // Log específico para action_move_stage
+            // Preservar stage_id e funnel_id se vazios no form mas existentes no node_data
+            // Isso evita perda de dados quando o select está desabilitado (loading) ou estágio não carregou
             if (node.node_type === "action_move_stage") {
                 console.log('🔀 action_move_stage - Dados coletados:');
-                console.log('  funnel_id:', nodeData.funnel_id);
-                console.log('  stage_id:', nodeData.stage_id);
+                console.log('  funnel_id (form):', nodeData.funnel_id, '| (node_data):', node.node_data.funnel_id);
+                console.log('  stage_id (form):', nodeData.stage_id, '| (node_data):', node.node_data.stage_id);
                 console.log('  validate_rules:', nodeData.validate_rules);
+                
+                // Se stage_id veio vazio mas existia antes, preservar o valor anterior
+                if ((!nodeData.stage_id || nodeData.stage_id === '') && node.node_data.stage_id) {
+                    console.warn('⚠️ stage_id vazio no formulário mas existia no node_data:', node.node_data.stage_id, '— preservando valor anterior');
+                    nodeData.stage_id = node.node_data.stage_id;
+                }
+                // Se funnel_id veio vazio mas existia antes, preservar o valor anterior
+                if ((!nodeData.funnel_id || nodeData.funnel_id === '') && node.node_data.funnel_id) {
+                    console.warn('⚠️ funnel_id vazio no formulário mas existia no node_data:', node.node_data.funnel_id, '— preservando valor anterior');
+                    nodeData.funnel_id = node.node_data.funnel_id;
+                }
+                
+                // Validação: se stage_id e funnel_id ainda estão vazios (nó novo sem seleção), avisar o usuário
+                const finalStageId = nodeData.stage_id || node.node_data.stage_id;
+                const finalFunnelId = nodeData.funnel_id || node.node_data.funnel_id;
+                if (!finalStageId || finalStageId === '') {
+                    console.warn('❌ Nenhum estágio selecionado para action_move_stage!');
+                    alert('Por favor, selecione um estágio antes de salvar.');
+                    return;
+                }
+                if (!finalFunnelId || finalFunnelId === '') {
+                    console.warn('❌ Nenhum funil selecionado para action_move_stage!');
+                    alert('Por favor, selecione um funil antes de salvar.');
+                    return;
+                }
             }
             // Checkboxes que não aparecem no FormData quando desmarcados
             const checkboxKeys = [

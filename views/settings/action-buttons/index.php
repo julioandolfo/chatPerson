@@ -285,13 +285,32 @@ ob_start();
         const container = document.getElementById(`payload_fields_${idx}`);
         const hidden = document.getElementById(`payload_${idx}`);
         if (!container || !hidden) return;
+        
+        // Preservar payload anterior para não perder campos que não estão no form (ex: stage_id durante loading)
+        let previousPayload = {};
+        try { previousPayload = JSON.parse(hidden.value || '{}'); } catch(e) {}
+        
         const selects = container.querySelectorAll('select[data-field]');
         const obj = {};
         selects.forEach(sel => {
             const key = sel.getAttribute('data-field');
             const val = sel.value;
-            if (val !== '') obj[key] = isNaN(Number(val)) ? val : Number(val);
+            if (val !== '') {
+                obj[key] = isNaN(Number(val)) ? val : Number(val);
+            }
         });
+        
+        // Se stage_id ficou vazio mas existia no payload anterior, preservar
+        if (!obj.stage_id && previousPayload.stage_id) {
+            console.warn('⚠️ stage_id vazio no form mas existia no payload anterior:', previousPayload.stage_id, '— preservando');
+            obj.stage_id = previousPayload.stage_id;
+        }
+        // Se funnel_id ficou vazio mas existia no payload anterior, preservar
+        if (!obj.funnel_id && previousPayload.funnel_id) {
+            console.warn('⚠️ funnel_id vazio no form mas existia no payload anterior:', previousPayload.funnel_id, '— preservando');
+            obj.funnel_id = previousPayload.funnel_id;
+        }
+        
         hidden.value = JSON.stringify(obj);
     };
 

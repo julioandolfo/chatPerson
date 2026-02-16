@@ -164,6 +164,29 @@ class AutomationService
             self::updateTriggerConfigFromNode($node['automation_id'], $data['node_data']);
         }
 
+        // Proteção: preservar stage_id e funnel_id em nós action_move_stage
+        // Evita que esses campos sejam sobrescritos com valores vazios acidentalmente
+        if (isset($data['node_data']) && is_array($data['node_data'])) {
+            $currentNodeData = $node['node_data'] ?? '{}';
+            if (is_string($currentNodeData)) {
+                $currentNodeData = json_decode($currentNodeData, true) ?: [];
+            }
+            
+            $nodeTypeCheck = $data['node_type'] ?? $node['node_type'] ?? '';
+            if ($nodeTypeCheck === 'action_move_stage') {
+                // Preservar stage_id se novo valor é vazio mas existia antes
+                if (empty($data['node_data']['stage_id']) && !empty($currentNodeData['stage_id'])) {
+                    \App\Helpers\Logger::automation("updateNode - Preservando stage_id={$currentNodeData['stage_id']} para nó {$nodeId} (novo valor era vazio)");
+                    $data['node_data']['stage_id'] = $currentNodeData['stage_id'];
+                }
+                // Preservar funnel_id se novo valor é vazio mas existia antes
+                if (empty($data['node_data']['funnel_id']) && !empty($currentNodeData['funnel_id'])) {
+                    \App\Helpers\Logger::automation("updateNode - Preservando funnel_id={$currentNodeData['funnel_id']} para nó {$nodeId} (novo valor era vazio)");
+                    $data['node_data']['funnel_id'] = $currentNodeData['funnel_id'];
+                }
+            }
+        }
+
         // Serializar node_data se for array
         if (isset($data['node_data']) && is_array($data['node_data'])) {
             $data['node_data'] = json_encode($data['node_data']);
@@ -973,9 +996,13 @@ class AutomationService
             case 'action_move_stage':
                 \App\Helpers\Logger::automation("  Executando: mover etapa");
                 \App\Helpers\Logger::automation("  📚 currentAutomationId ANTES de mover: " . (self::$currentAutomationId ?? 'NULL'));
-                self::executeMoveStage($nodeData, $conversationId, $executionId);
-                \App\Helpers\Logger::automation("  📚 currentAutomationId APÓS mover: " . (self::$currentAutomationId ?? 'NULL'));
-                \App\Helpers\Logger::automation("  ✅ Mover etapa concluído, continuando fluxo para próximos nós...");
+                try {
+                    self::executeMoveStage($nodeData, $conversationId, $executionId);
+                    \App\Helpers\Logger::automation("  📚 currentAutomationId APÓS mover: " . (self::$currentAutomationId ?? 'NULL'));
+                    \App\Helpers\Logger::automation("  ✅ Mover etapa concluído, continuando fluxo para próximos nós...");
+                } catch (\Throwable $e) {
+                    \App\Helpers\Logger::automation("  ⚠️ ERRO ao mover estágio: " . $e->getMessage() . " — Continuando fluxo para próximos nós...");
+                }
                 break;
             case 'action_set_tag':
                 \App\Helpers\Logger::automation("  Executando: definir tag");

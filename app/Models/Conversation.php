@@ -182,6 +182,15 @@ class Conversation extends Model
             }
         }
         
+        // Filtro por participante (conversas onde o usuário é participante ativo)
+        if (!empty($filters['participant_id'])) {
+            $sql .= " AND EXISTS (SELECT 1 FROM conversation_participants cp_filter 
+                       WHERE cp_filter.conversation_id = c.id 
+                       AND cp_filter.user_id = ? 
+                       AND cp_filter.removed_at IS NULL)";
+            $params[] = $filters['participant_id'];
+        }
+
         if (!empty($filters['department_id'])) {
             $sql .= " AND c.department_id = ?";
             $params[] = $filters['department_id'];

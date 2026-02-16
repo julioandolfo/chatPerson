@@ -3004,6 +3004,7 @@ function getChannelInfo(channel) {
                 <?php if ($canViewAllConversations || !empty($agents)): ?>
                 <select id="filter_agent" class="form-select form-select-sm form-select-solid">
                     <option value="">Agentes</option>
+                    <option value="participating" <?= ($filters['agent_id'] ?? '') === 'participating' ? 'selected' : '' ?>>Conversas que participo</option>
                     <option value="unassigned" <?= ($filters['agent_id'] ?? '') === 'unassigned' ? 'selected' : '' ?>>Não atribuídas</option>
                     <?php if ($canViewAllConversations && !empty($agents)): ?>
                         <?php foreach ($agents as $agent): ?>
@@ -11882,6 +11883,9 @@ function applyFilters() {
     if (agent === 'unassigned') {
         // Para "Não atribuídas", enviar agent_id=0 ou null (será tratado no backend)
         params.append('agent_id', '0');
+    } else if (agent === 'participating') {
+        // Para "Conversas que participo"
+        params.append('agent_id', 'participating');
     } else if (agent) {
         params.append('agent_id', agent);
     }
@@ -14656,11 +14660,21 @@ function sendMessage() {
         previewMessage = `↩️ ${replyContext.text}\n\n${message}`;
     }
     
-    // Mostrar loading
+    // Mostrar loading (verificar se tem vídeos grandes que serão comprimidos)
     const btn = event.target.closest('button') || document.querySelector('button[onclick="sendMessage()"]');
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+    
+    const hasLargeVideo = pendingAttachments.some(att => {
+        const isVideo = att.file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)$/i.test(att.file.name);
+        return isVideo && att.file.size > 5 * 1024 * 1024;
+    });
+    
+    if (hasLargeVideo) {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando e comprimindo vídeo...';
+    } else {
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+    }
     
     // Adicionar mensagem otimisticamente (antes da resposta do servidor)
     const tempId = 'temp_' + Date.now();
@@ -17740,7 +17754,7 @@ function getMaxAttachmentSize(file) {
     const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
 
     if (type.startsWith('video/') || ['mp4', 'webm', 'ogg', 'mov', 'm4v'].includes(ext)) {
-        return 64 * 1024 * 1024; // 64MB
+        return 200 * 1024 * 1024; // 200MB (vídeos serão comprimidos automaticamente no servidor)
     }
     if (type.startsWith('audio/') || ['mp3', 'wav', 'ogg', 'webm'].includes(ext)) {
         return 16 * 1024 * 1024; // 16MB
@@ -17760,16 +17774,33 @@ function renderPendingAttachments() {
     }
     let html = '';
     pendingAttachments.forEach((item, idx) => {
-        const url = item.file.type.startsWith('image/') ? URL.createObjectURL(item.file) : null;
+        const isImage = item.file.type.startsWith('image/');
+        const isVideo = item.file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)$/i.test(item.file.name);
+        const url = isImage ? URL.createObjectURL(item.file) : null;
+        const videoUrl = isVideo ? URL.createObjectURL(item.file) : null;
+        const isLargeVideo = isVideo && item.file.size > 5 * 1024 * 1024; // >5MB = será comprimido
+        
+        let previewHtml;
+        if (url) {
+            previewHtml = `<div class="rounded overflow-hidden" style="width:64px;height:64px;background:#111;"><img src="${url}" style="width:64px;height:64px;object-fit:cover;" onload="if (window.URL && window.URL.revokeObjectURL) { window.URL.revokeObjectURL(this.src); }"></div>`;
+        } else if (videoUrl) {
+            previewHtml = `<div class="rounded overflow-hidden position-relative" style="width:64px;height:64px;background:#111;">
+                <video src="${videoUrl}" style="width:64px;height:64px;object-fit:cover;" muted preload="metadata" onloadeddata="this.currentTime=1;"></video>
+                <div class="position-absolute top-50 start-50 translate-middle"><i class="ki-duotone ki-play fs-3 text-white"><span class="path1"></span><span class="path2"></span></i></div>
+            </div>`;
+        } else {
+            previewHtml = `<div class="d-flex align-items-center justify-content-center rounded" style="width:64px;height:64px;background:#111;">
+                <i class="ki-duotone ki-file fs-2"></i>
+            </div>`;
+        }
+        
         html += `
             <div class="d-flex align-items-center gap-3 p-2 rounded border" data-attachment-idx="${idx}" style="background: rgba(255,255,255,0.03);">
-                ${url ? `<div class="rounded overflow-hidden" style="width:64px;height:64px;background:#111;"><img src="${url}" style="width:64px;height:64px;object-fit:cover;" onload="if (window.URL && window.URL.revokeObjectURL) { window.URL.revokeObjectURL(this.src); }"></div>` : `
-                <div class="d-flex align-items-center justify-content-center rounded" style="width:64px;height:64px;background:#111;">
-                    <i class="ki-duotone ki-file fs-2"></i>
-                </div>`}
+                ${previewHtml}
                 <div class="flex-grow-1 min-w-0">
                     <div class="fw-semibold text-truncate">${escapeHtml(item.file.name)}</div>
                     <div class="text-muted fs-7">${formatFileSize(item.file.size)}</div>
+                    ${isLargeVideo ? `<div class="text-info fs-8 mt-1"><i class="ki-duotone ki-information-4 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Será comprimido automaticamente no envio</div>` : ''}
                 </div>
                 <button type="button" class="btn btn-sm btn-icon btn-light-danger" title="Remover" onclick="removePendingAttachment(${idx})">
                     <i class="ki-duotone ki-cross fs-2"><span class="path1"></span><span class="path2"></span></i>
@@ -17866,7 +17897,7 @@ function uploadFile(file) {
 
     const allowedTypes = [
         'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
-        'video/mp4', 'video/webm', 'video/ogg',
+        'video/mp4', 'video/webm', 'video/ogg', 'video/quicktime', 'video/x-m4v',
         'audio/mp3', 'audio/wav', 'audio/ogg',
         'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

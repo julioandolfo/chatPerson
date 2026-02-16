@@ -2973,11 +2973,23 @@ class AutomationService
         if ($mode === 'global') {
             // Tentar usar a tabela working_hours_config primeiro (fonte primária)
             $isWithin = self::checkWorkingHoursConfig();
+            
             if ($isWithin === null) {
-                // Fallback para AvailabilityService (usa settings)
-                $isWithin = AvailabilityService::isBusinessHours();
+                \App\Helpers\Logger::automation("  ⏰ working_hours_config vazio/inexistente, usando fallback...");
+                
+                // Verificar feriados independentemente (AvailabilityService não verifica feriados)
+                $isHoliday = self::checkIsHoliday();
+                if ($isHoliday) {
+                    $isWithin = false;
+                    \App\Helpers\Logger::automation("  ⏰ Fallback: Hoje é feriado - Fora do horário");
+                } else {
+                    // Fallback para AvailabilityService (usa settings)
+                    $isWithin = AvailabilityService::isBusinessHours();
+                    \App\Helpers\Logger::automation("  ⏰ Fallback AvailabilityService: " . ($isWithin ? 'DENTRO' : 'FORA') . " do horário");
+                }
             }
-            \App\Helpers\Logger::automation("  ⏰ Usando configuração global. Dentro do horário: " . ($isWithin ? 'SIM' : 'NÃO'));
+            
+            \App\Helpers\Logger::automation("  ⏰ Resultado global final. Dentro do horário: " . ($isWithin ? 'SIM' : 'NÃO'));
         } else {
             // Usar horários manuais configurados no nó
             $timezone = $nodeData['business_hours_timezone'] ?? 'America/Sao_Paulo';
@@ -3054,13 +3066,17 @@ class AutomationService
             // Verificar se a tabela existe
             $tableCheck = $db->query("SHOW TABLES LIKE 'working_hours_config'");
             if ($tableCheck->rowCount() === 0) {
+                \App\Helpers\Logger::automation("  ⏰ Tabela working_hours_config NÃO existe");
                 return null;
             }
 
             $configs = $db->query("SELECT * FROM working_hours_config ORDER BY day_of_week")->fetchAll(\PDO::FETCH_ASSOC);
             if (empty($configs)) {
+                \App\Helpers\Logger::automation("  ⏰ Tabela working_hours_config existe mas está VAZIA");
                 return null;
             }
+            
+            \App\Helpers\Logger::automation("  ⏰ working_hours_config: " . count($configs) . " dia(s) configurado(s)");
 
             // Obter timezone das settings
             $timezone = 'America/Sao_Paulo';
@@ -3134,28 +3150,95 @@ class AutomationService
     }
 
     /**
+     * Verificar se hoje é feriado (check independente)
+     * Usado como fallback quando working_hours_config não está disponível
+     */
+    private static function checkIsHoliday(?string $timezone = null): bool
+    {
+        try {
+            $tz = new \DateTimeZone($timezone ?? 'America/Sao_Paulo');
+            
+            // Tentar pegar timezone das settings se não foi fornecido
+            if ($timezone === null) {
+                try {
+                    $db = \App\Helpers\Database::getInstance();
+                    $tzSetting = $db->prepare("SELECT value FROM settings WHERE `key` = ?");
+                    $tzSetting->execute(['business_hours.timezone']);
+                    $tzRow = $tzSetting->fetch(\PDO::FETCH_ASSOC);
+                    if ($tzRow && !empty($tzRow['value'])) {
+                        $tz = new \DateTimeZone($tzRow['value']);
+                    }
+                } catch (\Throwable $e) {
+                    // Usar timezone padrão
+                }
+            }
+            
+            $now = new \DateTime('now', $tz);
+            $today = $now->format('Y-m-d');
+            $monthDay = $now->format('m-d');
+            
+            $db = \App\Helpers\Database::getInstance();
+            
+            // Verificar se tabela holidays existe
+            $tableCheck = $db->query("SHOW TABLES LIKE 'holidays'");
+            if ($tableCheck->rowCount() === 0) {
+                return false;
+            }
+            
+            $holidaySql = "SELECT id, name FROM holidays WHERE date = ? OR (is_recurring = 1 AND DATE_FORMAT(date, '%m-%d') = ?) LIMIT 1";
+            $stmt = $db->prepare($holidaySql);
+            $stmt->execute([$today, $monthDay]);
+            $holiday = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($holiday) {
+                \App\Helpers\Logger::automation("  ⏰ Feriado encontrado: " . ($holiday['name'] ?? 'sem nome') . " (ID: {$holiday['id']})");
+                return true;
+            }
+            
+            return false;
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::automation("  ⚠️ Erro ao verificar feriados: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * Seguir pelo caminho correto baseado no resultado da verificação de horário de atendimento
      */
     private static function followBusinessHoursPath(array $nodeData, int $conversationId, array $allNodes, ?int $executionId, bool $isWithin): void
     {
         $expectedConnectionType = $isWithin ? 'within' : 'outside';
-        \App\Helpers\Logger::automation("  ⏰ Seguindo caminho: {$expectedConnectionType}");
+        $label = $isWithin ? '☀️ DENTRO do Horário' : '🌙 FORA do Horário';
+        \App\Helpers\Logger::automation("  ⏰ Resultado: {$label} → Buscando conexão tipo '{$expectedConnectionType}'");
 
         if (!empty($nodeData['connections'])) {
-            foreach ($nodeData['connections'] as $connection) {
+            $totalConnections = count($nodeData['connections']);
+            $foundMatch = false;
+            
+            \App\Helpers\Logger::automation("  ⏰ Total de conexões no nó: {$totalConnections}");
+            
+            foreach ($nodeData['connections'] as $idx => $connection) {
                 $connType = $connection['connection_type'] ?? null;
+                $targetId = $connection['target_node_id'] ?? 'N/A';
+                \App\Helpers\Logger::automation("  ⏰ Conexão [{$idx}]: tipo='{$connType}', destino={$targetId}");
+                
                 if ($connType === $expectedConnectionType) {
+                    $foundMatch = true;
                     $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                     if ($nextNode) {
-                        \App\Helpers\Logger::automation("  ⏰ → Seguindo para nó: {$connection['target_node_id']}");
+                        \App\Helpers\Logger::automation("  ⏰ ✅ Seguindo conexão '{$connType}' → nó {$connection['target_node_id']} (tipo: {$nextNode['node_type']})");
                         self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
                     } else {
-                        \App\Helpers\Logger::automation("  ❌ Nó {$connection['target_node_id']} não encontrado!");
+                        \App\Helpers\Logger::automation("  ❌ Nó destino {$connection['target_node_id']} não encontrado nos nós da automação!");
                     }
                 }
             }
+            
+            if (!$foundMatch) {
+                \App\Helpers\Logger::automation("  ⚠️ Nenhuma conexão com tipo '{$expectedConnectionType}' encontrada! Conexões disponíveis: " . json_encode(array_map(fn($c) => $c['connection_type'] ?? 'null', $nodeData['connections'])));
+            }
         } else {
-            \App\Helpers\Logger::automation("  ⚠️ Nenhuma conexão encontrada para '{$expectedConnectionType}'");
+            \App\Helpers\Logger::automation("  ⚠️ Nó não tem NENHUMA conexão configurada!");
         }
     }
 

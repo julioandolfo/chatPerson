@@ -3531,12 +3531,12 @@ function renderConnections() {
                 path.setAttribute('class', 'connection-line');
                 path.setAttribute('fill', 'none');
                 
-                // Cor da linha baseada no tipo de conexão (condições: true=verde, false=vermelho)
+                // Cor da linha baseada no tipo de conexão
                 let lineColor = '#009ef7'; // Cor padrão (azul)
-                if (connectionType === 'true') {
-                    lineColor = '#50cd89'; // Verde para TRUE
-                } else if (connectionType === 'false') {
-                    lineColor = '#f1416c'; // Vermelho para FALSE
+                if (connectionType === 'true' || connectionType === 'within') {
+                    lineColor = '#50cd89'; // Verde para TRUE / Dentro do Horário
+                } else if (connectionType === 'false' || connectionType === 'outside') {
+                    lineColor = '#f1416c'; // Vermelho para FALSE / Fora do Horário
                 }
                 path.setAttribute('stroke', lineColor);
                 path.setAttribute('stroke-width', '2');

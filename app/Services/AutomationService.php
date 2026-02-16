@@ -20,6 +20,12 @@ class AutomationService
     private static ?int $currentAutomationId = null;
 
     /**
+     * Stack de Automation IDs para suportar automações aninhadas
+     * (ex: Mover Estágio dispara outra automação dentro do fluxo atual)
+     */
+    private static array $automationIdStack = [];
+
+    /**
      * Verificar se uma automação está ativa (status + is_active)
      */
     private static function isAutomationActive(int $automationId): bool
@@ -834,7 +840,12 @@ class AutomationService
             return;
         }
 
-        // Guardar Automation ID atual para uso em nós (ex: ramificação IA)
+        // Guardar Automation ID anterior na stack (para suportar automações aninhadas)
+        // Ex: Mover Estágio → moveConversation → executeForConversationMoved → executeAutomation (aninhada)
+        if (self::$currentAutomationId !== null) {
+            self::$automationIdStack[] = self::$currentAutomationId;
+            \App\Helpers\Logger::automation("  📚 Automação aninhada detectada! Salvando automação anterior #" . self::$currentAutomationId . " na stack (profundidade: " . count(self::$automationIdStack) . ")");
+        }
         self::$currentAutomationId = $automationId;
         
         if (empty($automation['nodes'])) {
@@ -900,8 +911,14 @@ class AutomationService
             error_log("Erro ao executar automação {$automationId}: " . $e->getMessage());
             throw $e;
         } finally {
-            // Limpar referência do Automation ID atual
-            self::$currentAutomationId = null;
+            // Restaurar Automation ID anterior da stack (se era aninhada)
+            if (!empty(self::$automationIdStack)) {
+                $previousId = array_pop(self::$automationIdStack);
+                self::$currentAutomationId = $previousId;
+                \App\Helpers\Logger::automation("  📚 Restaurando automação anterior #{$previousId} da stack (profundidade restante: " . count(self::$automationIdStack) . ")");
+            } else {
+                self::$currentAutomationId = null;
+            }
         }
         
         \App\Helpers\Logger::automation("=== executeAutomation FIM ===");
@@ -955,7 +972,10 @@ class AutomationService
                 break;
             case 'action_move_stage':
                 \App\Helpers\Logger::automation("  Executando: mover etapa");
+                \App\Helpers\Logger::automation("  📚 currentAutomationId ANTES de mover: " . (self::$currentAutomationId ?? 'NULL'));
                 self::executeMoveStage($nodeData, $conversationId, $executionId);
+                \App\Helpers\Logger::automation("  📚 currentAutomationId APÓS mover: " . (self::$currentAutomationId ?? 'NULL'));
+                \App\Helpers\Logger::automation("  ✅ Mover etapa concluído, continuando fluxo para próximos nós...");
                 break;
             case 'action_set_tag':
                 \App\Helpers\Logger::automation("  Executando: definir tag");
@@ -988,18 +1008,20 @@ class AutomationService
 
         // Seguir para próximos nós conectados
         if (!empty($nodeData['connections'])) {
-            \App\Helpers\Logger::automation("  Nó tem " . count($nodeData['connections']) . " conexão(ões)");
-            foreach ($nodeData['connections'] as $connection) {
-                \App\Helpers\Logger::automation("    → Seguindo para nó: {$connection['target_node_id']}");
+            \App\Helpers\Logger::automation("  🔗 Nó {$node['id']} ({$node['node_type']}) tem " . count($nodeData['connections']) . " conexão(ões) - seguindo...");
+            foreach ($nodeData['connections'] as $connIdx => $connection) {
+                $connType = $connection['connection_type'] ?? 'padrão';
+                \App\Helpers\Logger::automation("    → [{$connIdx}] Seguindo para nó: {$connection['target_node_id']} (connection_type: {$connType})");
                 $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                 if ($nextNode) {
+                    \App\Helpers\Logger::automation("    → Nó encontrado: {$nextNode['node_type']}");
                     self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
                 } else {
-                    \App\Helpers\Logger::automation("    ERRO: Nó {$connection['target_node_id']} não encontrado!");
+                    \App\Helpers\Logger::automation("    ❌ ERRO: Nó {$connection['target_node_id']} não encontrado na lista de nós da automação!");
                 }
             }
         } else {
-            \App\Helpers\Logger::automation("  Nó não tem conexões - fim do fluxo");
+            \App\Helpers\Logger::automation("  ⏹️ Nó {$node['id']} ({$node['node_type']}) não tem conexões - fim deste ramo do fluxo");
         }
     }
 

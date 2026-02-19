@@ -1707,45 +1707,88 @@ class WhatsAppService
                                 }
                                 
                                 // Converter PNG → JPG para melhor compatibilidade com WhatsApp CDN
-                                // WhatsApp pode rejeitar PNGs grandes com "connection reset by peer"
+                                // WhatsApp pode rejeitar PNGs com "connection reset by peer"
                                 $sendPath = $absolutePath;
                                 $tempJpg = null;
                                 
-                                if ($mediaType === 'image' && strtolower($contentMime) === 'image/png' && function_exists('imagecreatefrompng')) {
-                                    Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG para compatibilidade WhatsApp...");
-                                    try {
-                                        $img = @imagecreatefrompng($absolutePath);
-                                        if ($img) {
-                                            $w = imagesx($img);
-                                            $h = imagesy($img);
-                                            
-                                            // Criar imagem com fundo branco (substituir transparência)
-                                            $jpg = imagecreatetruecolor($w, $h);
-                                            $white = imagecolorallocate($jpg, 255, 255, 255);
-                                            imagefill($jpg, 0, 0, $white);
-                                            imagecopy($jpg, $img, 0, 0, 0, 0, $w, $h);
-                                            imagedestroy($img);
-                                            
-                                            // Salvar como JPG temporário (qualidade 85 = bom equilíbrio)
-                                            $tempJpg = sys_get_temp_dir() . '/' . uniqid('wa_img_') . '.jpg';
-                                            imagejpeg($jpg, $tempJpg, 85);
-                                            imagedestroy($jpg);
-                                            
-                                            if (file_exists($tempJpg) && filesize($tempJpg) > 0) {
-                                                $oldSize = $fileSize;
-                                                $newSize = filesize($tempJpg);
-                                                $sendPath = $tempJpg;
-                                                $contentMime = 'image/jpeg';
-                                                $mediaName = preg_replace('/\.png$/i', '.jpg', $mediaName ?? 'image.jpg');
-                                                
-                                                Logger::quepasa("sendMessage - ✅ PNG→JPG: {$oldSize} → {$newSize} bytes (redução " . round((1 - $newSize / $oldSize) * 100) . "%)");
+                                if ($mediaType === 'image' && strtolower($contentMime) === 'image/png') {
+                                    $tempJpg = sys_get_temp_dir() . '/' . uniqid('wa_img_') . '.jpg';
+                                    $converted = false;
+                                    
+                                    // Método 1: PHP GD
+                                    if (!$converted && function_exists('imagecreatefrompng')) {
+                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via GD...");
+                                        try {
+                                            $img = @imagecreatefrompng($absolutePath);
+                                            if ($img) {
+                                                $w = imagesx($img);
+                                                $h = imagesy($img);
+                                                $jpg = imagecreatetruecolor($w, $h);
+                                                $white = imagecolorallocate($jpg, 255, 255, 255);
+                                                imagefill($jpg, 0, 0, $white);
+                                                imagecopy($jpg, $img, 0, 0, 0, 0, $w, $h);
+                                                imagedestroy($img);
+                                                imagejpeg($jpg, $tempJpg, 85);
+                                                imagedestroy($jpg);
+                                                $converted = file_exists($tempJpg) && filesize($tempJpg) > 0;
+                                                if ($converted) Logger::quepasa("sendMessage - ✅ Conversão via GD bem-sucedida");
+                                            }
+                                        } catch (\Throwable $e) {
+                                            Logger::quepasa("sendMessage - ⚠️ GD falhou: " . $e->getMessage());
+                                        }
+                                    }
+                                    
+                                    // Método 2: PHP Imagick
+                                    if (!$converted && class_exists('Imagick')) {
+                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via Imagick...");
+                                        try {
+                                            $im = new \Imagick($absolutePath);
+                                            $im->setImageBackgroundColor('white');
+                                            $im->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+                                            $im->setImageFormat('jpeg');
+                                            $im->setImageCompressionQuality(85);
+                                            $im->writeImage($tempJpg);
+                                            $im->destroy();
+                                            $converted = file_exists($tempJpg) && filesize($tempJpg) > 0;
+                                            if ($converted) Logger::quepasa("sendMessage - ✅ Conversão via Imagick bem-sucedida");
+                                        } catch (\Throwable $e) {
+                                            Logger::quepasa("sendMessage - ⚠️ Imagick falhou: " . $e->getMessage());
+                                        }
+                                    }
+                                    
+                                    // Método 3: FFmpeg (disponível na maioria dos Docker)
+                                    if (!$converted && function_exists('exec')) {
+                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via ffmpeg/convert...");
+                                        // Tentar ffmpeg
+                                        $ffmpegCmd = 'ffmpeg -y -i ' . escapeshellarg($absolutePath) . ' -q:v 2 ' . escapeshellarg($tempJpg) . ' 2>&1';
+                                        exec($ffmpegCmd, $out, $code);
+                                        $converted = ($code === 0) && file_exists($tempJpg) && filesize($tempJpg) > 0;
+                                        
+                                        if ($converted) {
+                                            Logger::quepasa("sendMessage - ✅ Conversão via ffmpeg bem-sucedida");
+                                        } else {
+                                            // Tentar ImageMagick convert
+                                            $convertCmd = 'convert ' . escapeshellarg($absolutePath) . ' -background white -flatten -quality 85 ' . escapeshellarg($tempJpg) . ' 2>&1';
+                                            exec($convertCmd, $out2, $code2);
+                                            $converted = ($code2 === 0) && file_exists($tempJpg) && filesize($tempJpg) > 0;
+                                            if ($converted) {
+                                                Logger::quepasa("sendMessage - ✅ Conversão via ImageMagick bem-sucedida");
                                             } else {
-                                                Logger::quepasa("sendMessage - ⚠️ Conversão PNG→JPG falhou, usando PNG original");
-                                                $tempJpg = null;
+                                                Logger::quepasa("sendMessage - ⚠️ Nenhum conversor disponível (ffmpeg exit={$code}, convert exit={$code2})");
                                             }
                                         }
-                                    } catch (\Throwable $e) {
-                                        Logger::quepasa("sendMessage - ⚠️ Erro ao converter PNG→JPG: " . $e->getMessage());
+                                    }
+                                    
+                                    if ($converted) {
+                                        $oldSize = $fileSize;
+                                        $newSize = filesize($tempJpg);
+                                        $sendPath = $tempJpg;
+                                        $contentMime = 'image/jpeg';
+                                        $mediaName = preg_replace('/\.png$/i', '.jpg', $mediaName ?? 'image.jpg');
+                                        Logger::quepasa("sendMessage - ✅ PNG→JPG: {$oldSize} → {$newSize} bytes (redução " . round((1 - $newSize / $oldSize) * 100) . "%)");
+                                    } else {
+                                        Logger::quepasa("sendMessage - ⚠️ Nenhum método de conversão PNG→JPG disponível, enviando PNG original");
+                                        if (file_exists($tempJpg)) @unlink($tempJpg);
                                         $tempJpg = null;
                                     }
                                 }

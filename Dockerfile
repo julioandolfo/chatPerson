@@ -1,25 +1,34 @@
 # Imagem base com Apache
 FROM php:8.2-apache
 
-# PHP error logging global (Docker/Coolify best practice)
+# PHP config: logs, limites de upload para mídia (vídeos até 200MB)
 RUN printf "log_errors=On\n\
 error_reporting=E_ALL\n\
 display_errors=Off\n\
-error_log=/proc/self/fd/2\n" \
-> /usr/local/etc/php/conf.d/99-errors.ini
+error_log=/proc/self/fd/2\n\
+upload_max_filesize=256M\n\
+post_max_size=256M\n\
+memory_limit=512M\n\
+max_execution_time=300\n\
+max_input_time=300\n" \
+> /usr/local/etc/php/conf.d/99-app.ini
 
 # Instala dependências de sistema
 RUN apt-get update && apt-get install -y \
     git \
     unzip \
     libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libwebp-dev \
     libonig-dev \
     libxml2-dev \
     zip \
     curl \
     ffmpeg \
     libpq-dev \
- && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql \
+ && docker-php-ext-configure gd --with-jpeg --with-freetype --with-webp \
+ && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql gd \
  && a2enmod rewrite
 
 # Ajusta DocumentRoot para /public

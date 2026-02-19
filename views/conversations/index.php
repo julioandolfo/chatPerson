@@ -14608,7 +14608,12 @@ async function sendAudioMessage(audioBlob, conversationId) {
 }
 
 // Enviar mensagem
+let _sendingMessage = false;
 function sendMessage() {
+    // Mutex para prevenir envio duplicado (Enter + click simultâneo, double-click, etc.)
+    if (_sendingMessage) return;
+    _sendingMessage = true;
+    
     const input = document.getElementById('messageInput');
     const isNote = document.getElementById('noteToggle').checked;
     let message = input.value.trim();
@@ -14616,6 +14621,7 @@ function sendMessage() {
     
     // Não permitir enviar vazio sem anexos
     if (!message && !hasAttachments) {
+        _sendingMessage = false;
         return;
     }
     
@@ -14632,6 +14638,7 @@ function sendMessage() {
     if (!conversationId) {
         console.error('Nenhuma conversa selecionada');
         alert('Por favor, selecione uma conversa primeiro');
+        _sendingMessage = false;
         return;
     }
 
@@ -14661,7 +14668,9 @@ function sendMessage() {
     }
     
     // Mostrar loading (verificar se tem vídeos grandes que serão comprimidos)
-    const btn = event.target.closest('button') || document.querySelector('button[onclick="sendMessage()"]');
+    const btn = (typeof event !== 'undefined' && event && event.target && event.target.closest) 
+        ? (event.target.closest('button') || document.querySelector('button[onclick="sendMessage()"]'))
+        : document.querySelector('button[onclick="sendMessage()"]');
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
     
@@ -14771,6 +14780,7 @@ function sendMessage() {
         // Limpar anexos apenas depois da resposta (sucesso ou erro já removeu temp)
         pendingAttachments = [];
         renderPendingAttachments();
+        _sendingMessage = false;
     });
 }
 

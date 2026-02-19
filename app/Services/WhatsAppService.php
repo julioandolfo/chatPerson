@@ -1711,6 +1711,7 @@ class WhatsAppService
                                     $fileBase64 = base64_encode($fileContent);
                                     
                                     $payload['content'] = "data:{$contentMime};base64,{$fileBase64}";
+                                    $payload['type'] = $mediaType; // image, video, document
                                     
                                     if (!empty($mediaName)) {
                                         $payload['fileName'] = $mediaName;
@@ -1727,6 +1728,7 @@ class WhatsAppService
                                     $sentViaBase64 = true;
                                     
                                     Logger::quepasa("sendMessage - ✅ Payload {$mediaType} configurado via BASE64:");
+                                    Logger::quepasa("sendMessage -   type: {$mediaType}");
                                     Logger::quepasa("sendMessage -   mime: {$contentMime}");
                                     Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
                                     Logger::quepasa("sendMessage -   tamanho original: {$fileSize} bytes");
@@ -1744,6 +1746,7 @@ class WhatsAppService
                         // Fallback: usar URL (para arquivos muito grandes ou não encontrados localmente)
                         if (!$sentViaBase64) {
                             $payload['url'] = $options['media_url'];
+                            $payload['type'] = $mediaType; // image, video, document
                             
                             if (!empty($mediaName)) {
                                 $payload['fileName'] = $mediaName;
@@ -1773,7 +1776,12 @@ class WhatsAppService
                 Logger::quepasa("sendMessage - Iniciando envio");
                 Logger::quepasa("sendMessage - URL: {$url}");
                 Logger::quepasa("sendMessage - To: {$to}");
-                Logger::quepasa("sendMessage - Payload: " . json_encode($payload));
+                // Log do payload sem o conteúdo base64 (para não estourar logs)
+                $payloadForLog = $payload;
+                if (!empty($payloadForLog['content']) && strlen($payloadForLog['content']) > 200) {
+                    $payloadForLog['content'] = substr($payloadForLog['content'], 0, 80) . '...[' . strlen($payload['content']) . ' chars total]';
+                }
+                Logger::quepasa("sendMessage - Payload: " . json_encode($payloadForLog));
                 if (!empty($options['quoted_message_external_id']) || !empty($options['quoted_message_id'])) {
                     Logger::quepasa("sendMessage - Reply debug: quoted_external=" . ($options['quoted_message_external_id'] ?? 'null') . " | quoted_id=" . ($options['quoted_message_id'] ?? 'null') . " | quotedChatId=" . ($payload['quotedChatId'] ?? 'null'));
                 }

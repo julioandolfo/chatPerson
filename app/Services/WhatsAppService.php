@@ -534,7 +534,23 @@ class WhatsAppService
             ];
             
             if (!empty($options['media_url'])) {
-                $data['url'] = $options['media_url'];
+                // Tentar ler arquivo local e enviar como base64 (evita problemas de URL inacessível pelo QuePasa/Docker)
+                $mediaUrl = $options['media_url'];
+                $publicBase = realpath(__DIR__ . '/../../public');
+                $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
+                $absolutePath = $publicBase . $pathFromUrl;
+                
+                if (file_exists($absolutePath) && filesize($absolutePath) > 0 && filesize($absolutePath) <= 50 * 1024 * 1024) {
+                    $fileContent = file_get_contents($absolutePath);
+                    if ($fileContent !== false) {
+                        $data['base64'] = base64_encode($fileContent);
+                        Logger::quepasa("sendMessageNative - Mídia enviada via base64 ({$absolutePath}, " . filesize($absolutePath) . " bytes)");
+                    } else {
+                        $data['url'] = $mediaUrl;
+                    }
+                } else {
+                    $data['url'] = $mediaUrl;
+                }
             } elseif (!empty($options['media_path'])) {
                 $data['localPath'] = $options['media_path'];
             } elseif (!empty($options['media_base64'])) {
@@ -584,6 +600,48 @@ class WhatsAppService
     // ═══════════════════════════════════════════════════════════════
     // FIM PROVIDER NATIVE
     // ═══════════════════════════════════════════════════════════════
+
+    /**
+     * Verificar se um erro HTTP/resposta é transitório e pode ser retentado
+     */
+    private static function isTransientError(int $httpCode, string $responseBody): bool
+    {
+        // HTTP 429 (Too Many Requests), 502, 503, 504 são sempre transitórios
+        if (in_array($httpCode, [429, 502, 503, 504])) {
+            return true;
+        }
+        
+        // HTTP 400 com erros de rede do QuePasa (connection reset, timeout, etc.)
+        if ($httpCode === 400 && !empty($responseBody)) {
+            $transientPatterns = [
+                'connection reset by peer',
+                'connection refused',
+                'i/o timeout',
+                'context deadline exceeded',
+                'broken pipe',
+                'EOF',
+                'no such host',
+                'network is unreachable',
+                'connection timed out',
+                'TLS handshake timeout',
+                'server misbehaving',
+            ];
+            
+            $lowerBody = strtolower($responseBody);
+            foreach ($transientPatterns as $pattern) {
+                if (str_contains($lowerBody, strtolower($pattern))) {
+                    return true;
+                }
+            }
+        }
+        
+        // HTTP 500 pode ser transitório
+        if ($httpCode === 500) {
+            return true;
+        }
+        
+        return false;
+    }
 
     /**
      * Normalizar número de telefone do WhatsApp
@@ -1621,24 +1679,88 @@ class WhatsAppService
                     } else {
                         Logger::quepasa("sendMessage - Não é áudio, enviando como mídia normal (imagem/vídeo/documento)");
                         
-                        // ✅ CORREÇÃO: Para vídeo/documento também precisa do campo text obrigatório
-                        $payload['url'] = $options['media_url'];
+                        // Obter caminho local do arquivo para envio via BASE64 (mais confiável que URL)
+                        $mediaUrl = $options['media_url'];
+                        $publicBase = realpath(__DIR__ . '/../../public');
+                        $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
+                        $absolutePath = $publicBase . $pathFromUrl;
                         
-                        if (!empty($mediaName)) {
-                            $payload['fileName'] = $mediaName;
-                        }
+                        $sentViaBase64 = false;
                         
-                        // Para vídeo sem legenda, não enviar texto
-                        if ($captionTrim !== '') {
-                            $payload['text'] = $captionTrim;
-                        } elseif ($mediaType !== 'video') {
-                            $payload['text'] = ' '; // Espaço obrigatório quando não há caption (imagem/documento)
+                        // Tentar enviar via base64 (evita problemas com URL inacessível do Docker/QuePasa)
+                        if (file_exists($absolutePath)) {
+                            $fileSize = filesize($absolutePath);
+                            $maxBase64Size = 50 * 1024 * 1024; // 50MB - limite seguro para base64
+                            
+                            Logger::quepasa("sendMessage - Arquivo local encontrado: {$absolutePath} ({$fileSize} bytes)");
+                            
+                            if ($fileSize <= $maxBase64Size && $fileSize > 0) {
+                                // Detectar mimetype real do arquivo
+                                $contentMime = $mediaMime ?: 'application/octet-stream';
+                                if (function_exists('finfo_open')) {
+                                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                                    $detectedMime = $finfo ? finfo_file($finfo, $absolutePath) : null;
+                                    if ($finfo) finfo_close($finfo);
+                                    if ($detectedMime) {
+                                        $contentMime = $detectedMime;
+                                    }
+                                }
+                                
+                                $fileContent = file_get_contents($absolutePath);
+                                if ($fileContent !== false) {
+                                    $fileBase64 = base64_encode($fileContent);
+                                    
+                                    $payload['content'] = "data:{$contentMime};base64,{$fileBase64}";
+                                    
+                                    if (!empty($mediaName)) {
+                                        $payload['fileName'] = $mediaName;
+                                    }
+                                    
+                                    if ($captionTrim !== '') {
+                                        $payload['text'] = $captionTrim;
+                                    } elseif ($mediaType !== 'video') {
+                                        $payload['text'] = ' ';
+                                    } else {
+                                        unset($payload['text']);
+                                    }
+                                    
+                                    $sentViaBase64 = true;
+                                    
+                                    Logger::quepasa("sendMessage - ✅ Payload {$mediaType} configurado via BASE64:");
+                                    Logger::quepasa("sendMessage -   mime: {$contentMime}");
+                                    Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
+                                    Logger::quepasa("sendMessage -   tamanho original: {$fileSize} bytes");
+                                    Logger::quepasa("sendMessage -   tamanho base64: " . strlen($fileBase64) . " chars");
+                                } else {
+                                    Logger::quepasa("sendMessage - ⚠️ Falha ao ler conteúdo do arquivo, usando URL como fallback");
+                                }
+                            } else {
+                                Logger::quepasa("sendMessage - Arquivo grande demais para base64 ({$fileSize} bytes > {$maxBase64Size}), usando URL");
+                            }
                         } else {
-                            unset($payload['text']);
+                            Logger::quepasa("sendMessage - ⚠️ Arquivo não encontrado localmente: {$absolutePath}");
                         }
                         
-                        Logger::quepasa("sendMessage - Payload {$mediaType} configurado:");
-                        Logger::quepasa("sendMessage -   url: {$payload['url']}");
+                        // Fallback: usar URL (para arquivos muito grandes ou não encontrados localmente)
+                        if (!$sentViaBase64) {
+                            $payload['url'] = $options['media_url'];
+                            
+                            if (!empty($mediaName)) {
+                                $payload['fileName'] = $mediaName;
+                            }
+                            
+                            if ($captionTrim !== '') {
+                                $payload['text'] = $captionTrim;
+                            } elseif ($mediaType !== 'video') {
+                                $payload['text'] = ' ';
+                            } else {
+                                unset($payload['text']);
+                            }
+                            
+                            Logger::quepasa("sendMessage - Payload {$mediaType} configurado via URL (fallback):");
+                            Logger::quepasa("sendMessage -   url: {$payload['url']}");
+                        }
+                        
                         Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
                         $payloadText = $payload['text'] ?? null;
                         $textPreview = $payloadText === null ? '(sem texto)' : ($payloadText === ' ' ? '(espaço)' : substr($payloadText, 0, 50));
@@ -1664,82 +1786,121 @@ class WhatsAppService
                 throw new \InvalidArgumentException('Provider não suportado');
             }
 
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
-                CURLOPT_CONNECTTIMEOUT => 30, // ✅ Timeout de conexão separado
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode($payload),
-                CURLOPT_HTTPHEADER => $headers,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_MAXREDIRS => 5,
-                CURLOPT_SSL_VERIFYPEER => false,
-                CURLOPT_SSL_VERIFYHOST => false
-            ]);
-
-            Logger::quepasa("sendMessage - Timeout configurado: 120s");
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
-            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-            $responseLen = strlen($response ?? '');
-            $error = curl_error($ch);
-            $errno = curl_errno($ch);
-            curl_close($ch);
-
-            Logger::quepasa("sendMessage - HTTP Code: {$httpCode} | Content-Type: " . ($contentType ?: 'null') . " | RespLen: {$responseLen}");
-            Logger::quepasa("sendMessage - Effective URL: {$effectiveUrl}");
-            Logger::quepasa("sendMessage - Response Preview: " . substr($response ?? '', 0, 500));
-
-            if ($error) {
-                Logger::quepasa("sendMessage - Erro cURL [{$errno}]: {$error}");
-                Logger::error("WhatsApp sendMessage Error: {$error}");
-                
-                // ✅ Tratamento especial para timeout (CURLE_OPERATION_TIMEDOUT = 28)
-                // A mensagem pode ter sido enviada mesmo com timeout na resposta
-                if ($errno === CURLE_OPERATION_TIMEDOUT || $errno === 28) {
-                    Logger::quepasa("sendMessage - ⚠️ TIMEOUT: Mensagem pode ter sido enviada, mas resposta não retornou a tempo");
-                    
-                    // Retornar sucesso parcial (sem message_id confirmado)
-                    return [
-                        'success' => true,
-                        'message_id' => null,
-                        'status' => 'sent_timeout',
-                        'warning' => 'Timeout na resposta - mensagem pode ter sido enviada'
-                    ];
+            $jsonPayload = json_encode($payload);
+            $maxRetries = 3;
+            $lastError = null;
+            $lastHttpCode = 0;
+            $lastResponse = '';
+            
+            for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+                if ($attempt > 1) {
+                    $waitSeconds = $attempt * 2; // 4s, 6s
+                    Logger::quepasa("sendMessage - 🔄 Retry {$attempt}/{$maxRetries} após aguardar {$waitSeconds}s...");
+                    sleep($waitSeconds);
                 }
                 
-                throw new \Exception("Erro ao enviar mensagem: {$error}");
-            }
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 120,
+                    CURLOPT_CONNECTTIMEOUT => 30,
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => $jsonPayload,
+                    CURLOPT_HTTPHEADER => $headers,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_MAXREDIRS => 5,
+                    CURLOPT_SSL_VERIFYPEER => false,
+                    CURLOPT_SSL_VERIFYHOST => false
+                ]);
 
-            if ($httpCode !== 200 && $httpCode !== 201) {
-                Logger::quepasa("sendMessage - HTTP Error {$httpCode}: {$response}");
-                Logger::error("WhatsApp sendMessage HTTP {$httpCode}: {$response}");
-                throw new \Exception("Erro ao enviar mensagem (HTTP {$httpCode}): {$response}");
-            }
+                if ($attempt === 1) {
+                    Logger::quepasa("sendMessage - Timeout configurado: 120s");
+                }
 
-            $data = json_decode($response, true);
-            
-            // Extrair ID da mensagem retornada (alguns provedores retornam em message.id)
-            $returnedMessageId = $data['id']
-                ?? $data['message_id']
-                ?? ($data['message']['id'] ?? null);
-            
-            if (empty($returnedMessageId)) {
-                Logger::quepasa("sendMessage - ⚠️ message_id não retornado no payload: " . substr($response ?? '', 0, 300));
-            } else {
-                Logger::quepasa("sendMessage - message_id retornado: {$returnedMessageId}");
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+                $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                $responseLen = strlen($response ?? '');
+                $error = curl_error($ch);
+                $errno = curl_errno($ch);
+                curl_close($ch);
+
+                Logger::quepasa("sendMessage - [Tentativa {$attempt}] HTTP Code: {$httpCode} | Content-Type: " . ($contentType ?: 'null') . " | RespLen: {$responseLen}");
+                Logger::quepasa("sendMessage - Effective URL: {$effectiveUrl}");
+                Logger::quepasa("sendMessage - Response Preview: " . substr($response ?? '', 0, 500));
+
+                // Erro de cURL (timeout, conexão recusada, etc.)
+                if ($error) {
+                    Logger::quepasa("sendMessage - Erro cURL [{$errno}]: {$error}");
+                    
+                    if ($errno === CURLE_OPERATION_TIMEDOUT || $errno === 28) {
+                        Logger::quepasa("sendMessage - ⚠️ TIMEOUT: Mensagem pode ter sido enviada, mas resposta não retornou a tempo");
+                        return [
+                            'success' => true,
+                            'message_id' => null,
+                            'status' => 'sent_timeout',
+                            'warning' => 'Timeout na resposta - mensagem pode ter sido enviada'
+                        ];
+                    }
+                    
+                    $lastError = $error;
+                    $lastHttpCode = 0;
+                    $lastResponse = $response ?? '';
+                    continue; // Retry
+                }
+
+                // Sucesso
+                if ($httpCode === 200 || $httpCode === 201) {
+                    $data = json_decode($response, true);
+                    
+                    $returnedMessageId = $data['id']
+                        ?? $data['message_id']
+                        ?? ($data['message']['id'] ?? null);
+                    
+                    if (empty($returnedMessageId)) {
+                        Logger::quepasa("sendMessage - ⚠️ message_id não retornado no payload: " . substr($response ?? '', 0, 300));
+                    } else {
+                        Logger::quepasa("sendMessage - message_id retornado: {$returnedMessageId}");
+                    }
+                    
+                    if ($attempt > 1) {
+                        Logger::quepasa("sendMessage - ✅ Mensagem enviada com sucesso após {$attempt} tentativas");
+                    } else {
+                        Logger::quepasa("sendMessage - Mensagem enviada com sucesso");
+                    }
+                    
+                    return [
+                        'success' => true,
+                        'message_id' => $returnedMessageId,
+                        'status' => $data['status'] ?? 'sent'
+                    ];
+                }
+
+                // Erro HTTP - verificar se é transitório e pode ser retentado
+                $isTransient = self::isTransientError($httpCode, $response ?? '');
+                
+                Logger::quepasa("sendMessage - HTTP Error {$httpCode} (transitório: " . ($isTransient ? 'SIM' : 'NÃO') . ")");
+                
+                $lastHttpCode = $httpCode;
+                $lastResponse = $response ?? '';
+                
+                if (!$isTransient || $attempt >= $maxRetries) {
+                    break; // Erro não-transitório ou esgotou tentativas
+                }
+                
+                Logger::quepasa("sendMessage - Erro transitório detectado, tentando novamente...");
             }
             
-            Logger::quepasa("sendMessage - Mensagem enviada com sucesso");
+            // Esgotou todas as tentativas
+            if ($lastError) {
+                Logger::error("WhatsApp sendMessage Error após {$maxRetries} tentativas: {$lastError}");
+                throw new \Exception("Erro ao enviar mensagem: {$lastError}");
+            }
             
-            return [
-                'success' => true,
-                'message_id' => $returnedMessageId,
-                'status' => $data['status'] ?? 'sent'
-            ];
+            Logger::quepasa("sendMessage - HTTP Error {$lastHttpCode} após {$attempt} tentativa(s): {$lastResponse}");
+            Logger::error("WhatsApp sendMessage HTTP {$lastHttpCode}: {$lastResponse}");
+            throw new \Exception("Erro ao enviar mensagem (HTTP {$lastHttpCode}): {$lastResponse}");
         } catch (\Exception $e) {
             Logger::quepasa("sendMessage - Exception: " . $e->getMessage());
             Logger::error("WhatsApp sendMessage Error: " . $e->getMessage());

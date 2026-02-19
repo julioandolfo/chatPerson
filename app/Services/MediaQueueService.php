@@ -66,9 +66,11 @@ class MediaQueueService
     {
         self::ensureTable();
         $externalId = $params['external_message_id'];
+        $direction = $params['direction'] ?? 'download';
+        $convId = $params['conversation_id'] ?? '?';
         
         if (MediaQueue::existsForMessage($externalId)) {
-            Logger::mediaQueue("[conv:" . ($params['conversation_id'] ?? '?') . "] Item já existe na fila: {$externalId}", 'WARNING');
+            Logger::mediaQueue("[conv:{$convId}] Item já existe na fila: {$externalId}", 'WARNING');
             return null;
         }
 
@@ -77,16 +79,16 @@ class MediaQueueService
             'conversation_id'     => $params['conversation_id'] ?? null,
             'account_id'          => $params['account_id'],
             'external_message_id' => $externalId,
-            'direction'           => 'download',
+            'direction'           => $direction,
             'media_type'          => $params['media_type'] ?? 'document',
             'priority'            => $params['priority'] ?? 5,
             'max_attempts'        => 10,
             'payload'             => json_encode([
                 'api_url'         => $params['api_url'],
-                'token'           => $params['token'],
-                'trackid'         => $params['trackid'],
-                'message_id_only' => $params['message_id_only'],
-                'message_wid'     => $params['message_wid'],
+                'token'           => $params['token'] ?? '',
+                'trackid'         => $params['trackid'] ?? '',
+                'message_id_only' => $params['message_id_only'] ?? null,
+                'message_wid'     => $params['message_wid'] ?? null,
                 'filename'        => $params['filename'] ?? null,
                 'mimetype'        => $params['mimetype'] ?? null,
                 'filesize'        => $params['filesize'] ?? null,
@@ -94,7 +96,8 @@ class MediaQueueService
             ]),
         ]);
 
-        Logger::mediaQueue("[conv:" . ($params['conversation_id'] ?? '?') . "] Download enfileirado: id={$queueId}, msg={$externalId}, type=" . ($params['media_type'] ?? 'unknown'));
+        $label = $direction === 'upload' ? 'Upload' : 'Download';
+        Logger::mediaQueue("[conv:{$convId}] {$label} enfileirado: id={$queueId}, msg={$externalId}, type=" . ($params['media_type'] ?? 'unknown'));
         return $queueId;
     }
 
@@ -118,20 +121,30 @@ class MediaQueueService
         }
 
         $convId = $item['conversation_id'] ?? '?';
-        Logger::mediaQueue("[conv:{$convId}] Processando item #{$item['id']}: dir={$item['direction']} type={$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
+        
+        // Corrigir direction para itens antigos salvos incorretamente
+        $direction = $item['direction'];
+        if ($direction === 'download' && str_starts_with($item['external_message_id'], 'send_')) {
+            $direction = 'upload';
+            Logger::mediaQueue("[conv:{$convId}] Corrigindo direction: #{$item['id']} era 'download' mas é upload (send_*)", 'WARNING');
+            $db = \App\Helpers\Database::getInstance();
+            $db->prepare("UPDATE media_queue SET direction = 'upload' WHERE id = ?")->execute([$item['id']]);
+        }
+        
+        Logger::mediaQueue("[conv:{$convId}] Processando item #{$item['id']}: dir={$direction} type={$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
 
         // Rate limit: aguardar entre processamentos
         usleep(self::$rateLimitMs * 1000);
 
         try {
-            $result = ($item['direction'] === 'upload') 
+            $result = ($direction === 'upload') 
                 ? self::executeUpload($item) 
                 : self::executeDownload($item);
             $stats['processed']++;
 
             if ($result['success']) {
                 MediaQueue::markCompleted($item['id'], $result);
-                if ($item['direction'] === 'download') {
+                if ($direction === 'download') {
                     self::updateMessageWithDownload($item, $result);
                     Logger::mediaQueue("[conv:{$convId}] Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
                 } else {
@@ -141,7 +154,7 @@ class MediaQueueService
             } else {
                 MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
                 $stats['errors']++;
-                Logger::mediaQueue("[conv:{$convId}] " . ($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
+                Logger::mediaQueue("[conv:{$convId}] " . ($direction === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
             }
         } catch (\Exception $e) {
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);

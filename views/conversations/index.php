@@ -24,9 +24,12 @@ function renderAttachment($attachment) {
         $isAudio = strpos($mime, 'audio') !== false || $type === 'audio';
         $isVideo = strpos($mime, 'video') !== false || $type === 'video';
         
+        $hasError = !empty($attachment['error_message']);
+        $failedLabel = $hasError ? 'Falhou' : 'Falhou - Retentando';
+        
         $statusConf = match($queueStatus) {
             'processing' => ['label' => 'Baixando...', 'color' => '#3b82f6', 'bg' => 'rgba(59,130,246,0.08)', 'border' => 'rgba(59,130,246,0.3)', 'spin' => true],
-            'failed'     => ['label' => 'Falhou - Retentando', 'color' => '#ef4444', 'bg' => 'rgba(239,68,68,0.08)', 'border' => 'rgba(239,68,68,0.3)', 'spin' => false],
+            'failed'     => ['label' => $failedLabel, 'color' => '#ef4444', 'bg' => 'rgba(239,68,68,0.08)', 'border' => 'rgba(239,68,68,0.3)', 'spin' => !$hasError],
             default      => ['label' => 'Na fila...', 'color' => '#f59e0b', 'bg' => 'rgba(245,158,11,0.08)', 'border' => 'rgba(245,158,11,0.3)', 'spin' => true],
         };
         
@@ -67,7 +70,11 @@ function renderAttachment($attachment) {
         }
         $html .= $statusConf['label'] . '</span>';
         if ($sizeStr) $html .= '<span style="font-size:0.65rem;color:#888">' . $sizeStr . '</span>';
-        $html .= '</div></div></div></div>';
+        $html .= '</div>';
+        if ($hasError) {
+            $html .= '<div style="font-size:0.65rem;color:#ef4444;margin-top:4px;word-break:break-word">' . htmlspecialchars(mb_substr($attachment['error_message'], 0, 100)) . '</div>';
+        }
+        $html .= '</div></div></div>';
         
         return $html;
     }
@@ -3805,8 +3812,12 @@ function getChannelInfo(channel) {
                                             </div>
                                         <?php endif; ?>
                                         
-                                        <?php if (!empty($msg['attachments']) && is_array($msg['attachments'])): ?>
-                                            <?php foreach ($msg['attachments'] as $attachment): ?>
+                                        <?php 
+                                        $msgAttachments = $msg['attachments'] ?? [];
+                                        if (is_string($msgAttachments)) $msgAttachments = json_decode($msgAttachments, true) ?? [];
+                                        ?>
+                                        <?php if (!empty($msgAttachments) && is_array($msgAttachments)): ?>
+                                            <?php foreach ($msgAttachments as $attachment): ?>
                                                 <?= renderAttachment($attachment) ?>
                                             <?php endforeach; ?>
                                         <?php endif; ?>
@@ -13836,8 +13847,12 @@ function addMessageToChat(message) {
         
         // Renderizar anexos se houver
         let attachmentsHtml = '';
-        if (message.attachments && Array.isArray(message.attachments) && message.attachments.length > 0) {
-            message.attachments.forEach(att => {
+        let msgAttachments = message.attachments;
+        if (typeof msgAttachments === 'string') {
+            try { msgAttachments = JSON.parse(msgAttachments); } catch(e) { msgAttachments = null; }
+        }
+        if (msgAttachments && Array.isArray(msgAttachments) && msgAttachments.length > 0) {
+            msgAttachments.forEach(att => {
                 attachmentsHtml += renderAttachmentHtml(att);
             });
         }
@@ -13939,8 +13954,8 @@ function addMessageToChat(message) {
         
         // Também detectar se é apenas o nome do arquivo igual ao anexo
         let hasMatchingAttachment = false;
-        if (message.attachments && Array.isArray(message.attachments)) {
-            hasMatchingAttachment = message.attachments.some(att => {
+        if (msgAttachments && Array.isArray(msgAttachments)) {
+            hasMatchingAttachment = msgAttachments.some(att => {
                 const attFilename = att.original_name || att.filename || att.name || '';
                 return trimmedContent === attFilename;
             });
@@ -18251,9 +18266,10 @@ function renderAttachmentHtml(attachment) {
         const isAudio = mime.includes('audio') || type === 'audio';
         const isVideo = mime.includes('video') || type === 'video';
         
+        const hasError = !!attachment.error_message;
         const conf = {
             processing: {label:'Baixando...', color:'#3b82f6', bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.3)', spin:true},
-            failed:     {label:'Falhou - Retentando', color:'#ef4444', bg:'rgba(239,68,68,0.08)', border:'rgba(239,68,68,0.3)', spin:false},
+            failed:     {label: hasError ? 'Falhou' : 'Falhou - Retentando', color:'#ef4444', bg:'rgba(239,68,68,0.08)', border:'rgba(239,68,68,0.3)', spin: !hasError},
             queued:     {label:'Na fila...', color:'#f59e0b', bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.3)', spin:true},
         }[qs] || {label:'Pendente', color:'#f59e0b', bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.3)', spin:true};
         
@@ -18282,6 +18298,7 @@ function renderAttachmentHtml(attachment) {
                     <span style="display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;color:${conf.color};font-weight:500">${statusDot}${conf.label}</span>
                     ${sizeStr ? `<span style="font-size:0.65rem;color:#888">${sizeStr}</span>` : ''}
                 </div>
+                ${hasError ? `<div style="font-size:0.65rem;color:#ef4444;margin-top:4px;word-break:break-word">${escapeHtml(attachment.error_message.substring(0,100))}</div>` : ''}
             </div>
         </div></div>`;
     }
@@ -23763,8 +23780,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             if (!Array.isArray(attachments)) return;
             
-            // Substituir os placeholders pelos attachments reais
-            const hasCompleted = attachments.some(a => !a.download_pending && a.path);
+            const hasCompleted = attachments.some(a => (!a.download_pending && a.path) || a.error_message);
             if (!hasCompleted) return;
             
             let newHtml = '';

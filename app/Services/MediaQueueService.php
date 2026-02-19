@@ -153,13 +153,21 @@ class MediaQueueService
                 }
                 $stats['success']++;
             } else {
+                $isFinalFailure = false;
                 if (!empty($result['permanent'])) {
-                    // Erro permanente: marcar como failed imediatamente, sem mais retries
                     MediaQueue::markFailed($item['id'], $result['error'], $item['max_attempts'], $item['max_attempts']);
                     Logger::mediaQueue("[conv:{$convId}] ERRO PERMANENTE (sem retry): #{$item['id']} → {$result['error']}", 'ERROR');
+                    $isFinalFailure = true;
                 } else {
                     MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
                     Logger::mediaQueue("[conv:{$convId}] " . ($direction === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
+                    if ($item['attempts'] >= $item['max_attempts']) {
+                        $isFinalFailure = true;
+                    }
+                }
+                
+                if ($isFinalFailure) {
+                    self::updateMessageAsFailed($item, $result['error']);
                 }
                 $stats['errors']++;
             }
@@ -167,6 +175,9 @@ class MediaQueueService
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);
             $stats['errors']++;
             Logger::mediaQueue("[conv:{$convId}] Exceção: #{$item['id']} → {$e->getMessage()}", 'ERROR');
+            if ($item['attempts'] >= $item['max_attempts']) {
+                self::updateMessageAsFailed($item, $e->getMessage());
+            }
         }
 
         return $stats;
@@ -229,13 +240,18 @@ class MediaQueueService
                     return ['success' => false, 'error' => "PERMANENTE: {$errorBody}", 'permanent' => true];
                 }
                 
-                // Erros de CDN/HMAC: retentar (cache do QuePasa pode resolver)
+                // HMAC/key expirado: retentar até 5x (cache do QuePasa pode resolver), depois desistir
+                if (strpos($errorBody, 'invalid media hmac') !== false
+                    || strpos($errorBody, 'media key is missing') !== false) {
+                    $isPermanent = ($item['attempts'] ?? 0) >= 5;
+                    return ['success' => false, 'error' => "HMAC/Key error: {$errorBody}", 'permanent' => $isPermanent];
+                }
+                
+                // Erros de CDN transientes: retentar até o limite (10x)
                 if (strpos($errorBody, 'unexpected EOF') !== false
                     || strpos($errorBody, 'connection reset') !== false
-                    || strpos($errorBody, 'failed to download') !== false
-                    || strpos($errorBody, 'invalid media hmac') !== false
-                    || strpos($errorBody, 'media key is missing') !== false) {
-                    return ['success' => false, 'error' => "WhatsApp CDN/HMAC error: {$errorBody}"];
+                    || strpos($errorBody, 'failed to download') !== false) {
+                    return ['success' => false, 'error' => "WhatsApp CDN error: {$errorBody}"];
                 }
                 continue;
             }
@@ -537,11 +553,106 @@ class MediaQueueService
     }
 
     /**
+     * Quando todas as tentativas se esgotam, atualizar o placeholder para mostrar erro no chat
+     */
+    private static function updateMessageAsFailed(array $item, string $error): void
+    {
+        if (empty($item['message_id'])) return;
+        
+        $convId = $item['conversation_id'] ?? '?';
+        $message = Message::find($item['message_id']);
+        if (!$message) return;
+        
+        $attachments = $message['attachments'] ?? [];
+        if (is_string($attachments)) {
+            $attachments = json_decode($attachments, true) ?? [];
+        }
+        
+        $changed = false;
+        foreach ($attachments as $i => $att) {
+            if (!empty($att['download_pending']) || !empty($att['upload_pending'])) {
+                $attachments[$i]['queue_status'] = 'failed';
+                $attachments[$i]['error_message'] = mb_substr($error, 0, 200);
+                $changed = true;
+            }
+        }
+        
+        if ($changed) {
+            $db = Database::getInstance();
+            $db->prepare("UPDATE messages SET attachments = ?, status = 'error' WHERE id = ?")
+               ->execute([json_encode(array_values($attachments)), $item['message_id']]);
+            Logger::mediaQueue("[conv:{$convId}] Mensagem #{$item['message_id']} marcada como ERRO (tentativas esgotadas)");
+        }
+    }
+
+    /**
+     * Limpar placeholders de upload_pending em mensagens cujo envio já completou/falhou.
+     * Chamado periodicamente para corrigir mensagens órfãs (enfileiradas sem message_id).
+     */
+    public static function cleanOrphanPlaceholders(): int
+    {
+        $db = Database::getInstance();
+        $fixed = 0;
+        
+        $messages = $db->query("
+            SELECT id, attachments FROM messages 
+            WHERE attachments LIKE '%upload_pending%' 
+               OR (attachments LIKE '%download_pending%' AND attachments LIKE '%queue_status%')
+            LIMIT 50
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+        
+        foreach ($messages as $msg) {
+            $attachments = json_decode($msg['attachments'], true);
+            if (!is_array($attachments)) continue;
+            
+            // Verificar se existe item pendente ou falho na fila para esta mensagem
+            $stmt = $db->prepare("SELECT status FROM media_queue WHERE message_id = ? ORDER BY id DESC LIMIT 1");
+            $stmt->execute([$msg['id']]);
+            $queueItem = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($queueItem && in_array($queueItem['status'], ['queued', 'processing'])) continue;
+            
+            // Se o item falhou definitivamente, não limpar os flags de erro
+            $hasErrorMessage = false;
+            foreach ($attachments as $att) {
+                if (!empty($att['error_message'])) { $hasErrorMessage = true; break; }
+            }
+            if ($hasErrorMessage) continue;
+            
+            $changed = false;
+            foreach ($attachments as $i => $att) {
+                if (!empty($att['upload_pending']) || !empty($att['download_pending'])) {
+                    unset($attachments[$i]['download_pending']);
+                    unset($attachments[$i]['upload_pending']);
+                    unset($attachments[$i]['queue_status']);
+                    $changed = true;
+                }
+            }
+            
+            if ($changed) {
+                $db->prepare("UPDATE messages SET attachments = ?, status = CASE WHEN status = 'queued' THEN 'sent' ELSE status END WHERE id = ?")
+                   ->execute([json_encode(array_values($attachments)), $msg['id']]);
+                $fixed++;
+            }
+        }
+        
+        if ($fixed > 0) {
+            Logger::mediaQueue("Placeholders órfãos limpos: {$fixed} mensagens corrigidas");
+        }
+        
+        return $fixed;
+    }
+
+    /**
      * Retornar status da fila para API
      */
     public static function getQueueStatus(int $conversationId): array
     {
         self::ensureTable();
+        
+        // Limpar placeholders órfãos automaticamente
+        self::cleanOrphanPlaceholders();
+        
         $pending = MediaQueue::getPendingByConversation($conversationId);
         $stats = MediaQueue::getStats();
         return [

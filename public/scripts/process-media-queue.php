@@ -122,6 +122,9 @@ try {
             Logger::mediaQueue("Nenhum item processado nesta execução. duration={$durationMs}ms");
         }
 
+        // Limpar placeholders órfãos a cada execução
+        MediaQueueService::cleanOrphanPlaceholders();
+        
         if (date('H:i') === '03:00') {
             $cleaned = MediaQueue::cleanup(7);
             if ($cleaned > 0) {

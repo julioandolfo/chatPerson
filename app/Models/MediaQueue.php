@@ -118,8 +118,8 @@ class MediaQueue extends Model
             ");
             $stmt->execute([$error, $id]);
         } else {
-            // Backoff exponencial: 30s, 60s, 120s, 240s, 480s...
-            $delaySec = min(30 * pow(2, $currentAttempts - 1), 1800);
+            // Backoff exponencial: 30s, 60s, 120s, 240s, 300s (máx 5min)
+            $delaySec = min(30 * pow(2, $currentAttempts - 1), 300);
             $nextAttempt = date('Y-m-d H:i:s', time() + $delaySec);
             
             $stmt = $db->prepare("

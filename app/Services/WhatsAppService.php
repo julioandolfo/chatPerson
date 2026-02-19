@@ -2099,6 +2099,20 @@ class WhatsAppService
             if ($isFinalCdnError) {
                 Logger::quepasa("sendMessage - 📋 Erro CDN persistente, enfileirando envio para retry posterior...");
                 try {
+                    // Garantir que temos a media_url para fallback via URL
+                    $queueMediaUrl = $options['media_url'] ?? null;
+                    if (!$queueMediaUrl && !empty($payload['filename'])) {
+                        // Tentar construir URL a partir do path local
+                        $publicBase = realpath(__DIR__ . '/../../public');
+                        $possiblePaths = glob($publicBase . '/assets/media/attachments/*/' . $payload['filename']);
+                        if (!empty($possiblePaths)) {
+                            $relativePath = str_replace($publicBase, '', $possiblePaths[0]);
+                            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'https';
+                            $host = $_SERVER['HTTP_HOST'] ?? 'chat.personizi.com.br';
+                            $queueMediaUrl = $protocol . '://' . $host . $relativePath;
+                        }
+                    }
+                    
                     MediaQueueService::enqueueDownload([
                         'account_id'          => $accountId,
                         'external_message_id' => 'send_' . ($conversationId ?? 0) . '_' . time(),
@@ -2117,7 +2131,7 @@ class WhatsAppService
                             'send_url'     => $url,
                             'send_headers' => $headers,
                             'send_payload' => $payload,
-                            'media_url'    => $options['media_url'] ?? null,
+                            'media_url'    => $queueMediaUrl,
                         ],
                     ]);
                     

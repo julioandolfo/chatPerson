@@ -268,12 +268,28 @@ class MediaQueueService
             $sendHeaders = $headerLines;
         }
         
+        $convId = $item['conversation_id'] ?? '?';
+        
         // Lista de tentativas: base64 via /send, depois URL via /senddocument e /send
         $attempts = [];
         
         // Tentativa 1: payload original (base64) via /send
         if (!empty($sendPayload)) {
             $attempts[] = ['url' => $apiBase . '/send', 'payload' => $sendPayload, 'label' => 'base64 /send'];
+        }
+        
+        // Se não temos media_url, tentar construir a partir do filename
+        if (empty($mediaUrl) && !empty($payload['filename'])) {
+            $publicBase = realpath(__DIR__ . '/../../public');
+            if ($publicBase) {
+                $possiblePaths = @glob($publicBase . '/assets/media/attachments/*/' . basename($payload['filename']));
+                if (!empty($possiblePaths) && file_exists($possiblePaths[0])) {
+                    $relativePath = str_replace($publicBase, '', $possiblePaths[0]);
+                    $host = $_SERVER['HTTP_HOST'] ?? 'chat.personizi.com.br';
+                    $mediaUrl = 'https://' . $host . $relativePath;
+                    Logger::mediaQueue("[conv:{$convId}] media_url reconstruída: {$mediaUrl}");
+                }
+            }
         }
         
         // Tentativas 2-3: via URL pública

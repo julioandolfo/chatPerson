@@ -152,9 +152,15 @@ class MediaQueueService
                 }
                 $stats['success']++;
             } else {
-                MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
+                if (!empty($result['permanent'])) {
+                    // Erro permanente: marcar como failed imediatamente, sem mais retries
+                    MediaQueue::markFailed($item['id'], $result['error'], $item['max_attempts'], $item['max_attempts']);
+                    Logger::mediaQueue("[conv:{$convId}] ERRO PERMANENTE (sem retry): #{$item['id']} → {$result['error']}", 'ERROR');
+                } else {
+                    MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
+                    Logger::mediaQueue("[conv:{$convId}] " . ($direction === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
+                }
                 $stats['errors']++;
-                Logger::mediaQueue("[conv:{$convId}] " . ($direction === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
             }
         } catch (\Exception $e) {
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);
@@ -187,6 +193,7 @@ class MediaQueueService
         ];
         if ($messageWid !== $messageIdOnly) {
             $endpoints[] = "/download/{$messageWid}?cache=true";
+            $endpoints[] = "/download/{$messageWid}";
         }
 
         foreach ($endpoints as $endpoint) {
@@ -215,11 +222,19 @@ class MediaQueueService
 
             if ($httpCode !== 200) {
                 $errorBody = ($data && $dataLen < 2000) ? $data : '';
-                // CDN errors: stop trying different endpoints
+                
+                // Erro permanente: mensagem não existe mais no QuePasa
+                if (strpos($errorBody, 'message not found') !== false) {
+                    return ['success' => false, 'error' => "PERMANENTE: {$errorBody}", 'permanent' => true];
+                }
+                
+                // Erros de CDN/HMAC: retentar (cache do QuePasa pode resolver)
                 if (strpos($errorBody, 'unexpected EOF') !== false
                     || strpos($errorBody, 'connection reset') !== false
-                    || strpos($errorBody, 'failed to download') !== false) {
-                    return ['success' => false, 'error' => "WhatsApp CDN error: {$errorBody}"];
+                    || strpos($errorBody, 'failed to download') !== false
+                    || strpos($errorBody, 'invalid media hmac') !== false
+                    || strpos($errorBody, 'media key is missing') !== false) {
+                    return ['success' => false, 'error' => "WhatsApp CDN/HMAC error: {$errorBody}"];
                 }
                 continue;
             }

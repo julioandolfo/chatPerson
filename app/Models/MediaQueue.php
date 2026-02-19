@@ -34,6 +34,14 @@ class MediaQueue extends Model
     {
         $db = Database::getInstance();
         
+        // Resetar itens "processing" travados há mais de 3 minutos
+        $db->exec("
+            UPDATE media_queue 
+            SET status = 'queued', error_message = CONCAT(IFNULL(error_message,''), ' | Reset: stuck processing')
+            WHERE status = 'processing' 
+              AND updated_at < DATE_SUB(NOW(), INTERVAL 3 MINUTE)
+        ");
+        
         $processing = $db->query("
             SELECT 1 FROM media_queue WHERE status = 'processing' LIMIT 1
         ")->fetch(\PDO::FETCH_ASSOC);

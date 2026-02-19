@@ -6,9 +6,8 @@
  * 
  * Processa UM item por vez para respeitar os limites do WhatsApp CDN.
  * 
- * Crontab (a cada 30 segundos):
- * * * * * cd /var/www/html && php public/scripts/process-media-queue.php
- * * * * * sleep 30 && cd /var/www/html && php public/scripts/process-media-queue.php
+ * Coolify (a cada minuto):
+ * sh -lc 'flock -n /tmp/process_media_queue.lock php public/scripts/process-media-queue.php >> /var/www/html/storage/logs/process-media-queue.log 2>&1 || true'
  * 
  * Loop contínuo:
  * php public/scripts/process-media-queue.php --loop
@@ -23,19 +22,6 @@ use App\Helpers\Logger;
 
 $isLoop = in_array('--loop', $argv ?? []);
 $maxLoopTime = 300;
-$lockFile = __DIR__ . '/../../storage/cache/media_queue.lock';
-$lockDir = dirname($lockFile);
-
-if (!is_dir($lockDir)) {
-    @mkdir($lockDir, 0777, true);
-}
-
-$fp = @fopen($lockFile, 'c');
-if (!$fp || !flock($fp, LOCK_EX | LOCK_NB)) {
-    Logger::mediaQueue("CRON já em execução (lock ativo), saindo.", 'WARNING');
-    exit(0);
-}
-fwrite($fp, (string)getmypid());
 
 Logger::mediaQueue("═══ CRON INICIADO ═══ PID=" . getmypid() . " mode=" . ($isLoop ? 'loop' : 'single') . " host=" . gethostname());
 
@@ -44,7 +30,6 @@ try {
     $tables = $db->query("SHOW TABLES LIKE 'media_queue'")->fetchAll();
     if (empty($tables)) {
         Logger::mediaQueue("Tabela media_queue não existe. Nada a processar.", 'WARNING');
-        flock($fp, LOCK_UN); fclose($fp); @unlink($lockFile);
         exit(0);
     }
 
@@ -63,7 +48,6 @@ try {
 
     if ($queued === 0 && $processing === 0) {
         Logger::mediaQueue("Fila vazia, nada a processar.");
-        flock($fp, LOCK_UN); fclose($fp); @unlink($lockFile);
         exit(0);
     }
 
@@ -81,7 +65,7 @@ try {
     if ($nextItem) {
         Logger::mediaQueue("Próximo item: #{$nextItem['id']} dir={$nextItem['direction']} type={$nextItem['media_type']} status={$nextItem['status']} attempts={$nextItem['attempts']}/{$nextItem['max_attempts']} msg_id={$nextItem['message_id']} conv_id={$nextItem['conversation_id']} ext_id={$nextItem['external_message_id']}");
     } else {
-        Logger::mediaQueue("Nenhum item elegível para processamento (todos com next_attempt_at no futuro?).");
+        Logger::mediaQueue("Nenhum item elegível (todos com next_attempt_at no futuro).");
         
         $nextAttempt = $db->query("
             SELECT id, next_attempt_at, status, attempts 
@@ -96,7 +80,6 @@ try {
                 Logger::mediaQueue("  Aguardando: #{$na['id']} next_attempt={$na['next_attempt_at']} status={$na['status']} attempts={$na['attempts']}");
             }
         }
-        flock($fp, LOCK_UN); fclose($fp); @unlink($lockFile);
         exit(0);
     }
 
@@ -151,10 +134,6 @@ try {
     Logger::mediaQueue("EXCEÇÃO FATAL: " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine(), 'ERROR');
     Logger::mediaQueue("Stack trace: " . $e->getTraceAsString(), 'ERROR');
 }
-
-flock($fp, LOCK_UN);
-fclose($fp);
-@unlink($lockFile);
 
 Logger::mediaQueue("═══ CRON FINALIZADO ═══");
 exit(0);

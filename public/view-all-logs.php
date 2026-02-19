@@ -1855,7 +1855,7 @@ WHERE c.whatsapp_account_id IS NOT NULL
             $mqStats = null;
             $mqItems = [];
             $mqCronLog = [];
-            $mqLockFile = __DIR__ . '/../storage/cache/media_queue.lock';
+            $mqLockFile = '/tmp/process_media_queue.lock';
             $mqCronRunning = file_exists($mqLockFile) && (function() use ($mqLockFile) {
                 $fp = @fopen($mqLockFile, 'r');
                 if (!$fp) return false;

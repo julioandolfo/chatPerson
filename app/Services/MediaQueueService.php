@@ -68,7 +68,7 @@ class MediaQueueService
         $externalId = $params['external_message_id'];
         
         if (MediaQueue::existsForMessage($externalId)) {
-            Logger::mediaQueue("Item já existe na fila: {$externalId}", 'WARNING');
+            Logger::mediaQueue("[conv:" . ($params['conversation_id'] ?? '?') . "] Item já existe na fila: {$externalId}", 'WARNING');
             return null;
         }
 
@@ -94,7 +94,7 @@ class MediaQueueService
             ]),
         ]);
 
-        Logger::mediaQueue("Download enfileirado: id={$queueId}, msg={$externalId}, type=" . ($params['media_type'] ?? 'unknown'));
+        Logger::mediaQueue("[conv:" . ($params['conversation_id'] ?? '?') . "] Download enfileirado: id={$queueId}, msg={$externalId}, type=" . ($params['media_type'] ?? 'unknown'));
         return $queueId;
     }
 
@@ -117,7 +117,8 @@ class MediaQueueService
             return $stats;
         }
 
-        Logger::mediaQueue("Processando item #{$item['id']}: dir={$item['direction']} type={$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
+        $convId = $item['conversation_id'] ?? '?';
+        Logger::mediaQueue("[conv:{$convId}] Processando item #{$item['id']}: dir={$item['direction']} type={$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
 
         // Rate limit: aguardar entre processamentos
         usleep(self::$rateLimitMs * 1000);
@@ -132,20 +133,20 @@ class MediaQueueService
                 MediaQueue::markCompleted($item['id'], $result);
                 if ($item['direction'] === 'download') {
                     self::updateMessageWithDownload($item, $result);
-                    Logger::mediaQueue("Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
+                    Logger::mediaQueue("[conv:{$convId}] Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
                 } else {
-                    Logger::mediaQueue("Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
+                    Logger::mediaQueue("[conv:{$convId}] Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
                 }
                 $stats['success']++;
             } else {
                 MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
                 $stats['errors']++;
-                Logger::mediaQueue(($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
+                Logger::mediaQueue("[conv:{$convId}] " . ($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
             }
         } catch (\Exception $e) {
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);
             $stats['errors']++;
-            Logger::mediaQueue("Exceção: #{$item['id']} → {$e->getMessage()}", 'ERROR');
+            Logger::mediaQueue("[conv:{$convId}] Exceção: #{$item['id']} → {$e->getMessage()}", 'ERROR');
         }
 
         return $stats;
@@ -177,7 +178,7 @@ class MediaQueueService
 
         foreach ($endpoints as $endpoint) {
             $url = $apiUrl . $endpoint;
-            Logger::mediaQueue("Download tentando: {$url}");
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Download tentando: {$url}");
 
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -197,7 +198,7 @@ class MediaQueueService
             curl_close($ch);
 
             $dataLen = $data ? strlen($data) : 0;
-            Logger::mediaQueue("Download resposta: HTTP {$httpCode}, Size: {$dataLen}, Type: " . ($contentType ?: 'null') . ($curlError ? ", cURL error: {$curlError}" : ''));
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Download resposta: HTTP {$httpCode}, Size: {$dataLen}, Type: " . ($contentType ?: 'null') . ($curlError ? ", cURL error: {$curlError}" : ''));
 
             if ($httpCode !== 200) {
                 $errorBody = ($data && $dataLen < 2000) ? $data : '';
@@ -287,7 +288,7 @@ class MediaQueueService
         $lastError = '';
         foreach ($attempts as $att) {
             $jsonPayload = json_encode($att['payload']);
-            Logger::mediaQueue("Upload [{$att['label']}]: {$att['url']}, payload_size=" . strlen($jsonPayload));
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Upload [{$att['label']}]: {$att['url']}, payload_size=" . strlen($jsonPayload));
             
             $ch = curl_init($att['url']);
             curl_setopt_array($ch, [
@@ -307,7 +308,7 @@ class MediaQueueService
             $curlError = curl_error($ch);
             curl_close($ch);
             
-            Logger::mediaQueue("Upload [{$att['label']}] HTTP {$httpCode}" . ($curlError ? " cURL: {$curlError}" : '') . " resp=" . substr($response ?? '', 0, 300));
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Upload [{$att['label']}] HTTP {$httpCode}" . ($curlError ? " cURL: {$curlError}" : '') . " resp=" . substr($response ?? '', 0, 300));
             
             if ($curlError) {
                 $lastError = "cURL error [{$att['label']}]: {$curlError}";
@@ -316,7 +317,7 @@ class MediaQueueService
             
             if ($httpCode === 200 || $httpCode === 201) {
                 $data = json_decode($response, true);
-                Logger::mediaQueue("Upload enviado com sucesso via [{$att['label']}]!");
+                Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Upload enviado com sucesso via [{$att['label']}]!");
                 return [
                     'success'    => true,
                     'message_id' => $data['id'] ?? $data['message_id'] ?? ($data['message']['id'] ?? null),
@@ -398,13 +399,13 @@ class MediaQueueService
     private static function updateMessageWithDownload(array $item, array $result): void
     {
         if (empty($item['message_id'])) {
-            Logger::mediaQueue("message_id não definido, não é possível atualizar mensagem", 'WARNING');
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] message_id não definido, não é possível atualizar mensagem", 'WARNING');
             return;
         }
 
         $message = Message::find($item['message_id']);
         if (!$message) {
-            Logger::mediaQueue("Mensagem #{$item['message_id']} não encontrada no banco", 'WARNING');
+            Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Mensagem #{$item['message_id']} não encontrada no banco", 'WARNING');
             return;
         }
 
@@ -453,7 +454,7 @@ class MediaQueueService
             $stmt->execute([$item['message_id']]);
         }
 
-        Logger::mediaQueue("Mensagem #{$item['message_id']} atualizada com attachment (type={$attachmentType})");
+        Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Mensagem #{$item['message_id']} atualizada com attachment (type={$attachmentType})");
     }
 
     /**

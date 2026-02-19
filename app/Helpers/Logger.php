@@ -137,6 +137,14 @@ class Logger
     }
 
     /**
+     * Log específico para Media Queue (fila de downloads/uploads)
+     */
+    public static function mediaQueue(string $message, string $level = 'INFO'): void
+    {
+        self::log("[{$level}] {$message}", 'media_queue.log');
+    }
+
+    /**
      * Log específico para API4Com (telefonia)
      */
     public static function api4com(string $message, string $level = 'INFO'): void

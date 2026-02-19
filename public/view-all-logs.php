@@ -388,6 +388,7 @@ $logFileMap = [
     'conversas' => __DIR__ . '/../logs/conversas.log',
     'unificacao_logs' => __DIR__ . '/../logs/unificacao.log',
     'webhook' => __DIR__ . '/../logs/webhook.log',
+    'media_queue' => __DIR__ . '/../logs/media_queue.log',
 ];
 // Fallback: se não existir em logs/, tentar em storage/logs/
 foreach ($logFileMap as $key => $path) {
@@ -814,6 +815,7 @@ function colorizeLog($log) {
             <a href="?tab=unificacao" class="tab <?= $activeTab === 'unificacao' ? 'active' : '' ?>">🔗 Unificação Contas</a>
             <a href="?tab=unificacao_logs" class="tab <?= $activeTab === 'unificacao_logs' ? 'active' : '' ?>">📊 Logs Unificação</a>
             <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
+            <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
         </div>
         
@@ -1845,6 +1847,281 @@ WHERE c.whatsapp_account_id IS NOT NULL
         
         <div class="footer">
             <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+        
+        <?php elseif ($activeTab === 'media_queue'): ?>
+        <!-- ═══════════════ ABA MEDIA QUEUE ═══════════════ -->
+        <?php
+            $mqStats = null;
+            $mqItems = [];
+            $mqCronLog = [];
+            $mqLockFile = __DIR__ . '/../storage/cache/media_queue.lock';
+            $mqCronRunning = file_exists($mqLockFile) && (function() use ($mqLockFile) {
+                $fp = @fopen($mqLockFile, 'r');
+                if (!$fp) return false;
+                $locked = !@flock($fp, LOCK_EX | LOCK_NB);
+                if (!$locked) @flock($fp, LOCK_UN);
+                @fclose($fp);
+                return $locked;
+            })();
+            
+            try {
+                if (!isset($db)) {
+                    require_once __DIR__ . '/../config/bootstrap.php';
+                    $db = \App\Helpers\Database::getInstance();
+                }
+                
+                $mqStats = $db->query("
+                    SELECT 
+                        COUNT(*) as total,
+                        SUM(CASE WHEN status = 'queued' THEN 1 ELSE 0 END) as queued,
+                        SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) as processing,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+                        SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
+                        SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled,
+                        SUM(CASE WHEN direction = 'download' THEN 1 ELSE 0 END) as downloads,
+                        SUM(CASE WHEN direction = 'upload' THEN 1 ELSE 0 END) as uploads
+                    FROM media_queue
+                ")->fetch(\PDO::FETCH_ASSOC);
+                
+                $mqItems = $db->query("
+                    SELECT id, message_id, conversation_id, account_id, external_message_id,
+                           direction, media_type, status, priority, attempts, max_attempts,
+                           error_message, next_attempt_at, created_at, updated_at, processed_at
+                    FROM media_queue
+                    ORDER BY 
+                        CASE status 
+                            WHEN 'processing' THEN 1 
+                            WHEN 'queued' THEN 2 
+                            WHEN 'failed' THEN 3 
+                            WHEN 'completed' THEN 4 
+                            WHEN 'cancelled' THEN 5 
+                        END,
+                        created_at DESC
+                    LIMIT 50
+                ")->fetchAll(\PDO::FETCH_ASSOC);
+                
+            } catch (\Exception $e) {
+                $mqStats = null;
+            }
+            
+            $mqLogFile = $logFileMap['media_queue'];
+            $mqLogLines = [];
+            if (file_exists($mqLogFile)) {
+                $allMqLines = file($mqLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $mqLogLines = array_slice(array_reverse($allMqLines), 0, $maxLines);
+            }
+            
+            $mqLastRunLine = null;
+            foreach ($mqLogLines as $line) {
+                if (strpos($line, 'CRON INICIADO') !== false) {
+                    $mqLastRunLine = $line;
+                    break;
+                }
+            }
+            $mqLastRunTime = null;
+            if ($mqLastRunLine && preg_match('/\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]/', $mqLastRunLine, $m)) {
+                $mqLastRunTime = strtotime($m[1]);
+            }
+            $mqLastRunAgo = $mqLastRunTime ? (time() - $mqLastRunTime) : null;
+        ?>
+        
+        <div class="content">
+            <h2 style="color: #9cdcfe; margin-bottom: 15px;">📦 Media Queue — Fila de Downloads/Uploads</h2>
+            
+            <!-- Status do CRON -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                <div class="stat" style="border-left: 3px solid <?= $mqCronRunning ? '#4ec9b0' : ($mqLastRunAgo !== null && $mqLastRunAgo < 120 ? '#4ec9b0' : '#f48771') ?>;">
+                    <div class="label">CRON Status</div>
+                    <div class="value" style="font-size: 14px; color: <?= $mqCronRunning ? '#4ec9b0' : ($mqLastRunAgo !== null && $mqLastRunAgo < 120 ? '#4ec9b0' : '#f48771') ?>;">
+                        <?php if ($mqCronRunning): ?>
+                            🟢 Rodando agora
+                        <?php elseif ($mqLastRunAgo !== null && $mqLastRunAgo < 120): ?>
+                            🟢 Ativo (há <?= $mqLastRunAgo ?>s)
+                        <?php elseif ($mqLastRunAgo !== null): ?>
+                            🔴 Parado (há <?= round($mqLastRunAgo / 60, 1) ?> min)
+                        <?php else: ?>
+                            ⚪ Nunca executou
+                        <?php endif; ?>
+                    </div>
+                </div>
+                
+                <?php if ($mqStats): ?>
+                <div class="stat" style="border-left: 3px solid #569cd6;">
+                    <div class="label">Total</div>
+                    <div class="value"><?= $mqStats['total'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #dcdcaa;">
+                    <div class="label">Na Fila</div>
+                    <div class="value" style="color: #dcdcaa;"><?= $mqStats['queued'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #569cd6;">
+                    <div class="label">Processando</div>
+                    <div class="value" style="color: #569cd6;"><?= $mqStats['processing'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #4ec9b0;">
+                    <div class="label">Concluídos</div>
+                    <div class="value" style="color: #4ec9b0;"><?= $mqStats['completed'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #f48771;">
+                    <div class="label">Falharam</div>
+                    <div class="value" style="color: #f48771;"><?= $mqStats['failed'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #858585;">
+                    <div class="label">Downloads</div>
+                    <div class="value"><?= $mqStats['downloads'] ?? 0 ?></div>
+                </div>
+                <div class="stat" style="border-left: 3px solid #858585;">
+                    <div class="label">Uploads</div>
+                    <div class="value"><?= $mqStats['uploads'] ?? 0 ?></div>
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <?php if ($mqLastRunAgo !== null && $mqLastRunAgo > 300 && !$mqCronRunning): ?>
+            <div style="background: rgba(244,135,113,0.1); border: 1px solid #f48771; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                <strong style="color: #f48771;">⚠️ O cron da Media Queue parece estar PARADO!</strong>
+                <p style="color: #d4d4d4; font-size: 13px; margin-top: 5px;">Última execução foi há <?= round($mqLastRunAgo / 60, 1) ?> minutos.</p>
+                <p style="color: #858585; font-size: 12px; margin-top: 5px;">Verifique o crontab ou execute manualmente:
+                    <code style="color: #ce9178;">php public/scripts/process-media-queue.php</code>
+                </p>
+            </div>
+            <?php elseif ($mqLastRunAgo === null && !$mqCronRunning): ?>
+            <div style="background: rgba(220,220,170,0.1); border: 1px solid #dcdcaa; border-radius: 6px; padding: 12px; margin-bottom: 15px;">
+                <strong style="color: #dcdcaa;">⚠️ O cron da Media Queue nunca executou!</strong>
+                <p style="color: #858585; font-size: 12px; margin-top: 5px;">Configure no crontab:
+                    <code style="color: #ce9178;">* * * * * cd /var/www/html && php public/scripts/process-media-queue.php</code>
+                </p>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Tabela de itens da fila -->
+            <?php if (!empty($mqItems)): ?>
+            <details open style="margin-bottom: 20px;">
+                <summary style="cursor: pointer; color: #9cdcfe; font-size: 14px; font-weight: bold; margin-bottom: 10px;">📋 Itens na Fila (últimos <?= count($mqItems) ?>)</summary>
+                <div style="overflow-x: auto;">
+                    <table class="diag-table" style="font-size: 12px;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Dir</th>
+                                <th>Tipo</th>
+                                <th>Status</th>
+                                <th>Tentativas</th>
+                                <th>Msg ID</th>
+                                <th>Conv ID</th>
+                                <th>Erro</th>
+                                <th>Próxima Tentativa</th>
+                                <th>Criado</th>
+                                <th>Processado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($mqItems as $mqi): ?>
+                            <tr style="<?php
+                                if ($mqi['status'] === 'failed') echo 'background: rgba(244,135,113,0.08);';
+                                elseif ($mqi['status'] === 'processing') echo 'background: rgba(86,156,214,0.08);';
+                                elseif ($mqi['status'] === 'completed') echo 'background: rgba(78,201,176,0.05);';
+                                elseif ($mqi['status'] === 'queued') echo 'background: rgba(220,220,170,0.05);';
+                            ?>">
+                                <td style="color: #858585;"><?= $mqi['id'] ?></td>
+                                <td>
+                                    <?php if ($mqi['direction'] === 'download'): ?>
+                                        <span style="color: #4ec9b0;">⬇ down</span>
+                                    <?php else: ?>
+                                        <span style="color: #569cd6;">⬆ up</span>
+                                    <?php endif; ?>
+                                </td>
+                                <td style="color: #d4d4d4;"><?= htmlspecialchars($mqi['media_type'] ?? '-') ?></td>
+                                <td>
+                                    <?php
+                                        $statusColors = ['queued' => '#dcdcaa', 'processing' => '#569cd6', 'completed' => '#4ec9b0', 'failed' => '#f48771', 'cancelled' => '#858585'];
+                                        $statusLabels = ['queued' => 'Na Fila', 'processing' => 'Processando', 'completed' => 'Concluído', 'failed' => 'Falhou', 'cancelled' => 'Cancelado'];
+                                        $sc = $statusColors[$mqi['status']] ?? '#858585';
+                                        $sl = $statusLabels[$mqi['status']] ?? $mqi['status'];
+                                    ?>
+                                    <span class="badge" style="background: <?= $sc ?>20; color: <?= $sc ?>; border: 1px solid <?= $sc ?>40; padding: 2px 6px; border-radius: 3px; font-size: 11px;"><?= $sl ?></span>
+                                </td>
+                                <td style="text-align: center; color: <?= $mqi['attempts'] >= $mqi['max_attempts'] ? '#f48771' : '#d4d4d4' ?>;">
+                                    <?= $mqi['attempts'] ?>/<?= $mqi['max_attempts'] ?>
+                                </td>
+                                <td style="color: #858585; font-size: 11px;"><?= $mqi['message_id'] ?? '-' ?></td>
+                                <td style="color: #858585; font-size: 11px;"><?= $mqi['conversation_id'] ?? '-' ?></td>
+                                <td style="color: #f48771; font-size: 11px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<?= htmlspecialchars($mqi['error_message'] ?? '') ?>">
+                                    <?= htmlspecialchars(substr($mqi['error_message'] ?? '-', 0, 60)) ?>
+                                </td>
+                                <td style="color: #858585; font-size: 11px; white-space: nowrap;"><?= $mqi['next_attempt_at'] ?? '-' ?></td>
+                                <td style="color: #858585; font-size: 11px; white-space: nowrap;"><?= $mqi['created_at'] ?></td>
+                                <td style="color: #858585; font-size: 11px; white-space: nowrap;"><?= $mqi['processed_at'] ?? '-' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </details>
+            <?php elseif ($mqStats && $mqStats['total'] == 0): ?>
+            <div style="background: rgba(78,201,176,0.05); border: 1px solid #4ec9b030; border-radius: 6px; padding: 15px; margin-bottom: 20px; text-align: center;">
+                <span style="color: #4ec9b0; font-size: 14px;">✅ Fila vazia — nenhum item pendente.</span>
+            </div>
+            <?php endif; ?>
+            
+            <!-- Logs do CRON -->
+            <details <?= empty($mqItems) ? 'open' : '' ?> style="margin-bottom: 20px;">
+                <summary style="cursor: pointer; color: #9cdcfe; font-size: 14px; font-weight: bold; margin-bottom: 10px;">📄 Logs do CRON (últimas <?= count($mqLogLines) ?> linhas)</summary>
+                
+                <div style="margin-bottom: 10px;">
+                    <form method="get" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="hidden" name="tab" value="media_queue">
+                        <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="Filtrar logs..." 
+                               style="background: #2d2d2d; color: #d4d4d4; border: 1px solid #404040; padding: 6px 12px; border-radius: 4px; font-size: 13px; width: 250px;">
+                        <select name="level" style="background: #2d2d2d; color: #d4d4d4; border: 1px solid #404040; padding: 6px 8px; border-radius: 4px; font-size: 13px;">
+                            <option value="">Todos os níveis</option>
+                            <option value="INFO" <?= $level === 'INFO' ? 'selected' : '' ?>>INFO</option>
+                            <option value="WARNING" <?= $level === 'WARNING' ? 'selected' : '' ?>>WARNING</option>
+                            <option value="ERROR" <?= $level === 'ERROR' ? 'selected' : '' ?>>ERROR</option>
+                        </select>
+                        <button type="submit" style="background: #0e639c; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">Filtrar</button>
+                        <button type="button" onclick="window.location.href='?tab=media_queue'" style="background: #3c3c3c; color: #d4d4d4; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer; font-size: 13px;">Limpar</button>
+                        <span style="color: #858585; font-size: 12px; margin-left: auto;">
+                            <a href="?tab=media_queue&lines=1000" style="color: #4ec9b0;">Ver 1000</a> |
+                            <a href="?tab=media_queue&lines=5000" style="color: #4ec9b0;">Ver 5000</a>
+                        </span>
+                    </form>
+                </div>
+                
+                <?php if (empty($mqLogLines)): ?>
+                <div style="background: rgba(220,220,170,0.05); border: 1px solid #dcdcaa30; border-radius: 6px; padding: 15px; text-align: center;">
+                    <span style="color: #dcdcaa;">⚠️ Nenhum log encontrado. O cron ainda não foi executado ou o arquivo de log não existe.</span>
+                    <p style="color: #858585; font-size: 12px; margin-top: 5px;">Esperado em: <code style="color: #ce9178;"><?= htmlspecialchars($mqLogFile) ?></code></p>
+                </div>
+                <?php else: ?>
+                <div class="log-container" style="max-height: 600px; overflow-y: auto; background: #1a1a1a; border-radius: 6px; padding: 10px; font-family: 'Fira Code', 'Cascadia Code', monospace; font-size: 12px; line-height: 1.6;">
+                    <?php 
+                    $filteredMqLogs = $mqLogLines;
+                    if (!empty($filter) || !empty($level)) {
+                        $filteredMqLogs = array_filter($filteredMqLogs, function($line) use ($filter, $level) {
+                            $matchFilter = empty($filter) || stripos($line, $filter) !== false;
+                            $matchLevel = empty($level) || stripos($line, "[$level]") !== false;
+                            return $matchFilter && $matchLevel;
+                        });
+                    }
+                    foreach ($filteredMqLogs as $line): 
+                        $lineColor = '#d4d4d4';
+                        if (strpos($line, '[ERROR]') !== false) $lineColor = '#f48771';
+                        elseif (strpos($line, '[WARNING]') !== false) $lineColor = '#dcdcaa';
+                        elseif (strpos($line, 'CRON INICIADO') !== false || strpos($line, 'CRON FINALIZADO') !== false) $lineColor = '#569cd6';
+                        elseif (strpos($line, 'sucesso') !== false || strpos($line, 'concluído') !== false || strpos($line, 'Concluído') !== false || strpos($line, 'enviado') !== false) $lineColor = '#4ec9b0';
+                        elseif (strpos($line, 'falhou') !== false || strpos($line, 'Falhou') !== false) $lineColor = '#f48771';
+                    ?>
+                    <div style="color: <?= $lineColor ?>; padding: 1px 0; border-bottom: 1px solid #2a2a2a; word-break: break-all;"><?= htmlspecialchars($line) ?></div>
+                    <?php endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </details>
+        </div>
+        
+        <div class="footer">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=media_queue" style="color: #4ec9b0;">🔄 Atualizar</a></p>
         </div>
         
         <?php elseif ($activeTab === 'webhook'): ?>

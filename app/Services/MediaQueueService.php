@@ -52,9 +52,9 @@ class MediaQueueService
                     INDEX idx_account_status (account_id, status)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             ");
-            Logger::quepasa("MediaQueue - Tabela media_queue criada automaticamente");
+            Logger::mediaQueue("Tabela media_queue criada automaticamente");
         } catch (\Exception $e) {
-            Logger::quepasa("MediaQueue - Erro ao criar tabela: " . $e->getMessage());
+            Logger::mediaQueue("Erro ao criar tabela: " . $e->getMessage(), 'ERROR');
         }
     }
 
@@ -68,7 +68,7 @@ class MediaQueueService
         $externalId = $params['external_message_id'];
         
         if (MediaQueue::existsForMessage($externalId)) {
-            Logger::quepasa("MediaQueue - Item já existe na fila: {$externalId}");
+            Logger::mediaQueue("Item já existe na fila: {$externalId}", 'WARNING');
             return null;
         }
 
@@ -94,7 +94,7 @@ class MediaQueueService
             ]),
         ]);
 
-        Logger::quepasa("MediaQueue - ✅ Download enfileirado: id={$queueId}, msg={$externalId}, type={$params['media_type']}");
+        Logger::mediaQueue("Download enfileirado: id={$queueId}, msg={$externalId}, type=" . ($params['media_type'] ?? 'unknown'));
         return $queueId;
     }
 
@@ -117,7 +117,7 @@ class MediaQueueService
             return $stats;
         }
 
-        Logger::quepasa("MediaQueue - 🔄 Processando item #{$item['id']}: {$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
+        Logger::mediaQueue("Processando item #{$item['id']}: dir={$item['direction']} type={$item['media_type']} msg={$item['external_message_id']} (tentativa {$item['attempts']}/{$item['max_attempts']})");
 
         // Rate limit: aguardar entre processamentos
         usleep(self::$rateLimitMs * 1000);
@@ -132,20 +132,20 @@ class MediaQueueService
                 MediaQueue::markCompleted($item['id'], $result);
                 if ($item['direction'] === 'download') {
                     self::updateMessageWithDownload($item, $result);
-                    Logger::quepasa("MediaQueue - ✅ Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
+                    Logger::mediaQueue("Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
                 } else {
-                    Logger::quepasa("MediaQueue - ✅ Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
+                    Logger::mediaQueue("Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
                 }
                 $stats['success']++;
             } else {
                 MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
                 $stats['errors']++;
-                Logger::quepasa("MediaQueue - ❌ " . ($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}");
+                Logger::mediaQueue(($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}", 'ERROR');
             }
         } catch (\Exception $e) {
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);
             $stats['errors']++;
-            Logger::quepasa("MediaQueue - ❌ Exceção: #{$item['id']} → {$e->getMessage()}");
+            Logger::mediaQueue("Exceção: #{$item['id']} → {$e->getMessage()}", 'ERROR');
         }
 
         return $stats;
@@ -177,7 +177,7 @@ class MediaQueueService
 
         foreach ($endpoints as $endpoint) {
             $url = $apiUrl . $endpoint;
-            Logger::quepasa("MediaQueue - Tentando: {$url}");
+            Logger::mediaQueue("Download tentando: {$url}");
 
             $ch = curl_init($url);
             curl_setopt_array($ch, [
@@ -197,7 +197,7 @@ class MediaQueueService
             curl_close($ch);
 
             $dataLen = $data ? strlen($data) : 0;
-            Logger::quepasa("MediaQueue - Resposta: HTTP {$httpCode}, Size: {$dataLen}, Type: " . ($contentType ?: 'null'));
+            Logger::mediaQueue("Download resposta: HTTP {$httpCode}, Size: {$dataLen}, Type: " . ($contentType ?: 'null') . ($curlError ? ", cURL error: {$curlError}" : ''));
 
             if ($httpCode !== 200) {
                 $errorBody = ($data && $dataLen < 2000) ? $data : '';
@@ -227,7 +227,8 @@ class MediaQueueService
     }
 
     /**
-     * Re-executar envio de mídia que falhou por erro CDN
+     * Re-executar envio de mídia que falhou por erro CDN.
+     * Tenta: 1) base64 via /send  2) URL via /senddocument  3) URL via /send
      */
     private static function executeUpload(array $item): array
     {
@@ -237,9 +238,11 @@ class MediaQueueService
         $sendUrl = $meta['send_url'] ?? $payload['api_url'] ?? null;
         $sendHeaders = $meta['send_headers'] ?? [];
         $sendPayload = $meta['send_payload'] ?? [];
+        $mediaUrl = $meta['media_url'] ?? null;
+        $apiBase = rtrim($payload['api_url'] ?? $sendUrl ?? '', '/');
         
-        if (empty($sendUrl) || empty($sendPayload)) {
-            return ['success' => false, 'error' => 'Dados de envio incompletos (url ou payload ausente)'];
+        if (empty($apiBase)) {
+            return ['success' => false, 'error' => 'URL de API ausente'];
         }
         
         // Reconstruir headers se vieram como array associativo
@@ -251,52 +254,80 @@ class MediaQueueService
             $sendHeaders = $headerLines;
         }
         
-        $jsonPayload = json_encode($sendPayload);
-        Logger::quepasa("MediaQueue - 📤 Upload retry: url={$sendUrl}, payload_size=" . strlen($jsonPayload));
+        // Lista de tentativas: base64 via /send, depois URL via /senddocument e /send
+        $attempts = [];
         
-        $ch = curl_init($sendUrl);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $jsonPayload,
-            CURLOPT_HTTPHEADER     => array_merge($sendHeaders, ['Content-Type: application/json']),
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false,
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-        
-        Logger::quepasa("MediaQueue - 📤 Upload response: HTTP {$httpCode}, size=" . strlen($response ?? ''));
-        
-        if ($curlError) {
-            return ['success' => false, 'error' => "cURL error: {$curlError}"];
+        // Tentativa 1: payload original (base64) via /send
+        if (!empty($sendPayload)) {
+            $attempts[] = ['url' => $apiBase . '/send', 'payload' => $sendPayload, 'label' => 'base64 /send'];
         }
         
-        if ($httpCode === 200 || $httpCode === 201) {
-            $data = json_decode($response, true);
-            return [
-                'success'    => true,
-                'message_id' => $data['id'] ?? $data['message_id'] ?? ($data['message']['id'] ?? null),
-                'status'     => 'sent',
-            ];
+        // Tentativas 2-3: via URL pública
+        if (!empty($mediaUrl)) {
+            $urlMediaSafe = str_starts_with($mediaUrl, 'http://') 
+                ? preg_replace('/^http:/i', 'https:', $mediaUrl)
+                : $mediaUrl;
+            
+            $chatId = $sendPayload['chatid'] ?? $sendPayload['chatId'] ?? null;
+            if ($chatId) {
+                $urlPayload = [
+                    'chatid'   => $chatId,
+                    'url'      => $urlMediaSafe,
+                    'mime'     => $payload['mimetype'] ?? $sendPayload['mime'] ?? '',
+                    'filename' => $payload['filename'] ?? $sendPayload['filename'] ?? null,
+                ];
+                
+                if ($item['media_type'] === 'document') {
+                    $attempts[] = ['url' => $apiBase . '/senddocument', 'payload' => $urlPayload, 'label' => 'URL /senddocument'];
+                }
+                $attempts[] = ['url' => $apiBase . '/send', 'payload' => $urlPayload, 'label' => 'URL /send'];
+            }
         }
         
-        // Verificar se ainda é erro CDN
-        $respLower = strtolower($response ?? '');
-        $errMsg = "HTTP {$httpCode}: " . substr($response ?? '', 0, 300);
-        
-        if (strpos($respLower, 'connection reset') !== false 
-            || strpos($respLower, 'unexpected eof') !== false) {
-            $errMsg = "CDN error (retry): " . substr($response ?? '', 0, 200);
+        $lastError = '';
+        foreach ($attempts as $att) {
+            $jsonPayload = json_encode($att['payload']);
+            Logger::mediaQueue("Upload [{$att['label']}]: {$att['url']}, payload_size=" . strlen($jsonPayload));
+            
+            $ch = curl_init($att['url']);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CONNECTTIMEOUT => 15,
+                CURLOPT_TIMEOUT        => 60,
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $jsonPayload,
+                CURLOPT_HTTPHEADER     => array_merge($sendHeaders, ['Content-Type: application/json']),
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+            ]);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            
+            Logger::mediaQueue("Upload [{$att['label']}] HTTP {$httpCode}" . ($curlError ? " cURL: {$curlError}" : '') . " resp=" . substr($response ?? '', 0, 300));
+            
+            if ($curlError) {
+                $lastError = "cURL error [{$att['label']}]: {$curlError}";
+                continue;
+            }
+            
+            if ($httpCode === 200 || $httpCode === 201) {
+                $data = json_decode($response, true);
+                Logger::mediaQueue("Upload enviado com sucesso via [{$att['label']}]!");
+                return [
+                    'success'    => true,
+                    'message_id' => $data['id'] ?? $data['message_id'] ?? ($data['message']['id'] ?? null),
+                    'status'     => 'sent',
+                ];
+            }
+            
+            $lastError = "HTTP {$httpCode} [{$att['label']}]: " . substr($response ?? '', 0, 200);
         }
         
-        return ['success' => false, 'error' => $errMsg];
+        return ['success' => false, 'error' => $lastError ?: 'Todas as tentativas falharam'];
     }
 
     /**
@@ -367,13 +398,13 @@ class MediaQueueService
     private static function updateMessageWithDownload(array $item, array $result): void
     {
         if (empty($item['message_id'])) {
-            Logger::quepasa("MediaQueue - ⚠️ message_id não definido, não é possível atualizar mensagem");
+            Logger::mediaQueue("message_id não definido, não é possível atualizar mensagem", 'WARNING');
             return;
         }
 
         $message = Message::find($item['message_id']);
         if (!$message) {
-            Logger::quepasa("MediaQueue - ⚠️ Mensagem #{$item['message_id']} não encontrada");
+            Logger::mediaQueue("Mensagem #{$item['message_id']} não encontrada no banco", 'WARNING');
             return;
         }
 
@@ -422,7 +453,7 @@ class MediaQueueService
             $stmt->execute([$item['message_id']]);
         }
 
-        Logger::quepasa("MediaQueue - ✅ Mensagem #{$item['message_id']} atualizada com attachment");
+        Logger::mediaQueue("Mensagem #{$item['message_id']} atualizada com attachment (type={$attachmentType})");
     }
 
     /**

@@ -2007,13 +2007,95 @@ class WhatsAppService
                 Logger::quepasa("sendMessage - Erro transitório detectado, tentando novamente...");
             }
             
-            // Esgotou todas as tentativas — verificar se é erro CDN para enfileirar
+            // Esgotou tentativas base64 — verificar se é erro CDN
             $finalError = $lastError ?: "HTTP {$lastHttpCode}: {$lastResponse}";
             $finalRespLower = strtolower($lastResponse . ' ' . ($lastError ?? ''));
             $isFinalCdnError = (strpos($finalRespLower, 'connection reset') !== false
                 || strpos($finalRespLower, 'unexpected eof') !== false
                 || strpos($finalRespLower, 'failed to execute request') !== false);
             
+            // FALLBACK 1: Se erro CDN com base64, tentar via URL pública
+            if ($isFinalCdnError && !empty($options['media_url'])) {
+                Logger::quepasa("sendMessage - 🔄 CDN rejeitou base64, tentando via URL...");
+                
+                $fallbackMediaUrl = $options['media_url'];
+                // Garantir HTTPS para acessibilidade externa
+                if (str_starts_with($fallbackMediaUrl, 'http://')) {
+                    $fallbackMediaUrl = preg_replace('/^http:/i', 'https:', $fallbackMediaUrl);
+                }
+                
+                $urlPayload = [
+                    'chatid' => $payload['chatId'] ?? $payload['chatid'],
+                    'url'    => $fallbackMediaUrl,
+                    'mime'   => $payload['mime'] ?? '',
+                ];
+                if (!empty($payload['filename'])) {
+                    $urlPayload['filename'] = $payload['filename'];
+                }
+                // caption se existir
+                if (!empty($payload['text']) && trim($payload['text']) !== '') {
+                    $urlPayload['text'] = $payload['text'];
+                }
+                
+                $jsonUrlPayload = json_encode($urlPayload);
+                Logger::quepasa("sendMessage - URL fallback payload: " . substr($jsonUrlPayload, 0, 500));
+                
+                // Tentar /senddocument para documentos, /send para outros
+                $sendEndpoints = ['/senddocument', '/send'];
+                if (($mediaType ?? '') !== 'document') {
+                    $sendEndpoints = ['/send'];
+                }
+                
+                foreach ($sendEndpoints as $sendEndpoint) {
+                    $fallbackUrl = rtrim($account['api_url'], '/') . $sendEndpoint;
+                    Logger::quepasa("sendMessage - 🔄 Tentando {$sendEndpoint} via URL: {$fallbackUrl}");
+                    
+                    $ch = curl_init($fallbackUrl);
+                    curl_setopt_array($ch, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT        => 120,
+                        CURLOPT_CONNECTTIMEOUT => 30,
+                        CURLOPT_POST           => true,
+                        CURLOPT_POSTFIELDS     => $jsonUrlPayload,
+                        CURLOPT_HTTPHEADER     => $headers,
+                        CURLOPT_FOLLOWLOCATION => true,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_SSL_VERIFYHOST => false,
+                    ]);
+                    
+                    $fbResponse = curl_exec($ch);
+                    $fbHttpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    $fbError = curl_error($ch);
+                    curl_close($ch);
+                    
+                    Logger::quepasa("sendMessage - {$sendEndpoint} URL response: HTTP {$fbHttpCode}, " . substr($fbResponse ?? '', 0, 400));
+                    
+                    if ($fbHttpCode === 200 || $fbHttpCode === 201) {
+                        $fbData = json_decode($fbResponse, true);
+                        $fbMessageId = $fbData['id'] ?? $fbData['message_id'] ?? ($fbData['message']['id'] ?? null);
+                        Logger::quepasa("sendMessage - ✅ Enviado com sucesso via {$sendEndpoint} + URL! message_id={$fbMessageId}");
+                        return [
+                            'success'    => true,
+                            'message_id' => $fbMessageId,
+                            'status'     => 'sent',
+                        ];
+                    }
+                    
+                    // Se ainda é CDN error, tentar próximo endpoint
+                    $fbRespLower = strtolower($fbResponse ?? '');
+                    if (strpos($fbRespLower, 'connection reset') !== false || strpos($fbRespLower, 'failed to execute') !== false) {
+                        Logger::quepasa("sendMessage - ❌ {$sendEndpoint} via URL também falhou com CDN error");
+                        continue;
+                    }
+                    
+                    // Outro tipo de erro — parar de tentar
+                    break;
+                }
+                
+                Logger::quepasa("sendMessage - ❌ Todos os fallbacks falharam, enfileirando...");
+            }
+            
+            // FALLBACK 2: Enfileirar para retry posterior
             if ($isFinalCdnError) {
                 Logger::quepasa("sendMessage - 📋 Erro CDN persistente, enfileirando envio para retry posterior...");
                 try {
@@ -2035,11 +2117,12 @@ class WhatsAppService
                             'send_url'     => $url,
                             'send_headers' => $headers,
                             'send_payload' => $payload,
+                            'media_url'    => $options['media_url'] ?? null,
                         ],
                     ]);
                     
                     return [
-                        'success' => true,
+                        'success' => false,
                         'message_id' => null,
                         'status' => 'queued',
                         'warning' => 'Erro CDN do WhatsApp. Envio adicionado à fila e será retentado automaticamente.'

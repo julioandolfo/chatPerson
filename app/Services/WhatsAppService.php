@@ -1706,7 +1706,51 @@ class WhatsAppService
                                     }
                                 }
                                 
-                                $fileContent = file_get_contents($absolutePath);
+                                // Converter PNG → JPG para melhor compatibilidade com WhatsApp CDN
+                                // WhatsApp pode rejeitar PNGs grandes com "connection reset by peer"
+                                $sendPath = $absolutePath;
+                                $tempJpg = null;
+                                
+                                if ($mediaType === 'image' && strtolower($contentMime) === 'image/png' && function_exists('imagecreatefrompng')) {
+                                    Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG para compatibilidade WhatsApp...");
+                                    try {
+                                        $img = @imagecreatefrompng($absolutePath);
+                                        if ($img) {
+                                            $w = imagesx($img);
+                                            $h = imagesy($img);
+                                            
+                                            // Criar imagem com fundo branco (substituir transparência)
+                                            $jpg = imagecreatetruecolor($w, $h);
+                                            $white = imagecolorallocate($jpg, 255, 255, 255);
+                                            imagefill($jpg, 0, 0, $white);
+                                            imagecopy($jpg, $img, 0, 0, 0, 0, $w, $h);
+                                            imagedestroy($img);
+                                            
+                                            // Salvar como JPG temporário (qualidade 85 = bom equilíbrio)
+                                            $tempJpg = sys_get_temp_dir() . '/' . uniqid('wa_img_') . '.jpg';
+                                            imagejpeg($jpg, $tempJpg, 85);
+                                            imagedestroy($jpg);
+                                            
+                                            if (file_exists($tempJpg) && filesize($tempJpg) > 0) {
+                                                $oldSize = $fileSize;
+                                                $newSize = filesize($tempJpg);
+                                                $sendPath = $tempJpg;
+                                                $contentMime = 'image/jpeg';
+                                                $mediaName = preg_replace('/\.png$/i', '.jpg', $mediaName ?? 'image.jpg');
+                                                
+                                                Logger::quepasa("sendMessage - ✅ PNG→JPG: {$oldSize} → {$newSize} bytes (redução " . round((1 - $newSize / $oldSize) * 100) . "%)");
+                                            } else {
+                                                Logger::quepasa("sendMessage - ⚠️ Conversão PNG→JPG falhou, usando PNG original");
+                                                $tempJpg = null;
+                                            }
+                                        }
+                                    } catch (\Throwable $e) {
+                                        Logger::quepasa("sendMessage - ⚠️ Erro ao converter PNG→JPG: " . $e->getMessage());
+                                        $tempJpg = null;
+                                    }
+                                }
+                                
+                                $fileContent = file_get_contents($sendPath);
                                 if ($fileContent !== false) {
                                     $fileBase64 = base64_encode($fileContent);
                                     
@@ -1733,6 +1777,11 @@ class WhatsAppService
                                     Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
                                     Logger::quepasa("sendMessage -   tamanho original: {$fileSize} bytes");
                                     Logger::quepasa("sendMessage -   tamanho base64: " . strlen($fileBase64) . " chars");
+                                    
+                                    // Limpar arquivo temporário JPG
+                                    if ($tempJpg && file_exists($tempJpg)) {
+                                        @unlink($tempJpg);
+                                    }
                                 } else {
                                     Logger::quepasa("sendMessage - ⚠️ Falha ao ler conteúdo do arquivo, usando URL como fallback");
                                 }

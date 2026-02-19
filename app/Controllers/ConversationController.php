@@ -4174,5 +4174,77 @@ class ConversationController
             ], 400);
         }
     }
+
+    /**
+     * Obter status da fila de mídia de uma conversa
+     */
+    public function getMediaQueue(int $id): void
+    {
+        try {
+            $result = \App\Services\MediaQueueService::getQueueStatus($id);
+            Response::json(['success' => true, 'data' => $result]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Retentar download de item na fila
+     */
+    public function retryMediaQueue(int $id): void
+    {
+        try {
+            $item = \App\Models\MediaQueue::find($id);
+            if (!$item) {
+                Response::json(['success' => false, 'message' => 'Item não encontrado'], 404);
+                return;
+            }
+
+            \App\Models\MediaQueue::update($id, [
+                'status' => 'queued',
+                'next_attempt_at' => date('Y-m-d H:i:s'),
+                'error_message' => null,
+            ]);
+
+            Response::json(['success' => true, 'message' => 'Download reagendado']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Cancelar download de item na fila
+     */
+    public function cancelMediaQueue(int $id): void
+    {
+        try {
+            $item = \App\Models\MediaQueue::find($id);
+            if (!$item) {
+                Response::json(['success' => false, 'message' => 'Item não encontrado'], 404);
+                return;
+            }
+
+            \App\Models\MediaQueue::update($id, [
+                'status' => 'cancelled',
+            ]);
+
+            Response::json(['success' => true, 'message' => 'Download cancelado']);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Estatísticas globais da fila de mídia
+     */
+    public function getMediaQueueStats(): void
+    {
+        try {
+            $stats = \App\Models\MediaQueue::getStats();
+            Response::json(['success' => true, 'data' => $stats]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
 

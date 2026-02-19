@@ -2688,60 +2688,47 @@ class WhatsAppService
                     }
                     
                     $downloaded = false;
-                    $maxRetries = 4;
-                    $retryDelays = [0, 3, 8, 15];
                     
-                    for ($retry = 0; $retry < $maxRetries && !$downloaded; $retry++) {
-                        if ($retryDelays[$retry] > 0) {
-                            $waitTime = $retryDelays[$retry];
-                            Logger::quepasa("processWebhook - ⏳ Aguardando {$waitTime}s antes da tentativa " . ($retry + 1) . "/{$maxRetries} (esperando WhatsApp CDN)...");
-                            sleep($waitTime);
+                    // Tentar apenas 1 download rápido (QuePasa tem timeout de 10s no webhook)
+                    // Se falhar, salvar mensagem com filename como fallback
+                    foreach ($endpoints as $endpoint) {
+                        $downloadUrl = $apiUrl . $endpoint;
+                        Logger::quepasa("processWebhook - Tentando download: {$downloadUrl}");
+                        
+                        $ch = curl_init($downloadUrl);
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_CONNECTTIMEOUT => 3,
+                            CURLOPT_TIMEOUT => 7,
+                            CURLOPT_HTTPHEADER => $curlHeaders,
+                            CURLOPT_FOLLOWLOCATION => true,
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false
+                        ]);
+                        
+                        $mediaData = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                        $curlError = curl_error($ch);
+                        curl_close($ch);
+                        
+                        $dataLen = $mediaData ? strlen($mediaData) : 0;
+                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$dataLen} bytes" . ($curlError ? ", cURL error: {$curlError}" : ''));
+                        
+                        if ($httpCode !== 200 && $mediaData && $dataLen < 2000) {
+                            Logger::quepasa("processWebhook - Resposta de erro: " . $mediaData);
+                            
+                            // Erros do WhatsApp CDN: não adianta tentar outro endpoint
+                            if (strpos($mediaData, 'unexpected EOF') !== false 
+                                || strpos($mediaData, 'connection reset') !== false
+                                || strpos($mediaData, 'i/o timeout') !== false
+                                || strpos($mediaData, 'failed to download') !== false) {
+                                Logger::quepasa("processWebhook - ⚠️ Erro do WhatsApp CDN — problema de rede no servidor QuePasa, não adianta tentar novamente");
+                                break;
+                            }
                         }
                         
-                        $isWhatsAppCdnError = false;
-                        
-                        foreach ($endpoints as $endpoint) {
-                            if ($isWhatsAppCdnError) {
-                                break; // Erro do WhatsApp CDN, pular para próximo retry com delay
-                            }
-                            
-                            $downloadUrl = $apiUrl . $endpoint;
-                            Logger::quepasa("processWebhook - Tentando endpoint (tentativa " . ($retry + 1) . "): {$downloadUrl}");
-                            
-                            $ch = curl_init($downloadUrl);
-                            curl_setopt_array($ch, [
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_CONNECTTIMEOUT => 5,
-                                CURLOPT_TIMEOUT => 15,
-                                CURLOPT_HTTPHEADER => $curlHeaders,
-                                CURLOPT_FOLLOWLOCATION => true,
-                                CURLOPT_SSL_VERIFYPEER => false,
-                                CURLOPT_SSL_VERIFYHOST => false
-                            ]);
-                            
-                            $mediaData = curl_exec($ch);
-                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-                            $curlError = curl_error($ch);
-                            curl_close($ch);
-                            
-                            $dataLen = $mediaData ? strlen($mediaData) : 0;
-                            Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$dataLen} bytes" . ($curlError ? ", cURL error: {$curlError}" : ''));
-                            
-                            if ($httpCode !== 200 && $mediaData && $dataLen < 2000) {
-                                Logger::quepasa("processWebhook - Resposta de erro: " . $mediaData);
-                                
-                                // Detectar erros do WhatsApp CDN (não adianta tentar outro endpoint)
-                                if (strpos($mediaData, 'unexpected EOF') !== false 
-                                    || strpos($mediaData, 'connection reset') !== false
-                                    || strpos($mediaData, 'i/o timeout') !== false
-                                    || strpos($mediaData, 'failed to download') !== false) {
-                                    $isWhatsAppCdnError = true;
-                                    Logger::quepasa("processWebhook - ⚠️ Erro do WhatsApp CDN detectado, pulando para próximo retry com delay");
-                                }
-                            }
-                            
-                            if ($httpCode === 200 && $mediaData && $dataLen > 100) {
+                        if ($httpCode === 200 && $mediaData && $dataLen > 100) {
                                 $isJson = @json_decode($mediaData);
                                 $isValidMedia = ($isJson === null && (
                                     strpos($contentType, 'audio') !== false ||
@@ -2754,7 +2741,7 @@ class WhatsAppService
                                 ));
                                 
                                 if ($isValidMedia) {
-                                    Logger::quepasa("processWebhook - ✅ {$messageType} baixado com sucesso: {$dataLen} bytes (tentativa " . ($retry + 1) . ")");
+                                    Logger::quepasa("processWebhook - ✅ {$messageType} baixado com sucesso: {$dataLen} bytes via {$endpoint}");
                                     
                                     $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
                                     if (!is_dir($tempDir)) {
@@ -2833,18 +2820,60 @@ class WhatsAppService
                                 }
                             }
                         }
-                    }
                     
                     if (!$downloaded) {
-                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType}. Tentativas: " . ($maxRetries * count($endpoints)) . " (endpoints: " . count($endpoints) . " × retries: {$maxRetries})");
+                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType} (" . count($endpoints) . " endpoints tentados)");
                         
-                        // Fallback: salvar a mensagem com o nome do arquivo como texto
-                        // para não descartar a mensagem silenciosamente
                         $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
-                        if (!empty($originalFilename) && empty($message)) {
-                            $message = $originalFilename;
-                            Logger::quepasa("processWebhook - ⚠️ Usando filename como texto da mensagem (fallback): {$message}");
+                        $originalMimetype = $payload['attachment']['mime'] ?? $mimetype ?? null;
+                        $originalFilesize = $payload['attachment']['filelength'] ?? $size ?? null;
+                        
+                        // Enfileirar para download posterior via MediaQueueService
+                        $queuePayload = [
+                            'account_id'          => $account['id'],
+                            'external_message_id' => $messageWid,
+                            'media_type'          => $messageType,
+                            'api_url'             => $apiUrl,
+                            'token'               => $account['quepasa_token'] ?? '',
+                            'trackid'             => $account['quepasa_trackid'] ?? $account['name'],
+                            'message_id_only'     => $messageIdOnly,
+                            'message_wid'         => $messageWid,
+                            'filename'            => $originalFilename,
+                            'mimetype'            => $originalMimetype,
+                            'filesize'            => $originalFilesize,
+                            'attachment_meta'     => $payload['attachment'] ?? [],
+                        ];
+                        // message_id e conversation_id serão preenchidos após salvar a mensagem
+                        $pendingQueuePayload = $queuePayload;
+                        
+                        Logger::quepasa("processWebhook - 📋 Download enfileirado para processamento posterior: {$originalFilename}");
+                        
+                        // Criar attachment placeholder com flag de download pendente
+                        $attachmentType = 'document';
+                        if ($originalMimetype) {
+                            if (strpos($originalMimetype, 'audio') !== false) $attachmentType = 'audio';
+                            elseif (strpos($originalMimetype, 'image') !== false) $attachmentType = 'image';
+                            elseif (strpos($originalMimetype, 'video') !== false) $attachmentType = 'video';
                         }
+                        
+                        $downloadedFile = [
+                            'path'             => null,
+                            'type'             => $attachmentType,
+                            'mime_type'        => $originalMimetype,
+                            'mimetype'         => $originalMimetype,
+                            'size'             => $originalFilesize,
+                            'filename'         => $originalFilename,
+                            'download_pending' => true,
+                            'queue_status'     => 'queued',
+                        ];
+                        
+                        // Definir message e mediaUrl falsos para que a mensagem não seja descartada
+                        if (empty($message) && !empty($originalFilename)) {
+                            $message = $originalFilename;
+                        }
+                        $mimetype = $originalMimetype;
+                        $filename = $originalFilename;
+                        $size = $originalFilesize;
                     }
                 } catch (\Exception $e) {
                     Logger::quepasa("processWebhook - Erro ao baixar {$messageType}: " . $e->getMessage());
@@ -3827,7 +3856,12 @@ class WhatsAppService
 
             // Processar anexos/mídia do WhatsApp agora que temos a conversa
             $attachments = [];
-            if ($mediaUrl) {
+            
+            // Se download está pendente (enfileirado), criar attachment placeholder
+            if (isset($downloadedFile) && !empty($downloadedFile['download_pending'])) {
+                $attachments[] = $downloadedFile;
+                Logger::quepasa("processWebhook - 📋 Attachment placeholder (download pendente): " . ($downloadedFile['filename'] ?? 'sem nome'));
+            } elseif ($mediaUrl) {
                 try {
                     // Se o arquivo já foi baixado via API, criar attachment diretamente
                     if (isset($downloadedFile) && !empty($downloadedFile['local_path'])) {
@@ -4023,71 +4057,66 @@ class WhatsAppService
                     ];
                     
                     $vcardDownloaded = false;
-                    $vcardMaxRetries = 2;
                     
-                    for ($vcardRetry = 0; $vcardRetry < $vcardMaxRetries && !$vcardDownloaded; $vcardRetry++) {
-                        if ($vcardRetry > 0) {
-                            $waitTime = 3 * $vcardRetry;
-                            Logger::quepasa("processWebhook - 📇 ⏳ Aguardando {$waitTime}s antes da tentativa " . ($vcardRetry + 1) . "...");
-                            sleep($waitTime);
+                    foreach ($endpoints as $endpoint) {
+                        $downloadUrl = $apiUrl . $endpoint;
+                        Logger::quepasa("processWebhook - 📇 Tentando baixar vCard: {$downloadUrl}");
+                        
+                        $ch = curl_init($downloadUrl);
+                        curl_setopt_array($ch, [
+                            CURLOPT_RETURNTRANSFER => true,
+                            CURLOPT_CONNECTTIMEOUT => 3,
+                            CURLOPT_TIMEOUT => 7,
+                            CURLOPT_HTTPHEADER => $vcardCurlHeaders,
+                            CURLOPT_FOLLOWLOCATION => true,
+                            CURLOPT_SSL_VERIFYPEER => false,
+                            CURLOPT_SSL_VERIFYHOST => false
+                        ]);
+                        
+                        $vcardRaw = curl_exec($ch);
+                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                        curl_close($ch);
+                        
+                        $vcardLen = strlen($vcardRaw ?? '');
+                        Logger::quepasa("processWebhook - 📇 Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$vcardLen} bytes");
+                        
+                        if ($httpCode !== 200 && $vcardRaw && $vcardLen < 2000) {
+                            Logger::quepasa("processWebhook - 📇 Resposta de erro: " . $vcardRaw);
+                            if (strpos($vcardRaw, 'failed to download') !== false || strpos($vcardRaw, 'connection reset') !== false) {
+                                Logger::quepasa("processWebhook - 📇 ⚠️ Erro do WhatsApp CDN, abortando tentativas de download");
+                                break;
+                            }
                         }
                         
-                        foreach ($endpoints as $endpoint) {
-                            $downloadUrl = $apiUrl . $endpoint;
-                            Logger::quepasa("processWebhook - 📇 Tentando baixar vCard (tentativa " . ($vcardRetry + 1) . "): {$downloadUrl}");
+                        if ($httpCode === 200 && $vcardRaw && $vcardLen > 10) {
+                            $isJson = @json_decode($vcardRaw);
                             
-                            $ch = curl_init($downloadUrl);
-                            curl_setopt_array($ch, [
-                                CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_CONNECTTIMEOUT => 5,
-                                CURLOPT_TIMEOUT => 15,
-                                CURLOPT_HTTPHEADER => $vcardCurlHeaders,
-                                CURLOPT_FOLLOWLOCATION => true,
-                                CURLOPT_SSL_VERIFYPEER => false,
-                                CURLOPT_SSL_VERIFYHOST => false
-                            ]);
-                            
-                            $vcardRaw = curl_exec($ch);
-                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-                            curl_close($ch);
-                            
-                            $vcardLen = strlen($vcardRaw ?? '');
-                            Logger::quepasa("processWebhook - 📇 Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$vcardLen} bytes");
-                            
-                            if ($httpCode !== 200 && $vcardRaw && $vcardLen < 2000) {
-                                Logger::quepasa("processWebhook - 📇 Resposta de erro: " . $vcardRaw);
-                            }
-                            
-                            if ($httpCode === 200 && $vcardRaw && $vcardLen > 10) {
-                                $isJson = @json_decode($vcardRaw);
-                                
-                                if (strpos($vcardRaw, 'BEGIN:VCARD') !== false) {
-                                    Logger::quepasa("processWebhook - ✅ vCard baixado com sucesso: {$vcardLen} bytes (tentativa " . ($vcardRetry + 1) . ")");
-                                    $vcardData = self::parseVCardContent($vcardRaw, $message);
+                            if (strpos($vcardRaw, 'BEGIN:VCARD') !== false) {
+                                Logger::quepasa("processWebhook - ✅ vCard baixado com sucesso: {$vcardLen} bytes");
+                                $vcardData = self::parseVCardContent($vcardRaw, $message);
+                                $vcardDownloaded = true;
+                                break;
+                            } elseif ($isJson === null && (
+                                strpos($contentType, 'text') !== false ||
+                                strpos($contentType, 'vcard') !== false ||
+                                strpos($contentType, 'octet-stream') !== false ||
+                                empty($contentType)
+                            )) {
+                                $decoded = base64_decode($vcardRaw, true);
+                                if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
+                                    Logger::quepasa("processWebhook - ✅ vCard (base64) baixado com sucesso");
+                                    $vcardData = self::parseVCardContent($decoded, $message);
                                     $vcardDownloaded = true;
                                     break;
-                                } elseif ($isJson === null && (
-                                    strpos($contentType, 'text') !== false ||
-                                    strpos($contentType, 'vcard') !== false ||
-                                    strpos($contentType, 'octet-stream') !== false ||
-                                    empty($contentType)
-                                )) {
-                                    $decoded = base64_decode($vcardRaw, true);
-                                    if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
-                                        Logger::quepasa("processWebhook - ✅ vCard (base64) baixado com sucesso");
-                                        $vcardData = self::parseVCardContent($decoded, $message);
-                                        $vcardDownloaded = true;
-                                        break;
-                                    }
-                                    Logger::quepasa("processWebhook - ⚠️ Conteúdo baixado não parece ser vCard: " . substr($vcardRaw, 0, 200));
                                 }
+                                Logger::quepasa("processWebhook - ⚠️ Conteúdo baixado não parece ser vCard: " . substr($vcardRaw, 0, 200));
                             }
                         }
                     }
                     
                     if (!$vcardDownloaded) {
-                        Logger::quepasa("processWebhook - ⚠️ Não foi possível baixar o vCard via API ({$vcardMaxRetries} tentativas)");
+                        Logger::quepasa("processWebhook - ⚠️ Não foi possível baixar o vCard via API");
                     }
                 }
                 
@@ -4180,6 +4209,17 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
                 
+                // Se havia download pendente, enfileirar agora com o messageId correto
+                if (isset($pendingQueuePayload) && $messageId) {
+                    try {
+                        $pendingQueuePayload['message_id'] = $messageId;
+                        $pendingQueuePayload['conversation_id'] = $conversation['id'] ?? null;
+                        \App\Services\MediaQueueService::enqueueDownload($pendingQueuePayload);
+                    } catch (\Exception $queueEx) {
+                        Logger::quepasa("processWebhook - ⚠️ Erro ao enfileirar download: " . $queueEx->getMessage());
+                    }
+                }
+                
                 // Se foi uma nova conversa, executar automações AGORA (após mensagem estar salva)
                 Logger::quepasa("🔍 DEBUG: Verificando se deve executar automações... isNewConversation=" . ($isNewConversation ? 'TRUE' : 'FALSE'));
                 if ($isNewConversation) {
@@ -4227,6 +4267,17 @@ class WhatsAppService
                 }
                 
                 $messageId = \App\Models\Message::createMessage($messageData);
+                
+                // Se havia download pendente, enfileirar agora (fallback path)
+                if (isset($pendingQueuePayload) && $messageId) {
+                    try {
+                        $pendingQueuePayload['message_id'] = $messageId;
+                        $pendingQueuePayload['conversation_id'] = $conversation['id'] ?? null;
+                        \App\Services\MediaQueueService::enqueueDownload($pendingQueuePayload);
+                    } catch (\Exception $queueEx) {
+                        Logger::quepasa("processWebhook - ⚠️ Erro ao enfileirar download (fallback): " . $queueEx->getMessage());
+                    }
+                }
                 
                 // Disparar automações manualmente (fallback)
                 try {

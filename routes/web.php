@@ -116,6 +116,12 @@ Router::get('/conversations/{id}/timeline', [ConversationController::class, 'get
 Router::get('/conversations/{id}/sentiment', [ConversationController::class, 'getSentiment'], ['Authentication']);
 Router::get('/conversations/{id}/performance', [ConversationController::class, 'getPerformance'], ['Authentication']);
 
+// Rotas de Fila de Mídia (Media Queue)
+Router::get('/conversations/{id}/media-queue', [ConversationController::class, 'getMediaQueue'], ['Authentication']);
+Router::post('/media-queue/{id}/retry', [ConversationController::class, 'retryMediaQueue'], ['Authentication']);
+Router::post('/media-queue/{id}/cancel', [ConversationController::class, 'cancelMediaQueue'], ['Authentication']);
+Router::get('/media-queue/stats', [ConversationController::class, 'getMediaQueueStats'], ['Authentication']);
+
 // Rotas de Coaching em Tempo Real
 Router::get('/coaching/pending-hints', [RealtimeCoachingController::class, 'getPendingHints'], ['Authentication']); // Polling
 Router::get('/coaching/stats', [RealtimeCoachingController::class, 'getStats'], ['Authentication']); // Estatísticas

@@ -15,6 +15,45 @@ $hideRightSidebar = true; // Esconder sidebar padrão do Metronic (vamos usar no
 function renderAttachment($attachment) {
     $type = $attachment['type'] ?? 'document';
     
+    // Renderizar download pendente (na fila)
+    if (!empty($attachment['download_pending'])) {
+        $filename = htmlspecialchars($attachment['filename'] ?? 'Arquivo');
+        $queueStatus = $attachment['queue_status'] ?? 'queued';
+        $statusLabel = match($queueStatus) {
+            'queued' => 'Na fila',
+            'processing' => 'Baixando...',
+            'failed' => 'Falhou',
+            default => 'Pendente'
+        };
+        $statusIcon = match($queueStatus) {
+            'queued' => '<i class="ki-outline ki-time fs-3 me-2 text-warning"></i>',
+            'processing' => '<span class="spinner-border spinner-border-sm me-2 text-primary"></span>',
+            'failed' => '<i class="ki-outline ki-cross-circle fs-3 me-2 text-danger"></i>',
+            default => '<i class="ki-outline ki-time fs-3 me-2 text-muted"></i>'
+        };
+        $statusClass = match($queueStatus) {
+            'queued' => 'border-warning',
+            'processing' => 'border-primary',
+            'failed' => 'border-danger',
+            default => 'border-secondary'
+        };
+        
+        $html = '<div class="attachment-item mb-2 media-queue-item" data-queue-status="' . $queueStatus . '">';
+        $html .= '<div class="d-flex align-items-center gap-2 p-3 border rounded ' . $statusClass . '" style="background: rgba(255,255,255,0.03); max-width: 350px; border-left-width: 3px !important;">';
+        $html .= $statusIcon;
+        $html .= '<div class="flex-grow-1 min-w-0">';
+        $html .= '<div class="text-truncate fw-semibold" style="font-size: 0.85rem;">' . $filename . '</div>';
+        $html .= '<div class="text-muted" style="font-size: 0.75rem;">';
+        $html .= '<span class="badge badge-sm badge-light-' . ($queueStatus === 'failed' ? 'danger' : ($queueStatus === 'processing' ? 'primary' : 'warning')) . '">' . $statusLabel . '</span>';
+        if (!empty($attachment['size'])) {
+            $sizeFormatted = number_format(($attachment['size'] / 1024), 1) . ' KB';
+            if ($attachment['size'] > 1048576) $sizeFormatted = number_format(($attachment['size'] / 1048576), 1) . ' MB';
+            $html .= ' &middot; ' . $sizeFormatted;
+        }
+        $html .= '</div></div></div></div>';
+        return $html;
+    }
+    
     // Renderizar contato compartilhado (vCard)
     if ($type === 'contact') {
         $displayName = htmlspecialchars($attachment['display_name'] ?? 'Contato');
@@ -18185,6 +18224,35 @@ function renderAttachmentHtml(attachment) {
     const type = attachment.type || 'document';
     const mimeType = attachment.mime_type || attachment.mimetype || '';
     
+    // Renderizar download pendente (na fila)
+    if (attachment.download_pending) {
+        const filename = escapeHtml(attachment.filename || 'Arquivo');
+        const qs = attachment.queue_status || 'queued';
+        const labels = {queued: 'Na fila', processing: 'Baixando...', failed: 'Falhou'};
+        const icons = {
+            queued: '<i class="ki-outline ki-time fs-3 me-2 text-warning"></i>',
+            processing: '<span class="spinner-border spinner-border-sm me-2 text-primary"></span>',
+            failed: '<i class="ki-outline ki-cross-circle fs-3 me-2 text-danger"></i>'
+        };
+        const borderCls = {queued: 'border-warning', processing: 'border-primary', failed: 'border-danger'};
+        const badgeCls = {queued: 'light-warning', processing: 'light-primary', failed: 'light-danger'};
+        let sizeStr = '';
+        if (attachment.size) {
+            sizeStr = attachment.size > 1048576
+                ? ' &middot; ' + (attachment.size/1048576).toFixed(1) + ' MB'
+                : ' &middot; ' + (attachment.size/1024).toFixed(1) + ' KB';
+        }
+        return `<div class="attachment-item mb-2 media-queue-item" data-queue-status="${qs}">
+            <div class="d-flex align-items-center gap-2 p-3 border rounded ${borderCls[qs]||'border-secondary'}" style="background:rgba(255,255,255,0.03);max-width:350px;border-left-width:3px!important">
+            ${icons[qs]||icons.queued}
+            <div class="flex-grow-1 min-w-0">
+                <div class="text-truncate fw-semibold" style="font-size:0.85rem">${filename}</div>
+                <div class="text-muted" style="font-size:0.75rem">
+                    <span class="badge badge-sm badge-${badgeCls[qs]||'light-warning'}">${labels[qs]||'Pendente'}</span>${sizeStr}
+                </div>
+            </div></div></div>`;
+    }
+    
     // Renderizar contato compartilhado (vCard)
     if (type === 'contact') {
         const displayName = escapeHtml(attachment.display_name || 'Contato');
@@ -23527,6 +23595,99 @@ document.addEventListener('DOMContentLoaded', function() {
 <link rel="stylesheet" href="/assets/css/mockup-editor.css">
 <script src="/assets/js/mockup-wizard.js"></script>
 <script src="/assets/js/mockup-canvas-editor.js"></script>
+
+<!-- Media Queue Polling -->
+<script>
+(function() {
+    let _mqInterval = null;
+    let _mqConversationId = null;
+
+    window._mediaQueuePoll = function(conversationId) {
+        if (_mqInterval) clearInterval(_mqInterval);
+        _mqConversationId = conversationId;
+        if (!conversationId) return;
+
+        checkMediaQueue(conversationId);
+        _mqInterval = setInterval(() => {
+            if (window.currentConversationId != _mqConversationId) {
+                clearInterval(_mqInterval);
+                _mqInterval = null;
+                return;
+            }
+            checkMediaQueue(_mqConversationId);
+        }, 15000);
+    };
+
+    async function checkMediaQueue(conversationId) {
+        try {
+            const resp = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/media-queue`);
+            const json = await resp.json();
+            if (!json.success) return;
+
+            const items = json.data.pending_items || [];
+            updateMediaQueueBanner(items, json.data.global_stats);
+            updateMediaQueueAttachments(items);
+        } catch (e) {
+            // silencioso
+        }
+    }
+
+    function updateMediaQueueBanner(items, stats) {
+        let banner = document.getElementById('media-queue-banner');
+        const queuedCount = items.filter(i => i.status === 'queued').length;
+        const processingCount = items.filter(i => i.status === 'processing').length;
+        const failedCount = items.filter(i => i.status === 'failed').length;
+
+        if (queuedCount === 0 && processingCount === 0 && failedCount === 0) {
+            if (banner) banner.remove();
+            return;
+        }
+
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'media-queue-banner';
+            banner.style.cssText = 'padding:8px 16px;font-size:0.8rem;border-bottom:1px solid var(--bs-border-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+            const chatContainer = document.getElementById('messages-container');
+            if (chatContainer) chatContainer.parentNode.insertBefore(banner, chatContainer);
+        }
+
+        let html = '';
+        if (processingCount > 0) {
+            html += `<span class="badge badge-light-primary"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px"></span>Baixando ${processingCount} arquivo${processingCount>1?'s':''}</span>`;
+        }
+        if (queuedCount > 0) {
+            html += `<span class="badge badge-light-warning"><i class="ki-outline ki-time fs-7 me-1"></i>${queuedCount} na fila</span>`;
+        }
+        if (failedCount > 0) {
+            html += `<span class="badge badge-light-danger"><i class="ki-outline ki-cross-circle fs-7 me-1"></i>${failedCount} falhou</span>`;
+        }
+        if ((stats.queued||0) > 0 || (stats.processing||0) > 0) {
+            html += `<span class="text-muted ms-auto" style="font-size:0.7rem">Fila global: ${stats.queued||0} pendentes</span>`;
+        }
+        banner.innerHTML = html;
+    }
+
+    function updateMediaQueueAttachments(items) {
+        if (!items.length) return;
+
+        items.forEach(item => {
+            const queueItems = document.querySelectorAll('.media-queue-item');
+            queueItems.forEach(el => {
+                const currentStatus = el.dataset.queueStatus;
+                if (item.status === 'completed' && currentStatus !== 'completed') {
+                    // Recarregar a mensagem para mostrar o arquivo baixado
+                    location.reload();
+                }
+            });
+        });
+    }
+
+    document.addEventListener('conversation:opened', function(e) {
+        const cid = e.detail?.conversationId || e.detail?.id;
+        if (cid) window._mediaQueuePoll(cid);
+    });
+})();
+</script>
 
 <?php $content = ob_get_clean(); ?>
 

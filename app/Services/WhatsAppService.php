@@ -2676,32 +2676,35 @@ class WhatsAppService
                     ];
                     
                     // Endpoints válidos do QuePasa (fonte: código-fonte Go do QuePasa)
-                    // O endpoint /download aceita {messageid} no path OU ?messageid= como query param
-                    // O parâmetro cache=true faz o QuePasa usar o cache interno (mais confiável)
+                    // Erro "unexpected EOF" = WhatsApp CDN cortou conexão. Retry com delay resolve.
                     $endpoints = [
                         "/download/{$messageIdOnly}?cache=true",
-                        "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
                         "/download/{$messageIdOnly}",
+                        "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
                     ];
                     
-                    // Adicionar endpoints com wid completo apenas se diferente do messageIdOnly
                     if ($messageWid !== $messageIdOnly) {
                         $endpoints[] = "/download/{$messageWid}?cache=true";
-                        $endpoints[] = "/download?messageid=" . urlencode($messageWid) . "&cache=true";
                     }
                     
                     $downloaded = false;
-                    $maxRetries = 2;
-                    $retryDelaySeconds = 2;
+                    $maxRetries = 4;
+                    $retryDelays = [0, 3, 8, 15];
                     
                     for ($retry = 0; $retry < $maxRetries && !$downloaded; $retry++) {
-                        if ($retry > 0) {
-                            $waitTime = $retryDelaySeconds * $retry;
-                            Logger::quepasa("processWebhook - ⏳ Aguardando {$waitTime}s antes da tentativa " . ($retry + 1) . "/{$maxRetries}...");
+                        if ($retryDelays[$retry] > 0) {
+                            $waitTime = $retryDelays[$retry];
+                            Logger::quepasa("processWebhook - ⏳ Aguardando {$waitTime}s antes da tentativa " . ($retry + 1) . "/{$maxRetries} (esperando WhatsApp CDN)...");
                             sleep($waitTime);
                         }
                         
+                        $isWhatsAppCdnError = false;
+                        
                         foreach ($endpoints as $endpoint) {
+                            if ($isWhatsAppCdnError) {
+                                break; // Erro do WhatsApp CDN, pular para próximo retry com delay
+                            }
+                            
                             $downloadUrl = $apiUrl . $endpoint;
                             Logger::quepasa("processWebhook - Tentando endpoint (tentativa " . ($retry + 1) . "): {$downloadUrl}");
                             
@@ -2725,9 +2728,17 @@ class WhatsAppService
                             $dataLen = $mediaData ? strlen($mediaData) : 0;
                             Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$dataLen} bytes" . ($curlError ? ", cURL error: {$curlError}" : ''));
                             
-                            // Logar corpo da resposta de erro para diagnóstico
                             if ($httpCode !== 200 && $mediaData && $dataLen < 2000) {
                                 Logger::quepasa("processWebhook - Resposta de erro: " . $mediaData);
+                                
+                                // Detectar erros do WhatsApp CDN (não adianta tentar outro endpoint)
+                                if (strpos($mediaData, 'unexpected EOF') !== false 
+                                    || strpos($mediaData, 'connection reset') !== false
+                                    || strpos($mediaData, 'i/o timeout') !== false
+                                    || strpos($mediaData, 'failed to download') !== false) {
+                                    $isWhatsAppCdnError = true;
+                                    Logger::quepasa("processWebhook - ⚠️ Erro do WhatsApp CDN detectado, pulando para próximo retry com delay");
+                                }
                             }
                             
                             if ($httpCode === 200 && $mediaData && $dataLen > 100) {

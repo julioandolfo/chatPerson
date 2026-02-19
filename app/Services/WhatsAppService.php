@@ -1891,11 +1891,13 @@ class WhatsAppService
             $lastError = null;
             $lastHttpCode = 0;
             $lastResponse = '';
+            $isCdnError = false;
             
             for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
                 if ($attempt > 1) {
-                    $waitSeconds = $attempt * 2; // 4s, 6s
-                    Logger::quepasa("sendMessage - 🔄 Retry {$attempt}/{$maxRetries} após aguardar {$waitSeconds}s...");
+                    // Espera maior para erros de CDN (connection reset)
+                    $waitSeconds = $isCdnError ? ($attempt * 5) : ($attempt * 2);
+                    Logger::quepasa("sendMessage - 🔄 Retry {$attempt}/{$maxRetries} após aguardar {$waitSeconds}s" . ($isCdnError ? ' (CDN error)' : '') . "...");
                     sleep($waitSeconds);
                 }
                 
@@ -1980,19 +1982,67 @@ class WhatsAppService
                 // Erro HTTP - verificar se é transitório e pode ser retentado
                 $isTransient = self::isTransientError($httpCode, $response ?? '');
                 
-                Logger::quepasa("sendMessage - HTTP Error {$httpCode} (transitório: " . ($isTransient ? 'SIM' : 'NÃO') . ")");
+                // Detectar erro CDN do WhatsApp para ajustar estratégia de retry
+                $respLower = strtolower($response ?? '');
+                $isCdnError = (strpos($respLower, 'connection reset') !== false
+                    || strpos($respLower, 'unexpected eof') !== false
+                    || strpos($respLower, 'failed to download') !== false
+                    || strpos($respLower, 'failed to execute request') !== false);
+                
+                Logger::quepasa("sendMessage - HTTP Error {$httpCode} (transitório: " . ($isTransient ? 'SIM' : 'NÃO') . ", CDN: " . ($isCdnError ? 'SIM' : 'NÃO') . ")");
                 
                 $lastHttpCode = $httpCode;
                 $lastResponse = $response ?? '';
                 
                 if (!$isTransient || $attempt >= $maxRetries) {
-                    break; // Erro não-transitório ou esgotou tentativas
+                    break;
                 }
                 
                 Logger::quepasa("sendMessage - Erro transitório detectado, tentando novamente...");
             }
             
-            // Esgotou todas as tentativas
+            // Esgotou todas as tentativas — verificar se é erro CDN para enfileirar
+            $finalError = $lastError ?: "HTTP {$lastHttpCode}: {$lastResponse}";
+            $finalRespLower = strtolower($lastResponse . ' ' . ($lastError ?? ''));
+            $isFinalCdnError = (strpos($finalRespLower, 'connection reset') !== false
+                || strpos($finalRespLower, 'unexpected eof') !== false
+                || strpos($finalRespLower, 'failed to execute request') !== false);
+            
+            if ($isFinalCdnError) {
+                Logger::quepasa("sendMessage - 📋 Erro CDN persistente, enfileirando envio para retry posterior...");
+                try {
+                    MediaQueueService::enqueueDownload([
+                        'account_id'          => $accountId,
+                        'external_message_id' => 'send_' . ($conversationId ?? 0) . '_' . time(),
+                        'media_type'          => $payload['type'] ?? 'document',
+                        'direction'           => 'upload',
+                        'priority'            => 3,
+                        'api_url'             => $url,
+                        'token'               => $account['quepasa_token'] ?? '',
+                        'trackid'             => $account['quepasa_trackid'] ?? $account['name'],
+                        'message_id_only'     => $to,
+                        'message_wid'         => $to,
+                        'filename'            => $payload['fileName'] ?? $payload['filename'] ?? null,
+                        'mimetype'            => $payload['mime_type'] ?? null,
+                        'conversation_id'     => $conversationId ?? null,
+                        'attachment_meta'     => [
+                            'send_url'     => $url,
+                            'send_headers' => $headers,
+                            'send_payload' => $payload,
+                        ],
+                    ]);
+                    
+                    return [
+                        'success' => true,
+                        'message_id' => null,
+                        'status' => 'queued',
+                        'warning' => 'Erro CDN do WhatsApp. Envio adicionado à fila e será retentado automaticamente.'
+                    ];
+                } catch (\Exception $queueEx) {
+                    Logger::quepasa("sendMessage - ⚠️ Falha ao enfileirar: " . $queueEx->getMessage());
+                }
+            }
+            
             if ($lastError) {
                 Logger::error("WhatsApp sendMessage Error após {$maxRetries} tentativas: {$lastError}");
                 throw new \Exception("Erro ao enviar mensagem: {$lastError}");

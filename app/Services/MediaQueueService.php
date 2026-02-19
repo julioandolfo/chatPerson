@@ -123,18 +123,24 @@ class MediaQueueService
         usleep(self::$rateLimitMs * 1000);
 
         try {
-            $result = self::executeDownload($item);
+            $result = ($item['direction'] === 'upload') 
+                ? self::executeUpload($item) 
+                : self::executeDownload($item);
             $stats['processed']++;
 
             if ($result['success']) {
                 MediaQueue::markCompleted($item['id'], $result);
-                self::updateMessageWithDownload($item, $result);
+                if ($item['direction'] === 'download') {
+                    self::updateMessageWithDownload($item, $result);
+                    Logger::quepasa("MediaQueue - ✅ Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
+                } else {
+                    Logger::quepasa("MediaQueue - ✅ Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
+                }
                 $stats['success']++;
-                Logger::quepasa("MediaQueue - ✅ Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
             } else {
                 MediaQueue::markFailed($item['id'], $result['error'], $item['attempts'], $item['max_attempts']);
                 $stats['errors']++;
-                Logger::quepasa("MediaQueue - ❌ Download falhou: #{$item['id']} → {$result['error']}");
+                Logger::quepasa("MediaQueue - ❌ " . ($item['direction'] === 'upload' ? 'Upload' : 'Download') . " falhou: #{$item['id']} → {$result['error']}");
             }
         } catch (\Exception $e) {
             MediaQueue::markFailed($item['id'], $e->getMessage(), $item['attempts'], $item['max_attempts']);
@@ -218,6 +224,79 @@ class MediaQueueService
         }
 
         return ['success' => false, 'error' => 'Todos os endpoints falharam'];
+    }
+
+    /**
+     * Re-executar envio de mídia que falhou por erro CDN
+     */
+    private static function executeUpload(array $item): array
+    {
+        $payload = $item['payload'];
+        $meta = $payload['attachment_meta'] ?? [];
+        
+        $sendUrl = $meta['send_url'] ?? $payload['api_url'] ?? null;
+        $sendHeaders = $meta['send_headers'] ?? [];
+        $sendPayload = $meta['send_payload'] ?? [];
+        
+        if (empty($sendUrl) || empty($sendPayload)) {
+            return ['success' => false, 'error' => 'Dados de envio incompletos (url ou payload ausente)'];
+        }
+        
+        // Reconstruir headers se vieram como array associativo
+        if (!empty($sendHeaders) && !is_int(array_key_first($sendHeaders))) {
+            $headerLines = [];
+            foreach ($sendHeaders as $key => $value) {
+                $headerLines[] = "{$key}: {$value}";
+            }
+            $sendHeaders = $headerLines;
+        }
+        
+        $jsonPayload = json_encode($sendPayload);
+        Logger::quepasa("MediaQueue - 📤 Upload retry: url={$sendUrl}, payload_size=" . strlen($jsonPayload));
+        
+        $ch = curl_init($sendUrl);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $jsonPayload,
+            CURLOPT_HTTPHEADER     => array_merge($sendHeaders, ['Content-Type: application/json']),
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        Logger::quepasa("MediaQueue - 📤 Upload response: HTTP {$httpCode}, size=" . strlen($response ?? ''));
+        
+        if ($curlError) {
+            return ['success' => false, 'error' => "cURL error: {$curlError}"];
+        }
+        
+        if ($httpCode === 200 || $httpCode === 201) {
+            $data = json_decode($response, true);
+            return [
+                'success'    => true,
+                'message_id' => $data['id'] ?? $data['message_id'] ?? ($data['message']['id'] ?? null),
+                'status'     => 'sent',
+            ];
+        }
+        
+        // Verificar se ainda é erro CDN
+        $respLower = strtolower($response ?? '');
+        $errMsg = "HTTP {$httpCode}: " . substr($response ?? '', 0, 300);
+        
+        if (strpos($respLower, 'connection reset') !== false 
+            || strpos($respLower, 'unexpected eof') !== false) {
+            $errMsg = "CDN error (retry): " . substr($response ?? '', 0, 200);
+        }
+        
+        return ['success' => false, 'error' => $errMsg];
     }
 
     /**

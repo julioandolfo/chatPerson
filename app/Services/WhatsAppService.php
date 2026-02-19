@@ -2681,15 +2681,18 @@ class WhatsAppService
                     $endpoints = [
                         "/download/{$messageIdOnly}?cache=true",
                         "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
-                        "/download/{$messageWid}?cache=true",
-                        "/download?messageid=" . urlencode($messageWid) . "&cache=true",
                         "/download/{$messageIdOnly}",
-                        "/download/{$messageWid}",
                     ];
                     
+                    // Adicionar endpoints com wid completo apenas se diferente do messageIdOnly
+                    if ($messageWid !== $messageIdOnly) {
+                        $endpoints[] = "/download/{$messageWid}?cache=true";
+                        $endpoints[] = "/download?messageid=" . urlencode($messageWid) . "&cache=true";
+                    }
+                    
                     $downloaded = false;
-                    $maxRetries = 3;
-                    $retryDelaySeconds = 3;
+                    $maxRetries = 2;
+                    $retryDelaySeconds = 2;
                     
                     for ($retry = 0; $retry < $maxRetries && !$downloaded; $retry++) {
                         if ($retry > 0) {
@@ -2705,7 +2708,8 @@ class WhatsAppService
                             $ch = curl_init($downloadUrl);
                             curl_setopt_array($ch, [
                                 CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_TIMEOUT => 120,
+                                CURLOPT_CONNECTTIMEOUT => 5,
+                                CURLOPT_TIMEOUT => 15,
                                 CURLOPT_HTTPHEADER => $curlHeaders,
                                 CURLOPT_FOLLOWLOCATION => true,
                                 CURLOPT_SSL_VERIFYPEER => false,
@@ -2822,6 +2826,14 @@ class WhatsAppService
                     
                     if (!$downloaded) {
                         Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType}. Tentativas: " . ($maxRetries * count($endpoints)) . " (endpoints: " . count($endpoints) . " × retries: {$maxRetries})");
+                        
+                        // Fallback: salvar a mensagem com o nome do arquivo como texto
+                        // para não descartar a mensagem silenciosamente
+                        $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
+                        if (!empty($originalFilename) && empty($message)) {
+                            $message = $originalFilename;
+                            Logger::quepasa("processWebhook - ⚠️ Usando filename como texto da mensagem (fallback): {$message}");
+                        }
                     }
                 } catch (\Exception $e) {
                     Logger::quepasa("processWebhook - Erro ao baixar {$messageType}: " . $e->getMessage());
@@ -3986,11 +3998,12 @@ class WhatsAppService
                     $endpoints = [
                         "/download/{$messageIdOnly}?cache=true",
                         "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
-                        "/download/{$messageWid}?cache=true",
-                        "/download?messageid=" . urlencode($messageWid) . "&cache=true",
                         "/download/{$messageIdOnly}",
-                        "/download/{$messageWid}",
                     ];
+                    if ($messageWid !== $messageIdOnly) {
+                        $endpoints[] = "/download/{$messageWid}?cache=true";
+                        $endpoints[] = "/download?messageid=" . urlencode($messageWid) . "&cache=true";
+                    }
                     
                     $vcardCurlHeaders = [
                         'Accept: */*',
@@ -3999,7 +4012,7 @@ class WhatsAppService
                     ];
                     
                     $vcardDownloaded = false;
-                    $vcardMaxRetries = 3;
+                    $vcardMaxRetries = 2;
                     
                     for ($vcardRetry = 0; $vcardRetry < $vcardMaxRetries && !$vcardDownloaded; $vcardRetry++) {
                         if ($vcardRetry > 0) {
@@ -4015,7 +4028,8 @@ class WhatsAppService
                             $ch = curl_init($downloadUrl);
                             curl_setopt_array($ch, [
                                 CURLOPT_RETURNTRANSFER => true,
-                                CURLOPT_TIMEOUT => 30,
+                                CURLOPT_CONNECTTIMEOUT => 5,
+                                CURLOPT_TIMEOUT => 15,
                                 CURLOPT_HTTPHEADER => $vcardCurlHeaders,
                                 CURLOPT_FOLLOWLOCATION => true,
                                 CURLOPT_SSL_VERIFYPEER => false,

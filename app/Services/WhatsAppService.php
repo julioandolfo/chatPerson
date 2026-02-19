@@ -1602,7 +1602,7 @@ class WhatsAppService
                                 $payload['url'] = str_starts_with($mediaUrl, 'http://') 
                                     ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
                                     : $mediaUrl;
-                                $payload['fileName'] = $mediaName ?: 'audio.mp3';
+                                $payload['filename'] = $mediaName ?: 'audio.mp3';
                                 $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
                                 
                                 Logger::quepasa("sendMessage - Usando URL como fallback (arquivo grande)");
@@ -1635,10 +1635,10 @@ class WhatsAppService
                                 // ✅ Usar campo 'content' com data URI (recomendado pela API Quepasa)
                                 $contentMime = $finalMime ?: 'audio/mpeg';
                                 $payload['content'] = "data:{$contentMime};base64,{$audioBase64}";
-                                $payload['type'] = 'audio';
+                                $payload['mime'] = $contentMime;
                                 $payload['ptt'] = true;
                                 $payload['voice'] = true;
-                                $payload['fileName'] = $finalFileName;
+                                $payload['filename'] = $finalFileName;
                                 
                                 // Enviar sem texto quando não há legenda
                                 if ($captionTrim !== '') {
@@ -1671,7 +1671,7 @@ class WhatsAppService
                             $payload['url'] = str_starts_with($mediaUrl, 'http://') 
                                 ? preg_replace('/^http:/i', 'https:', $mediaUrl) 
                                 : $mediaUrl;
-                            $payload['fileName'] = $mediaName ?: 'audio.mp3';
+                            $payload['filename'] = $mediaName ?: 'audio.mp3';
                             $payload['text'] = $captionTrim !== '' ? $captionTrim : ' ';
                             
                             Logger::quepasa("sendMessage - Usando URL como fallback (arquivo não encontrado localmente)");
@@ -1798,14 +1798,19 @@ class WhatsAppService
                                     $fileBase64 = base64_encode($fileContent);
                                     
                                     $payload['content'] = "data:{$contentMime};base64,{$fileBase64}";
-                                    $payload['type'] = $mediaType; // image, video, document
+                                    $payload['mime'] = $contentMime;
                                     
                                     if (!empty($mediaName)) {
-                                        $payload['fileName'] = $mediaName;
+                                        $payload['filename'] = $mediaName;
                                     }
                                     
+                                    // Para documentos: NÃO enviar text vazio/espaço
+                                    // O QuePasa trata text+attachment como mensagem composta,
+                                    // o que pode causar falha no upload ao CDN do WhatsApp
                                     if ($captionTrim !== '') {
                                         $payload['text'] = $captionTrim;
+                                    } elseif ($mediaType === 'document') {
+                                        unset($payload['text']);
                                     } elseif ($mediaType !== 'video') {
                                         $payload['text'] = ' ';
                                     } else {
@@ -1815,9 +1820,8 @@ class WhatsAppService
                                     $sentViaBase64 = true;
                                     
                                     Logger::quepasa("sendMessage - ✅ Payload {$mediaType} configurado via BASE64:");
-                                    Logger::quepasa("sendMessage -   type: {$mediaType}");
                                     Logger::quepasa("sendMessage -   mime: {$contentMime}");
-                                    Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
+                                    Logger::quepasa("sendMessage -   filename: " . ($payload['filename'] ?? 'NULL'));
                                     Logger::quepasa("sendMessage -   tamanho original: {$fileSize} bytes");
                                     Logger::quepasa("sendMessage -   tamanho base64: " . strlen($fileBase64) . " chars");
                                     
@@ -1838,14 +1842,16 @@ class WhatsAppService
                         // Fallback: usar URL (para arquivos muito grandes ou não encontrados localmente)
                         if (!$sentViaBase64) {
                             $payload['url'] = $options['media_url'];
-                            $payload['type'] = $mediaType; // image, video, document
+                            $payload['mime'] = $mediaMime ?? '';
                             
                             if (!empty($mediaName)) {
-                                $payload['fileName'] = $mediaName;
+                                $payload['filename'] = $mediaName;
                             }
                             
                             if ($captionTrim !== '') {
                                 $payload['text'] = $captionTrim;
+                            } elseif ($mediaType === 'document') {
+                                unset($payload['text']);
                             } elseif ($mediaType !== 'video') {
                                 $payload['text'] = ' ';
                             } else {
@@ -1856,7 +1862,7 @@ class WhatsAppService
                             Logger::quepasa("sendMessage -   url: {$payload['url']}");
                         }
                         
-                        Logger::quepasa("sendMessage -   fileName: " . ($payload['fileName'] ?? 'NULL'));
+                        Logger::quepasa("sendMessage -   filename: " . ($payload['filename'] ?? 'NULL'));
                         $payloadText = $payload['text'] ?? null;
                         $textPreview = $payloadText === null ? '(sem texto)' : ($payloadText === ' ' ? '(espaço)' : substr($payloadText, 0, 50));
                         Logger::quepasa("sendMessage -   text: '" . $textPreview . "'");
@@ -2014,7 +2020,7 @@ class WhatsAppService
                     MediaQueueService::enqueueDownload([
                         'account_id'          => $accountId,
                         'external_message_id' => 'send_' . ($conversationId ?? 0) . '_' . time(),
-                        'media_type'          => $payload['type'] ?? 'document',
+                        'media_type'          => $mediaType ?? 'document',
                         'direction'           => 'upload',
                         'priority'            => 3,
                         'api_url'             => $url,
@@ -2022,8 +2028,8 @@ class WhatsAppService
                         'trackid'             => $account['quepasa_trackid'] ?? $account['name'],
                         'message_id_only'     => $to,
                         'message_wid'         => $to,
-                        'filename'            => $payload['fileName'] ?? $payload['filename'] ?? null,
-                        'mimetype'            => $payload['mime_type'] ?? null,
+                        'filename'            => $payload['filename'] ?? null,
+                        'mimetype'            => $payload['mime'] ?? null,
                         'conversation_id'     => $conversationId ?? null,
                         'attachment_meta'     => [
                             'send_url'     => $url,

@@ -140,9 +140,10 @@ class MediaQueue extends Model
     {
         $db = Database::getInstance();
         $stmt = $db->prepare("
-            SELECT id, media_type, status, attempts, max_attempts, error_message, 
+            SELECT id, message_id, direction, media_type, status, attempts, max_attempts, error_message, 
                    created_at, next_attempt_at, external_message_id,
-                   JSON_UNQUOTE(JSON_EXTRACT(payload, '$.filename')) as filename
+                   JSON_UNQUOTE(JSON_EXTRACT(payload, '$.filename')) as filename,
+                   JSON_UNQUOTE(JSON_EXTRACT(payload, '$.mimetype')) as mimetype
             FROM media_queue 
             WHERE conversation_id = ? AND status IN ('queued', 'processing', 'failed')
             ORDER BY created_at DESC

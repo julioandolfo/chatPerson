@@ -19,38 +19,56 @@ function renderAttachment($attachment) {
     if (!empty($attachment['download_pending'])) {
         $filename = htmlspecialchars($attachment['filename'] ?? 'Arquivo');
         $queueStatus = $attachment['queue_status'] ?? 'queued';
-        $statusLabel = match($queueStatus) {
-            'queued' => 'Na fila',
-            'processing' => 'Baixando...',
-            'failed' => 'Falhou',
-            default => 'Pendente'
-        };
-        $statusIcon = match($queueStatus) {
-            'queued' => '<i class="ki-outline ki-time fs-3 me-2 text-warning"></i>',
-            'processing' => '<span class="spinner-border spinner-border-sm me-2 text-primary"></span>',
-            'failed' => '<i class="ki-outline ki-cross-circle fs-3 me-2 text-danger"></i>',
-            default => '<i class="ki-outline ki-time fs-3 me-2 text-muted"></i>'
-        };
-        $statusClass = match($queueStatus) {
-            'queued' => 'border-warning',
-            'processing' => 'border-primary',
-            'failed' => 'border-danger',
-            default => 'border-secondary'
+        $mime = $attachment['mimetype'] ?? $attachment['mime_type'] ?? '';
+        $isImage = strpos($mime, 'image') !== false || $type === 'image';
+        $isAudio = strpos($mime, 'audio') !== false || $type === 'audio';
+        $isVideo = strpos($mime, 'video') !== false || $type === 'video';
+        
+        $statusConf = match($queueStatus) {
+            'processing' => ['label' => 'Baixando...', 'color' => '#3b82f6', 'bg' => 'rgba(59,130,246,0.08)', 'border' => 'rgba(59,130,246,0.3)', 'spin' => true],
+            'failed'     => ['label' => 'Falhou - Retentando', 'color' => '#ef4444', 'bg' => 'rgba(239,68,68,0.08)', 'border' => 'rgba(239,68,68,0.3)', 'spin' => false],
+            default      => ['label' => 'Na fila...', 'color' => '#f59e0b', 'bg' => 'rgba(245,158,11,0.08)', 'border' => 'rgba(245,158,11,0.3)', 'spin' => true],
         };
         
-        $html = '<div class="attachment-item mb-2 media-queue-item" data-queue-status="' . $queueStatus . '">';
-        $html .= '<div class="d-flex align-items-center gap-2 p-3 border rounded ' . $statusClass . '" style="background: rgba(255,255,255,0.03); max-width: 350px; border-left-width: 3px !important;">';
-        $html .= $statusIcon;
-        $html .= '<div class="flex-grow-1 min-w-0">';
-        $html .= '<div class="text-truncate fw-semibold" style="font-size: 0.85rem;">' . $filename . '</div>';
-        $html .= '<div class="text-muted" style="font-size: 0.75rem;">';
-        $html .= '<span class="badge badge-sm badge-light-' . ($queueStatus === 'failed' ? 'danger' : ($queueStatus === 'processing' ? 'primary' : 'warning')) . '">' . $statusLabel . '</span>';
+        $iconSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="' . $statusConf['color'] . '" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>';
+        if ($isImage) $iconSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="' . $statusConf['color'] . '" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>';
+        elseif ($isAudio) $iconSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="' . $statusConf['color'] . '" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
+        elseif ($isVideo) $iconSvg = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="' . $statusConf['color'] . '" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>';
+
+        $sizeStr = '';
         if (!empty($attachment['size'])) {
-            $sizeFormatted = number_format(($attachment['size'] / 1024), 1) . ' KB';
-            if ($attachment['size'] > 1048576) $sizeFormatted = number_format(($attachment['size'] / 1048576), 1) . ' MB';
-            $html .= ' &middot; ' . $sizeFormatted;
+            $sizeStr = $attachment['size'] > 1048576 
+                ? number_format($attachment['size'] / 1048576, 1) . ' MB' 
+                : number_format($attachment['size'] / 1024, 1) . ' KB';
         }
+        
+        $spinner = $statusConf['spin'] 
+            ? '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border:2px solid transparent;border-top-color:' . $statusConf['color'] . ';border-radius:50%;animation:mqSpin 1s linear infinite"></div></div>'
+            : '';
+        
+        $html = '<div class="attachment-item mb-2 media-queue-item" data-queue-status="' . $queueStatus . '">';
+        $html .= '<div style="max-width:320px;border-radius:12px;overflow:hidden;border:1px solid ' . $statusConf['border'] . ';background:' . $statusConf['bg'] . '">';
+        
+        // Área do ícone com spinner
+        $html .= '<div style="position:relative;display:flex;align-items:center;justify-content:center;height:80px;background:rgba(0,0,0,0.03)">';
+        $html .= $spinner;
+        $html .= '<div style="position:relative;z-index:1;opacity:0.7">' . $iconSvg . '</div>';
+        $html .= '</div>';
+        
+        // Info
+        $html .= '<div style="padding:10px 14px">';
+        $html .= '<div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' . $filename . '</div>';
+        $html .= '<div style="display:flex;align-items:center;gap:6px;margin-top:4px">';
+        $html .= '<span style="display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;color:' . $statusConf['color'] . ';font-weight:500">';
+        if ($statusConf['spin']) {
+            $html .= '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' . $statusConf['color'] . ';animation:mqPulse 1.5s ease-in-out infinite"></span>';
+        } else {
+            $html .= '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 9v4m0 4h.01"/><circle cx="12" cy="12" r="10"/></svg>';
+        }
+        $html .= $statusConf['label'] . '</span>';
+        if ($sizeStr) $html .= '<span style="font-size:0.65rem;color:#888">' . $sizeStr . '</span>';
         $html .= '</div></div></div></div>';
+        
         return $html;
     }
     
@@ -18228,29 +18246,44 @@ function renderAttachmentHtml(attachment) {
     if (attachment.download_pending) {
         const filename = escapeHtml(attachment.filename || 'Arquivo');
         const qs = attachment.queue_status || 'queued';
-        const labels = {queued: 'Na fila', processing: 'Baixando...', failed: 'Falhou'};
-        const icons = {
-            queued: '<i class="ki-outline ki-time fs-3 me-2 text-warning"></i>',
-            processing: '<span class="spinner-border spinner-border-sm me-2 text-primary"></span>',
-            failed: '<i class="ki-outline ki-cross-circle fs-3 me-2 text-danger"></i>'
-        };
-        const borderCls = {queued: 'border-warning', processing: 'border-primary', failed: 'border-danger'};
-        const badgeCls = {queued: 'light-warning', processing: 'light-primary', failed: 'light-danger'};
+        const mime = attachment.mime_type || attachment.mimetype || '';
+        const isImage = mime.includes('image') || type === 'image';
+        const isAudio = mime.includes('audio') || type === 'audio';
+        const isVideo = mime.includes('video') || type === 'video';
+        
+        const conf = {
+            processing: {label:'Baixando...', color:'#3b82f6', bg:'rgba(59,130,246,0.08)', border:'rgba(59,130,246,0.3)', spin:true},
+            failed:     {label:'Falhou - Retentando', color:'#ef4444', bg:'rgba(239,68,68,0.08)', border:'rgba(239,68,68,0.3)', spin:false},
+            queued:     {label:'Na fila...', color:'#f59e0b', bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.3)', spin:true},
+        }[qs] || {label:'Pendente', color:'#f59e0b', bg:'rgba(245,158,11,0.08)', border:'rgba(245,158,11,0.3)', spin:true};
+        
+        let iconSvg = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${conf.color}" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+        if (isImage) iconSvg = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${conf.color}" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`;
+        else if (isAudio) iconSvg = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${conf.color}" stroke-width="1.5"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+        else if (isVideo) iconSvg = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="${conf.color}" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>`;
+        
         let sizeStr = '';
-        if (attachment.size) {
-            sizeStr = attachment.size > 1048576
-                ? ' &middot; ' + (attachment.size/1048576).toFixed(1) + ' MB'
-                : ' &middot; ' + (attachment.size/1024).toFixed(1) + ' KB';
-        }
+        if (attachment.size) sizeStr = attachment.size > 1048576 ? (attachment.size/1048576).toFixed(1)+' MB' : (attachment.size/1024).toFixed(1)+' KB';
+        
+        const spinner = conf.spin ? `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border:2px solid transparent;border-top-color:${conf.color};border-radius:50%;animation:mqSpin 1s linear infinite"></div></div>` : '';
+        const statusDot = conf.spin 
+            ? `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${conf.color};animation:mqPulse 1.5s ease-in-out infinite"></span>`
+            : `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 9v4m0 4h.01"/><circle cx="12" cy="12" r="10"/></svg>`;
+        
         return `<div class="attachment-item mb-2 media-queue-item" data-queue-status="${qs}">
-            <div class="d-flex align-items-center gap-2 p-3 border rounded ${borderCls[qs]||'border-secondary'}" style="background:rgba(255,255,255,0.03);max-width:350px;border-left-width:3px!important">
-            ${icons[qs]||icons.queued}
-            <div class="flex-grow-1 min-w-0">
-                <div class="text-truncate fw-semibold" style="font-size:0.85rem">${filename}</div>
-                <div class="text-muted" style="font-size:0.75rem">
-                    <span class="badge badge-sm badge-${badgeCls[qs]||'light-warning'}">${labels[qs]||'Pendente'}</span>${sizeStr}
+        <div style="max-width:320px;border-radius:12px;overflow:hidden;border:1px solid ${conf.border};background:${conf.bg}">
+            <div style="position:relative;display:flex;align-items:center;justify-content:center;height:80px;background:rgba(0,0,0,0.03)">
+                ${spinner}
+                <div style="position:relative;z-index:1;opacity:0.7">${iconSvg}</div>
+            </div>
+            <div style="padding:10px 14px">
+                <div style="font-size:0.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${filename}</div>
+                <div style="display:flex;align-items:center;gap:6px;margin-top:4px">
+                    <span style="display:inline-flex;align-items:center;gap:4px;font-size:0.7rem;color:${conf.color};font-weight:500">${statusDot}${conf.label}</span>
+                    ${sizeStr ? `<span style="font-size:0.65rem;color:#888">${sizeStr}</span>` : ''}
                 </div>
-            </div></div></div>`;
+            </div>
+        </div></div>`;
     }
     
     // Renderizar contato compartilhado (vCard)
@@ -23596,15 +23629,23 @@ document.addEventListener('DOMContentLoaded', function() {
 <script src="/assets/js/mockup-wizard.js"></script>
 <script src="/assets/js/mockup-canvas-editor.js"></script>
 
-<!-- Media Queue Polling -->
+<!-- Media Queue Styles & Polling -->
+<style>
+@keyframes mqSpin { to { transform: rotate(360deg); } }
+@keyframes mqPulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+@keyframes mqFadeIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+</style>
 <script>
 (function() {
     let _mqInterval = null;
     let _mqConversationId = null;
+    let _mqPrevCompleted = new Set();
+    const _mqBaseUrl = '<?= \App\Helpers\Url::to('/conversations') ?>';
 
     window._mediaQueuePoll = function(conversationId) {
         if (_mqInterval) clearInterval(_mqInterval);
         _mqConversationId = conversationId;
+        _mqPrevCompleted.clear();
         if (!conversationId) return;
 
         checkMediaQueue(conversationId);
@@ -23615,71 +23656,147 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             checkMediaQueue(_mqConversationId);
-        }, 15000);
+        }, 10000);
     };
 
     async function checkMediaQueue(conversationId) {
         try {
-            const resp = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/media-queue`);
+            const resp = await fetch(`${_mqBaseUrl}/${conversationId}/media-queue`);
             const json = await resp.json();
             if (!json.success) return;
 
             const items = json.data.pending_items || [];
             updateMediaQueueBanner(items, json.data.global_stats);
-            updateMediaQueueAttachments(items);
-        } catch (e) {
-            // silencioso
-        }
+            updateMediaQueueStatus(items);
+        } catch (e) {}
     }
 
     function updateMediaQueueBanner(items, stats) {
         let banner = document.getElementById('media-queue-banner');
-        const queuedCount = items.filter(i => i.status === 'queued').length;
-        const processingCount = items.filter(i => i.status === 'processing').length;
-        const failedCount = items.filter(i => i.status === 'failed').length;
+        const queued = items.filter(i => i.status === 'queued').length;
+        const processing = items.filter(i => i.status === 'processing').length;
+        const failed = items.filter(i => i.status === 'failed').length;
+        const total = queued + processing + failed;
 
-        if (queuedCount === 0 && processingCount === 0 && failedCount === 0) {
-            if (banner) banner.remove();
+        if (total === 0) {
+            if (banner) { banner.style.animation = 'mqFadeIn 0.3s ease reverse forwards'; setTimeout(() => banner.remove(), 300); }
             return;
         }
 
         if (!banner) {
             banner = document.createElement('div');
             banner.id = 'media-queue-banner';
-            banner.style.cssText = 'padding:8px 16px;font-size:0.8rem;border-bottom:1px solid var(--bs-border-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+            banner.style.cssText = 'padding:10px 16px;font-size:0.8rem;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:linear-gradient(90deg,rgba(59,130,246,0.06),rgba(245,158,11,0.06));border-bottom:1px solid rgba(59,130,246,0.15);animation:mqFadeIn 0.3s ease';
             const chatContainer = document.getElementById('messages-container');
             if (chatContainer) chatContainer.parentNode.insertBefore(banner, chatContainer);
         }
 
-        let html = '';
-        if (processingCount > 0) {
-            html += `<span class="badge badge-light-primary"><span class="spinner-border spinner-border-sm me-1" style="width:10px;height:10px"></span>Baixando ${processingCount} arquivo${processingCount>1?'s':''}</span>`;
-        }
-        if (queuedCount > 0) {
-            html += `<span class="badge badge-light-warning"><i class="ki-outline ki-time fs-7 me-1"></i>${queuedCount} na fila</span>`;
-        }
-        if (failedCount > 0) {
-            html += `<span class="badge badge-light-danger"><i class="ki-outline ki-cross-circle fs-7 me-1"></i>${failedCount} falhou</span>`;
-        }
-        if ((stats.queued||0) > 0 || (stats.processing||0) > 0) {
-            html += `<span class="text-muted ms-auto" style="font-size:0.7rem">Fila global: ${stats.queued||0} pendentes</span>`;
-        }
+        let html = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2" style="flex-shrink:0"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+        if (processing > 0) html += `<span style="display:inline-flex;align-items:center;gap:4px;color:#3b82f6;font-weight:500"><span style="width:8px;height:8px;border:2px solid transparent;border-top-color:#3b82f6;border-radius:50%;animation:mqSpin 0.8s linear infinite;display:inline-block"></span>Baixando ${processing}</span>`;
+        if (queued > 0) html += `<span style="display:inline-flex;align-items:center;gap:4px;color:#f59e0b;font-weight:500"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;animation:mqPulse 1.5s ease infinite;display:inline-block"></span>${queued} na fila</span>`;
+        if (failed > 0) html += `<span style="color:#ef4444;font-weight:500">${failed} com erro</span>`;
+        
+        const globalQueued = (stats.queued||0) + (stats.processing||0);
+        if (globalQueued > total) html += `<span style="color:#888;font-size:0.7rem;margin-left:auto">+${globalQueued - total} em outras conversas</span>`;
+        
         banner.innerHTML = html;
     }
 
-    function updateMediaQueueAttachments(items) {
-        if (!items.length) return;
-
+    function updateMediaQueueStatus(items) {
+        // Atualizar status visual dos placeholders existentes
+        const queueEls = document.querySelectorAll('.media-queue-item');
+        
         items.forEach(item => {
-            const queueItems = document.querySelectorAll('.media-queue-item');
-            queueItems.forEach(el => {
-                const currentStatus = el.dataset.queueStatus;
-                if (item.status === 'completed' && currentStatus !== 'completed') {
-                    // Recarregar a mensagem para mostrar o arquivo baixado
-                    location.reload();
-                }
-            });
+            if (!item.message_id) return;
+            
+            const msgEl = document.querySelector(`[data-message-id="${item.message_id}"]`);
+            if (!msgEl) return;
+            
+            const queueItem = msgEl.querySelector('.media-queue-item');
+            if (!queueItem) return;
+            
+            const currentStatus = queueItem.dataset.queueStatus;
+            if (currentStatus === item.status) return;
+            
+            // Atualizar status visual
+            queueItem.dataset.queueStatus = item.status;
+            const newAttachment = {
+                download_pending: true,
+                queue_status: item.status,
+                filename: item.filename || 'Arquivo',
+                mime_type: item.mimetype || '',
+                type: item.media_type || 'document',
+                size: null
+            };
+            queueItem.outerHTML = renderAttachmentHtml(newAttachment);
         });
+        
+        // Verificar se há itens completados (sem mais pendentes para um message_id)
+        const pendingMsgIds = new Set(items.map(i => i.message_id).filter(Boolean));
+        
+        queueEls.forEach(el => {
+            const msgEl = el.closest('[data-message-id]');
+            if (!msgEl) return;
+            const msgId = msgEl.getAttribute('data-message-id');
+            
+            // Se tinha placeholder mas não está mais nos pending_items, o download completou
+            if (msgId && !pendingMsgIds.has(parseInt(msgId)) && !_mqPrevCompleted.has(msgId)) {
+                _mqPrevCompleted.add(msgId);
+                reloadSingleMessage(msgId, msgEl);
+            }
+        });
+    }
+
+    async function reloadSingleMessage(msgId, msgEl) {
+        try {
+            const convId = _mqConversationId;
+            const resp = await fetch(`${_mqBaseUrl}/${convId}/messages?message_id=${msgId}`);
+            const json = await resp.json();
+            if (!json.success || !json.data) return;
+            
+            const msg = Array.isArray(json.data) ? json.data.find(m => m.id == msgId) : json.data;
+            if (!msg || !msg.attachments) return;
+            
+            let attachments = msg.attachments;
+            if (typeof attachments === 'string') {
+                try { attachments = JSON.parse(attachments); } catch(e) { return; }
+            }
+            if (!Array.isArray(attachments)) return;
+            
+            // Substituir os placeholders pelos attachments reais
+            const hasCompleted = attachments.some(a => !a.download_pending && a.path);
+            if (!hasCompleted) return;
+            
+            let newHtml = '';
+            attachments.forEach(att => { newHtml += renderAttachmentHtml(att); });
+            
+            // Animação de transição
+            const container = msgEl.querySelector('.media-queue-item')?.parentElement || msgEl;
+            const queueItems = msgEl.querySelectorAll('.media-queue-item');
+            
+            if (queueItems.length > 0 && newHtml) {
+                queueItems.forEach(qi => {
+                    qi.style.transition = 'opacity 0.3s, transform 0.3s';
+                    qi.style.opacity = '0';
+                    qi.style.transform = 'scale(0.95)';
+                });
+                
+                setTimeout(() => {
+                    // Inserir o novo attachment no lugar dos placeholders
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = newHtml;
+                    wrapper.style.animation = 'mqFadeIn 0.4s ease';
+                    
+                    const firstQueue = msgEl.querySelector('.media-queue-item');
+                    if (firstQueue) {
+                        firstQueue.parentElement.insertBefore(wrapper, firstQueue);
+                        queueItems.forEach(qi => qi.remove());
+                    }
+                }, 350);
+            }
+        } catch (e) {
+            console.warn('Erro ao recarregar mensagem:', e);
+        }
     }
 
     document.addEventListener('conversation:opened', function(e) {

@@ -148,6 +148,7 @@ class MediaQueueService
                     self::updateMessageWithDownload($item, $result);
                     Logger::mediaQueue("[conv:{$convId}] Download concluído: #{$item['id']} → {$result['path']} ({$result['size']} bytes)");
                 } else {
+                    self::updateMessageAfterUpload($item);
                     Logger::mediaQueue("[conv:{$convId}] Upload enviado: #{$item['id']} → message_id=" . ($result['message_id'] ?? 'null'));
                 }
                 $stats['success']++;
@@ -499,6 +500,40 @@ class MediaQueueService
         }
 
         Logger::mediaQueue("[conv:" . ($item['conversation_id'] ?? '?') . "] Mensagem #{$item['message_id']} atualizada com attachment (type={$attachmentType})");
+    }
+
+    /**
+     * Após upload bem-sucedido, remover flags de pending dos attachments da mensagem
+     */
+    private static function updateMessageAfterUpload(array $item): void
+    {
+        if (empty($item['message_id'])) return;
+        
+        $convId = $item['conversation_id'] ?? '?';
+        $message = Message::find($item['message_id']);
+        if (!$message) return;
+        
+        $attachments = $message['attachments'] ?? [];
+        if (is_string($attachments)) {
+            $attachments = json_decode($attachments, true) ?? [];
+        }
+        
+        $changed = false;
+        foreach ($attachments as $i => $att) {
+            if (!empty($att['download_pending']) || !empty($att['upload_pending'])) {
+                unset($attachments[$i]['download_pending']);
+                unset($attachments[$i]['upload_pending']);
+                unset($attachments[$i]['queue_status']);
+                $changed = true;
+            }
+        }
+        
+        if ($changed) {
+            $db = Database::getInstance();
+            $db->prepare("UPDATE messages SET attachments = ?, status = 'sent' WHERE id = ?")
+               ->execute([json_encode(array_values($attachments)), $item['message_id']]);
+            Logger::mediaQueue("[conv:{$convId}] Mensagem #{$item['message_id']} atualizada: flags de pending removidas, status=sent");
+        }
     }
 
     /**

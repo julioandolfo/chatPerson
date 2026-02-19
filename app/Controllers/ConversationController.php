@@ -2394,21 +2394,31 @@ class ConversationController
         Permission::abortIfCannot('conversations.view.own');
         
         try {
+            // Busca de mensagem individual (para atualizar attachment após download)
+            if (isset($_GET['message_id'])) {
+                $singleMsgId = (int)$_GET['message_id'];
+                $msg = \App\Models\Message::find($singleMsgId);
+                if ($msg && ($msg['conversation_id'] ?? null) == $id) {
+                    if (!empty($msg['attachments']) && is_string($msg['attachments'])) {
+                        $msg['attachments'] = json_decode($msg['attachments'], true) ?? [];
+                    }
+                    Response::json(['success' => true, 'data' => [$msg]]);
+                } else {
+                    Response::json(['success' => false, 'message' => 'Mensagem não encontrada'], 404);
+                }
+                return;
+            }
+            
             $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 50;
             $beforeId = isset($_GET['before_id']) ? (int)$_GET['before_id'] : null;
             $lastMessageId = isset($_GET['last_message_id']) ? (int)$_GET['last_message_id'] : null;
             
-            // Log de entrada para diagnosticar inconsistência entre lista e chat
-            \App\Helpers\Logger::info("📥 getMessages: id={$id}, limit={$limit}, beforeId=" . ($beforeId ?? 'null') . ", lastMessageId=" . ($lastMessageId ?? 'null'), 'conversas.log');
+            \App\Helpers\Logger::info("getMessages: id={$id}, limit={$limit}, beforeId=" . ($beforeId ?? 'null') . ", lastMessageId=" . ($lastMessageId ?? 'null'), 'conversas.log');
             
-            // Validar limit
             if ($limit < 1 || $limit > 100) {
                 $limit = 50;
             }
             
-            // Buscar mensagens
-            // Se lastMessageId foi fornecido (polling), buscar apenas mensagens APÓS esse ID
-            // Se beforeId foi fornecido (paginação), buscar apenas mensagens ANTES desse ID
             $messages = \App\Models\Message::getMessagesWithSenderDetails($id, $limit, null, $beforeId, $lastMessageId);
             
             // Adicionar campos type e direction para cada mensagem

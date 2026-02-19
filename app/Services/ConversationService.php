@@ -1772,6 +1772,37 @@ class ConversationService
                     
                     \App\Helpers\Logger::info("ConversationService::sendMessage - Integração respondeu: success=" . ($sendResult['success'] ?? false) . ", msg_id=" . ($sendResult['message_id'] ?? 'NULL'));
                     
+                    // Se envio foi enfileirado (CDN error), marcar mensagem como pendente com visual
+                    if ($sendResult && ($sendResult['status'] ?? '') === 'queued' && $messageId) {
+                        Message::update($messageId, ['status' => 'queued']);
+                        
+                        // Marcar attachments como upload_pending para exibir placeholder visual
+                        $existingMsg = Message::find($messageId);
+                        if ($existingMsg) {
+                            $existingAtts = $existingMsg['attachments'] ?? [];
+                            if (is_string($existingAtts)) $existingAtts = json_decode($existingAtts, true) ?? [];
+                            foreach ($existingAtts as &$att) {
+                                $att['download_pending'] = true;
+                                $att['queue_status'] = 'queued';
+                                $att['upload_pending'] = true;
+                            }
+                            unset($att);
+                            if (!empty($existingAtts)) {
+                                $db = \App\Helpers\Database::getInstance();
+                                $db->prepare("UPDATE messages SET attachments = ? WHERE id = ?")->execute([json_encode($existingAtts), $messageId]);
+                            }
+                        }
+                        
+                        // Atualizar o item na fila com o message_id
+                        try {
+                            $db = \App\Helpers\Database::getInstance();
+                            $db->prepare("UPDATE media_queue SET message_id = ?, conversation_id = ? WHERE message_id IS NULL AND conversation_id = ? AND direction = 'upload' ORDER BY id DESC LIMIT 1")
+                               ->execute([$messageId, $conversation['id'] ?? null, $conversation['id'] ?? null]);
+                        } catch (\Exception $e) {}
+                        
+                        Logger::quepasa("ConversationService::sendMessage - Envio enfileirado, messageId={$messageId} marcado como queued com placeholder visual");
+                    }
+                    
                     // Atualizar status e external_id da mensagem
                     if ($sendResult && ($sendResult['success'] ?? false)) {
                         Message::update($messageId, [

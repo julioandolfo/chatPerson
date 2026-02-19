@@ -2655,171 +2655,173 @@ class WhatsAppService
                     Logger::quepasa("processWebhook - extra content: " . json_encode($payload['extra']));
                 }
                 
-                // Tentar baixar áudio via API Quepasa/Orbichat
-                // Endpoints possíveis: /attachment/{id}, /download/{wid}, /messages/{id}/download
+                // Baixar mídia via API QuePasa (endpoint correto: GET /download/{messageid}?cache=true)
                 try {
-                    // Logar campos disponíveis para identificar o ID correto da mensagem
                     Logger::quepasa("processWebhook - Campos disponíveis no payload: id=" . ($payload['id'] ?? 'null') . ", wid=" . ($payload['wid'] ?? 'null') . ", messageId=" . ($messageId ?? 'null'));
                     
-                    // Usar o ID da mensagem correto (não o wid da conta)
                     $messageWid = $payload['id'] ?? $messageId;
                     $apiUrl = rtrim($account['api_url'], '/');
                     
                     Logger::quepasa("processWebhook - Tentando baixar {$messageType} via API: messageWid={$messageWid}");
                     
-                    // Extrair apenas o ID se vier com sufixo @s.whatsapp.net
                     $messageIdOnly = $messageWid;
                     if (strpos($messageIdOnly, '@') !== false) {
                         $messageIdOnly = explode('@', $messageIdOnly)[0];
                     }
                     
-                    // Tentar endpoints comuns (Quepasa/Orbichat)
+                    $curlHeaders = [
+                        'Accept: */*',
+                        'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
+                        'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
+                    ];
+                    
+                    // Endpoints válidos do QuePasa (fonte: código-fonte Go do QuePasa)
+                    // O endpoint /download aceita {messageid} no path OU ?messageid= como query param
+                    // O parâmetro cache=true faz o QuePasa usar o cache interno (mais confiável)
                     $endpoints = [
-                        "/attachment/{$messageWid}",
-                        "/attachment/{$messageIdOnly}",
-                        "/download/{$messageWid}",
+                        "/download/{$messageIdOnly}?cache=true",
+                        "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
+                        "/download/{$messageWid}?cache=true",
+                        "/download?messageid=" . urlencode($messageWid) . "&cache=true",
                         "/download/{$messageIdOnly}",
-                        "/messages/{$messageWid}/download",
-                        "/messages/{$messageIdOnly}/download",
-                        "/messages/{$messageWid}/attachment",
-                        "/messages/{$messageIdOnly}/attachment",
-                        "/{$messageWid}/download",
-                        "/{$messageIdOnly}/download"
+                        "/download/{$messageWid}",
                     ];
                     
                     $downloaded = false;
-                    foreach ($endpoints as $endpoint) {
-                        $downloadUrl = $apiUrl . $endpoint;
-                        Logger::quepasa("processWebhook - Tentando endpoint: {$downloadUrl}");
+                    $maxRetries = 3;
+                    $retryDelaySeconds = 3;
+                    
+                    for ($retry = 0; $retry < $maxRetries && !$downloaded; $retry++) {
+                        if ($retry > 0) {
+                            $waitTime = $retryDelaySeconds * $retry;
+                            Logger::quepasa("processWebhook - ⏳ Aguardando {$waitTime}s antes da tentativa " . ($retry + 1) . "/{$maxRetries}...");
+                            sleep($waitTime);
+                        }
                         
-                        $ch = curl_init($downloadUrl);
-                        $headers = [
-                            'Accept: */*',
-                            'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
-                            'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
-                        ];
-                        
-                        curl_setopt_array($ch, [
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
-                            CURLOPT_HTTPHEADER => $headers,
-                            CURLOPT_FOLLOWLOCATION => true,
-                            CURLOPT_SSL_VERIFYPEER => false,
-                            CURLOPT_SSL_VERIFYHOST => false
-                        ]);
-                        
-                        $mediaData = curl_exec($ch);
-                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-                        curl_close($ch);
-                        
-                        Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($mediaData) . " bytes");
-                        
-                        if ($httpCode === 200 && $mediaData && strlen($mediaData) > 100) {
-                            // Verificar se é mídia válida (não é JSON de erro)
-                            $isJson = @json_decode($mediaData);
-                            $isValidMedia = ($isJson === null && (
-                                strpos($contentType, 'audio') !== false ||
-                                strpos($contentType, 'image') !== false ||
-                                strpos($contentType, 'video') !== false ||
-                                strpos($contentType, 'application') !== false ||
-                                strpos($contentType, 'octet-stream') !== false ||
-                                strpos($contentType, 'binary') !== false ||
-                                empty($contentType)
-                            ));
+                        foreach ($endpoints as $endpoint) {
+                            $downloadUrl = $apiUrl . $endpoint;
+                            Logger::quepasa("processWebhook - Tentando endpoint (tentativa " . ($retry + 1) . "): {$downloadUrl}");
                             
-                            if ($isValidMedia) {
-                                Logger::quepasa("processWebhook - ✅ {$messageType} baixado com sucesso: " . strlen($mediaData) . " bytes");
+                            $ch = curl_init($downloadUrl);
+                            curl_setopt_array($ch, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 120,
+                                CURLOPT_HTTPHEADER => $curlHeaders,
+                                CURLOPT_FOLLOWLOCATION => true,
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false
+                            ]);
+                            
+                            $mediaData = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                            $curlError = curl_error($ch);
+                            curl_close($ch);
+                            
+                            $dataLen = $mediaData ? strlen($mediaData) : 0;
+                            Logger::quepasa("processWebhook - Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$dataLen} bytes" . ($curlError ? ", cURL error: {$curlError}" : ''));
+                            
+                            // Logar corpo da resposta de erro para diagnóstico
+                            if ($httpCode !== 200 && $mediaData && $dataLen < 2000) {
+                                Logger::quepasa("processWebhook - Resposta de erro: " . $mediaData);
+                            }
+                            
+                            if ($httpCode === 200 && $mediaData && $dataLen > 100) {
+                                $isJson = @json_decode($mediaData);
+                                $isValidMedia = ($isJson === null && (
+                                    strpos($contentType, 'audio') !== false ||
+                                    strpos($contentType, 'image') !== false ||
+                                    strpos($contentType, 'video') !== false ||
+                                    strpos($contentType, 'application') !== false ||
+                                    strpos($contentType, 'octet-stream') !== false ||
+                                    strpos($contentType, 'binary') !== false ||
+                                    empty($contentType)
+                                ));
                                 
-                                // Salvar mídia temporariamente
-                                $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
-                                if (!is_dir($tempDir)) {
-                                    mkdir($tempDir, 0755, true);
-                                }
-                                
-                                // Determinar extensão: prioridade = extensão do filename original > mime type > fallback
-                                $extension = 'bin';
-                                
-                                // 1. Tentar extensão do nome original do arquivo (mais confiável)
-                                $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
-                                if ($originalFilename) {
-                                    $origExt = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
-                                    if (!empty($origExt) && $origExt !== 'bin') {
-                                        $extension = $origExt;
+                                if ($isValidMedia) {
+                                    Logger::quepasa("processWebhook - ✅ {$messageType} baixado com sucesso: {$dataLen} bytes (tentativa " . ($retry + 1) . ")");
+                                    
+                                    $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
+                                    if (!is_dir($tempDir)) {
+                                        mkdir($tempDir, 0755, true);
                                     }
-                                }
-                                
-                                // 2. Se ainda é bin, tentar determinar pelo mime type
-                                if ($extension === 'bin') {
-                                    $attachmentMime = $payload['attachment']['mime'] ?? $mimetype ?? $contentType;
-                                    if ($attachmentMime) {
-                                        $mimeExtMap = self::getMimeToExtensionMap();
-                                        // Tentar match exato primeiro
-                                        $cleanMime = strtolower(trim(explode(';', $attachmentMime)[0]));
-                                        if (isset($mimeExtMap[$cleanMime])) {
-                                            $extension = $mimeExtMap[$cleanMime];
-                                        } else {
-                                            // Fallback parcial por substring
-                                            if (strpos($attachmentMime, 'opus') !== false || strpos($attachmentMime, 'ogg') !== false) $extension = 'ogg';
-                                            elseif (strpos($attachmentMime, 'mpeg') !== false && strpos($attachmentMime, 'audio') !== false) $extension = 'mp3';
-                                            elseif (strpos($attachmentMime, 'mp4') !== false) $extension = 'mp4';
-                                            elseif (strpos($attachmentMime, 'webm') !== false) $extension = 'webm';
-                                            elseif (strpos($attachmentMime, 'jpeg') !== false || strpos($attachmentMime, 'jpg') !== false) $extension = 'jpg';
-                                            elseif (strpos($attachmentMime, 'png') !== false) $extension = 'png';
-                                            elseif (strpos($attachmentMime, 'gif') !== false) $extension = 'gif';
-                                            elseif (strpos($attachmentMime, 'webp') !== false) $extension = 'webp';
-                                            elseif (strpos($attachmentMime, 'pdf') !== false) $extension = 'pdf';
-                                            elseif (strpos($attachmentMime, 'document') !== false || strpos($attachmentMime, 'msword') !== false) $extension = 'doc';
-                                            elseif (strpos($attachmentMime, 'sheet') !== false || strpos($attachmentMime, 'excel') !== false) $extension = 'xls';
-                                            elseif (strpos($attachmentMime, 'presentation') !== false || strpos($attachmentMime, 'powerpoint') !== false) $extension = 'ppt';
-                                            elseif (strpos($attachmentMime, 'zip') !== false) $extension = 'zip';
-                                            elseif (strpos($attachmentMime, 'rar') !== false) $extension = 'rar';
-                                            elseif (strpos($attachmentMime, 'text/plain') !== false) $extension = 'txt';
-                                            elseif (strpos($attachmentMime, 'text/csv') !== false) $extension = 'csv';
+                                    
+                                    $extension = 'bin';
+                                    
+                                    $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
+                                    if ($originalFilename) {
+                                        $origExt = strtolower(pathinfo($originalFilename, PATHINFO_EXTENSION));
+                                        if (!empty($origExt) && $origExt !== 'bin') {
+                                            $extension = $origExt;
                                         }
                                     }
+                                    
+                                    if ($extension === 'bin') {
+                                        $attachmentMime = $payload['attachment']['mime'] ?? $mimetype ?? $contentType;
+                                        if ($attachmentMime) {
+                                            $mimeExtMap = self::getMimeToExtensionMap();
+                                            $cleanMime = strtolower(trim(explode(';', $attachmentMime)[0]));
+                                            if (isset($mimeExtMap[$cleanMime])) {
+                                                $extension = $mimeExtMap[$cleanMime];
+                                            } else {
+                                                if (strpos($attachmentMime, 'opus') !== false || strpos($attachmentMime, 'ogg') !== false) $extension = 'ogg';
+                                                elseif (strpos($attachmentMime, 'mpeg') !== false && strpos($attachmentMime, 'audio') !== false) $extension = 'mp3';
+                                                elseif (strpos($attachmentMime, 'mp4') !== false) $extension = 'mp4';
+                                                elseif (strpos($attachmentMime, 'webm') !== false) $extension = 'webm';
+                                                elseif (strpos($attachmentMime, 'jpeg') !== false || strpos($attachmentMime, 'jpg') !== false) $extension = 'jpg';
+                                                elseif (strpos($attachmentMime, 'png') !== false) $extension = 'png';
+                                                elseif (strpos($attachmentMime, 'gif') !== false) $extension = 'gif';
+                                                elseif (strpos($attachmentMime, 'webp') !== false) $extension = 'webp';
+                                                elseif (strpos($attachmentMime, 'pdf') !== false) $extension = 'pdf';
+                                                elseif (strpos($attachmentMime, 'document') !== false || strpos($attachmentMime, 'msword') !== false) $extension = 'doc';
+                                                elseif (strpos($attachmentMime, 'sheet') !== false || strpos($attachmentMime, 'excel') !== false) $extension = 'xls';
+                                                elseif (strpos($attachmentMime, 'presentation') !== false || strpos($attachmentMime, 'powerpoint') !== false) $extension = 'ppt';
+                                                elseif (strpos($attachmentMime, 'zip') !== false) $extension = 'zip';
+                                                elseif (strpos($attachmentMime, 'rar') !== false) $extension = 'rar';
+                                                elseif (strpos($attachmentMime, 'text/plain') !== false) $extension = 'txt';
+                                                elseif (strpos($attachmentMime, 'text/csv') !== false) $extension = 'csv';
+                                            }
+                                        }
+                                    }
+                                    
+                                    Logger::quepasa("processWebhook - Extensão determinada: {$extension} (filename original: " . ($originalFilename ?? 'N/A') . ")");
+                                    
+                                    $tempFile = $tempDir . '/' . $messageType . '_' . $messageIdOnly . '_' . time() . '.' . $extension;
+                                    file_put_contents($tempFile, $mediaData);
+                                    
+                                    $relativePath = 'assets/media/attachments/temp/' . basename($tempFile);
+                                    
+                                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                                    $basePath = \App\Helpers\Url::to('/' . $relativePath);
+                                    $mediaUrl = $protocol . '://' . $host . $basePath;
+                                    
+                                    $mimetype = $payload['attachment']['mime'] ?? $attachmentMime ?? $contentType;
+                                    $filename = basename($tempFile);
+                                    $size = strlen($mediaData);
+                                    
+                                    Logger::quepasa("processWebhook - {$messageType} salvo em: {$tempFile}");
+                                    Logger::quepasa("processWebhook - Caminho relativo: {$relativePath}");
+                                    Logger::quepasa("processWebhook - URL pública absoluta: {$mediaUrl}");
+                                    
+                                    $downloadedFile = [
+                                        'path' => $relativePath,
+                                        'local_path' => $tempFile,
+                                        'url' => $mediaUrl,
+                                        'mime_type' => $mimetype,
+                                        'filename' => $filename,
+                                        'size' => $size
+                                    ];
+                                    
+                                    $downloaded = true;
+                                    break;
                                 }
-                                
-                                Logger::quepasa("processWebhook - Extensão determinada: {$extension} (filename original: " . ($originalFilename ?? 'N/A') . ")");
-                                
-                                $tempFile = $tempDir . '/' . $messageType . '_' . $messageIdOnly . '_' . time() . '.' . $extension;
-                                file_put_contents($tempFile, $mediaData);
-                                
-                                // Criar caminho relativo para salvar no banco (sem /public/)
-                                $relativePath = 'assets/media/attachments/temp/' . basename($tempFile);
-                                
-                                // Criar URL absoluta completa com protocolo e domínio
-                                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                                $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                                $basePath = \App\Helpers\Url::to('/' . $relativePath);
-                                $mediaUrl = $protocol . '://' . $host . $basePath;
-                                
-                                $mimetype = $payload['attachment']['mime'] ?? $attachmentMime ?? $contentType;
-                                $filename = basename($tempFile);
-                                $size = strlen($mediaData);
-                                
-                                Logger::quepasa("processWebhook - {$messageType} salvo em: {$tempFile}");
-                                Logger::quepasa("processWebhook - Caminho relativo: {$relativePath}");
-                                Logger::quepasa("processWebhook - URL pública absoluta: {$mediaUrl}");
-                                
-                                // Marcar que o arquivo já está salvo localmente (não precisa baixar novamente)
-                                $downloadedFile = [
-                                    'path' => $relativePath,
-                                    'local_path' => $tempFile,
-                                    'url' => $mediaUrl,
-                                    'mime_type' => $mimetype,
-                                    'filename' => $filename,
-                                    'size' => $size
-                                ];
-                                
-                                $downloaded = true;
-                                break;
                             }
                         }
                     }
                     
                     if (!$downloaded) {
-                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType}. Tentativas: " . count($endpoints));
+                        Logger::quepasa("processWebhook - ❌ Não foi possível baixar o {$messageType}. Tentativas: " . ($maxRetries * count($endpoints)) . " (endpoints: " . count($endpoints) . " × retries: {$maxRetries})");
                     }
                 } catch (\Exception $e) {
                     Logger::quepasa("processWebhook - Erro ao baixar {$messageType}: " . $e->getMessage());
@@ -3980,77 +3982,87 @@ class WhatsAppService
                         $messageIdOnly = explode('@', $messageIdOnly)[0];
                     }
                     
+                    // Endpoints válidos do QuePasa para download
                     $endpoints = [
-                        "/attachment/{$messageWid}",
-                        "/attachment/{$messageIdOnly}",
-                        "/download/{$messageWid}",
+                        "/download/{$messageIdOnly}?cache=true",
+                        "/download?messageid=" . urlencode($messageIdOnly) . "&cache=true",
+                        "/download/{$messageWid}?cache=true",
+                        "/download?messageid=" . urlencode($messageWid) . "&cache=true",
                         "/download/{$messageIdOnly}",
-                        "/messages/{$messageWid}/download",
-                        "/messages/{$messageIdOnly}/download",
-                        "/{$messageWid}/download",
-                        "/{$messageIdOnly}/download"
+                        "/download/{$messageWid}",
+                    ];
+                    
+                    $vcardCurlHeaders = [
+                        'Accept: */*',
+                        'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
+                        'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
                     ];
                     
                     $vcardDownloaded = false;
-                    foreach ($endpoints as $endpoint) {
-                        $downloadUrl = $apiUrl . $endpoint;
-                        Logger::quepasa("processWebhook - 📇 Tentando baixar vCard: {$downloadUrl}");
+                    $vcardMaxRetries = 3;
+                    
+                    for ($vcardRetry = 0; $vcardRetry < $vcardMaxRetries && !$vcardDownloaded; $vcardRetry++) {
+                        if ($vcardRetry > 0) {
+                            $waitTime = 3 * $vcardRetry;
+                            Logger::quepasa("processWebhook - 📇 ⏳ Aguardando {$waitTime}s antes da tentativa " . ($vcardRetry + 1) . "...");
+                            sleep($waitTime);
+                        }
                         
-                        $ch = curl_init($downloadUrl);
-                        $headers = [
-                            'Accept: */*',
-                            'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
-                            'X-QUEPASA-TRACKID: ' . ($account['quepasa_trackid'] ?? $account['name'])
-                        ];
-                        
-                        curl_setopt_array($ch, [
-                            CURLOPT_RETURNTRANSFER => true,
-                            CURLOPT_TIMEOUT => 15,
-                            CURLOPT_HTTPHEADER => $headers,
-                            CURLOPT_FOLLOWLOCATION => true,
-                            CURLOPT_SSL_VERIFYPEER => false,
-                            CURLOPT_SSL_VERIFYHOST => false
-                        ]);
-                        
-                        $vcardRaw = curl_exec($ch);
-                        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-                        curl_close($ch);
-                        
-                        Logger::quepasa("processWebhook - 📇 Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: " . strlen($vcardRaw ?? '') . " bytes");
-                        
-                        if ($httpCode === 200 && $vcardRaw && strlen($vcardRaw) > 10) {
-                            // Verificar se é vCard válido (não é JSON de erro)
-                            $isJson = @json_decode($vcardRaw);
+                        foreach ($endpoints as $endpoint) {
+                            $downloadUrl = $apiUrl . $endpoint;
+                            Logger::quepasa("processWebhook - 📇 Tentando baixar vCard (tentativa " . ($vcardRetry + 1) . "): {$downloadUrl}");
                             
-                            if (strpos($vcardRaw, 'BEGIN:VCARD') !== false) {
-                                // É um vCard direto
-                                Logger::quepasa("processWebhook - ✅ vCard baixado com sucesso: " . strlen($vcardRaw) . " bytes");
-                                $vcardData = self::parseVCardContent($vcardRaw, $message);
-                                $vcardDownloaded = true;
-                                break;
-                            } elseif ($isJson === null && (
-                                strpos($contentType, 'text') !== false ||
-                                strpos($contentType, 'vcard') !== false ||
-                                strpos($contentType, 'octet-stream') !== false ||
-                                empty($contentType)
-                            )) {
-                                // Tentar decodificar como base64
-                                $decoded = base64_decode($vcardRaw, true);
-                                if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
-                                    Logger::quepasa("processWebhook - ✅ vCard (base64) baixado com sucesso");
-                                    $vcardData = self::parseVCardContent($decoded, $message);
+                            $ch = curl_init($downloadUrl);
+                            curl_setopt_array($ch, [
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 30,
+                                CURLOPT_HTTPHEADER => $vcardCurlHeaders,
+                                CURLOPT_FOLLOWLOCATION => true,
+                                CURLOPT_SSL_VERIFYPEER => false,
+                                CURLOPT_SSL_VERIFYHOST => false
+                            ]);
+                            
+                            $vcardRaw = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+                            curl_close($ch);
+                            
+                            $vcardLen = strlen($vcardRaw ?? '');
+                            Logger::quepasa("processWebhook - 📇 Endpoint {$endpoint}: HTTP {$httpCode}, Content-Type: " . ($contentType ?: 'null') . ", Size: {$vcardLen} bytes");
+                            
+                            if ($httpCode !== 200 && $vcardRaw && $vcardLen < 2000) {
+                                Logger::quepasa("processWebhook - 📇 Resposta de erro: " . $vcardRaw);
+                            }
+                            
+                            if ($httpCode === 200 && $vcardRaw && $vcardLen > 10) {
+                                $isJson = @json_decode($vcardRaw);
+                                
+                                if (strpos($vcardRaw, 'BEGIN:VCARD') !== false) {
+                                    Logger::quepasa("processWebhook - ✅ vCard baixado com sucesso: {$vcardLen} bytes (tentativa " . ($vcardRetry + 1) . ")");
+                                    $vcardData = self::parseVCardContent($vcardRaw, $message);
                                     $vcardDownloaded = true;
                                     break;
+                                } elseif ($isJson === null && (
+                                    strpos($contentType, 'text') !== false ||
+                                    strpos($contentType, 'vcard') !== false ||
+                                    strpos($contentType, 'octet-stream') !== false ||
+                                    empty($contentType)
+                                )) {
+                                    $decoded = base64_decode($vcardRaw, true);
+                                    if ($decoded && strpos($decoded, 'BEGIN:VCARD') !== false) {
+                                        Logger::quepasa("processWebhook - ✅ vCard (base64) baixado com sucesso");
+                                        $vcardData = self::parseVCardContent($decoded, $message);
+                                        $vcardDownloaded = true;
+                                        break;
+                                    }
+                                    Logger::quepasa("processWebhook - ⚠️ Conteúdo baixado não parece ser vCard: " . substr($vcardRaw, 0, 200));
                                 }
-                                // Pode ser o conteúdo do vCard sem BEGIN:VCARD (raro)
-                                Logger::quepasa("processWebhook - ⚠️ Conteúdo baixado não parece ser vCard: " . substr($vcardRaw, 0, 200));
                             }
                         }
                     }
                     
                     if (!$vcardDownloaded) {
-                        Logger::quepasa("processWebhook - ⚠️ Não foi possível baixar o vCard via API");
+                        Logger::quepasa("processWebhook - ⚠️ Não foi possível baixar o vCard via API ({$vcardMaxRetries} tentativas)");
                     }
                 }
                 

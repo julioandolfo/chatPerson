@@ -58,7 +58,7 @@ try {
         FROM media_queue 
         WHERE status IN ('queued', 'processing') 
           AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
-        ORDER BY priority ASC, created_at ASC 
+        ORDER BY priority ASC, id ASC 
         LIMIT 1
     ")->fetch(\PDO::FETCH_ASSOC);
 

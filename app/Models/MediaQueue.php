@@ -34,23 +34,30 @@ class MediaQueue extends Model
     {
         $db = Database::getInstance();
         
-        // Verificar se já tem algum item "processing" (evitar concorrência)
         $processing = $db->query("
-            SELECT id FROM media_queue WHERE status = 'processing' LIMIT 1
+            SELECT 1 FROM media_queue WHERE status = 'processing' LIMIT 1
         ")->fetch(\PDO::FETCH_ASSOC);
         
         if ($processing) {
             return null;
         }
         
-        $item = $db->query("
-            SELECT * FROM media_queue 
+        $nextId = $db->query("
+            SELECT id FROM media_queue 
             WHERE status = 'queued' 
               AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
               AND attempts < max_attempts
-            ORDER BY priority ASC, created_at ASC
+            ORDER BY priority ASC, id ASC
             LIMIT 1
         ")->fetch(\PDO::FETCH_ASSOC);
+        
+        if (!$nextId) {
+            return null;
+        }
+        
+        $item = $db->query("
+            SELECT * FROM media_queue WHERE id = " . (int)$nextId['id']
+        )->fetch(\PDO::FETCH_ASSOC);
         
         if (!$item) {
             return null;

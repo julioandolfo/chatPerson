@@ -1503,29 +1503,62 @@ class ConversationService
             self::stopActiveAutomations($conversationId);
         }
 
-        // Transcrever áudio automaticamente (contato e/ou agente, conforme config)
-        $shouldAttemptTranscription = $messageType === 'audio' && !empty($attachmentsData) && (
-            $senderType === 'contact' || 
-            ($senderType === 'agent' && !empty(\App\Services\TranscriptionService::getSettings()['transcribe_agent_messages']))
-        );
+        // === TRANSCRIÇÃO DE ÁUDIO - DEBUG DETALHADO ===
+        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ══════════════════════════════════════");
+        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] messageType={$messageType}, senderType={$senderType}, attachmentsCount=" . count($attachmentsData) . ", messageId={$messageId}, convId={$conversationId}");
+        
+        $shouldAttemptTranscription = false;
+        if ($messageType !== 'audio') {
+            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: messageType não é 'audio' (é '{$messageType}')");
+        } elseif (empty($attachmentsData)) {
+            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: attachmentsData está vazio");
+        } else {
+            if ($senderType === 'contact') {
+                $shouldAttemptTranscription = true;
+                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] OK: senderType=contact, prosseguindo");
+            } elseif ($senderType === 'agent') {
+                $agentTranscribeConfig = \App\Services\TranscriptionService::getSettings()['transcribe_agent_messages'] ?? false;
+                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] senderType=agent, transcribe_agent_messages=" . ($agentTranscribeConfig ? 'true' : 'false'));
+                if (!empty($agentTranscribeConfig)) {
+                    $shouldAttemptTranscription = true;
+                } else {
+                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: transcribe_agent_messages está desabilitado");
+                }
+            } else {
+                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: senderType='{$senderType}' não é contact nem agent");
+            }
+        }
+        
+        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] shouldAttemptTranscription=" . ($shouldAttemptTranscription ? 'true' : 'false'));
         
         if ($shouldAttemptTranscription) {
             try {
                 $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
+                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Settings: enabled=" . ($transcriptionSettings['enabled'] ? 'true' : 'false') . ", auto_transcribe=" . ($transcriptionSettings['auto_transcribe'] ? 'true' : 'false') . ", only_for_ai_agents=" . ($transcriptionSettings['only_for_ai_agents'] ? 'true' : 'false') . ", language=" . ($transcriptionSettings['language'] ?? '?'));
                 
-                if (!empty($transcriptionSettings['enabled']) && !empty($transcriptionSettings['auto_transcribe'])) {
+                if (empty($transcriptionSettings['enabled'])) {
+                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: transcrição DESABILITADA (enabled=false)");
+                } elseif (empty($transcriptionSettings['auto_transcribe'])) {
+                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: auto_transcribe DESABILITADO");
+                } else {
                     $shouldTranscribe = true;
                     if (!empty($transcriptionSettings['only_for_ai_agents'])) {
                         $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
-                        $shouldTranscribe = ($aiConversation && $aiConversation['status'] === 'active');
+                        $hasActiveAI = ($aiConversation && $aiConversation['status'] === 'active');
+                        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] only_for_ai_agents=true, aiConversation=" . ($aiConversation ? "status={$aiConversation['status']}" : 'NULL') . ", hasActiveAI=" . ($hasActiveAI ? 'true' : 'false'));
+                        $shouldTranscribe = $hasActiveAI;
+                        if (!$shouldTranscribe) {
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: only_for_ai_agents=true mas conversa NÃO tem IA ativa");
+                        }
                     }
                     
                     if ($shouldTranscribe) {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática (msg={$messageId}, conv={$conversationId}, sender={$senderType})");
+                        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ✅ Prosseguindo com transcrição!");
                         
                         $audioAttachment = null;
                         $audioAttachmentIndex = null;
                         foreach ($attachmentsData as $idx => $att) {
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Attachment[$idx]: type=" . ($att['type'] ?? 'NULL') . ", path=" . ($att['path'] ?? 'NULL') . ", mime=" . ($att['mime_type'] ?? $att['mimetype'] ?? 'NULL'));
                             if (($att['type'] ?? '') === 'audio') {
                                 $audioAttachment = $att;
                                 $audioAttachmentIndex = $idx;
@@ -1533,14 +1566,29 @@ class ConversationService
                             }
                         }
                         
-                        if ($audioAttachment && !empty($audioAttachment['path'])) {
+                        if (!$audioAttachment) {
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: Nenhum attachment com type=audio encontrado nos attachments");
+                        } elseif (empty($audioAttachment['path'])) {
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: audioAttachment encontrado mas sem 'path'");
+                        } else {
                             $audioFilePath = __DIR__ . '/../../public' . $audioAttachment['path'];
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] audioFilePath={$audioFilePath}");
+                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] file_exists=" . (file_exists($audioFilePath) ? 'true' : 'false'));
                             
-                            if (file_exists($audioFilePath)) {
+                            if (!file_exists($audioFilePath)) {
+                                \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ERRO: Arquivo de áudio NÃO encontrado: {$audioFilePath}");
+                            } else {
+                                $fileSize = filesize($audioFilePath);
+                                $fileExt = pathinfo($audioFilePath, PATHINFO_EXTENSION);
+                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Arquivo OK: size={$fileSize} bytes, extension={$fileExt}");
+                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Chamando TranscriptionService::transcribe()...");
+                                
                                 $transcriptionResult = \App\Services\TranscriptionService::transcribe($audioFilePath, [
                                     'language' => $transcriptionSettings['language'] ?? 'pt',
                                     'model' => $transcriptionSettings['model'] ?? 'whisper-1'
                                 ]);
+                                
+                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Resultado: success=" . ($transcriptionResult['success'] ? 'true' : 'false') . ", textLen=" . strlen($transcriptionResult['text'] ?? '') . ", error=" . ($transcriptionResult['error'] ?? 'NULL'));
                                 
                                 if ($transcriptionResult['success'] && !empty($transcriptionResult['text'])) {
                                     $transcriptionData = [
@@ -1550,14 +1598,12 @@ class ConversationService
                                         'created_at' => date('Y-m-d H:i:s')
                                     ];
                                     
-                                    // Salvar transcrição dentro do attachment JSON (onde a view lê)
                                     $attachmentsData[$audioAttachmentIndex]['transcription'] = $transcriptionData;
                                     
                                     $updateFields = [
                                         'attachments' => json_encode($attachmentsData, JSON_UNESCAPED_UNICODE)
                                     ];
                                     
-                                    // Opcionalmente atualizar o content da mensagem
                                     if (!empty($transcriptionSettings['update_message_content'])) {
                                         $updateFields['content'] = $transcriptionResult['text'];
                                         $content = $transcriptionResult['text'];
@@ -1565,20 +1611,19 @@ class ConversationService
                                     
                                     Message::update($messageId, $updateFields);
                                     
-                                    \App\Helpers\Logger::info("ConversationService::sendMessage - Transcrição concluída (msg={$messageId}, len=" . strlen($transcriptionResult['text']) . ", cost=$" . ($transcriptionResult['cost'] ?? 0) . ")");
+                                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ✅ SUCESSO! Transcrição salva no attachment JSON (msg={$messageId}, textLen=" . strlen($transcriptionResult['text']) . ")");
                                 } else {
-                                    \App\Helpers\Logger::error("ConversationService::sendMessage - Falha na transcrição: " . ($transcriptionResult['error'] ?? 'Erro desconhecido'));
+                                    \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ❌ FALHA na transcrição: " . ($transcriptionResult['error'] ?? 'Texto vazio'));
                                 }
-                            } else {
-                                \App\Helpers\Logger::error("ConversationService::sendMessage - Arquivo de áudio não encontrado: {$audioFilePath}");
                             }
                         }
                     }
                 }
             } catch (\Exception $e) {
-                \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao transcrever áudio: " . $e->getMessage());
+                \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ❌ EXCEPTION: " . $e->getMessage() . " | File: " . $e->getFile() . ":" . $e->getLine());
             }
         }
+        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ══════════════════════════════════════ FIM");
 
         // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
         // ✅ CORREÇÃO: Resolver integration_account_id em PHP puro

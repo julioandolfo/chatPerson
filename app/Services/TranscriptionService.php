@@ -14,7 +14,7 @@ class TranscriptionService
 {
     const API_URL = 'https://api.openai.com/v1/audio/transcriptions';
     const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB (limite da OpenAI)
-    const SUPPORTED_FORMATS = ['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm'];
+    const SUPPORTED_FORMATS = ['mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'ogg'];
     const MAX_RETRIES = 3;
     const RETRY_DELAY = 1; // segundos
 
@@ -295,13 +295,15 @@ class TranscriptionService
         
         return array_merge([
             'enabled' => false,
-            'auto_transcribe' => true, // Transcrever automaticamente quando áudio chega
-            'only_for_ai_agents' => true, // Só transcrever se conversa tem agente de IA
-            'language' => 'pt', // Português por padrão
+            'auto_transcribe' => true,
+            'only_for_ai_agents' => true,
+            'transcribe_agent_messages' => false,
+            'language' => 'pt',
             'model' => 'whisper-1',
-            'update_message_content' => true, // Atualizar conteúdo da mensagem com texto transcrito
-            'max_file_size_mb' => 25, // Limite de tamanho
-            'cost_limit_per_day' => 10.00 // Limite de custo diário
+            'update_message_content' => true,
+            'max_file_size_mb' => 25,
+            'cost_limit_per_day' => 10.00,
+            'show_transcription_in_chat' => true,
         ], $transcriptionSettings);
     }
 }

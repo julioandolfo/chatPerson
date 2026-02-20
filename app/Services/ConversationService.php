@@ -1571,7 +1571,7 @@ class ConversationService
                         } elseif (empty($audioAttachment['path'])) {
                             \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: audioAttachment encontrado mas sem 'path'");
                         } else {
-                            $audioFilePath = __DIR__ . '/../../public' . $audioAttachment['path'];
+                            $audioFilePath = __DIR__ . '/../../public/' . ltrim($audioAttachment['path'], '/');
                             \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] audioFilePath={$audioFilePath}");
                             \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] file_exists=" . (file_exists($audioFilePath) ? 'true' : 'false'));
                             

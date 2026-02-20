@@ -860,6 +860,14 @@ $tts = $cs['text_to_speech'] ?? [];
                     <span class="fw-semibold fs-6">Só transcrever se conversa tem agente de IA atribuído</span>
                 </label>
             </div>
+            <div class="fv-row mb-7">
+                <label class="d-flex align-items-center">
+                    <input type="checkbox" name="audio_transcription_transcribe_agent_messages" class="form-check-input me-2" 
+                           <?= ($transcription['transcribe_agent_messages'] ?? false) ? 'checked' : '' ?> />
+                    <span class="fw-semibold fs-6">Transcrever áudios enviados por agentes</span>
+                </label>
+                <div class="form-text">Se desmarcado, apenas áudios de contatos serão transcritos</div>
+            </div>
             <div class="row">
                 <div class="col-lg-6">
                     <div class="fv-row mb-7">

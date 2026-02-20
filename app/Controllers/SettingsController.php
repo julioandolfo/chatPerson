@@ -727,11 +727,13 @@ class SettingsController
                     'enabled' => isset($data['audio_transcription_enabled']),
                     'auto_transcribe' => isset($data['audio_transcription_auto_transcribe']),
                     'only_for_ai_agents' => isset($data['audio_transcription_only_for_ai_agents']),
+                    'transcribe_agent_messages' => isset($data['audio_transcription_transcribe_agent_messages']),
                     'language' => $data['audio_transcription_language'] ?? 'pt',
                     'model' => 'whisper-1',
                     'update_message_content' => isset($data['audio_transcription_update_message_content']),
                     'max_file_size_mb' => isset($data['audio_transcription_max_file_size_mb']) ? (int)$data['audio_transcription_max_file_size_mb'] : 25,
                     'cost_limit_per_day' => isset($data['audio_transcription_cost_limit_per_day']) ? (float)$data['audio_transcription_cost_limit_per_day'] : 10.00,
+                    'show_transcription_in_chat' => isset($data['audio_transcription_show_transcription_in_chat']),
                 ],
                 'text_to_speech' => [
                     'enabled' => isset($data['text_to_speech_enabled']),

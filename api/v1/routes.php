@@ -86,6 +86,15 @@ $routes = [
     
     // Messages (Enviar mensagem via WhatsApp)
     'POST /messages/send' => ['Api\V1\Controllers\MessagesController', 'send', true],
+
+    // Estatísticas / Dashboard
+    'GET /stats/overview'          => ['Api\V1\Controllers\StatsController', 'overview',    true],
+    'GET /stats/conversations'     => ['Api\V1\Controllers\StatsController', 'conversations', true],
+    'GET /stats/agents'            => ['Api\V1\Controllers\StatsController', 'agents',      true],
+    'GET /stats/agents/:id'        => ['Api\V1\Controllers\StatsController', 'agentDetail', true],
+    'GET /stats/departments'       => ['Api\V1\Controllers\StatsController', 'departments', true],
+    'GET /stats/funnels'           => ['Api\V1\Controllers\StatsController', 'funnels',     true],
+    'GET /stats/sla'               => ['Api\V1\Controllers\StatsController', 'sla',         true],
 ];
 
 // Encontrar rota correspondente

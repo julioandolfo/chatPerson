@@ -221,15 +221,16 @@ class ConversationSettingsService
             
             // Transcrição de Áudio (OpenAI Whisper)
             'audio_transcription' => [
-                'enabled' => false, // Habilitar/desabilitar transcrição automática
-                'auto_transcribe' => true, // Transcrever automaticamente quando áudio chega
-                'only_for_ai_agents' => true, // Só transcrever se conversa tem agente de IA atribuído
-                'language' => 'pt', // Código ISO 639-1 (pt, en, es, etc)
-                'model' => 'whisper-1', // Modelo Whisper (sempre whisper-1 por enquanto)
-                'update_message_content' => true, // Atualizar conteúdo da mensagem com texto transcrito
-                'max_file_size_mb' => 25, // Limite de tamanho do arquivo (25MB é limite da OpenAI)
-                'cost_limit_per_day' => 10.00, // Limite de custo diário em USD ($0.006/minuto)
-                'show_transcription_in_chat' => true, // ✅ NOVO: Exibir transcrição abaixo do áudio no chat
+                'enabled' => false,
+                'auto_transcribe' => true,
+                'only_for_ai_agents' => true,
+                'transcribe_agent_messages' => false,
+                'language' => 'pt',
+                'model' => 'whisper-1',
+                'update_message_content' => true,
+                'max_file_size_mb' => 25,
+                'cost_limit_per_day' => 10.00,
+                'show_transcription_in_chat' => true,
             ],
             
             // Text-to-Speech (Geração de Áudio)

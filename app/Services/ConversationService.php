@@ -1503,14 +1503,17 @@ class ConversationService
             self::stopActiveAutomations($conversationId);
         }
 
-        // ✅ NOVO: Transcrever áudio automaticamente se for mensagem do contato com áudio
-        if ($senderType === 'contact' && $messageType === 'audio' && !empty($attachmentsData)) {
+        // Transcrever áudio automaticamente (contato e/ou agente, conforme config)
+        $shouldAttemptTranscription = $messageType === 'audio' && !empty($attachmentsData) && (
+            $senderType === 'contact' || 
+            ($senderType === 'agent' && !empty(\App\Services\TranscriptionService::getSettings()['transcribe_agent_messages']))
+        );
+        
+        if ($shouldAttemptTranscription) {
             try {
                 $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
                 
-                // Verificar se transcrição está habilitada
                 if (!empty($transcriptionSettings['enabled']) && !empty($transcriptionSettings['auto_transcribe'])) {
-                    // Verificar se deve transcrever apenas para agentes de IA
                     $shouldTranscribe = true;
                     if (!empty($transcriptionSettings['only_for_ai_agents'])) {
                         $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
@@ -1518,60 +1521,53 @@ class ConversationService
                     }
                     
                     if ($shouldTranscribe) {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática (msg={$messageId}, conv={$conversationId})");
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Iniciando transcrição automática (msg={$messageId}, conv={$conversationId}, sender={$senderType})");
                         
-                        // Pegar primeiro anexo de áudio
                         $audioAttachment = null;
-                        foreach ($attachmentsData as $att) {
+                        $audioAttachmentIndex = null;
+                        foreach ($attachmentsData as $idx => $att) {
                             if (($att['type'] ?? '') === 'audio') {
                                 $audioAttachment = $att;
+                                $audioAttachmentIndex = $idx;
                                 break;
                             }
                         }
                         
                         if ($audioAttachment && !empty($audioAttachment['path'])) {
-                            // Construir caminho completo do arquivo
                             $audioFilePath = __DIR__ . '/../../public' . $audioAttachment['path'];
                             
-                            // Verificar se arquivo existe
                             if (file_exists($audioFilePath)) {
-                                // Transcrever
                                 $transcriptionResult = \App\Services\TranscriptionService::transcribe($audioFilePath, [
                                     'language' => $transcriptionSettings['language'] ?? 'pt',
                                     'model' => $transcriptionSettings['model'] ?? 'whisper-1'
                                 ]);
                                 
                                 if ($transcriptionResult['success'] && !empty($transcriptionResult['text'])) {
-                                    // Atualizar conteúdo da mensagem com texto transcrito
+                                    $transcriptionData = [
+                                        'text' => $transcriptionResult['text'],
+                                        'cost' => $transcriptionResult['cost'] ?? 0,
+                                        'duration' => $transcriptionResult['duration'] ?? null,
+                                        'created_at' => date('Y-m-d H:i:s')
+                                    ];
+                                    
+                                    // Salvar transcrição dentro do attachment JSON (onde a view lê)
+                                    $attachmentsData[$audioAttachmentIndex]['transcription'] = $transcriptionData;
+                                    
+                                    $updateFields = [
+                                        'attachments' => json_encode($attachmentsData, JSON_UNESCAPED_UNICODE)
+                                    ];
+                                    
+                                    // Opcionalmente atualizar o content da mensagem
                                     if (!empty($transcriptionSettings['update_message_content'])) {
-                                        Message::update($messageId, [
-                                            'content' => $transcriptionResult['text']
-                                        ]);
-                                        
-                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição concluída (msg={$messageId}, len=" . strlen($transcriptionResult['text']) . ", cost=$" . $transcriptionResult['cost'] . ")");
-                                        
-                                        // Atualizar variável $content para usar no processamento com IA abaixo
+                                        $updateFields['content'] = $transcriptionResult['text'];
                                         $content = $transcriptionResult['text'];
-                                    } else {
-                                        // Salvar transcrição em metadata ou campo separado
-                                        $metadata = json_decode(Message::find($messageId)['metadata'] ?? '{}', true);
-                                        $metadata['transcription'] = [
-                                            'text' => $transcriptionResult['text'],
-                                            'cost' => $transcriptionResult['cost'],
-                                            'duration' => $transcriptionResult['duration'] ?? null,
-                                            'created_at' => date('Y-m-d H:i:s')
-                                        ];
-                                        Message::update($messageId, [
-                                            'metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE)
-                                        ]);
-                                        
-                                        // Usar texto transcrito para processamento com IA mesmo se não atualizar content
-                                        $content = $transcriptionResult['text'];
-                                        
-                                        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ Transcrição salva em metadata (msg={$messageId})");
                                     }
+                                    
+                                    Message::update($messageId, $updateFields);
+                                    
+                                    \App\Helpers\Logger::info("ConversationService::sendMessage - Transcrição concluída (msg={$messageId}, len=" . strlen($transcriptionResult['text']) . ", cost=$" . ($transcriptionResult['cost'] ?? 0) . ")");
                                 } else {
-                                    \App\Helpers\Logger::error("ConversationService::sendMessage - ❌ Falha na transcrição: " . ($transcriptionResult['error'] ?? 'Erro desconhecido'));
+                                    \App\Helpers\Logger::error("ConversationService::sendMessage - Falha na transcrição: " . ($transcriptionResult['error'] ?? 'Erro desconhecido'));
                                 }
                             } else {
                                 \App\Helpers\Logger::error("ConversationService::sendMessage - Arquivo de áudio não encontrado: {$audioFilePath}");
@@ -1581,7 +1577,6 @@ class ConversationService
                 }
             } catch (\Exception $e) {
                 \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao transcrever áudio: " . $e->getMessage());
-                // Não bloquear criação da mensagem se transcrição falhar
             }
         }
 

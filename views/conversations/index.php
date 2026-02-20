@@ -213,13 +213,8 @@ function renderAttachment($attachment) {
                 $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($ttsOriginalText)) . '</div>';
                 $html .= '</div>';
             } elseif ($transcription && !empty($transcription['text'])) {
-                // üudio do cliente - exibir transcrição
-                $html .= '<div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">';
-                $html .= '<div class="d-flex align-items-center gap-1 mb-1">';
-                $html .= '<i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>';
-                $html .= '<span class="text-muted fs-8 fw-semibold">Transcrição:</span>';
-                $html .= '</div>';
-                $html .= '<div class="fs-7" style="color: rgba(0,0,0,0.7);">' . nl2br(htmlspecialchars($transcription['text'])) . '</div>';
+                $html .= '<div class="audio-transcription mt-2" style="padding: 6px 10px; background: rgba(59,130,246,0.06); border-radius: 8px; border-left: 3px solid rgba(59,130,246,0.4);">';
+                $html .= '<div class="fs-8" style="color: rgba(255,255,255,0.75); line-height: 1.4;"><i class="ki-duotone ki-text fs-8 me-1" style="opacity:.5;"><span class="path1"></span><span class="path2"></span></i>' . nl2br(htmlspecialchars($transcription['text'])) . '</div>';
                 $html .= '</div>';
             }
         }
@@ -3842,9 +3837,24 @@ function getChannelInfo(channel) {
                                             }
                                         }
                                         
-                                        $isMediaPlaceholder = in_array($trimmedContent, ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia']);
-                                        $shouldShowContent = !empty($msgContent) && !$isTechnicalFilename && !$hasMatchingAttachment && !$isMediaPlaceholder;
-                                        ?>
+                        $isMediaPlaceholder = in_array($trimmedContent, ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia']);
+                        
+                        // Evitar duplicar texto se content é idêntico à transcrição do áudio
+                        $isTranscriptionDuplicate = false;
+                        if (!empty($msgAttachments) && is_array($msgAttachments)) {
+                            foreach ($msgAttachments as $att) {
+                                $attTranscription = $att['transcription']['text'] ?? null;
+                                $attTtsText = $att['tts_original_text'] ?? null;
+                                if (($attTranscription && trim($attTranscription) === $trimmedContent) || 
+                                    ($attTtsText && trim($attTtsText) === $trimmedContent)) {
+                                    $isTranscriptionDuplicate = true;
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        $shouldShowContent = !empty($msgContent) && !$isTechnicalFilename && !$hasMatchingAttachment && !$isMediaPlaceholder && !$isTranscriptionDuplicate;
+                        ?>
                                         <?php if ($shouldShowContent): ?>
                                             <div class="<?= (!empty($msg['attachments']) || $isQuoted) ? 'mt-2' : '' ?>">
                                                 <?= str_replace("\n", "<br>", htmlspecialchars($contentToShow)) ?>
@@ -13962,7 +13972,18 @@ function addMessageToChat(message) {
         }
         
         const isMediaPlaceholder = ['Documento', 'Imagem', 'Vídeo', 'Áudio', 'Mensagem de voz', 'Figurinha', 'Mídia'].includes(trimmedContent);
-        const shouldShowContent = actualContent && !isTechnicalFilename && !hasMatchingAttachment && !isMediaPlaceholder;
+        
+        let isTranscriptionDuplicate = false;
+        if (msgAttachments && Array.isArray(msgAttachments) && trimmedContent) {
+            isTranscriptionDuplicate = msgAttachments.some(att => {
+                const attTranscription = att.transcription?.text;
+                const attTts = att.tts_original_text;
+                return (attTranscription && attTranscription.trim() === trimmedContent) ||
+                       (attTts && attTts.trim() === trimmedContent);
+            });
+        }
+        
+        const shouldShowContent = actualContent && !isTechnicalFilename && !hasMatchingAttachment && !isMediaPlaceholder && !isTranscriptionDuplicate;
         
         // Renderizar reações se existirem
         let reactionsHtml = '';
@@ -18440,15 +18461,10 @@ function renderAttachmentHtml(attachment) {
                     </div>
                 `;
             } else if (transcription && transcription.text) {
-                // üudio do cliente - exibir transcrição
                 const transcriptionText = escapeHtml(transcription.text);
                 transcriptionHtml = `
-                    <div class="audio-transcription mt-2" style="padding: 8px; background: rgba(0,0,0,0.05); border-radius: 6px; border-left: 3px solid #3b82f6;">
-                        <div class="d-flex align-items-center gap-1 mb-1">
-                            <i class="ki-duotone ki-text fs-7 text-muted"><span class="path1"></span><span class="path2"></span></i>
-                            <span class="text-muted fs-8 fw-semibold">Transcrição:</span>
-                        </div>
-                        <div class="fs-7" style="color: rgba(0,0,0,0.7);">${nl2br(transcriptionText)}</div>
+                    <div class="audio-transcription mt-2" style="padding: 6px 10px; background: rgba(59,130,246,0.06); border-radius: 8px; border-left: 3px solid rgba(59,130,246,0.4);">
+                        <div class="fs-8" style="color: rgba(255,255,255,0.75); line-height: 1.4;"><i class="ki-duotone ki-text fs-8 me-1" style="opacity:.5;"><span class="path1"></span><span class="path2"></span></i>${nl2br(transcriptionText)}</div>
                     </div>
                 `;
             }

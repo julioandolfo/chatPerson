@@ -321,7 +321,7 @@ class WebhookController
         
         $integrationId = $integration['id'];
         $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
-        $ttlMinutes = $integration['cache_ttl_minutes'] ?? 60;
+        // Pedidos recebidos por webhook são permanentes (expires_at = NULL)
         
         // 2. Extrair dados do pedido
         $orderStatus = $orderData['status'];
@@ -392,9 +392,7 @@ class WebhookController
             self::log("✓ Contato existente: ID={$contactId}, Nome={$contact['name']}");
         }
         
-        // 5. Cachear ou atualizar pedido
-        $expiresAt = date('Y-m-d H:i:s', time() + ($ttlMinutes * 60));
-        
+        // 5. Cachear ou atualizar pedido — permanente (expires_at = NULL)
         $cacheData = [
             'woocommerce_integration_id' => $integrationId,
             'contact_id' => $contactId,
@@ -404,7 +402,7 @@ class WebhookController
             'order_total' => $orderTotal,
             'order_date' => $orderDate,
             'seller_id' => $sellerId,
-            'expires_at' => $expiresAt
+            'expires_at' => null
         ];
         
         // Verificar se já existe

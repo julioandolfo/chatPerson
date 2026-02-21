@@ -27,13 +27,14 @@ class WooCommerceOrderCache extends Model
     protected bool $timestamps = false; // Usa campos manuais
 
     /**
-     * Obter pedidos em cache de um contato
+     * Obter pedidos em cache de um contato.
+     * Retorna entradas permanentes (expires_at IS NULL) e as ainda não expiradas.
      */
     public static function getByContact(int $contactId, ?int $integrationId = null): array
     {
         $sql = "SELECT * FROM woocommerce_order_cache 
                 WHERE contact_id = ? 
-                AND expires_at > NOW()";
+                AND (expires_at IS NULL OR expires_at > NOW())";
         
         $params = [$contactId];
         
@@ -48,11 +49,12 @@ class WooCommerceOrderCache extends Model
     }
 
     /**
-     * Limpar cache expirado
+     * Limpar apenas entradas com TTL explícito já expirado.
+     * Entradas permanentes (expires_at IS NULL) nunca são removidas por este método.
      */
     public static function clearExpired(): int
     {
-        $sql = "DELETE FROM woocommerce_order_cache WHERE expires_at <= NOW()";
+        $sql = "DELETE FROM woocommerce_order_cache WHERE expires_at IS NOT NULL AND expires_at <= NOW()";
         $stmt = Database::query($sql);
         return $stmt->rowCount();
     }
@@ -80,9 +82,15 @@ class WooCommerceOrderCache extends Model
     /**
      * Salvar pedido no cache, incluindo seller_id quando disponível
      */
-    public static function cacheOrder(int $integrationId, int $contactId, array $order, int $ttlMinutes = 5, ?int $sellerId = null): int
+    /**
+     * @param int|null $ttlMinutes TTL em minutos ou NULL para armazenamento permanente (padrão).
+     */
+    public static function cacheOrder(int $integrationId, int $contactId, array $order, ?int $ttlMinutes = null, ?int $sellerId = null): int
     {
-        $expiresAt = date('Y-m-d H:i:s', time() + ($ttlMinutes * 60));
+        // NULL = permanente; valor numérico = expira após N minutos
+        $expiresAt = $ttlMinutes !== null
+            ? date('Y-m-d H:i:s', time() + ($ttlMinutes * 60))
+            : null;
         
         $data = [
             'woocommerce_integration_id' => $integrationId,

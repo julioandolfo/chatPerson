@@ -32,7 +32,7 @@ class WooCommerceSyncJob
     public static function run(): void
     {
         $startTime = microtime(true);
-        self::log('Iniciando sincronização de pedidos WooCommerce (últimos 30 dias)...');
+        self::log('Iniciando sincronização de pedidos WooCommerce (últimos 30 dias, armazenamento permanente)...');
         
         try {
             // 1. Buscar todas as integrações ativas
@@ -62,10 +62,10 @@ class WooCommerceSyncJob
                 }
             }
             
-            // 2. Limpar cache expirado (pedidos com TTL >30 dias sem renovação)
+            // 2. Limpar entradas com TTL explícito expirado (entradas permanentes nunca são removidas)
             $expired = WooCommerceOrderCache::clearExpired();
             if ($expired > 0) {
-                self::log("Limpeza: {$expired} pedido(s) removido(s) do cache (TTL expirado, >30 dias sem renovação).", 'WARNING');
+                self::log("Limpeza: {$expired} entrada(s) com TTL expirado removida(s) (entradas permanentes preservadas).", 'WARNING');
             } else {
                 self::log('Limpeza: nenhum pedido expirado no cache.');
             }
@@ -89,12 +89,11 @@ class WooCommerceSyncJob
         $consumerSecret = $integration['consumer_secret'];
         $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
         
-        // TTL longo para cache histórico (30 dias) — independente do cache_ttl_minutes
-        // que é para cache de curto prazo (busca em tempo real por contato).
-        // Webhooks cuidam de atualizações em tempo real; o cron renova o histórico.
-        $syncTtlMinutes = 30 * 24 * 60; // 43200 minutos = 30 dias
+        // Pedidos sincronizados em batch são permanentes (expires_at = NULL).
+        // O cron não remove pedidos históricos — apenas atualiza os recentes.
+        // Webhooks cuidam de atualizações de status em tempo real.
         
-        // Buscar pedidos dos últimos 30 dias (alinhado com o TTL histórico)
+        // Buscar pedidos dos últimos 30 dias no cron (novos e atualizados recentemente)
         $dateFrom = date('Y-m-d', strtotime('-30 days')) . 'T00:00:00';
         
         // ═══ PAGINAÇÃO: WooCommerce API limita a 100 por página ═══
@@ -236,9 +235,7 @@ class WooCommerceSyncJob
                     $contactId = $contact['id'];
                 }
                 
-                // Cachear pedido com TTL histórico (30 dias)
-                $expiresAt = date('Y-m-d H:i:s', time() + ($syncTtlMinutes * 60));
-                
+                // Pedidos sincronizados pelo cron são permanentes (expires_at = NULL)
                 $cacheData = [
                     'woocommerce_integration_id' => $integration['id'],
                     'contact_id' => $contactId,
@@ -248,7 +245,7 @@ class WooCommerceSyncJob
                     'order_total' => $orderTotal,
                     'order_date' => $orderDate,
                     'seller_id' => $sellerId,
-                    'expires_at' => $expiresAt
+                    'expires_at' => null
                 ];
                 
                 // Verificar se já existe

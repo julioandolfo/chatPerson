@@ -66,7 +66,8 @@ class AttachmentService
         // Criar diretório se não existir
         $conversationDir = self::$uploadDir . $conversationId . '/';
         if (!is_dir($conversationDir)) {
-            mkdir($conversationDir, 0755, true);
+            mkdir($conversationDir, 0775, true);
+            self::fixPermissions($conversationDir);
         }
 
         // Gerar nome único
@@ -75,8 +76,13 @@ class AttachmentService
 
         // Mover arquivo
         if (!move_uploaded_file($file['tmp_name'], $filepath)) {
-            throw new \Exception('Erro ao salvar arquivo');
+            // Tentar corrigir permissões e tentar novamente
+            self::fixPermissions($conversationDir);
+            if (!move_uploaded_file($file['tmp_name'], $filepath)) {
+                throw new \Exception('Erro ao salvar arquivo. Verifique permissões de escrita em: ' . $conversationDir);
+            }
         }
+        @chmod($filepath, 0664);
 
         // Se for áudio webm, converter para ogg/opus para compatibilidade com WhatsApp
         // IMPORTANTE: Arquivos gravados como áudio podem vir como video/webm (sem stream de vídeo)
@@ -268,7 +274,8 @@ class AttachmentService
         // Criar diretório
         $conversationDir = self::$uploadDir . $conversationId . '/';
         if (!is_dir($conversationDir)) {
-            mkdir($conversationDir, 0755, true);
+            mkdir($conversationDir, 0775, true);
+            self::fixPermissions($conversationDir);
         }
 
         // Determinar extensão: prioridade = nome original > URL path > Content-Type > fallback
@@ -306,8 +313,12 @@ class AttachmentService
 
         // Salvar arquivo
         if (file_put_contents($filepath, $fileContent) === false) {
-            throw new \Exception('Erro ao salvar arquivo');
+            self::fixPermissions($conversationDir);
+            if (file_put_contents($filepath, $fileContent) === false) {
+                throw new \Exception('Erro ao salvar arquivo. Verifique permissões de escrita em: ' . $conversationDir);
+            }
         }
+        @chmod($filepath, 0664);
 
         $fileType = self::getFileType($extension, $contentType);
         
@@ -920,6 +931,30 @@ class AttachmentService
         }
 
         return true;
+    }
+
+    /**
+     * Corrigir permissões de diretório para garantir escrita pelo processo web
+     */
+    private static function fixPermissions(string $dirPath): void
+    {
+        try {
+            @chmod($dirPath, 0775);
+            
+            // Em Linux, tentar ajustar owner para www-data se estiver rodando como root
+            if (PHP_OS_FAMILY !== 'Windows' && function_exists('posix_getuid') && posix_getuid() === 0) {
+                @chown($dirPath, 'www-data');
+                @chgrp($dirPath, 'www-data');
+            }
+            
+            // Garantir que o diretório pai também tenha permissão
+            $parentDir = dirname($dirPath);
+            if (is_dir($parentDir) && !is_writable($parentDir)) {
+                @chmod($parentDir, 0775);
+            }
+        } catch (\Throwable $e) {
+            Logger::error("AttachmentService::fixPermissions - Erro: " . $e->getMessage());
+        }
     }
 
     /**

@@ -14,53 +14,67 @@ use App\Helpers\Database;
 
 class WooCommerceSyncJob
 {
+    private static string $logFile = '';
+
+    private static function log(string $msg, string $level = 'INFO'): void
+    {
+        if (empty(self::$logFile)) {
+            self::$logFile = dirname(__DIR__, 2) . '/logs/wc_sync.log';
+        }
+        $line = '[' . date('Y-m-d H:i:s') . "] [{$level}] {$msg}";
+        echo $line . "\n";
+        @file_put_contents(self::$logFile, $line . "\n", FILE_APPEND | LOCK_EX);
+    }
+
     /**
      * Executar sincronização
      */
     public static function run(): void
     {
         $startTime = microtime(true);
-        echo "[WooCommerceSync] Iniciando sincronização de pedidos WooCommerce...\n";
+        self::log('Iniciando sincronização de pedidos WooCommerce (últimos 30 dias)...');
         
         try {
             // 1. Buscar todas as integrações ativas
             $integrations = WooCommerceIntegration::getAllActive();
             
             if (empty($integrations)) {
-                echo "[WooCommerceSync] Nenhuma integração ativa encontrada.\n";
+                self::log('Nenhuma integração ativa encontrada.', 'WARNING');
                 return;
             }
             
-            echo "[WooCommerceSync] Encontradas " . count($integrations) . " integração(ões) ativa(s).\n";
+            self::log('Encontradas ' . count($integrations) . ' integração(ões) ativa(s).');
             
             $totalOrders = 0;
             $totalErrors = 0;
             
             foreach ($integrations as $integration) {
                 try {
-                    echo "[WooCommerceSync] Sincronizando integração #{$integration['id']}: {$integration['name']}...\n";
+                    self::log("Sincronizando integração #{$integration['id']}: {$integration['name']}...");
                     
                     $orders = self::syncIntegration($integration);
                     $totalOrders += $orders;
                     
-                    echo "[WooCommerceSync] ✅ {$orders} pedidos sincronizados da integração #{$integration['id']}\n";
+                    self::log("✅ {$orders} pedidos sincronizados da integração #{$integration['id']}", 'SUCCESS');
                 } catch (\Exception $e) {
                     $totalErrors++;
-                    echo "[WooCommerceSync] ❌ Erro na integração #{$integration['id']}: {$e->getMessage()}\n";
-                    error_log("WooCommerceSync - Erro integração {$integration['id']}: " . $e->getMessage());
+                    self::log("❌ Erro na integração #{$integration['id']}: {$e->getMessage()}", 'ERROR');
                 }
             }
             
-            // 2. Limpar cache expirado
+            // 2. Limpar cache expirado (pedidos com TTL >30 dias sem renovação)
             $expired = WooCommerceOrderCache::clearExpired();
-            echo "[WooCommerceSync] Limpeza: {$expired} pedidos expirados removidos do cache.\n";
+            if ($expired > 0) {
+                self::log("Limpeza: {$expired} pedido(s) removido(s) do cache (TTL expirado, >30 dias sem renovação).", 'WARNING');
+            } else {
+                self::log('Limpeza: nenhum pedido expirado no cache.');
+            }
             
             $duration = round(microtime(true) - $startTime, 2);
-            echo "[WooCommerceSync] ✅ Sincronização concluída em {$duration}s - {$totalOrders} pedidos sincronizados, {$totalErrors} erros.\n";
+            self::log("✅ Sincronização concluída em {$duration}s — {$totalOrders} pedidos sincronizados, {$totalErrors} erros.", 'SUCCESS');
             
         } catch (\Exception $e) {
-            echo "[WooCommerceSync] ❌ ERRO CRÍTICO: {$e->getMessage()}\n";
-            error_log("WooCommerceSync - Erro crítico: " . $e->getMessage());
+            self::log("❌ ERRO CRÍTICO: {$e->getMessage()}", 'ERROR');
             throw $e;
         }
     }
@@ -73,11 +87,15 @@ class WooCommerceSyncJob
         $wcUrl = rtrim($integration['woocommerce_url'], '/');
         $consumerKey = $integration['consumer_key'];
         $consumerSecret = $integration['consumer_secret'];
-        $ttlMinutes = $integration['cache_ttl_minutes'] ?? 60; // Padrão: 1 hora
         $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
         
-        // Buscar pedidos recentes (últimos 7 dias)
-        $dateFrom = date('Y-m-d', strtotime('-7 days')) . 'T00:00:00';
+        // TTL longo para cache histórico (30 dias) — independente do cache_ttl_minutes
+        // que é para cache de curto prazo (busca em tempo real por contato).
+        // Webhooks cuidam de atualizações em tempo real; o cron renova o histórico.
+        $syncTtlMinutes = 30 * 24 * 60; // 43200 minutos = 30 dias
+        
+        // Buscar pedidos dos últimos 30 dias (alinhado com o TTL histórico)
+        $dateFrom = date('Y-m-d', strtotime('-30 days')) . 'T00:00:00';
         
         // ═══ PAGINAÇÃO: WooCommerce API limita a 100 por página ═══
         $perPage = 100;
@@ -85,7 +103,7 @@ class WooCommerceSyncJob
         $maxPages = 50; // Limite de segurança (5000 pedidos máx)
         $allOrders = [];
         
-        echo "[WooCommerceSync]   Buscando pedidos com paginação (per_page={$perPage})...\n";
+        self::log("  Integração #{$integration['id']}: buscando pedidos dos últimos 30 dias a partir de {$dateFrom} (per_page={$perPage})...");
         
         while ($page <= $maxPages) {
             $url = $wcUrl . '/wp-json/wc/v3/orders?' . http_build_query([
@@ -116,7 +134,7 @@ class WooCommerceSyncJob
                 if ($page === 1) {
                     throw new \Exception("Erro ao buscar pedidos: HTTP {$httpCode}");
                 }
-                echo "[WooCommerceSync]   Página {$page}: HTTP {$httpCode}, parando paginação.\n";
+                self::log("  Página {$page}: HTTP {$httpCode}, parando paginação.", 'WARNING');
                 break;
             }
             
@@ -135,7 +153,7 @@ class WooCommerceSyncJob
             }
             
             if ($page === 1 && $totalAvailable !== null) {
-                echo "[WooCommerceSync]   Total disponível no WooCommerce: {$totalAvailable} pedidos em {$totalPages} página(s)\n";
+                self::log("  Total disponível no WooCommerce (últimos 30 dias): {$totalAvailable} pedido(s) em {$totalPages} página(s).");
             }
             
             $orders = json_decode($responseBody, true);
@@ -145,7 +163,7 @@ class WooCommerceSyncJob
             }
             
             $allOrders = array_merge($allOrders, $orders);
-            echo "[WooCommerceSync]   Página {$page}: " . count($orders) . " pedidos (total acumulado: " . count($allOrders) . ")\n";
+            self::log('  Página ' . $page . ': ' . count($orders) . ' pedidos (acumulado: ' . count($allOrders) . ')');
             
             // Se retornou menos que o per_page, não há mais páginas
             if (count($orders) < $perPage) {
@@ -167,7 +185,7 @@ class WooCommerceSyncJob
             return 0;
         }
         
-        echo "[WooCommerceSync]   Processando " . count($allOrders) . " pedidos...\n";
+        self::log('  Processando ' . count($allOrders) . ' pedidos...');
         
         $syncedCount = 0;
         
@@ -218,8 +236,8 @@ class WooCommerceSyncJob
                     $contactId = $contact['id'];
                 }
                 
-                // Cachear pedido
-                $expiresAt = date('Y-m-d H:i:s', time() + ($ttlMinutes * 60));
+                // Cachear pedido com TTL histórico (30 dias)
+                $expiresAt = date('Y-m-d H:i:s', time() + ($syncTtlMinutes * 60));
                 
                 $cacheData = [
                     'woocommerce_integration_id' => $integration['id'],

@@ -389,6 +389,7 @@ $logFileMap = [
     'unificacao_logs' => __DIR__ . '/../logs/unificacao.log',
     'webhook' => __DIR__ . '/../logs/webhook.log',
     'media_queue' => __DIR__ . '/../logs/media_queue.log',
+    'wc_sync' => __DIR__ . '/../logs/wc_sync.log',
 ];
 // Fallback: se não existir em logs/, tentar em storage/logs/
 foreach ($logFileMap as $key => $path) {
@@ -817,6 +818,7 @@ function colorizeLog($log) {
             <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
             <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
+            <a href="?tab=wc_sync" class="tab <?= $activeTab === 'wc_sync' ? 'active' : '' ?>">🔄 Cron Sync WooCommerce</a>
         </div>
         
         <?php if ($activeTab === 'unificacao'): ?>
@@ -2308,6 +2310,107 @@ WHERE c.whatsapp_account_id IS NOT NULL
             </p>
         </div>
         
+        <?php elseif ($activeTab === 'wc_sync'): ?>
+        <!-- ═══════════════ ABA CRON SYNC WOOCOMMERCE ═══════════════ -->
+        <?php
+            $wcSyncLogFile = $logFileMap['wc_sync'] ?? '';
+            $wcSyncLines = [];
+            if (file_exists($wcSyncLogFile)) {
+                $allWcLines = file($wcSyncLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $wcSyncLines = array_slice(array_reverse($allWcLines), 0, $maxLines);
+            }
+            if (!empty($filter)) {
+                $wcSyncLines = array_filter($wcSyncLines, fn($l) => stripos($l, $filter) !== false);
+            }
+            $wcSyncLevelFilter = $_GET['wcs_level'] ?? '';
+            if (!empty($wcSyncLevelFilter)) {
+                $wcSyncLines = array_filter($wcSyncLines, fn($l) => stripos($l, "[{$wcSyncLevelFilter}]") !== false);
+            }
+            $wcsStats = ['SUCCESS' => 0, 'WARNING' => 0, 'ERROR' => 0, 'INFO' => 0];
+            foreach (($allWcLines ?? []) as $l) {
+                foreach (array_keys($wcsStats) as $lvl) {
+                    if (stripos($l, "[{$lvl}]") !== false) { $wcsStats[$lvl]++; break; }
+                }
+            }
+        ?>
+        <header>
+            <h1>🔄 Cron Sync WooCommerce — Logs</h1>
+            <p style="color:#888;margin-top:5px;font-size:13px;">
+                Execuções automáticas do cron (a cada hora) — sincroniza pedidos dos últimos <strong>30 dias</strong> com TTL de <strong>30 dias</strong>.
+            </p>
+        </header>
+        <div class="stats" style="margin-bottom:15px;">
+            <div class="stat"><div class="stat-label">Sucesso</div><div class="stat-value" style="color:#4ec9b0;"><?= $wcsStats['SUCCESS'] ?></div></div>
+            <div class="stat"><div class="stat-label">Avisos</div><div class="stat-value" style="color:#dcdcaa;"><?= $wcsStats['WARNING'] ?></div></div>
+            <div class="stat"><div class="stat-label">Erros</div><div class="stat-value" style="color:#f44747;"><?= $wcsStats['ERROR'] ?></div></div>
+            <div class="stat"><div class="stat-label">Info</div><div class="stat-value" style="color:#569cd6;"><?= $wcsStats['INFO'] ?></div></div>
+        </div>
+        <div style="background:#252526;padding:12px;border-radius:6px;margin-bottom:15px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <form method="GET" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;width:100%;">
+                <input type="hidden" name="tab" value="wc_sync">
+                <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="Buscar: integração, pedidos, erro..."
+                    style="background:#1e1e1e;color:#d4d4d4;border:1px solid #3c3c3c;padding:6px 12px;border-radius:4px;flex:1;min-width:200px;">
+                <select name="wcs_level" style="background:#1e1e1e;color:#d4d4d4;border:1px solid #3c3c3c;padding:6px 12px;border-radius:4px;">
+                    <option value="">Todos</option>
+                    <option value="SUCCESS" <?= $wcSyncLevelFilter==='SUCCESS'?'selected':'' ?>>SUCCESS</option>
+                    <option value="WARNING" <?= $wcSyncLevelFilter==='WARNING'?'selected':'' ?>>WARNING</option>
+                    <option value="ERROR" <?= $wcSyncLevelFilter==='ERROR'?'selected':'' ?>>ERROR</option>
+                    <option value="INFO" <?= $wcSyncLevelFilter==='INFO'?'selected':'' ?>>INFO</option>
+                </select>
+                <select name="lines" style="background:#1e1e1e;color:#d4d4d4;border:1px solid #3c3c3c;padding:6px 12px;border-radius:4px;">
+                    <option value="200" <?= $maxLines==200?'selected':'' ?>>200</option>
+                    <option value="500" <?= $maxLines==500?'selected':'' ?>>500</option>
+                    <option value="1000" <?= $maxLines==1000?'selected':'' ?>>1000</option>
+                </select>
+                <button type="submit" style="background:#0e639c;color:white;border:none;padding:6px 16px;border-radius:4px;cursor:pointer;">🔍 Filtrar</button>
+                <a href="?tab=wc_sync" style="background:#3c3c3c;color:#d4d4d4;padding:6px 16px;border-radius:4px;text-decoration:none;">🔄 Limpar</a>
+            </form>
+        </div>
+        <div style="background:#1a2e1a;border:1px solid #2d5a2d;padding:10px 15px;border-radius:6px;margin-bottom:15px;font-size:12px;color:#b5cea8;">
+            <strong>💡 Como funciona o cron:</strong><br>
+            • Executa automaticamente a cada <strong>1 hora</strong> via <code style="color:#4ec9b0;">run-scheduled-jobs.php</code><br>
+            • Busca pedidos dos últimos <strong>30 dias</strong> do WooCommerce e salva no cache com TTL de <strong>30 dias</strong><br>
+            • <code style="color:#dcdcaa;">[WARNING] Limpeza</code> indica pedidos removidos por TTL expirado (>30 dias sem renovação) — normal<br>
+            • <code style="color:#f44747;">[ERROR]</code> indica falha de comunicação com a API WooCommerce
+        </div>
+        <div style="background:#252526;padding:8px 15px;border-radius:6px;margin-bottom:10px;font-size:12px;color:#888;">
+            📁 <span style="color:#d4d4d4;"><?= htmlspecialchars($wcSyncLogFile) ?></span>
+            <?php if (file_exists($wcSyncLogFile)): ?>
+                | Tamanho: <span style="color:#d4d4d4;"><?= number_format(filesize($wcSyncLogFile)/1024, 1) ?> KB</span>
+                | Última modificação: <span style="color:#d4d4d4;"><?= date('d/m/Y H:i:s', filemtime($wcSyncLogFile)) ?></span>
+            <?php endif; ?>
+            | Exibindo: <span style="color:#4ec9b0;"><?= count($wcSyncLines) ?></span> linhas
+        </div>
+        <div class="log-container" style="max-height:70vh;overflow-y:auto;background:#1e1e1e;border-radius:6px;padding:10px;">
+            <?php if (empty($wcSyncLines)): ?>
+                <div style="text-align:center;padding:40px;color:#888;">
+                    <?php if (!file_exists($wcSyncLogFile)): ?>
+                        <p style="font-size:18px;">📭 Arquivo de log ainda não existe</p>
+                        <p style="margin-top:10px;">O arquivo <code style="color:#4ec9b0;">wc_sync.log</code> será criado na próxima execução do cron.</p>
+                        <p style="margin-top:5px;font-size:12px;">Force a execução acessando: <code style="color:#4ec9b0;">/run-scheduled-jobs.php?force_wc_sync=1</code></p>
+                    <?php else: ?>
+                        <p>Nenhum log encontrado com os filtros aplicados.</p>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <?php foreach ($wcSyncLines as $line): ?>
+                    <?php
+                        $color = '#d4d4d4';
+                        if (stripos($line, '[ERROR]') !== false) $color = '#f44747';
+                        elseif (stripos($line, '[WARNING]') !== false) $color = '#dcdcaa';
+                        elseif (stripos($line, '[SUCCESS]') !== false) $color = '#4ec9b0';
+                        elseif (stripos($line, '[INFO]') !== false) $color = '#569cd6';
+                    ?>
+                    <div style="color:<?= $color ?>;font-size:12px;line-height:1.6;border-bottom:1px solid #2d2d2d;padding:2px 0;">
+                        <?= htmlspecialchars($line) ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+        <div class="footer" style="margin-top:15px;">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+
         <?php elseif ($activeTab === 'unificacao_logs' || $activeTab === 'quepasa'): ?>
         <!-- ═══════════════ ABA LOGS UNIFICAÇÃO / QUEPASA ═══════════════ -->
         <?php

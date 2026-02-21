@@ -407,7 +407,8 @@ class MediaQueueService
             $saveDir .= 'temp/';
         }
         if (!is_dir($saveDir)) {
-            mkdir($saveDir, 0755, true);
+            mkdir($saveDir, 0775, true);
+            @chmod($saveDir, 0775);
         }
 
         $extension = self::determineExtension($payload, $contentType);

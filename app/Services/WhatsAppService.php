@@ -2898,7 +2898,8 @@ class WhatsAppService
                                     
                                     $tempDir = __DIR__ . '/../../public/assets/media/attachments/temp';
                                     if (!is_dir($tempDir)) {
-                                        mkdir($tempDir, 0755, true);
+                                        mkdir($tempDir, 0775, true);
+                                        @chmod($tempDir, 0775);
                                     }
                                     
                                     $extension = 'bin';

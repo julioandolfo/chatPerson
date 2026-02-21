@@ -320,7 +320,9 @@ class WooCommerceController
                     $consumerKey = $integration['consumer_key'];
                     $consumerSecret = $integration['consumer_secret'];
                     $sellerMetaKey = $integration['seller_meta_key'] ?? '_vendor_id';
-                    $cacheTtlMinutes = $integration['cache_ttl_minutes'] ?? 60;
+                    // TTL longo para sync manual histórico (30 dias).
+                    // cache_ttl_minutes é para cache de curto prazo (busca em tempo real).
+                    $cacheTtlMinutes = 30 * 24 * 60; // 43200 minutos = 30 dias
                     
                     $dateMin = date('Y-m-d', strtotime("-{$daysBack} days"));
                     

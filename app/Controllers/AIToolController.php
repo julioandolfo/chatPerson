@@ -84,6 +84,15 @@ class AIToolController
                 $tool['config'] = json_decode($tool['config'], true);
             }
             
+            // Se for requisição AJAX ou JSON, retornar JSON
+            if (Request::isAjax() || Request::get('format') === 'json') {
+                Response::json([
+                    'success' => true,
+                    'tool' => $tool
+                ]);
+                return;
+            }
+            
             // Carregar dados para tools de escalação e funil
             $departments = \App\Models\Department::all();
             $funnels = \App\Models\Funnel::whereActive();
@@ -98,6 +107,13 @@ class AIToolController
                 'agents' => $agents
             ]);
         } catch (\Exception $e) {
+            if (Request::isAjax() || Request::get('format') === 'json') {
+                Response::json([
+                    'success' => false,
+                    'message' => $e->getMessage()
+                ], 500);
+                return;
+            }
             Response::forbidden($e->getMessage());
         }
     }

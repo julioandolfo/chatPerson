@@ -71,14 +71,32 @@ ob_start();
                                 </td>
                                 <td class="text-end">
                                     <div class="d-flex justify-content-end gap-2">
-                                        <a href="<?= \App\Helpers\Url::to('/ai-tools/' . $tool['id']) ?>" class="btn btn-sm btn-light btn-active-light-primary">
-                                            Ver
+                                        <a href="<?= \App\Helpers\Url::to('/ai-tools/' . $tool['id']) ?>" class="btn btn-sm btn-light btn-active-light-primary" title="Ver detalhes">
+                                            <i class="ki-duotone ki-eye fs-5">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                                <span class="path3"></span>
+                                            </i>
                                         </a>
+                                        <?php if (\App\Helpers\Permission::can('ai_tools.create')): ?>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-light btn-active-light-success duplicate-ai-tool-btn" 
+                                                data-id="<?= $tool['id'] ?>"
+                                                data-name="<?= htmlspecialchars($tool['name']) ?>"
+                                                data-type="<?= htmlspecialchars($tool['tool_type']) ?>"
+                                                title="Duplicar tool">
+                                            <i class="ki-duotone ki-copy fs-5">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                        </button>
+                                        <?php endif; ?>
                                         <?php if (\App\Helpers\Permission::can('ai_tools.delete')): ?>
                                         <button type="button" 
                                                 class="btn btn-sm btn-light btn-active-light-danger delete-ai-tool-btn" 
                                                 data-id="<?= $tool['id'] ?>"
-                                                data-name="<?= htmlspecialchars($tool['name']) ?>">
+                                                data-name="<?= htmlspecialchars($tool['name']) ?>"
+                                                title="Deletar">
                                             <i class="ki-duotone ki-trash fs-5">
                                                 <span class="path1"></span>
                                                 <span class="path2"></span>
@@ -86,7 +104,6 @@ ob_start();
                                                 <span class="path4"></span>
                                                 <span class="path5"></span>
                                             </i>
-                                            Deletar
                                         </button>
                                         <?php endif; ?>
                                     </div>
@@ -101,12 +118,15 @@ ob_start();
 </div>
 <!--end::Card-->
 
-<!--begin::Modal - Nova Tool-->
+<!--begin::Modal - Nova Tool (Wizard)-->
 <div class="modal fade" id="kt_modal_new_ai_tool" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-800px">
+    <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Nova Tool de IA</h2>
+                <div>
+                    <h2 class="fw-bold mb-1">Nova Tool de IA</h2>
+                    <span class="text-muted fs-7">Configure sua tool em 3 passos simples</span>
+                </div>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -114,112 +134,439 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_new_ai_tool_form" class="form">
-                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Nome</label>
-                        <input type="text" name="name" class="form-control form-control-solid" placeholder="Ex: Buscar Pedido WooCommerce" required />
+            
+            <!-- Wizard Steps -->
+            <div class="modal-body px-0 pb-0">
+                <div class="px-10">
+                    <!-- Stepper -->
+                    <div class="stepper stepper-pills stepper-column d-flex flex-column flex-xl-row flex-row-fluid" id="kt_create_tool_stepper">
+                        <div class="d-flex justify-content-between justify-content-xl-start flex-row-auto w-100 w-xl-300px">
+                            <div class="stepper-nav ps-lg-10">
+                                <!-- Step 1 -->
+                                <div class="stepper-item current" data-kt-stepper-element="nav" data-kt-stepper-item="1">
+                                    <div class="stepper-wrapper">
+                                        <div class="stepper-icon w-40px h-40px">
+                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
+                                            <span class="stepper-number">1</span>
+                                        </div>
+                                        <div class="stepper-label">
+                                            <h3 class="stepper-title">Informações Básicas</h3>
+                                            <div class="stepper-desc">Nome, slug e tipo</div>
+                                        </div>
+                                    </div>
+                                    <div class="stepper-line h-40px"></div>
+                                </div>
+                                
+                                <!-- Step 2 -->
+                                <div class="stepper-item" data-kt-stepper-element="nav" data-kt-stepper-item="2">
+                                    <div class="stepper-wrapper">
+                                        <div class="stepper-icon w-40px h-40px">
+                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
+                                            <span class="stepper-number">2</span>
+                                        </div>
+                                        <div class="stepper-label">
+                                            <h3 class="stepper-title">Configurações</h3>
+                                            <div class="stepper-desc">Parâmetros específicos do tipo</div>
+                                        </div>
+                                    </div>
+                                    <div class="stepper-line h-40px"></div>
+                                </div>
+                                
+                                <!-- Step 3 -->
+                                <div class="stepper-item" data-kt-stepper-element="nav" data-kt-stepper-item="3">
+                                    <div class="stepper-wrapper">
+                                        <div class="stepper-icon w-40px h-40px">
+                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
+                                            <span class="stepper-number">3</span>
+                                        </div>
+                                        <div class="stepper-label">
+                                            <h3 class="stepper-title">Revisão</h3>
+                                            <div class="stepper-desc">Verifique e finalize</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Form Content -->
+                        <div class="flex-row-fluid py-lg-10 px-lg-15">
+                            <form id="kt_modal_new_ai_tool_form" class="form">
+                                <!-- Step 1: Informações Básicas -->
+                                <div class="current" data-kt-stepper-element="content" data-kt-stepper-item="1">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Informações Básicas</span>
+                                                <span class="badge badge-light-primary fs-7">Etapa 1 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Defina o nome, identificador e tipo da tool.</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2 d-flex align-items-center">
+                                                <span>Nome da Tool</span>
+                                                <i class="ki-duotone ki-information-5 ms-2 fs-6" data-bs-toggle="tooltip" title="Nome amigável que a IA usará para identificar esta tool"></i>
+                                            </label>
+                                            <div class="input-group input-group-solid">
+                                                <span class="input-group-text"><i class="ki-duotone ki-tag fs-3"></i></span>
+                                                <input type="text" name="name" id="wizard_name" class="form-control form-control-lg" placeholder="Ex: Buscar Pedido WooCommerce" required />
+                                            </div>
+                                            <div class="form-text">Use um nome descritivo que a IA possa entender</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2 d-flex align-items-center">
+                                                <span>Slug (Identificador)</span>
+                                                <i class="ki-duotone ki-information-5 ms-2 fs-6" data-bs-toggle="tooltip" title="Identificador técnico único (sem espaços, use underscore)"></i>
+                                            </label>
+                                            <div class="input-group input-group-solid">
+                                                <span class="input-group-text"><i class="ki-duotone ki-code fs-3"></i></span>
+                                                <input type="text" name="slug" id="wizard_slug" class="form-control form-control-lg" placeholder="Ex: buscar_pedido_woocommerce" required />
+                                            </div>
+                                            <div class="form-text">Este identificador é usado internamente pelo sistema</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="fw-semibold fs-6 mb-2">Descrição</label>
+                                            <textarea name="description" id="wizard_description" class="form-control form-control-solid" rows="3" placeholder="Descreva o que esta tool faz e quando a IA deve usá-la..."></textarea>
+                                            <div class="form-text">Ajuda a IA a entender quando usar esta tool</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2">Tipo de Tool</label>
+                                            <div class="row g-5" id="tool_type_cards">
+                                                <!-- Cards serão gerados via JS -->
+                                                <select name="tool_type" id="kt_tool_type" class="form-select form-select-solid d-none" required>
+                                                    <option value="">Selecione</option>
+                                                    <option value="woocommerce">WooCommerce</option>
+                                                    <option value="database">Database</option>
+                                                    <option value="n8n">N8N</option>
+                                                    <option value="document">Document</option>
+                                                    <option value="system">System</option>
+                                                    <option value="api">API</option>
+                                                    <option value="followup">Followup</option>
+                                                    <option value="human_escalation">🧑‍💼 Escalar para Humano</option>
+                                                    <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
+                                                    <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 2: Configurações -->
+                                <div data-kt-stepper-element="content" data-kt-stepper-item="2">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Configurações</span>
+                                                <span class="badge badge-light-primary fs-7">Etapa 2 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Configure os parâmetros específicos do tipo selecionado.</div>
+                                        </div>
+                                        
+                                        <!-- Aviso de Function Schema Automático -->
+                                        <div class="fv-row mb-7" id="kt_auto_schema_notice" style="display: none;">
+                                            <div class="alert alert-info d-flex align-items-center p-5">
+                                                <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                <div>
+                                                    <h4 class="mb-1 text-info">Function Schema Automático</h4>
+                                                    <span id="kt_auto_schema_message">O function schema será gerado automaticamente.</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Function Schema Manual (para tipos customizáveis) -->
+                                        <div class="fv-row mb-7" id="kt_function_schema_section">
+                                            <label class="fw-semibold fs-6 mb-4 d-flex align-items-center">
+                                                <span>Function Schema</span>
+                                                <span class="badge badge-light-danger ms-2">Avançado</span>
+                                            </label>
+                                            <div class="card border border-dashed border-primary bg-light p-5">
+                                                <div class="fv-row mb-5">
+                                                    <label class="required fw-semibold fs-7 mb-2">Nome da Função</label>
+                                                    <input type="text" id="kt_function_name" class="form-control form-control-solid" placeholder="Ex: buscar_pedido_woocommerce" required />
+                                                </div>
+                                                
+                                                <div class="fv-row mb-5">
+                                                    <label class="required fw-semibold fs-7 mb-2">Descrição da Função</label>
+                                                    <textarea id="kt_function_description" class="form-control form-control-solid" rows="2" placeholder="Descreva o que esta função faz" required></textarea>
+                                                </div>
+                                                
+                                                <div class="fv-row mb-5">
+                                                    <label class="fw-semibold fs-7 mb-3 d-flex justify-content-between">
+                                                        <span>Parâmetros</span>
+                                                        <span class="text-muted fs-8">Campos que a IA pode preencher</span>
+                                                    </label>
+                                                    <div id="kt_function_parameters">
+                                                        <div class="text-muted fs-7 mb-3 text-center py-4 bg-white rounded">
+                                                            <i class="ki-duotone ki-plus-circle fs-2x mb-2 d-block"></i>
+                                                            Nenhum parâmetro adicionado
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-light-primary mt-3" onclick="addFunctionParameter()">
+                                                        <i class="ki-duotone ki-plus fs-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Adicionar Parâmetro
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Config Fields (dinâmico por tipo) -->
+                                        <div class="fv-row mb-7" id="kt_config_section" style="display: none;">
+                                            <label class="fw-semibold fs-6 mb-4 d-flex align-items-center">
+                                                <i class="ki-duotone ki-setting-2 fs-4 me-2 text-primary"></i>
+                                                <span>Configurações Específicas</span>
+                                            </label>
+                                            <div class="card bg-light p-5" id="kt_config_fields">
+                                                <!-- Campos serão inseridos dinamicamente via JavaScript -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 3: Revisão -->
+                                <div data-kt-stepper-element="content" data-kt-stepper-item="3">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Revisão</span>
+                                                <span class="badge badge-light-success fs-7">Etapa 3 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Verifique as configurações antes de criar a tool.</div>
+                                        </div>
+                                        
+                                        <!-- Resumo em Cards -->
+                                        <div class="mb-8">
+                                            <div class="card bg-light mb-5">
+                                                <div class="card-body">
+                                                    <h4 class="fw-bold mb-4 text-gray-800">
+                                                        <i class="ki-duotone ki-information fs-2 me-2"></i>
+                                                        Informações Básicas
+                                                    </h4>
+                                                    <div class="row g-5">
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Nome</div>
+                                                            <div class="fw-semibold fs-6" id="review_name">-</div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Slug</div>
+                                                            <div class="fw-semibold fs-6" id="review_slug">-</div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Tipo</div>
+                                                            <div class="fw-semibold fs-6"><span class="badge badge-light-primary" id="review_type">-</span></div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Status</div>
+                                                            <div class="fw-semibold fs-6"><span class="badge badge-light-success">Ativa</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-4">
+                                                        <div class="text-muted fs-7 mb-1">Descrição</div>
+                                                        <div class="fw-semibold fs-6" id="review_description">-</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="card bg-light" id="review_config_card" style="display: none;">
+                                                <div class="card-body">
+                                                    <h4 class="fw-bold mb-4 text-gray-800">
+                                                        <i class="ki-duotone ki-setting-2 fs-2 me-2"></i>
+                                                        Configurações
+                                                    </h4>
+                                                    <div id="review_config_content"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="alert alert-warning d-flex">
+                                            <i class="ki-duotone ki-information-5 fs-2x me-4"></i>
+                                            <div>
+                                                <span class="fw-semibold">Importante:</span> Após criar a tool, você precisará atribuí-la a um ou mais agentes de IA para que ela possa ser usada.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden fields para JSON -->
+                                <input type="hidden" name="function_schema" id="kt_function_schema_json" />
+                                <input type="hidden" name="config" id="kt_config_json" />
+                                <input type="hidden" name="enabled" value="1" />
+                                
+                                <!-- Actions -->
+                                <div class="d-flex flex-stack pt-10">
+                                    <div class="me-2">
+                                        <button type="button" class="btn btn-lg btn-light-primary me-3" data-kt-stepper-action="previous">
+                                            <i class="ki-duotone ki-arrow-left fs-3 me-1">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Voltar
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-lg btn-primary" data-kt-stepper-action="next">
+                                            <span class="indicator-label">
+                                                Próximo
+                                                <i class="ki-duotone ki-arrow-right fs-3 ms-2 me-0">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </span>
+                                            <span class="indicator-progress">
+                                                Aguarde...
+                                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                            </span>
+                                        </button>
+                                        <button type="submit" class="btn btn-lg btn-success" data-kt-stepper-action="submit" style="display: none;">
+                                            <span class="indicator-label">
+                                                <i class="ki-duotone ki-check fs-3 me-2"></i>
+                                                Criar Tool
+                                            </span>
+                                            <span class="indicator-progress">
+                                                Criando...
+                                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Slug</label>
-                        <input type="text" name="slug" class="form-control form-control-solid" placeholder="Ex: buscar_pedido_woocommerce" required />
-                        <div class="form-text">Identificador único da tool (sem espaços, use underscore)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal - Nova Tool-->
+
+<!--begin::Modal - Duplicar Tool-->
+<div class="modal fade" id="kt_modal_duplicate_ai_tool" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="d-flex align-items-center">
+                    <div class="btn btn-icon btn-light-success btn-sm me-3">
+                        <i class="ki-duotone ki-copy fs-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
                     </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Descrição</label>
-                        <textarea name="description" class="form-control form-control-solid" rows="3" placeholder="Descrição da funcionalidade da tool"></textarea>
+                    <div>
+                        <h2 class="fw-bold mb-0">Duplicar Tool</h2>
+                        <span class="text-muted fs-7">Crie uma cópia com configurações pré-preenchidas</span>
                     </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Tipo</label>
-                        <select name="tool_type" id="kt_tool_type" class="form-select form-select-solid" required>
-                            <option value="">Selecione o tipo</option>
-                            <option value="woocommerce">WooCommerce</option>
-                            <option value="database">Database</option>
-                            <option value="n8n">N8N</option>
-                            <option value="document">Document</option>
-                            <option value="system">System</option>
-                            <option value="api">API</option>
-                            <option value="followup">Followup</option>
-                            <option value="human_escalation">🧑‍💼 Escalar para Humano</option>
-                            <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
-                            <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Aviso de Function Schema Automático (para tipos especiais) -->
-                    <div class="fv-row mb-7" id="kt_auto_schema_notice" style="display: none;">
-                        <div class="alert alert-info d-flex align-items-center">
-                            <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                </div>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                    </i>
+                </div>
+            </div>
+            <form id="kt_modal_duplicate_ai_tool_form" class="form">
+                <div class="modal-body">
+                    <!-- Origem -->
+                    <div class="d-flex align-items-center bg-light rounded p-4 mb-5">
+                        <div class="symbol symbol-40px symbol-circle me-4 bg-success">
+                            <i class="ki-duotone ki-abstract-26 fs-2 text-white">
                                 <span class="path1"></span>
                                 <span class="path2"></span>
-                                <span class="path3"></span>
                             </i>
-                            <div>
-                                <h4 class="mb-1 text-info">Function Schema Automático</h4>
-                                <span id="kt_auto_schema_message">O function schema será gerado automaticamente com base nas configurações abaixo.</span>
-                            </div>
+                        </div>
+                        <div>
+                            <div class="text-muted fs-7 mb-1">Tool de origem</div>
+                            <div class="fw-bold fs-6 text-gray-800" id="duplicate-source-name">-</div>
+                            <span class="badge badge-light-primary mt-1" id="duplicate-source-type">-</span>
                         </div>
                     </div>
                     
-                    <!-- Function Schema Fields (para tipos customizáveis) -->
-                    <div class="fv-row mb-7" id="kt_function_schema_section">
-                        <label class="required fw-semibold fs-6 mb-2">Function Schema</label>
-                        <div class="card bg-light p-5">
-                            <div class="fv-row mb-5">
-                                <label class="required fw-semibold fs-7 mb-2">Nome da Função</label>
-                                <input type="text" id="kt_function_name" class="form-control form-control-solid" placeholder="Ex: buscar_pedido_woocommerce" required />
-                                <div class="form-text">Nome único da função (use underscore, sem espaços)</div>
-                            </div>
-                            
-                            <div class="fv-row mb-5">
-                                <label class="required fw-semibold fs-7 mb-2">Descrição da Função</label>
-                                <textarea id="kt_function_description" class="form-control form-control-solid" rows="2" placeholder="Descreva o que esta função faz" required></textarea>
-                                <div class="form-text">Descrição clara do propósito da função</div>
-                            </div>
-                            
-                            <div class="fv-row mb-5">
-                                <label class="fw-semibold fs-7 mb-3">Parâmetros</label>
-                                <div id="kt_function_parameters">
-                                    <div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>
+                    <!-- Novo nome e slug -->
+                    <div class="fv-row mb-5">
+                        <label class="required fw-semibold fs-6 mb-2">Novo Nome</label>
+                        <input type="text" name="name" id="duplicate_name" class="form-control form-control-solid" placeholder="Ex: Buscar Pedido WooCommerce (Copia)" required />
+                        <div class="form-text">Dê um nome descritivo para identificar a cópia</div>
+                    </div>
+                    
+                    <div class="fv-row mb-5">
+                        <label class="required fw-semibold fs-6 mb-2">Novo Slug</label>
+                        <input type="text" name="slug" id="duplicate_slug" class="form-control form-control-solid" placeholder="Ex: buscar_pedido_woocommerce_copia" required />
+                        <div class="form-text">Identificador único (sem espaços, use underscore)</div>
+                    </div>
+                    
+                    <input type="hidden" name="source_tool_id" id="duplicate_source_id" />
+                    <input type="hidden" name="tool_type" id="duplicate_tool_type" />
+                    <input type="hidden" name="description" id="duplicate_description" />
+                    <input type="hidden" name="function_schema" id="duplicate_function_schema" />
+                    <input type="hidden" name="config" id="duplicate_config" />
+                    
+                    <!-- Preview das configurações -->
+                    <div class="mb-5">
+                        <label class="fw-semibold fs-6 mb-2">Configurações que serão copiadas</label>
+                        <div class="bg-light rounded p-4">
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="ki-duotone ki-check-circle fs-2x text-success me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <span class="fw-semibold">Function Schema</span>
+                                    <div class="text-muted fs-7">Estrutura da função e parâmetros</div>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-light-primary" onclick="addFunctionParameter()">
-                                    <i class="ki-duotone ki-plus fs-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Adicionar Parâmetro
-                                </button>
+                            </div>
+                            <div class="d-flex align-items-center mb-3">
+                                <i class="ki-duotone ki-check-circle fs-2x text-success me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <span class="fw-semibold">Configurações</span>
+                                    <div class="text-muted fs-7">URL, credenciais, opções específicas do tipo</div>
+                                </div>
+                            </div>
+                            <div class="d-flex align-items-center">
+                                <i class="ki-duotone ki-check-circle fs-2x text-success me-3">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                <div>
+                                    <span class="fw-semibold">Status</span>
+                                    <div class="text-muted fs-7">Tool será criada como inativa (para revisão)</div>
+                                </div>
                             </div>
                         </div>
                     </div>
                     
-                    <!-- Config Fields (dinâmico por tipo) -->
-                    <div class="fv-row mb-7" id="kt_config_section" style="display: none;">
-                        <label class="fw-semibold fs-6 mb-2">Configurações</label>
-                        <div class="card bg-light p-5" id="kt_config_fields">
-                            <!-- Campos serão inseridos dinamicamente via JavaScript -->
+                    <div class="alert alert-info d-flex">
+                        <i class="ki-duotone ki-information-5 fs-2x me-3">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        <div>
+                            <span class="fw-semibold">Dica:</span> Após duplicar, você pode editar a tool para ajustar as configurações específicas antes de ativá-la.
                         </div>
-                    </div>
-                    
-                    <!-- Hidden fields para JSON -->
-                    <input type="hidden" name="function_schema" id="kt_function_schema_json" />
-                    <input type="hidden" name="config" id="kt_config_json" />
-                    
-                    <div class="fv-row mb-7">
-                        <label class="d-flex align-items-center">
-                            <input type="checkbox" name="enabled" class="form-check-input me-2" checked />
-                            Tool ativa
-                        </label>
                     </div>
                 </div>
                 <div class="modal-footer flex-center">
                     <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
-                    <button type="submit" id="kt_modal_new_ai_tool_submit" class="btn btn-primary">
-                        <span class="indicator-label">Criar Tool</span>
-                        <span class="indicator-progress">Aguarde...
+                    <button type="submit" id="kt_modal_duplicate_ai_tool_submit" class="btn btn-success">
+                        <span class="indicator-label">
+                            <i class="ki-duotone ki-copy fs-2 me-2">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            Duplicar Tool
+                        </span>
+                        <span class="indicator-progress">Criando cópia...
                         <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
                     </button>
                 </div>
@@ -227,7 +574,7 @@ ob_start();
         </div>
     </div>
 </div>
-<!--end::Modal - Nova Tool-->
+<!--end::Modal - Duplicar Tool-->
 
 <?php 
 $content = ob_get_clean(); 
@@ -923,33 +1270,286 @@ function buildConfig() {
 document.addEventListener("DOMContentLoaded", function() {
     console.log("=== AI Tools: DOMContentLoaded disparado ===");
     
-    // Verificar se toolTypeConfigs existe
-    console.log("toolTypeConfigs existe?", typeof toolTypeConfigs !== 'undefined');
-    console.log("toolTypeConfigs:", toolTypeConfigs);
+    // ==================== WIZARD ====================
+    const stepperElement = document.querySelector('#kt_create_tool_stepper');
+    let stepper = null;
+    
+    if (stepperElement && typeof KTStepper !== 'undefined') {
+        stepper = new KTStepper(stepperElement);
+        
+        // Handle next button
+        stepper.on('kt.stepper.next', function(stepper) {
+            const currentStep = stepper.getCurrentStepIndex();
+            
+            // Validação antes de avançar
+            if (currentStep === 1) {
+                if (!validateStep1()) {
+                    return;
+                }
+                updateReviewSummary();
+            }
+            
+            if (currentStep === 2) {
+                buildAndStoreJSONs();
+                updateReviewConfig();
+            }
+            
+            stepper.goNext();
+            updateWizardButtons(stepper);
+        });
+        
+        // Handle previous button
+        stepper.on('kt.stepper.previous', function(stepper) {
+            stepper.goPrevious();
+            updateWizardButtons(stepper);
+        });
+        
+        // Handle navigation click - Botões próximo/voltar
+        const nextBtn = document.querySelector('[data-kt-stepper-action="next"]');
+        const prevBtn = document.querySelector('[data-kt-stepper-action="previous"]');
+        const submitBtn = document.querySelector('[data-kt-stepper-action="submit"]');
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const currentStep = stepper.getCurrentStepIndex();
+                
+                if (currentStep === 1 && !validateStep1()) {
+                    return;
+                }
+                if (currentStep === 1) {
+                    updateReviewSummary();
+                }
+                if (currentStep === 2) {
+                    buildAndStoreJSONs();
+                    updateReviewConfig();
+                }
+                
+                stepper.goNext();
+                updateWizardButtons(stepper);
+            });
+        }
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                stepper.goPrevious();
+                updateWizardButtons(stepper);
+            });
+        }
+        
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('kt_modal_new_ai_tool_form').dispatchEvent(new Event('submit'));
+            });
+        }
+    }
+    
+    function updateWizardButtons(stepper) {
+        const currentStep = stepper.getCurrentStepIndex();
+        const totalSteps = stepper.getTotalStepsNumber();
+        const nextBtn = document.querySelector('[data-kt-stepper-action="next"]');
+        const submitBtn = document.querySelector('[data-kt-stepper-action="submit"]');
+        
+        if (currentStep === totalSteps) {
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (submitBtn) submitBtn.style.display = 'inline-flex';
+        } else {
+            if (nextBtn) nextBtn.style.display = 'inline-flex';
+            if (submitBtn) submitBtn.style.display = 'none';
+        }
+    }
+    
+    function validateStep1() {
+        const name = document.getElementById('wizard_name').value.trim();
+        const slug = document.getElementById('wizard_slug').value.trim();
+        const toolType = document.getElementById('kt_tool_type').value;
+        
+        if (!name) {
+            alert('Por favor, preencha o nome da tool.');
+            document.getElementById('wizard_name').focus();
+            return false;
+        }
+        
+        if (!slug) {
+            alert('Por favor, preencha o slug da tool.');
+            document.getElementById('wizard_slug').focus();
+            return false;
+        }
+        
+        if (!toolType) {
+            alert('Por favor, selecione o tipo da tool.');
+            return false;
+        }
+        
+        return true;
+    }
+    
+    function updateReviewSummary() {
+        document.getElementById('review_name').textContent = document.getElementById('wizard_name').value;
+        document.getElementById('review_slug').textContent = document.getElementById('wizard_slug').value;
+        document.getElementById('review_description').textContent = document.getElementById('wizard_description').value || '-';
+        
+        const toolType = document.getElementById('kt_tool_type').value;
+        const typeLabels = {
+            woocommerce: 'WooCommerce',
+            database: 'Database',
+            n8n: 'N8N',
+            document: 'Document',
+            system: 'System',
+            api: 'API',
+            followup: 'Followup',
+            human_escalation: '🧑‍💼 Escalar para Humano',
+            funnel_stage: '📊 Mover para Funil',
+            funnel_stage_smart: '🧠 Mover (Inteligente)'
+        };
+        document.getElementById('review_type').textContent = typeLabels[toolType] || toolType;
+    }
+    
+    function updateReviewConfig() {
+        const config = buildConfig();
+        const card = document.getElementById('review_config_card');
+        const content = document.getElementById('review_config_content');
+        
+        if (config && Object.keys(config).length > 0) {
+            let html = '<div class="row g-5">';
+            Object.keys(config).forEach(key => {
+                const value = config[key];
+                let displayValue = value;
+                if (typeof value === 'boolean') {
+                    displayValue = value ? '✅ Sim' : '❌ Não';
+                } else if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value).substring(0, 50) + '...';
+                }
+                
+                html += `
+                    <div class="col-md-6">
+                        <div class="text-muted fs-7 mb-1">${key}</div>
+                        <div class="fw-semibold fs-6">${displayValue}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    }
+    
+    function buildAndStoreJSONs() {
+        const functionSchema = buildFunctionSchema();
+        const config = buildConfig();
+        
+        if (functionSchema) {
+            document.getElementById('kt_function_schema_json').value = JSON.stringify(functionSchema);
+        }
+        if (config) {
+            document.getElementById('kt_config_json').value = JSON.stringify(config);
+        }
+    }
+    
+    // Gerar cards de tipo de tool
+    renderToolTypeCards();
+    
+    function renderToolTypeCards() {
+        const container = document.getElementById('tool_type_cards');
+        const select = document.getElementById('kt_tool_type');
+        const types = [
+            { value: 'human_escalation', label: '🧑‍💼 Escalar para Humano', desc: 'Transfere para atendente humano', color: 'success' },
+            { value: 'funnel_stage', label: '📊 Mover para Funil', desc: 'Move conversa entre etapas', color: 'primary' },
+            { value: 'funnel_stage_smart', label: '🧠 Mover (Inteligente)', desc: 'IA decide a melhor etapa', color: 'info' },
+            { value: 'n8n', label: '⚡ N8N Webhook', desc: 'Integração com workflows', color: 'warning' },
+            { value: 'woocommerce', label: '🛒 WooCommerce', desc: 'Integração com loja', color: 'danger' },
+            { value: 'api', label: '🔌 API Externa', desc: 'Conecta com APIs', color: 'secondary' },
+            { value: 'database', label: '🗄️ Database', desc: 'Consulta banco de dados', color: 'dark' },
+            { value: 'document', label: '📄 Documentos', desc: 'Busca em documentos', color: 'primary' },
+            { value: 'followup', label: '⏰ Follow-up', desc: 'Agenda retorno', color: 'success' },
+            { value: 'system', label: '⚙️ Sistema', desc: 'Funções internas', color: 'secondary' }
+        ];
+        
+        let html = '<div class="row g-3">';
+        types.forEach(type => {
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <label class="btn btn-flex btn-outline btn-outline-dashed btn-active-light-primary d-flex flex-column align-items-start w-100 h-100 p-6 tool-type-card" 
+                           data-type="${type.value}">
+                        <span class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="radio" name="tool_type_radio" value="${type.value}">
+                        </span>
+                        <span class="fs-4 fw-bold mb-2">${type.label}</span>
+                        <span class="text-muted fs-7 text-start">${type.desc}</span>
+                    </label>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+        // Event listeners para os cards
+        document.querySelectorAll('.tool-type-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const type = this.dataset.type;
+                
+                // Atualizar select escondido
+                select.value = type;
+                
+                // Atualizar visual
+                document.querySelectorAll('.tool-type-card').forEach(c => {
+                    c.classList.remove('active');
+                    c.querySelector('.form-check-input').checked = false;
+                });
+                this.classList.add('active');
+                this.querySelector('.form-check-input').checked = true;
+                
+                // Atualizar campos de config
+                updateConfigFields();
+            });
+        });
+    }
+    
+    // Auto-gerar slug do nome
+    const nameInput = document.getElementById('wizard_name');
+    const slugInput = document.getElementById('wizard_slug');
+    
+    if (nameInput && slugInput) {
+        nameInput.addEventListener('input', function() {
+            if (!slugInput.dataset.userModified) {
+                slugInput.value = generateSlug(this.value);
+            }
+        });
+        
+        slugInput.addEventListener('input', function() {
+            this.dataset.userModified = 'true';
+        });
+    }
+    
+    function generateSlug(text) {
+        return text
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '_');
+    }
     
     // Atualizar campos de config quando tipo mudar
     const toolTypeSelect = document.getElementById("kt_tool_type");
-    console.log("toolTypeSelect encontrado:", toolTypeSelect);
-    console.log("kt_config_section existe?", document.getElementById("kt_config_section"));
-    console.log("kt_config_fields existe?", document.getElementById("kt_config_fields"));
-    
     if (toolTypeSelect) {
-        console.log("Registrando event listener no select...");
         toolTypeSelect.addEventListener("change", function() {
-            console.log("=== EVENT CHANGE DISPARADO ===");
             console.log("Tipo selecionado:", this.value);
             updateConfigFields();
         });
-        console.log("Event listener registrado com sucesso!");
-    } else {
-        console.error("ERRO: toolTypeSelect não encontrado!");
     }
     
     const form = document.getElementById("kt_modal_new_ai_tool_form");
     if (form) {
         form.addEventListener("submit", function(e) {
             e.preventDefault();
-            const submitBtn = document.getElementById("kt_modal_new_ai_tool_submit");
+            const submitBtn = document.querySelector('[data-kt-stepper-action="submit"]');
             submitBtn.setAttribute("data-kt-indicator", "on");
             submitBtn.disabled = true;
             
@@ -973,10 +1573,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
             
             const formData = new FormData(form);
-            
-            // Converter enabled para boolean
-            const enabled = formData.get("enabled") === "on" || formData.get("enabled") === "true";
-            formData.set("enabled", enabled ? "1" : "0");
             
             fetch("<?= \App\Helpers\Url::to('/ai-tools') ?>", {
                 method: "POST",
@@ -1066,6 +1662,140 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     });
+    
+    // ✅ NOVO: Funcionalidade de duplicar AI Tool
+    const duplicateModal = document.getElementById('kt_modal_duplicate_ai_tool');
+    const duplicateModalInstance = duplicateModal ? new bootstrap.Modal(duplicateModal) : null;
+    let sourceToolData = null;
+    
+    document.querySelectorAll('.duplicate-ai-tool-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const toolId = this.getAttribute('data-id');
+            const toolName = this.getAttribute('data-name');
+            const toolType = this.getAttribute('data-type');
+            
+            // Mostrar loading no botão
+            const originalHtml = this.innerHTML;
+            this.disabled = true;
+            this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            
+            try {
+                // Buscar dados completos da tool
+                const response = await fetch(`<?= \App\Helpers\Url::to('/ai-tools') ?>/${toolId}?format=json`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar dados da tool');
+                }
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.tool) {
+                    throw new Error(data.message || 'Tool não encontrada');
+                }
+                
+                sourceToolData = data.tool;
+                
+                // Preencher modal
+                document.getElementById('duplicate-source-name').textContent = toolName;
+                document.getElementById('duplicate-source-type').textContent = toolType;
+                document.getElementById('duplicate_name').value = toolName + ' (Cópia)';
+                document.getElementById('duplicate_slug').value = (data.tool.slug || '') + '_copia';
+                document.getElementById('duplicate_source_id').value = toolId;
+                document.getElementById('duplicate_tool_type').value = toolType;
+                document.getElementById('duplicate_description').value = data.tool.description || '';
+                document.getElementById('duplicate_function_schema').value = JSON.stringify(data.tool.function_schema || {});
+                document.getElementById('duplicate_config').value = JSON.stringify(data.tool.config || {});
+                
+                // Abrir modal
+                duplicateModalInstance.show();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro: ' + error.message);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = originalHtml;
+            }
+        });
+    });
+    
+    // Submit do formulário de duplicação
+    const duplicateForm = document.getElementById('kt_modal_duplicate_ai_tool_form');
+    if (duplicateForm) {
+        duplicateForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('kt_modal_duplicate_ai_tool_submit');
+            submitBtn.setAttribute('data-kt-indicator', 'on');
+            submitBtn.disabled = true;
+            
+            const formData = new FormData(duplicateForm);
+            
+            // Converter enabled para boolean (inativa por padrão)
+            formData.set('enabled', '0');
+            
+            try {
+                const response = await fetch("<?= \App\Helpers\Url::to('/ai-tools') ?>", {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    duplicateModalInstance.hide();
+                    
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success('Tool duplicada com sucesso!');
+                    } else {
+                        alert('Tool duplicada com sucesso!');
+                    }
+                    
+                    // Recarregar página para mostrar nova tool
+                    location.reload();
+                } else {
+                    throw new Error(data.message || 'Erro ao duplicar tool');
+                }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                alert('Erro: ' + error.message);
+            } finally {
+                submitBtn.removeAttribute('data-kt-indicator');
+                submitBtn.disabled = false;
+            }
+        });
+    }
+    
+    // Atualizar slug automaticamente baseado no nome
+    const duplicateNameInput = document.getElementById('duplicate_name');
+    const duplicateSlugInput = document.getElementById('duplicate_slug');
+    
+    if (duplicateNameInput && duplicateSlugInput) {
+        duplicateNameInput.addEventListener('input', function() {
+            if (!duplicateSlugInput.dataset.userModified) {
+                const slug = this.value
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-z0-9_]/g, '_')
+                    .replace(/_+/g, '_')
+                    .replace(/^_|_$/g, '');
+                duplicateSlugInput.value = slug;
+            }
+        });
+        
+        duplicateSlugInput.addEventListener('input', function() {
+            this.dataset.userModified = 'true';
+        });
+    }
 });
 </script>
 <?php 

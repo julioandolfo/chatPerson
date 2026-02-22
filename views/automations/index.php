@@ -459,7 +459,7 @@ ob_start();
             // Contar nós
             $nodeCount = 0;
             try {
-                $nodeCount = count(\App\Models\AutomationNode::where('automation_id', $automation['id'])->get());
+                $nodeCount = count(\App\Models\AutomationNode::where('automation_id', '=', $automation['id'])->get());
             } catch (\Exception $e) {
                 $nodeCount = 0;
             }

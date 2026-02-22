@@ -138,58 +138,61 @@ ob_start();
             <!-- Wizard Steps -->
             <div class="modal-body px-0 pb-0">
                 <div class="px-10">
-                    <!-- Stepper -->
-                    <div class="stepper stepper-pills stepper-column d-flex flex-column flex-xl-row flex-row-fluid" id="kt_create_tool_stepper">
-                        <div class="d-flex justify-content-between justify-content-xl-start flex-row-auto w-100 w-xl-300px">
-                            <div class="stepper-nav ps-lg-10">
-                                <!-- Step 1 -->
-                                <div class="stepper-item current" data-kt-stepper-element="nav" data-kt-stepper-item="1">
-                                    <div class="stepper-wrapper">
-                                        <div class="stepper-icon w-40px h-40px">
-                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
-                                            <span class="stepper-number">1</span>
-                                        </div>
-                                        <div class="stepper-label">
-                                            <h3 class="stepper-title">Informações Básicas</h3>
-                                            <div class="stepper-desc">Nome, slug e tipo</div>
-                                        </div>
+                    <!-- Stepper Horizontal -->
+                    <div class="stepper stepper-links d-flex flex-column" id="kt_create_tool_stepper">
+                        <!-- Stepper Header (Horizontal) -->
+                        <div class="stepper-nav d-flex justify-content-center py-5 mb-5 border-bottom">
+                            <!-- Step 1 -->
+                            <div class="stepper-item current mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="1">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-primary text-white mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">1</span>
                                     </div>
-                                    <div class="stepper-line h-40px"></div>
-                                </div>
-                                
-                                <!-- Step 2 -->
-                                <div class="stepper-item" data-kt-stepper-element="nav" data-kt-stepper-item="2">
-                                    <div class="stepper-wrapper">
-                                        <div class="stepper-icon w-40px h-40px">
-                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
-                                            <span class="stepper-number">2</span>
-                                        </div>
-                                        <div class="stepper-label">
-                                            <h3 class="stepper-title">Configurações</h3>
-                                            <div class="stepper-desc">Parâmetros específicos do tipo</div>
-                                        </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Informações</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Nome e tipo</div>
                                     </div>
-                                    <div class="stepper-line h-40px"></div>
                                 </div>
-                                
-                                <!-- Step 3 -->
-                                <div class="stepper-item" data-kt-stepper-element="nav" data-kt-stepper-item="3">
-                                    <div class="stepper-wrapper">
-                                        <div class="stepper-icon w-40px h-40px">
-                                            <i class="ki-duotone ki-abstract-28 stepper-check fs-2"></i>
-                                            <span class="stepper-number">3</span>
-                                        </div>
-                                        <div class="stepper-label">
-                                            <h3 class="stepper-title">Revisão</h3>
-                                            <div class="stepper-desc">Verifique e finalize</div>
-                                        </div>
+                            </div>
+                            
+                            <!-- Stepper Line -->
+                            <div class="stepper-line h-2px w-100px bg-gray-200 mt-5 mx-2"></div>
+                            
+                            <!-- Step 2 -->
+                            <div class="stepper-item mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="2">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-gray-200 text-gray-600 mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">2</span>
+                                    </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Configurações</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Parâmetros</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stepper Line -->
+                            <div class="stepper-line h-2px w-100px bg-gray-200 mt-5 mx-2"></div>
+                            
+                            <!-- Step 3 -->
+                            <div class="stepper-item mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="3">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-gray-200 text-gray-600 mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">3</span>
+                                    </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Revisão</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Finalize</div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Form Content -->
-                        <div class="flex-row-fluid py-lg-10 px-lg-15">
+                        <div class="py-5 px-lg-10">
                             <form id="kt_modal_new_ai_tool_form" class="form">
                                 <!-- Step 1: Informações Básicas -->
                                 <div class="current" data-kt-stepper-element="content" data-kt-stepper-item="1">
@@ -1359,6 +1362,34 @@ document.addEventListener("DOMContentLoaded", function() {
             if (nextBtn) nextBtn.style.display = 'inline-flex';
             if (submitBtn) submitBtn.style.display = 'none';
         }
+        
+        // Atualizar visual dos steps
+        updateStepperVisuals(currentStep);
+    }
+    
+    function updateStepperVisuals(currentStep) {
+        document.querySelectorAll('.stepper-item').forEach((item, index) => {
+            const icon = item.querySelector('.stepper-icon');
+            const stepNum = index + 1;
+            
+            if (stepNum < currentStep) {
+                // Step completado
+                icon.classList.remove('bg-gray-200', 'text-gray-600', 'bg-primary', 'text-white');
+                icon.classList.add('bg-success', 'text-white');
+                item.classList.add('completed');
+            } else if (stepNum === currentStep) {
+                // Step atual
+                icon.classList.remove('bg-gray-200', 'text-gray-600', 'bg-success', 'text-white');
+                icon.classList.add('bg-primary', 'text-white');
+                item.classList.add('current');
+                item.classList.remove('completed');
+            } else {
+                // Step futuro
+                icon.classList.remove('bg-primary', 'text-white', 'bg-success', 'text-white');
+                icon.classList.add('bg-gray-200', 'text-gray-600');
+                item.classList.remove('current', 'completed');
+            }
+        });
     }
     
     function validateStep1() {

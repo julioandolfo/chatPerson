@@ -178,13 +178,16 @@ ob_start();
 </div>
 <!--end::Card-->
 
-<!--begin::Modal - Editar Tool-->
+<!--begin::Modal - Editar Tool (Wizard)-->
 <?php if (\App\Helpers\Permission::can('ai_tools.edit')): ?>
 <div class="modal fade" id="kt_modal_edit_ai_tool" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-800px">
+    <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bold">Editar Tool de IA</h2>
+                <div>
+                    <h2 class="fw-bold mb-1">Editar Tool de IA</h2>
+                    <span class="text-muted fs-7">Edite sua tool em 3 passos simples</span>
+                </div>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <i class="ki-duotone ki-cross fs-1">
                         <span class="path1"></span>
@@ -192,133 +195,324 @@ ob_start();
                     </i>
                 </div>
             </div>
-            <form id="kt_modal_edit_ai_tool_form" class="form">
-                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                    <input type="hidden" name="tool_id" value="<?= $tool['id'] ?>" />
-                    
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Nome</label>
-                        <input type="text" name="name" class="form-control form-control-solid" value="<?= htmlspecialchars($tool['name']) ?>" required />
-                    </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Slug</label>
-                        <input type="text" name="slug" class="form-control form-control-solid" value="<?= htmlspecialchars($tool['slug']) ?>" required />
-                        <div class="form-text">Identificador único da tool (sem espaços, use underscore)</div>
-                    </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Descrição</label>
-                        <textarea name="description" class="form-control form-control-solid" rows="3"><?= htmlspecialchars($tool['description'] ?? '') ?></textarea>
-                    </div>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Tipo</label>
-                        <select name="tool_type" id="kt_edit_tool_type" class="form-select form-select-solid" required>
-                            <option value="">Selecione o tipo</option>
-                            <option value="woocommerce" <?= ($tool['tool_type'] ?? '') === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
-                            <option value="database" <?= ($tool['tool_type'] ?? '') === 'database' ? 'selected' : '' ?>>Database</option>
-                            <option value="n8n" <?= ($tool['tool_type'] ?? '') === 'n8n' ? 'selected' : '' ?>>N8N</option>
-                            <option value="document" <?= ($tool['tool_type'] ?? '') === 'document' ? 'selected' : '' ?>>Document</option>
-                            <option value="system" <?= ($tool['tool_type'] ?? '') === 'system' ? 'selected' : '' ?>>System</option>
-                            <option value="api" <?= ($tool['tool_type'] ?? '') === 'api' ? 'selected' : '' ?>>API</option>
-                            <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
-                            <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
-                            <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
-                            <option value="funnel_stage_smart" <?= ($tool['tool_type'] ?? '') === 'funnel_stage_smart' ? 'selected' : '' ?>>🧠 Mover para Funil/Etapa (Inteligente)</option>
-                        </select>
-                    </div>
-                    
-                    <!-- Aviso de Function Schema Automático (para tipos especiais) -->
-                    <div class="fv-row mb-7" id="kt_edit_auto_schema_notice" style="display: none;">
-                        <div class="alert alert-info d-flex align-items-center">
-                            <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
-                                <span class="path1"></span>
-                                <span class="path2"></span>
-                                <span class="path3"></span>
-                            </i>
-                            <div>
-                                <h4 class="mb-1 text-info">Function Schema Automático</h4>
-                                <span id="kt_edit_auto_schema_message">O function schema será gerado automaticamente com base nas configurações abaixo.</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Function Schema Fields (para tipos customizáveis) -->
-                    <div class="fv-row mb-7" id="kt_edit_function_schema_section">
-                        <label class="required fw-semibold fs-6 mb-2">Function Schema</label>
-                        <div class="card bg-light p-5">
-                            <div class="fv-row mb-5">
-                                <label class="required fw-semibold fs-7 mb-2">Nome da Função</label>
-                                <input type="text" id="kt_edit_function_name" class="form-control form-control-solid" placeholder="Ex: buscar_pedido_woocommerce" required />
-                                <div class="form-text">Nome único da função (use underscore, sem espaços)</div>
-                            </div>
-                            
-                            <div class="fv-row mb-5">
-                                <label class="required fw-semibold fs-7 mb-2">Descrição da Função</label>
-                                <textarea id="kt_edit_function_description" class="form-control form-control-solid" rows="2" placeholder="Descreva o que esta função faz" required></textarea>
-                                <div class="form-text">Descrição clara do propósito da função</div>
-                            </div>
-                            
-                            <div class="fv-row mb-5">
-                                <label class="fw-semibold fs-7 mb-3">Parâmetros</label>
-                                <div id="kt_edit_function_parameters">
-                                    <div class="text-muted fs-7 mb-3">Nenhum parâmetro adicionado. Clique em "Adicionar Parâmetro" para adicionar.</div>
+            
+            <!-- Wizard Steps -->
+            <div class="modal-body px-0 pb-0">
+                <div class="px-10">
+                    <!-- Stepper Horizontal -->
+                    <div class="stepper stepper-links d-flex flex-column" id="kt_edit_tool_stepper">
+                        <!-- Stepper Header (Horizontal) -->
+                        <div class="stepper-nav d-flex justify-content-center py-5 mb-5 border-bottom">
+                            <!-- Step 1 -->
+                            <div class="stepper-item current mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="1">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-primary text-white mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">1</span>
+                                    </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Informações</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Nome e tipo</div>
+                                    </div>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-light-primary" onclick="addEditFunctionParameter()">
-                                    <i class="ki-duotone ki-plus fs-2">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    Adicionar Parâmetro
-                                </button>
+                            </div>
+                            
+                            <!-- Stepper Line -->
+                            <div class="stepper-line h-2px w-100px bg-gray-200 mt-5 mx-2"></div>
+                            
+                            <!-- Step 2 -->
+                            <div class="stepper-item mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="2">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-gray-200 text-gray-600 mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">2</span>
+                                    </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Configurações</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Parâmetros</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stepper Line -->
+                            <div class="stepper-line h-2px w-100px bg-gray-200 mt-5 mx-2"></div>
+                            
+                            <!-- Step 3 -->
+                            <div class="stepper-item mx-4" data-kt-stepper-element="nav" data-kt-stepper-item="3">
+                                <div class="stepper-wrapper d-flex flex-column align-items-center">
+                                    <div class="stepper-icon w-40px h-40px rounded-circle d-flex align-items-center justify-content-center bg-gray-200 text-gray-600 mb-2">
+                                        <i class="ki-duotone ki-check fs-2 stepper-check"></i>
+                                        <span class="stepper-number">3</span>
+                                    </div>
+                                    <div class="stepper-label text-center">
+                                        <h3 class="stepper-title fs-6 mb-1">Revisão</h3>
+                                        <div class="stepper-desc fs-7 text-muted">Finalize</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Config Fields (dinâmico por tipo) -->
-                    <div class="fv-row mb-7" id="kt_edit_config_section" style="display: none;">
-                        <label class="fw-semibold fs-6 mb-2">Configurações</label>
-                        <div class="card bg-light p-5" id="kt_edit_config_fields">
-                            <!-- Campos serão inseridos dinamicamente via JavaScript -->
+                        
+                        <!-- Form Content -->
+                        <div class="py-5 px-lg-10">
+                            <form id="kt_modal_edit_ai_tool_form" class="form">
+                                <input type="hidden" name="tool_id" value="<?= $tool['id'] ?>" />
+                                
+                                <!-- Step 1: Informações Básicas -->
+                                <div class="current" data-kt-stepper-element="content" data-kt-stepper-item="1">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Informações Básicas</span>
+                                                <span class="badge badge-light-primary fs-7">Etapa 1 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Defina o nome, identificador e tipo da tool.</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2 d-flex align-items-center">
+                                                <span>Nome da Tool</span>
+                                                <i class="ki-duotone ki-information-5 ms-2 fs-6" data-bs-toggle="tooltip" title="Nome amigável que a IA usará para identificar esta tool"></i>
+                                            </label>
+                                            <div class="input-group input-group-solid">
+                                                <span class="input-group-text"><i class="ki-duotone ki-tag fs-3"></i></span>
+                                                <input type="text" name="name" id="edit_wizard_name" class="form-control form-control-lg" value="<?= htmlspecialchars($tool['name']) ?>" required />
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2 d-flex align-items-center">
+                                                <span>Slug (Identificador)</span>
+                                                <i class="ki-duotone ki-information-5 ms-2 fs-6" data-bs-toggle="tooltip" title="Identificador técnico único (sem espaços, use underscore)"></i>
+                                            </label>
+                                            <div class="input-group input-group-solid">
+                                                <span class="input-group-text"><i class="ki-duotone ki-code fs-3"></i></span>
+                                                <input type="text" name="slug" id="edit_wizard_slug" class="form-control form-control-lg" value="<?= htmlspecialchars($tool['slug']) ?>" required />
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="fw-semibold fs-6 mb-2">Descrição</label>
+                                            <textarea name="description" id="edit_wizard_description" class="form-control form-control-solid" rows="3"><?= htmlspecialchars($tool['description'] ?? '') ?></textarea>
+                                            <div class="form-text">Ajuda a IA a entender quando usar esta tool</div>
+                                        </div>
+                                        
+                                        <div class="fv-row mb-8">
+                                            <label class="required fw-semibold fs-6 mb-2">Tipo de Tool</label>
+                                            <div class="row g-3" id="edit_tool_type_cards">
+                                                <!-- Cards serão gerados via JS -->
+                                                <select name="tool_type" id="kt_edit_tool_type" class="form-select form-select-solid d-none" required>
+                                                    <option value="">Selecione</option>
+                                                    <option value="woocommerce" <?= ($tool['tool_type'] ?? '') === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
+                                                    <option value="database" <?= ($tool['tool_type'] ?? '') === 'database' ? 'selected' : '' ?>>Database</option>
+                                                    <option value="n8n" <?= ($tool['tool_type'] ?? '') === 'n8n' ? 'selected' : '' ?>>N8N</option>
+                                                    <option value="document" <?= ($tool['tool_type'] ?? '') === 'document' ? 'selected' : '' ?>>Document</option>
+                                                    <option value="system" <?= ($tool['tool_type'] ?? '') === 'system' ? 'selected' : '' ?>>System</option>
+                                                    <option value="api" <?= ($tool['tool_type'] ?? '') === 'api' ? 'selected' : '' ?>>API</option>
+                                                    <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
+                                                    <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
+                                                    <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
+                                                    <option value="funnel_stage_smart" <?= ($tool['tool_type'] ?? '') === 'funnel_stage_smart' ? 'selected' : '' ?>>🧠 Mover para Funil/Etapa (Inteligente)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 2: Configurações -->
+                                <div data-kt-stepper-element="content" data-kt-stepper-item="2">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Configurações</span>
+                                                <span class="badge badge-light-primary fs-7">Etapa 2 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Configure os parâmetros específicos do tipo selecionado.</div>
+                                        </div>
+                                        
+                                        <!-- Aviso de Function Schema Automático -->
+                                        <div class="fv-row mb-7" id="kt_edit_auto_schema_notice" style="display: none;">
+                                            <div class="alert alert-info d-flex align-items-center p-5">
+                                                <i class="ki-duotone ki-information-5 fs-2x text-info me-4">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                    <span class="path3"></span>
+                                                </i>
+                                                <div>
+                                                    <h4 class="mb-1 text-info">Function Schema Automático</h4>
+                                                    <span id="kt_edit_auto_schema_message">O function schema será gerado automaticamente.</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Function Schema Manual -->
+                                        <div class="fv-row mb-7" id="kt_edit_function_schema_section">
+                                            <label class="fw-semibold fs-6 mb-4 d-flex align-items-center">
+                                                <span>Function Schema</span>
+                                                <span class="badge badge-light-danger ms-2">Avançado</span>
+                                            </label>
+                                            <div class="card border border-dashed border-primary bg-light p-5">
+                                                <div class="fv-row mb-5">
+                                                    <label class="required fw-semibold fs-7 mb-2">Nome da Função</label>
+                                                    <input type="text" id="kt_edit_function_name" class="form-control form-control-solid" required />
+                                                </div>
+                                                
+                                                <div class="fv-row mb-5">
+                                                    <label class="required fw-semibold fs-7 mb-2">Descrição da Função</label>
+                                                    <textarea id="kt_edit_function_description" class="form-control form-control-solid" rows="2" required></textarea>
+                                                </div>
+                                                
+                                                <div class="fv-row mb-5">
+                                                    <label class="fw-semibold fs-7 mb-3 d-flex justify-content-between">
+                                                        <span>Parâmetros</span>
+                                                        <span class="text-muted fs-8">Campos que a IA pode preencher</span>
+                                                    </label>
+                                                    <div id="kt_edit_function_parameters">
+                                                        <div class="text-muted fs-7 mb-3 text-center py-4 bg-white rounded">
+                                                            <i class="ki-duotone ki-plus-circle fs-2x mb-2 d-block"></i>
+                                                            Nenhum parâmetro adicionado
+                                                        </div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-light-primary mt-3" onclick="addEditFunctionParameter()">
+                                                        <i class="ki-duotone ki-plus fs-2">
+                                                            <span class="path1"></span>
+                                                            <span class="path2"></span>
+                                                        </i>
+                                                        Adicionar Parâmetro
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Config Fields -->
+                                        <div class="fv-row mb-7" id="kt_edit_config_section" style="display: none;">
+                                            <label class="fw-semibold fs-6 mb-4 d-flex align-items-center">
+                                                <i class="ki-duotone ki-setting-2 fs-4 me-2 text-primary"></i>
+                                                <span>Configurações Específicas</span>
+                                            </label>
+                                            <div class="card bg-light p-5" id="kt_edit_config_fields"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Step 3: Revisão -->
+                                <div data-kt-stepper-element="content" data-kt-stepper-item="3">
+                                    <div class="w-100">
+                                        <div class="pb-10 pb-lg-15">
+                                            <h2 class="fw-bold d-flex align-items-center text-gray-900">
+                                                <span class="me-3">Revisão</span>
+                                                <span class="badge badge-light-success fs-7">Etapa 3 de 3</span>
+                                            </h2>
+                                            <div class="text-muted fw-semibold fs-6">Verifique as configurações antes de salvar.</div>
+                                        </div>
+                                        
+                                        <!-- Resumo -->
+                                        <div class="mb-8">
+                                            <div class="card bg-light mb-5">
+                                                <div class="card-body">
+                                                    <h4 class="fw-bold mb-4 text-gray-800">
+                                                        <i class="ki-duotone ki-information fs-2 me-2"></i>
+                                                        Informações Básicas
+                                                    </h4>
+                                                    <div class="row g-5">
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Nome</div>
+                                                            <div class="fw-semibold fs-6" id="edit_review_name">-</div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Slug</div>
+                                                            <div class="fw-semibold fs-6" id="edit_review_slug">-</div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Tipo</div>
+                                                            <div class="fw-semibold fs-6"><span class="badge badge-light-primary" id="edit_review_type">-</span></div>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <div class="text-muted fs-7 mb-1">Status</div>
+                                                            <div class="fw-semibold fs-6"><span class="badge badge-light-success">Ativa</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="mt-4">
+                                                        <div class="text-muted fs-7 mb-1">Descrição</div>
+                                                        <div class="fw-semibold fs-6" id="edit_review_description">-</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="card bg-light" id="edit_review_config_card" style="display: none;">
+                                                <div class="card-body">
+                                                    <h4 class="fw-bold mb-4 text-gray-800">
+                                                        <i class="ki-duotone ki-setting-2 fs-2 me-2"></i>
+                                                        Configurações
+                                                    </h4>
+                                                    <div id="edit_review_config_content"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden fields -->
+                                <input type="hidden" name="function_schema" id="kt_edit_function_schema_json" />
+                                <input type="hidden" name="config" id="kt_edit_config_json" />
+                                <input type="hidden" name="enabled" value="1" />
+                                
+                                <!-- Actions -->
+                                <div class="d-flex flex-stack pt-10">
+                                    <div class="me-2">
+                                        <button type="button" class="btn btn-lg btn-light-primary me-3" data-kt-stepper-action="previous">
+                                            <i class="ki-duotone ki-arrow-left fs-3 me-1">
+                                                <span class="path1"></span>
+                                                <span class="path2"></span>
+                                            </i>
+                                            Voltar
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-lg btn-primary" data-kt-stepper-action="next">
+                                            <span class="indicator-label">
+                                                Próximo
+                                                <i class="ki-duotone ki-arrow-right fs-3 ms-2 me-0">
+                                                    <span class="path1"></span>
+                                                    <span class="path2"></span>
+                                                </i>
+                                            </span>
+                                            <span class="indicator-progress">
+                                                Aguarde...
+                                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                            </span>
+                                        </button>
+                                        <button type="submit" class="btn btn-lg btn-success" data-kt-stepper-action="submit" style="display: none;">
+                                            <span class="indicator-label">
+                                                <i class="ki-duotone ki-check fs-3 me-2"></i>
+                                                Salvar Alterações
+                                            </span>
+                                            <span class="indicator-progress">
+                                                Salvando...
+                                                <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                                            </span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
                     </div>
-                    
-                    <!-- Hidden fields para JSON -->
-                    <input type="hidden" name="function_schema" id="kt_edit_function_schema_json" />
-                    <input type="hidden" name="config" id="kt_edit_config_json" />
-                    
-                    <?php
-                    // Preparar dados para JavaScript
-                    $functionSchema = $tool['function_schema'] ?? [];
-                    if (is_string($functionSchema)) {
-                        $functionSchema = json_decode($functionSchema, true) ?? [];
-                    }
-                    $config = $tool['config'] ?? [];
-                    if (is_string($config)) {
-                        $config = json_decode($config, true) ?? [];
-                    }
-                    ?>
-                    
-                    <div class="fv-row mb-7">
-                        <label class="d-flex align-items-center">
-                            <input type="checkbox" name="enabled" class="form-check-input me-2" <?= ($tool['enabled'] ?? false) ? 'checked' : '' ?> />
-                            Tool ativa
-                        </label>
-                    </div>
                 </div>
-                <div class="modal-footer flex-center">
-                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
-                    <button type="submit" id="kt_modal_edit_ai_tool_submit" class="btn btn-primary">
-                        <span class="indicator-label">Salvar Alterações</span>
-                        <span class="indicator-progress">Aguarde...
-                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
-                    </button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
+
+<?php
+// Preparar dados para JavaScript
+$functionSchema = $tool['function_schema'] ?? [];
+if (is_string($functionSchema)) {
+    $functionSchema = json_decode($functionSchema, true) ?? [];
+}
+$config = $tool['config'] ?? [];
+if (is_string($config)) {
+    $config = json_decode($config, true) ?? [];
+}
+?>
 <?php endif; ?>
 <!--end::Modal - Editar Tool-->
 
@@ -1045,23 +1239,236 @@ document.addEventListener("DOMContentLoaded", function() {
     console.log("CONFIG_DATA:", CONFIG_DATA);
     console.log("TOOL_ID:", TOOL_ID);
     
+    // ==================== WIZARD DE EDIÇÃO ====================
+    const editStepperElement = document.querySelector('#kt_edit_tool_stepper');
+    let editStepper = null;
+    
+    if (editStepperElement && typeof KTStepper !== 'undefined') {
+        editStepper = new KTStepper(editStepperElement);
+        
+        // Handle next button
+        const nextBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="next"]');
+        const prevBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="previous"]');
+        const submitBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="submit"]');
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const currentStep = editStepper.getCurrentStepIndex();
+                
+                if (currentStep === 1) {
+                    if (!validateEditStep1()) return;
+                    updateEditReviewSummary();
+                }
+                if (currentStep === 2) {
+                    buildAndStoreEditJSONs();
+                    updateEditReviewConfig();
+                }
+                
+                editStepper.goNext();
+                updateEditWizardButtons(editStepper);
+            });
+        }
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                editStepper.goPrevious();
+                updateEditWizardButtons(editStepper);
+            });
+        }
+        
+        if (submitBtn) {
+            submitBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.getElementById('kt_modal_edit_ai_tool_form').dispatchEvent(new Event('submit'));
+            });
+        }
+    }
+    
+    function updateEditWizardButtons(stepper) {
+        const currentStep = stepper.getCurrentStepIndex();
+        const totalSteps = stepper.getTotalStepsNumber();
+        const nextBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="next"]');
+        const submitBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="submit"]');
+        
+        if (currentStep === totalSteps) {
+            if (nextBtn) nextBtn.style.display = 'none';
+            if (submitBtn) submitBtn.style.display = 'inline-flex';
+        } else {
+            if (nextBtn) nextBtn.style.display = 'inline-flex';
+            if (submitBtn) submitBtn.style.display = 'none';
+        }
+        
+        updateEditStepperVisuals(currentStep);
+    }
+    
+    function updateEditStepperVisuals(currentStep) {
+        document.querySelectorAll('#kt_edit_tool_stepper .stepper-item').forEach((item, index) => {
+            const icon = item.querySelector('.stepper-icon');
+            const stepNum = index + 1;
+            
+            if (stepNum < currentStep) {
+                icon.classList.remove('bg-gray-200', 'text-gray-600', 'bg-primary', 'text-white');
+                icon.classList.add('bg-success', 'text-white');
+            } else if (stepNum === currentStep) {
+                icon.classList.remove('bg-gray-200', 'text-gray-600', 'bg-success', 'text-white');
+                icon.classList.add('bg-primary', 'text-white');
+            } else {
+                icon.classList.remove('bg-primary', 'text-white', 'bg-success', 'text-white');
+                icon.classList.add('bg-gray-200', 'text-gray-600');
+            }
+        });
+    }
+    
+    function validateEditStep1() {
+        const name = document.getElementById('edit_wizard_name').value.trim();
+        const slug = document.getElementById('edit_wizard_slug').value.trim();
+        const toolType = document.getElementById('kt_edit_tool_type').value;
+        
+        if (!name) {
+            alert('Por favor, preencha o nome da tool.');
+            return false;
+        }
+        if (!slug) {
+            alert('Por favor, preencha o slug da tool.');
+            return false;
+        }
+        if (!toolType) {
+            alert('Por favor, selecione o tipo da tool.');
+            return false;
+        }
+        return true;
+    }
+    
+    function updateEditReviewSummary() {
+        document.getElementById('edit_review_name').textContent = document.getElementById('edit_wizard_name').value;
+        document.getElementById('edit_review_slug').textContent = document.getElementById('edit_wizard_slug').value;
+        document.getElementById('edit_review_description').textContent = document.getElementById('edit_wizard_description').value || '-';
+        
+        const toolType = document.getElementById('kt_edit_tool_type').value;
+        const typeLabels = {
+            woocommerce: 'WooCommerce',
+            database: 'Database',
+            n8n: 'N8N',
+            document: 'Document',
+            system: 'System',
+            api: 'API',
+            followup: 'Followup',
+            human_escalation: '🧑‍💼 Escalar para Humano',
+            funnel_stage: '📊 Mover para Funil',
+            funnel_stage_smart: '🧠 Mover (Inteligente)'
+        };
+        document.getElementById('edit_review_type').textContent = typeLabels[toolType] || toolType;
+    }
+    
+    function updateEditReviewConfig() {
+        const config = buildEditConfig();
+        const card = document.getElementById('edit_review_config_card');
+        const content = document.getElementById('edit_review_config_content');
+        
+        if (config && Object.keys(config).length > 0) {
+            let html = '<div class="row g-5">';
+            Object.keys(config).forEach(key => {
+                const value = config[key];
+                let displayValue = value;
+                if (typeof value === 'boolean') {
+                    displayValue = value ? '✅ Sim' : '❌ Não';
+                } else if (typeof value === 'object') {
+                    displayValue = JSON.stringify(value).substring(0, 50) + '...';
+                }
+                html += `<div class="col-md-6"><div class="text-muted fs-7 mb-1">${key}</div><div class="fw-semibold fs-6">${displayValue}</div></div>`;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    }
+    
+    function buildAndStoreEditJSONs() {
+        const functionSchema = buildEditFunctionSchema();
+        const config = buildEditConfig();
+        
+        if (functionSchema) {
+            document.getElementById('kt_edit_function_schema_json').value = JSON.stringify(functionSchema);
+        }
+        if (config) {
+            document.getElementById('kt_edit_config_json').value = JSON.stringify(config);
+        }
+    }
+    
+    // Gerar cards de tipo para edição
+    renderEditToolTypeCards();
+    
+    function renderEditToolTypeCards() {
+        const container = document.getElementById('edit_tool_type_cards');
+        const select = document.getElementById('kt_edit_tool_type');
+        const currentType = select.value;
+        
+        const types = [
+            { value: 'human_escalation', label: '🧑‍💼 Escalar para Humano', desc: 'Transfere para atendente humano' },
+            { value: 'funnel_stage', label: '📊 Mover para Funil', desc: 'Move conversa entre etapas' },
+            { value: 'funnel_stage_smart', label: '🧠 Mover (Inteligente)', desc: 'IA decide a melhor etapa' },
+            { value: 'n8n', label: '⚡ N8N Webhook', desc: 'Integração com workflows' },
+            { value: 'woocommerce', label: '🛒 WooCommerce', desc: 'Integração com loja' },
+            { value: 'api', label: '🔌 API Externa', desc: 'Conecta com APIs' },
+            { value: 'database', label: '🗄️ Database', desc: 'Consulta banco de dados' },
+            { value: 'document', label: '📄 Documentos', desc: 'Busca em documentos' },
+            { value: 'followup', label: '⏰ Follow-up', desc: 'Agenda retorno' },
+            { value: 'system', label: '⚙️ Sistema', desc: 'Funções internas' }
+        ];
+        
+        let html = '<div class="row g-3">';
+        types.forEach(type => {
+            const isSelected = type.value === currentType;
+            html += `
+                <div class="col-md-6 col-lg-4">
+                    <label class="btn btn-flex btn-outline btn-outline-dashed btn-active-light-primary d-flex flex-column align-items-start w-100 h-100 p-6 edit-tool-type-card ${isSelected ? 'active' : ''}" 
+                           data-type="${type.value}">
+                        <span class="form-check form-check-custom form-check-solid mb-3">
+                            <input class="form-check-input" type="radio" name="edit_tool_type_radio" value="${type.value}" ${isSelected ? 'checked' : ''}>
+                        </span>
+                        <span class="fs-4 fw-bold mb-2">${type.label}</span>
+                        <span class="text-muted fs-7 text-start">${type.desc}</span>
+                    </label>
+                </div>
+            `;
+        });
+        html += '</div>';
+        
+        container.innerHTML = html;
+        
+        // Event listeners
+        document.querySelectorAll('.edit-tool-type-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const type = this.dataset.type;
+                select.value = type;
+                
+                document.querySelectorAll('.edit-tool-type-card').forEach(c => {
+                    c.classList.remove('active');
+                    c.querySelector('.form-check-input').checked = false;
+                });
+                this.classList.add('active');
+                this.querySelector('.form-check-input').checked = true;
+                
+                updateEditConfigFields();
+            });
+        });
+    }
+    
     // Preencher campos quando modal de edição for aberto
     const editModal = document.getElementById("kt_modal_edit_ai_tool");
     if (editModal) {
         editModal.addEventListener("shown.bs.modal", function() {
             console.log("Modal de edição aberto");
             populateEditFields();
-        });
-    }
-    
-    // Atualizar campos de config quando tipo mudar (edição)
-    const toolTypeSelect = document.getElementById("kt_edit_tool_type");
-    console.log("Edit toolTypeSelect encontrado:", toolTypeSelect);
-    
-    if (toolTypeSelect) {
-        toolTypeSelect.addEventListener("change", function() {
-            console.log("Tipo de tool mudou para:", this.value);
-            updateEditConfigFields();
+            // Reset stepper para etapa 1
+            if (editStepper) {
+                editStepper.goTo(1);
+                updateEditWizardButtons(editStepper);
+            }
         });
     }
     
@@ -1088,7 +1495,7 @@ document.addEventListener("DOMContentLoaded", function() {
     if (form) {
         form.addEventListener("submit", function(e) {
             e.preventDefault();
-            const submitBtn = document.getElementById("kt_modal_edit_ai_tool_submit");
+            const submitBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="submit"]');
             submitBtn.setAttribute("data-kt-indicator", "on");
             submitBtn.disabled = true;
             
@@ -1113,10 +1520,6 @@ document.addEventListener("DOMContentLoaded", function() {
             
             const formData = new FormData(form);
             const toolId = formData.get("tool_id");
-            
-            // Converter enabled para boolean
-            const enabled = formData.get("enabled") === "on" || formData.get("enabled") === "true";
-            formData.set("enabled", enabled ? "1" : "0");
             
             fetch(AI_TOOLS_BASE_URL + "/" + toolId, {
                 method: "POST",

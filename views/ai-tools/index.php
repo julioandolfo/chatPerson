@@ -239,20 +239,21 @@ ob_start();
                                             <label class="required fw-semibold fs-6 mb-2">Tipo de Tool</label>
                                             <div class="row g-5" id="tool_type_cards">
                                                 <!-- Cards serão gerados via JS -->
-                                                <select name="tool_type" id="kt_tool_type" class="form-select form-select-solid d-none" required>
-                                                    <option value="">Selecione</option>
-                                                    <option value="woocommerce">WooCommerce</option>
-                                                    <option value="database">Database</option>
-                                                    <option value="n8n">N8N</option>
-                                                    <option value="document">Document</option>
-                                                    <option value="system">System</option>
-                                                    <option value="api">API</option>
-                                                    <option value="followup">Followup</option>
-                                                    <option value="human_escalation">🧑‍💼 Escalar para Humano</option>
-                                                    <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
-                                                    <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
-                                                </select>
                                             </div>
+                                            <!-- Select hidden para armazenar o valor -->
+                                            <select name="tool_type" id="kt_tool_type" class="form-select form-select-solid d-none" required>
+                                                <option value="">Selecione</option>
+                                                <option value="woocommerce">WooCommerce</option>
+                                                <option value="database">Database</option>
+                                                <option value="n8n">N8N</option>
+                                                <option value="document">Document</option>
+                                                <option value="system">System</option>
+                                                <option value="api">API</option>
+                                                <option value="followup">Followup</option>
+                                                <option value="human_escalation">🧑‍💼 Escalar para Humano</option>
+                                                <option value="funnel_stage">📊 Mover para Funil/Etapa</option>
+                                                <option value="funnel_stage_smart">🧠 Mover para Funil/Etapa (Inteligente)</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>

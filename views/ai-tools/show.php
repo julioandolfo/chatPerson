@@ -300,20 +300,21 @@ ob_start();
                                             <label class="required fw-semibold fs-6 mb-2">Tipo de Tool</label>
                                             <div class="row g-3" id="edit_tool_type_cards">
                                                 <!-- Cards serão gerados via JS -->
-                                                <select name="tool_type" id="kt_edit_tool_type" class="form-select form-select-solid d-none" required>
-                                                    <option value="">Selecione</option>
-                                                    <option value="woocommerce" <?= ($tool['tool_type'] ?? '') === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
-                                                    <option value="database" <?= ($tool['tool_type'] ?? '') === 'database' ? 'selected' : '' ?>>Database</option>
-                                                    <option value="n8n" <?= ($tool['tool_type'] ?? '') === 'n8n' ? 'selected' : '' ?>>N8N</option>
-                                                    <option value="document" <?= ($tool['tool_type'] ?? '') === 'document' ? 'selected' : '' ?>>Document</option>
-                                                    <option value="system" <?= ($tool['tool_type'] ?? '') === 'system' ? 'selected' : '' ?>>System</option>
-                                                    <option value="api" <?= ($tool['tool_type'] ?? '') === 'api' ? 'selected' : '' ?>>API</option>
-                                                    <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
-                                                    <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
-                                                    <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
-                                                    <option value="funnel_stage_smart" <?= ($tool['tool_type'] ?? '') === 'funnel_stage_smart' ? 'selected' : '' ?>>🧠 Mover para Funil/Etapa (Inteligente)</option>
-                                                </select>
                                             </div>
+                                            <!-- Select hidden para armazenar o valor -->
+                                            <select name="tool_type" id="kt_edit_tool_type" class="form-select form-select-solid d-none" required>
+                                                <option value="">Selecione</option>
+                                                <option value="woocommerce" <?= ($tool['tool_type'] ?? '') === 'woocommerce' ? 'selected' : '' ?>>WooCommerce</option>
+                                                <option value="database" <?= ($tool['tool_type'] ?? '') === 'database' ? 'selected' : '' ?>>Database</option>
+                                                <option value="n8n" <?= ($tool['tool_type'] ?? '') === 'n8n' ? 'selected' : '' ?>>N8N</option>
+                                                <option value="document" <?= ($tool['tool_type'] ?? '') === 'document' ? 'selected' : '' ?>>Document</option>
+                                                <option value="system" <?= ($tool['tool_type'] ?? '') === 'system' ? 'selected' : '' ?>>System</option>
+                                                <option value="api" <?= ($tool['tool_type'] ?? '') === 'api' ? 'selected' : '' ?>>API</option>
+                                                <option value="followup" <?= ($tool['tool_type'] ?? '') === 'followup' ? 'selected' : '' ?>>Followup</option>
+                                                <option value="human_escalation" <?= ($tool['tool_type'] ?? '') === 'human_escalation' ? 'selected' : '' ?>>🧑‍💼 Escalar para Humano</option>
+                                                <option value="funnel_stage" <?= ($tool['tool_type'] ?? '') === 'funnel_stage' ? 'selected' : '' ?>>📊 Mover para Funil/Etapa</option>
+                                                <option value="funnel_stage_smart" <?= ($tool['tool_type'] ?? '') === 'funnel_stage_smart' ? 'selected' : '' ?>>🧠 Mover para Funil/Etapa (Inteligente)</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>

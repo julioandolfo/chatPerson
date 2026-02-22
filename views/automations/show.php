@@ -1,3 +1,4 @@
+<?php ob_start(); ?>
 <script>
 /**
  * AUTOMATION EDITOR - MODERN JAVASCRIPT

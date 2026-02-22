@@ -168,6 +168,11 @@ ob_start();
     font-weight: 500;
 }
 
+.automation-card-actions .btn-icon {
+    flex: 0 0 auto;
+    padding: 8px;
+}
+
 /* Empty State Moderno */
 .automations-empty {
     display: flex;
@@ -536,8 +541,14 @@ ob_start();
                     Logs
                 </a>
                 <?php if (\App\Helpers\Permission::can('automations.delete')): ?>
-                <button type="button" class="btn btn-light btn-sm btn-active-light-danger delete-automation-btn" data-id="<?= $automation['id'] ?>" data-name="<?= htmlspecialchars($automation['name']) ?>">
-                    <i class="ki-duotone ki-trash fs-7"></i>
+                <button type="button" class="btn btn-icon btn-light btn-sm btn-active-light-danger delete-automation-btn" data-id="<?= $automation['id'] ?>" data-name="<?= htmlspecialchars($automation['name']) ?>" title="Excluir">
+                    <i class="ki-duotone ki-trash fs-6">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                        <span class="path4"></span>
+                        <span class="path5"></span>
+                    </i>
                 </button>
                 <?php endif; ?>
             </div>

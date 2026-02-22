@@ -1551,6 +1551,9 @@ class AutomationService
                 return \App\Services\ConversationSettingsService::assignRoundRobin($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             case 'by_load':
                 return \App\Services\ConversationSettingsService::assignByLoad($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
+            case 'by_pending_response':
+                // Distribuição por respostas pendentes - NÃO verifica disponibilidade online
+                return \App\Services\ConversationSettingsService::assignByPendingResponse($departmentId, $funnelId, $stageId, $allowAI, $considerMaxConversations);
             case 'by_performance':
                 return \App\Services\ConversationSettingsService::assignByPerformance($departmentId, $funnelId, $stageId, $allowAI, $considerAvailability, $considerMaxConversations);
             case 'by_specialty':
@@ -3784,6 +3787,7 @@ class AutomationService
                             $methodNames = [
                                 'round_robin' => 'Round-Robin',
                                 'by_load' => 'Por Carga',
+                                'by_pending_response' => 'Por Respostas Pendentes',
                                 'by_performance' => 'Por Performance',
                                 'by_specialty' => 'Por Especialidade',
                                 'percentage' => 'Por Porcentagem'

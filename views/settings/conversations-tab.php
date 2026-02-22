@@ -529,6 +529,7 @@ $tts = $cs['text_to_speech'] ?? [];
             <select name="distribution_method" class="form-select form-select-solid">
                 <option value="round_robin" <?= ($dist['method'] ?? 'round_robin') === 'round_robin' ? 'selected' : '' ?>>Round-Robin (Distribuição igual)</option>
                 <option value="by_load" <?= ($dist['method'] ?? '') === 'by_load' ? 'selected' : '' ?>>Por Carga (Menor carga primeiro)</option>
+                <option value="by_pending_response" <?= ($dist['method'] ?? '') === 'by_pending_response' ? 'selected' : '' ?>>Por Respostas Pendentes (Cliente aguardando, sem verificar online)</option>
                 <option value="by_performance" <?= ($dist['method'] ?? '') === 'by_performance' ? 'selected' : '' ?>>Por Performance (Melhor performance primeiro)</option>
                 <option value="by_specialty" <?= ($dist['method'] ?? '') === 'by_specialty' ? 'selected' : '' ?>>Por Especialidade</option>
                 <option value="percentage" <?= ($dist['method'] ?? '') === 'percentage' ? 'selected' : '' ?>>Por Porcentagem</option>

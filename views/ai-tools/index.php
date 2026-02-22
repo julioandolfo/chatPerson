@@ -794,6 +794,7 @@ const toolTypeConfigs = {
               options: [
                 { value: "round_robin", label: "Round Robin (sequencial)" },
                 { value: "by_load", label: "Por Carga (menos conversas)" },
+                { value: "by_pending_response", label: "Por Respostas Pendentes (cliente aguardando)" },
                 { value: "by_performance", label: "Por Performance" },
                 { value: "by_specialty", label: "Por Especialidade" },
                 { value: "percentage", label: "Por Porcentagem" }
@@ -1135,6 +1136,30 @@ function updateConditionalVisibility() {
             wrapper.style.display = values.includes(currentValue) ? "block" : "none";
         }
     });
+    
+    // Lógica especial: quando método é "by_pending_response", desabilita "consider_availability"
+    const distributionMethodField = document.querySelector('[data-field="distribution_method"]');
+    const considerAvailabilityWrapper = document.getElementById('field_wrapper_consider_availability');
+    const considerAvailabilityCheckbox = document.querySelector('[data-field="consider_availability"]');
+    
+    if (distributionMethodField && considerAvailabilityWrapper) {
+        if (distributionMethodField.value === 'by_pending_response') {
+            // Desabilita e desmarca o checkbox
+            if (considerAvailabilityCheckbox) {
+                considerAvailabilityCheckbox.checked = false;
+                considerAvailabilityCheckbox.disabled = true;
+            }
+            considerAvailabilityWrapper.style.opacity = '0.5';
+            considerAvailabilityWrapper.title = 'Método "Por Respostas Pendentes" não verifica disponibilidade online';
+        } else {
+            // Reabilita o checkbox
+            if (considerAvailabilityCheckbox) {
+                considerAvailabilityCheckbox.disabled = false;
+            }
+            considerAvailabilityWrapper.style.opacity = '1';
+            considerAvailabilityWrapper.title = '';
+        }
+    }
 }
 
 // Carregar etapas do funil selecionado

@@ -665,6 +665,7 @@ const toolTypeConfigs = {
               options: [
                 { value: "round_robin", label: "Round Robin (sequencial)" },
                 { value: "by_load", label: "Por Carga (menos conversas)" },
+                { value: "by_pending_response", label: "Por Respostas Pendentes (cliente aguardando)" },
                 { value: "by_performance", label: "Por Performance" },
                 { value: "by_specialty", label: "Por Especialidade" },
                 { value: "percentage", label: "Por Porcentagem" }
@@ -915,6 +916,37 @@ function updateEditConfigFields() {
         configFields.appendChild(fieldDiv);
         console.log(`Campo ${field.name} adicionado`);
     });
+    
+    // Adicionar listener para desabilitar "consider_availability" quando método é "by_pending_response"
+    const distributionMethodField = document.querySelector('[data-field="distribution_method"]');
+    if (distributionMethodField) {
+        distributionMethodField.addEventListener('change', function() {
+            const considerAvailabilityCheckbox = document.querySelector('[data-field="consider_availability"]');
+            const considerAvailabilityWrapper = considerAvailabilityCheckbox?.closest('.fv-row');
+            
+            if (this.value === 'by_pending_response') {
+                if (considerAvailabilityCheckbox) {
+                    considerAvailabilityCheckbox.checked = false;
+                    considerAvailabilityCheckbox.disabled = true;
+                }
+                if (considerAvailabilityWrapper) {
+                    considerAvailabilityWrapper.style.opacity = '0.5';
+                    considerAvailabilityWrapper.title = 'Método "Por Respostas Pendentes" não verifica disponibilidade online';
+                }
+            } else {
+                if (considerAvailabilityCheckbox) {
+                    considerAvailabilityCheckbox.disabled = false;
+                }
+                if (considerAvailabilityWrapper) {
+                    considerAvailabilityWrapper.style.opacity = '1';
+                    considerAvailabilityWrapper.title = '';
+                }
+            }
+        });
+        
+        // Disparar evento inicial para configurar estado correto
+        distributionMethodField.dispatchEvent(new Event('change'));
+    }
     
     console.log("Campos de config renderizados com sucesso");
 }

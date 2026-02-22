@@ -625,6 +625,9 @@ class ConversationSettingsService
                 return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
             case 'by_load':
                 return self::assignByLoad($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+            case 'by_pending_response':
+                // Distribuição por respostas pendentes - NÃO verifica disponibilidade online
+                return self::assignByPendingResponse($departmentId, $funnelId, $stageId, $includeAI, true, $excludeAgentId);
             case 'by_specialty':
                 return self::assignBySpecialty($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
             case 'by_performance':
@@ -728,6 +731,190 @@ class ConversationSettingsService
         }
         
         return $selectedAgent['id'] ?? null;
+    }
+
+    /**
+     * Distribuição por carga de respostas pendentes
+     * Atribui ao agente com MENOS conversas aguardando resposta do agente
+     * NÃO verifica disponibilidade online (availability_status)
+     * 
+     * @param int|null $departmentId ID do setor (opcional)
+     * @param int|null $funnelId ID do funil (opcional)
+     * @param int|null $stageId ID da etapa (opcional)
+     * @param bool $includeAI Incluir agentes de IA na distribuição
+     * @param bool $considerMaxConversations Respeitar limite máximo de conversas
+     * @param int|null $excludeAgentId ID do agente a excluir (para evitar reatribuir ao mesmo)
+     * @return int|null ID do agente selecionado ou null
+     */
+    public static function assignByPendingResponse(
+        ?int $departmentId = null, 
+        ?int $funnelId = null, 
+        ?int $stageId = null, 
+        bool $includeAI = false,
+        bool $considerMaxConversations = true,
+        ?int $excludeAgentId = null
+    ): ?int
+    {
+        // Buscar agentes SEM filtrar por disponibilidade online
+        $agents = self::getAvailableAgentsWithPendingCount(
+            $departmentId, 
+            $funnelId, 
+            $stageId, 
+            $includeAI, 
+            $considerMaxConversations
+        );
+        
+        // Filtrar agente excluído
+        if ($excludeAgentId !== null) {
+            $agents = array_filter($agents, function($agent) use ($excludeAgentId) {
+                return ($agent['id'] ?? null) != $excludeAgentId;
+            });
+        }
+        
+        if (empty($agents)) {
+            return null;
+        }
+        
+        // Ordenar por número de conversas pendentes (menor primeiro)
+        usort($agents, function($a, $b) {
+            $aPending = $a['pending_response_count'] ?? 0;
+            $bPending = $b['pending_response_count'] ?? 0;
+            return $aPending <=> $bPending;
+        });
+        
+        $selectedAgent = $agents[0] ?? null;
+        if (!$selectedAgent) {
+            return null;
+        }
+        
+        // Se for agente de IA, retornar ID especial
+        if (($selectedAgent['agent_type'] ?? 'human') === 'ai') {
+            return -1 * ($selectedAgent['ai_agent_id'] ?? 0);
+        }
+        
+        return $selectedAgent['id'] ?? null;
+    }
+
+    /**
+     * Buscar agentes disponíveis com contagem de conversas aguardando resposta
+     * NÃO filtra por disponibilidade online
+     * 
+     * @param int|null $departmentId ID do setor
+     * @param int|null $funnelId ID do funil
+     * @param int|null $stageId ID da etapa
+     * @param bool $includeAI Incluir agentes de IA
+     * @param bool $considerMaxConversations Respeitar limite máximo
+     * @return array Lista de agentes com contagem de pendentes
+     */
+    private static function getAvailableAgentsWithPendingCount(
+        ?int $departmentId = null,
+        ?int $funnelId = null,
+        ?int $stageId = null,
+        bool $includeAI = false,
+        bool $considerMaxConversations = true
+    ): array {
+        $settings = self::getSettings();
+        $agents = [];
+        
+        // Query para buscar agentes ativos (SEM filtro de availability_status = 'online')
+        $sql = "SELECT u.id, u.name, u.role, u.current_conversations, u.max_conversations, 
+                       u.availability_status, u.queue_enabled, u.department_id,
+                       MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
+                FROM users u
+                LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
+                WHERE u.status = 'active' 
+                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')
+                AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)";
+        
+        $params = [];
+        
+        // Filtro por setor
+        if ($departmentId !== null) {
+            $sql .= " AND (u.department_id = ? OR u.id IN (
+                SELECT user_id FROM user_departments WHERE department_id = ?
+            ))";
+            $params[] = $departmentId;
+            $params[] = $departmentId;
+        }
+        
+        // Filtro por funil/etapa (verificar se agente está associado)
+        if ($funnelId !== null || $stageId !== null) {
+            $sql .= " AND u.id IN (
+                SELECT agent_id FROM funnel_stage_agents 
+                WHERE 1=1";
+            if ($funnelId !== null) {
+                $sql .= " AND funnel_id = ?";
+                $params[] = $funnelId;
+            }
+            if ($stageId !== null) {
+                $sql .= " AND stage_id = ?";
+                $params[] = $stageId;
+            }
+            $sql .= " OR agent_id IS NULL)";
+        }
+        
+        $sql .= " GROUP BY u.id";
+        
+        // Filtro por limite de conversas
+        if ($considerMaxConversations) {
+            $sql .= " HAVING (u.max_conversations IS NULL OR u.current_conversations < u.max_conversations)";
+        }
+        
+        $humanAgents = Database::fetchAll($sql, $params);
+        
+        // Adicionar contagem de pendentes para cada agente humano
+        foreach ($humanAgents as &$agent) {
+            $agent['pending_response_count'] = self::getPendingResponseCountForAgent((int)$agent['id']);
+        }
+        
+        $agents = array_merge($agents, $humanAgents);
+        
+        // Agentes de IA (se habilitado)
+        if ($includeAI && $settings['distribution']['assign_to_ai_agent']) {
+            $aiAgents = \App\Models\AIAgent::getAvailableAgents();
+            foreach ($aiAgents as $aiAgent) {
+                $agents[] = [
+                    'id' => -($aiAgent['id']),
+                    'name' => $aiAgent['name'] . ' (IA)',
+                    'current_conversations' => $aiAgent['current_conversations'] ?? 0,
+                    'max_conversations' => $aiAgent['max_conversations'],
+                    'availability_status' => 'online',
+                    'last_assignment_at' => null,
+                    'agent_type' => 'ai',
+                    'ai_agent_id' => $aiAgent['id'],
+                    'pending_response_count' => 0 // IA responde automaticamente
+                ];
+            }
+        }
+        
+        return $agents;
+    }
+
+    /**
+     * Contar conversas aguardando resposta do agente
+     * Uma conversa está "aguardando resposta" quando a última mensagem foi do cliente
+     * 
+     * @param int $agentId ID do agente
+     * @return int Número de conversas pendentes
+     */
+    private static function getPendingResponseCountForAgent(int $agentId): int
+    {
+        $sql = "SELECT COUNT(DISTINCT c.id) as pending_count
+                FROM conversations c
+                WHERE c.agent_id = ?
+                AND c.status IN ('open', 'pending')
+                AND (
+                    -- Última mensagem foi do cliente (sender_type = 'contact')
+                    SELECT m.sender_type
+                    FROM messages m
+                    WHERE m.conversation_id = c.id
+                    AND m.message_type != 'system'
+                    ORDER BY m.created_at DESC
+                    LIMIT 1
+                ) = 'contact'";
+        
+        $result = Database::fetch($sql, [$agentId]);
+        return (int)($result['pending_count'] ?? 0);
     }
 
     /**

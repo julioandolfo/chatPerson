@@ -1,5 +1,4 @@
 <?php
-$layout = 'layouts.metronic.app';
 $title = 'Automações';
 
 ob_start();
@@ -651,4 +650,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <?php
 $content = ob_get_clean();
-include $layout;
+include __DIR__ . '/../layouts/metronic/app.php';

@@ -1261,4 +1261,4 @@ saveState();
 
 <?php
 $content = ob_get_clean();
-include $layout;
+include __DIR__ . '/../layouts/metronic/app.php';

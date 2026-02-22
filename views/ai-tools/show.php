@@ -1289,7 +1289,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     function updateEditWizardButtons(stepper) {
         const currentStep = stepper.getCurrentStepIndex();
-        const totalSteps = stepper.getTotalStepsNumber();
+        const totalSteps = 3; // Total fixo de 3 steps
         const nextBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="next"]');
         const submitBtn = document.querySelector('#kt_modal_edit_ai_tool [data-kt-stepper-action="submit"]');
         

@@ -1282,32 +1282,6 @@ document.addEventListener("DOMContentLoaded", function() {
         stepper = new KTStepper(stepperElement);
         
         // Handle next button
-        stepper.on('kt.stepper.next', function(stepper) {
-            const currentStep = stepper.getCurrentStepIndex();
-            
-            // Validação antes de avançar
-            if (currentStep === 1) {
-                if (!validateStep1()) {
-                    return;
-                }
-                updateReviewSummary();
-            }
-            
-            if (currentStep === 2) {
-                buildAndStoreJSONs();
-                updateReviewConfig();
-            }
-            
-            stepper.goNext();
-            updateWizardButtons(stepper);
-        });
-        
-        // Handle previous button
-        stepper.on('kt.stepper.previous', function(stepper) {
-            stepper.goPrevious();
-            updateWizardButtons(stepper);
-        });
-        
         // Handle navigation click - Botões próximo/voltar
         const nextBtn = document.querySelector('[data-kt-stepper-action="next"]');
         const prevBtn = document.querySelector('[data-kt-stepper-action="previous"]');
@@ -1352,7 +1326,7 @@ document.addEventListener("DOMContentLoaded", function() {
     
     function updateWizardButtons(stepper) {
         const currentStep = stepper.getCurrentStepIndex();
-        const totalSteps = stepper.getTotalStepsNumber();
+        const totalSteps = 3; // Total fixo de 3 steps
         const nextBtn = document.querySelector('[data-kt-stepper-action="next"]');
         const submitBtn = document.querySelector('[data-kt-stepper-action="submit"]');
         

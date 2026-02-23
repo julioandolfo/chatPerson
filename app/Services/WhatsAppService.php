@@ -1706,77 +1706,100 @@ class WhatsAppService
                                     }
                                 }
                                 
-                                // Converter PNG → JPG para melhor compatibilidade com WhatsApp CDN
-                                // WhatsApp pode rejeitar PNGs com "connection reset by peer"
+                                // Comprimir imagem antes do envio (redimensionar + JPG)
+                                // Garante que imagens fiquem leves (KB) para evitar erros de CDN
                                 $sendPath = $absolutePath;
                                 $tempJpg = null;
                                 
-                                if ($mediaType === 'image' && strtolower($contentMime) === 'image/png') {
+                                if ($mediaType === 'image' && function_exists('imagecreatefromstring')) {
                                     $tempJpg = sys_get_temp_dir() . '/' . uniqid('wa_img_') . '.jpg';
                                     $converted = false;
+                                    $originalMime = strtolower($contentMime);
                                     
-                                    // Método 1: PHP GD
-                                    if (!$converted && function_exists('imagecreatefrompng')) {
-                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via GD...");
-                                        try {
-                                            $img = @imagecreatefrompng($absolutePath);
-                                            if ($img) {
-                                                $w = imagesx($img);
-                                                $h = imagesy($img);
-                                                $jpg = imagecreatetruecolor($w, $h);
-                                                $white = imagecolorallocate($jpg, 255, 255, 255);
-                                                imagefill($jpg, 0, 0, $white);
-                                                imagecopy($jpg, $img, 0, 0, 0, 0, $w, $h);
-                                                imagedestroy($img);
-                                                imagejpeg($jpg, $tempJpg, 85);
-                                                imagedestroy($jpg);
-                                                $converted = file_exists($tempJpg) && filesize($tempJpg) > 0;
-                                                if ($converted) Logger::quepasa("sendMessage - ✅ Conversão via GD bem-sucedida");
+                                    $maxDimension = 1600;
+                                    $jpegQuality = 75;
+                                    $maxTargetSize = 500 * 1024; // 500KB alvo máximo
+                                    
+                                    Logger::quepasa("sendMessage - 🖼️ Comprimindo imagem (max {$maxDimension}px, quality {$jpegQuality}, target <" . ($maxTargetSize/1024) . "KB)...");
+                                    
+                                    try {
+                                        $imgData = file_get_contents($absolutePath);
+                                        $img = @imagecreatefromstring($imgData);
+                                        
+                                        if ($img) {
+                                            $w = imagesx($img);
+                                            $h = imagesy($img);
+                                            Logger::quepasa("sendMessage - Imagem original: {$w}x{$h}, " . strlen($imgData) . " bytes");
+                                            
+                                            // Redimensionar se maior que maxDimension
+                                            $newW = $w;
+                                            $newH = $h;
+                                            if ($w > $maxDimension || $h > $maxDimension) {
+                                                $ratio = min($maxDimension / $w, $maxDimension / $h);
+                                                $newW = (int)round($w * $ratio);
+                                                $newH = (int)round($h * $ratio);
+                                                Logger::quepasa("sendMessage - Redimensionando: {$w}x{$h} → {$newW}x{$newH}");
                                             }
-                                        } catch (\Throwable $e) {
-                                            Logger::quepasa("sendMessage - ⚠️ GD falhou: " . $e->getMessage());
+                                            
+                                            $jpg = imagecreatetruecolor($newW, $newH);
+                                            $white = imagecolorallocate($jpg, 255, 255, 255);
+                                            imagefill($jpg, 0, 0, $white);
+                                            imagecopyresampled($jpg, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+                                            imagedestroy($img);
+                                            
+                                            // Primeira tentativa com qualidade padrão
+                                            imagejpeg($jpg, $tempJpg, $jpegQuality);
+                                            
+                                            // Se ainda muito grande, reduzir qualidade progressivamente
+                                            if (file_exists($tempJpg) && filesize($tempJpg) > $maxTargetSize) {
+                                                $currentQuality = $jpegQuality;
+                                                while ($currentQuality > 40 && filesize($tempJpg) > $maxTargetSize) {
+                                                    $currentQuality -= 10;
+                                                    imagejpeg($jpg, $tempJpg, $currentQuality);
+                                                    Logger::quepasa("sendMessage - Re-comprimindo com quality={$currentQuality}, size=" . filesize($tempJpg) . " bytes");
+                                                }
+                                            }
+                                            
+                                            imagedestroy($jpg);
+                                            $converted = file_exists($tempJpg) && filesize($tempJpg) > 0;
+                                            if ($converted) Logger::quepasa("sendMessage - ✅ Compressão via GD bem-sucedida");
                                         }
+                                    } catch (\Throwable $e) {
+                                        Logger::quepasa("sendMessage - ⚠️ GD falhou: " . $e->getMessage());
                                     }
                                     
-                                    // Método 2: PHP Imagick
+                                    // Fallback: Imagick
                                     if (!$converted && class_exists('Imagick')) {
-                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via Imagick...");
+                                        Logger::quepasa("sendMessage - 🖼️ Comprimindo via Imagick...");
                                         try {
                                             $im = new \Imagick($absolutePath);
                                             $im->setImageBackgroundColor('white');
                                             $im->setImageAlphaChannel(\Imagick::ALPHACHANNEL_REMOVE);
+                                            
+                                            $geo = $im->getImageGeometry();
+                                            if ($geo['width'] > $maxDimension || $geo['height'] > $maxDimension) {
+                                                $im->thumbnailImage($maxDimension, $maxDimension, true);
+                                            }
+                                            
                                             $im->setImageFormat('jpeg');
-                                            $im->setImageCompressionQuality(85);
+                                            $im->setImageCompressionQuality($jpegQuality);
+                                            $im->stripImage();
                                             $im->writeImage($tempJpg);
                                             $im->destroy();
                                             $converted = file_exists($tempJpg) && filesize($tempJpg) > 0;
-                                            if ($converted) Logger::quepasa("sendMessage - ✅ Conversão via Imagick bem-sucedida");
+                                            if ($converted) Logger::quepasa("sendMessage - ✅ Compressão via Imagick bem-sucedida");
                                         } catch (\Throwable $e) {
                                             Logger::quepasa("sendMessage - ⚠️ Imagick falhou: " . $e->getMessage());
                                         }
                                     }
                                     
-                                    // Método 3: FFmpeg (disponível na maioria dos Docker)
+                                    // Fallback: FFmpeg
                                     if (!$converted && function_exists('exec')) {
-                                        Logger::quepasa("sendMessage - 🖼️ Convertendo PNG → JPG via ffmpeg/convert...");
-                                        // Tentar ffmpeg
-                                        $ffmpegCmd = 'ffmpeg -y -i ' . escapeshellarg($absolutePath) . ' -q:v 2 ' . escapeshellarg($tempJpg) . ' 2>&1';
+                                        Logger::quepasa("sendMessage - 🖼️ Comprimindo via ffmpeg...");
+                                        $ffmpegCmd = 'ffmpeg -y -i ' . escapeshellarg($absolutePath) . ' -vf "scale=' . $maxDimension . ':-1:flags=lanczos" -q:v 4 ' . escapeshellarg($tempJpg) . ' 2>&1';
                                         exec($ffmpegCmd, $out, $code);
                                         $converted = ($code === 0) && file_exists($tempJpg) && filesize($tempJpg) > 0;
-                                        
-                                        if ($converted) {
-                                            Logger::quepasa("sendMessage - ✅ Conversão via ffmpeg bem-sucedida");
-                                        } else {
-                                            // Tentar ImageMagick convert
-                                            $convertCmd = 'convert ' . escapeshellarg($absolutePath) . ' -background white -flatten -quality 85 ' . escapeshellarg($tempJpg) . ' 2>&1';
-                                            exec($convertCmd, $out2, $code2);
-                                            $converted = ($code2 === 0) && file_exists($tempJpg) && filesize($tempJpg) > 0;
-                                            if ($converted) {
-                                                Logger::quepasa("sendMessage - ✅ Conversão via ImageMagick bem-sucedida");
-                                            } else {
-                                                Logger::quepasa("sendMessage - ⚠️ Nenhum conversor disponível (ffmpeg exit={$code}, convert exit={$code2})");
-                                            }
-                                        }
+                                        if ($converted) Logger::quepasa("sendMessage - ✅ Compressão via ffmpeg bem-sucedida");
                                     }
                                     
                                     if ($converted) {
@@ -1784,8 +1807,9 @@ class WhatsAppService
                                         $newSize = filesize($tempJpg);
                                         $sendPath = $tempJpg;
                                         $contentMime = 'image/jpeg';
-                                        $mediaName = preg_replace('/\.png$/i', '.jpg', $mediaName ?? 'image.jpg');
-                                        Logger::quepasa("sendMessage - ✅ PNG→JPG: {$oldSize} → {$newSize} bytes (redução " . round((1 - $newSize / $oldSize) * 100) . "%)");
+                                        $ext = pathinfo($mediaName ?? 'image.jpg', PATHINFO_EXTENSION);
+                                        $mediaName = preg_replace('/\.' . preg_quote($ext, '/') . '$/i', '.jpg', $mediaName ?? 'image.jpg');
+                                        Logger::quepasa("sendMessage - ✅ Imagem comprimida: {$oldSize} → {$newSize} bytes (" . round($newSize/1024) . "KB, redução " . round((1 - $newSize / max($oldSize, 1)) * 100) . "%)");
                                     } else {
                                         Logger::quepasa("sendMessage - ⚠️ Nenhum método de conversão PNG→JPG disponível, enviando PNG original");
                                         if (file_exists($tempJpg)) @unlink($tempJpg);
@@ -1893,7 +1917,7 @@ class WhatsAppService
             }
 
             $jsonPayload = json_encode($payload);
-            $maxRetries = 3;
+            $maxRetries = 5;
             $lastError = null;
             $lastHttpCode = 0;
             $lastResponse = '';
@@ -1901,8 +1925,10 @@ class WhatsAppService
             
             for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
                 if ($attempt > 1) {
-                    // Espera maior para erros de CDN (connection reset)
-                    $waitSeconds = $isCdnError ? ($attempt * 5) : ($attempt * 2);
+                    // Backoff exponencial: CDN errors esperam mais (10s, 20s, 40s, 60s)
+                    $waitSeconds = $isCdnError 
+                        ? min(60, (int)pow(2, $attempt) * 5)  // 10, 20, 40, 60
+                        : min(30, $attempt * 3);               // 3, 6, 9, 12
                     Logger::quepasa("sendMessage - 🔄 Retry {$attempt}/{$maxRetries} após aguardar {$waitSeconds}s" . ($isCdnError ? ' (CDN error)' : '') . "...");
                     sleep($waitSeconds);
                 }

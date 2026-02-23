@@ -1944,6 +1944,35 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     opacity: 1;
 }
 
+.message-sending-indicator {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+}
+
+.message-sending-indicator .spinner-border {
+    color: rgba(255,255,255,0.5);
+}
+
+.message-send-error {
+    display: flex;
+    align-items: center;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.message-send-error .retry-send-btn {
+    font-size: 11px;
+    text-decoration: none;
+}
+
+.message-send-error .retry-send-btn:hover {
+    text-decoration: underline;
+}
+
 /* Container de erro de mensagem */
 .message-error-container {
     display: flex;
@@ -13780,6 +13809,11 @@ function addMessageToChat(message) {
             const deliveredAt = message.delivered_at || null;
             const errorMessage = message.error_message || null;
             
+            // Mensagem sendo enviada (otimista)
+            if (status === 'sending') {
+                return '';
+            }
+            
             // Se houver erro
             if (status === 'failed' || errorMessage) {
                 const errorText = escapeHtml(errorMessage || 'Erro ao enviar');
@@ -14760,33 +14794,16 @@ function sendMessage() {
         previewMessage = `↩️ ${replyContext.text}\n\n${message}`;
     }
     
-    // Mostrar loading (verificar se tem vídeos grandes que serão comprimidos)
-    const btn = (typeof event !== 'undefined' && event && event.target && event.target.closest) 
-        ? (event.target.closest('button') || document.querySelector('button[onclick="sendMessage()"]'))
-        : document.querySelector('button[onclick="sendMessage()"]');
-    const originalHTML = btn.innerHTML;
-    btn.disabled = true;
-    
-    const hasLargeVideo = pendingAttachments.some(att => {
-        const isVideo = att.file.type.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)$/i.test(att.file.name);
-        return isVideo && att.file.size > 5 * 1024 * 1024;
-    });
-    
-    if (hasLargeVideo) {
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando e comprimindo vídeo...';
-    } else {
-        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
-    }
-    
     // Adicionar mensagem otimisticamente (antes da resposta do servidor)
     const tempId = 'temp_' + Date.now();
     const tempMessage = {
         id: tempId,
-        content: previewMessage, // Usar preview formatado para exibição
+        content: previewMessage,
         direction: 'outgoing',
         type: isNote ? 'note' : 'message',
         created_at: new Date().toISOString(),
         sender_name: 'Você',
+        status: 'sending',
         quoted_message_id: replyContext ? replyContext.id : null,
         quoted_sender_name: replyContext ? replyContext.sender : null,
         quoted_text: replyContext ? replyContext.text : null
@@ -14794,7 +14811,25 @@ function sendMessage() {
     const messageDiv = addMessageToChat(tempMessage);
     if (messageDiv) {
         messageDiv.setAttribute('data-temp-id', tempId);
+        // Adicionar indicador de "enviando" na mensagem
+        const timeEl = messageDiv.querySelector('.message-time');
+        if (timeEl) {
+            const sendingIndicator = document.createElement('span');
+            sendingIndicator.className = 'message-sending-indicator';
+            sendingIndicator.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:2px;"></span><span class="sending-text">Enviando...</span>';
+            timeEl.appendChild(sendingIndicator);
+        }
     }
+    
+    // Timer para atualizar texto se demorar
+    const sendingTimer = setTimeout(() => {
+        const indicator = messageDiv?.querySelector('.sending-text');
+        if (indicator) indicator.textContent = 'Enviando (pode demorar)...';
+    }, 10000);
+    const sendingTimer2 = setTimeout(() => {
+        const indicator = messageDiv?.querySelector('.sending-text');
+        if (indicator) indicator.textContent = 'Tentando enviar...';
+    }, 30000);
     
     // Preparar payload (FormData para suportar anexos e legenda)
     const formData = new FormData();
@@ -14809,11 +14844,15 @@ function sendMessage() {
         });
     }
     
-    // Limpar input e reply (anexos serão limpos após sucesso)
+    // Limpar input, reply e anexos imediatamente (liberar interface)
     input.value = '';
     input.style.height = 'auto';
     document.getElementById('noteToggle').checked = false;
     cancelReply();
+    const filesToRetry = pendingAttachments.map(a => a.file);
+    pendingAttachments = [];
+    renderPendingAttachments();
+    _sendingMessage = false;
     
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
         method: 'POST',
@@ -14840,8 +14879,10 @@ function sendMessage() {
         return response.json();
     })
     .then(data => {
+        clearTimeout(sendingTimer);
+        clearTimeout(sendingTimer2);
+        
         if (data.success) {
-            // Remover mensagem temporíria e adicionar a real
             const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
             if (tempMsg) tempMsg.remove();
             
@@ -14849,32 +14890,88 @@ function sendMessage() {
                 addMessageToChat(data.message);
             }
             
-            // Atualizar lista de conversas
             updateConversationInList(conversationId, message);
         } else {
-            // Remover mensagem temporíria em caso de erro
-            const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
-            if (tempMsg) tempMsg.remove();
-            
-            alert('Erro ao enviar mensagem: ' + (data.message || 'Erro desconhecido'));
+            _showMessageError(tempMessage.id, data.message || 'Erro desconhecido', conversationId, finalMessage, isNote, replyContext, filesToRetry);
         }
     })
     .catch(error => {
+        clearTimeout(sendingTimer);
+        clearTimeout(sendingTimer2);
         console.error('Erro:', error);
-        // Remover mensagem temporíria em caso de erro
-        const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
-        if (tempMsg) tempMsg.remove();
-        
-        alert('Erro ao enviar mensagem');
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalHTML;
-        // Limpar anexos apenas depois da resposta (sucesso ou erro já removeu temp)
-        pendingAttachments = [];
-        renderPendingAttachments();
-        _sendingMessage = false;
+        _showMessageError(tempMessage.id, error.message || 'Erro de conexão', conversationId, finalMessage, isNote, replyContext, filesToRetry);
     });
+}
+
+function _showMessageError(tempId, errorMsg, conversationId, finalMessage, isNote, replyContext, files) {
+    const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+    if (!tempMsg) return;
+    
+    // Remover indicador de enviando
+    const indicator = tempMsg.querySelector('.message-sending-indicator');
+    if (indicator) indicator.remove();
+    
+    // Adicionar indicador de erro com botão de reenvio
+    const timeEl = tempMsg.querySelector('.message-time');
+    if (timeEl) {
+        const errorEl = document.createElement('div');
+        errorEl.className = 'message-send-error';
+        errorEl.innerHTML = `
+            <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Falha ao enviar</span>
+            <button class="btn btn-link btn-sm text-primary p-0 ms-2 retry-send-btn" title="Tentar novamente">
+                <i class="ki-duotone ki-arrows-circle fs-7"><span class="path1"></span><span class="path2"></span></i> Reenviar
+            </button>
+        `;
+        timeEl.after(errorEl);
+        
+        // Botão de reenvio
+        errorEl.querySelector('.retry-send-btn').addEventListener('click', function() {
+            errorEl.innerHTML = '<span class="text-warning fs-8"><span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:2px;"></span>Reenviando...</span>';
+            
+            const formData = new FormData();
+            formData.append('message', finalMessage);
+            formData.append('is_note', isNote ? '1' : '0');
+            if (replyContext) formData.append('quoted_message_id', replyContext.id);
+            if (files && files.length) {
+                files.forEach(f => formData.append('attachments[]', f));
+            }
+            
+            fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    tempMsg.remove();
+                    if (data.message) addMessageToChat(data.message);
+                    updateConversationInList(conversationId, finalMessage);
+                } else {
+                    errorEl.innerHTML = `
+                        <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Falha novamente</span>
+                        <button class="btn btn-link btn-sm text-primary p-0 ms-2 retry-send-btn" title="Tentar novamente">
+                            <i class="ki-duotone ki-arrows-circle fs-7"><span class="path1"></span><span class="path2"></span></i> Reenviar
+                        </button>
+                    `;
+                    errorEl.querySelector('.retry-send-btn').addEventListener('click', arguments.callee);
+                }
+            })
+            .catch(() => {
+                errorEl.innerHTML = `
+                    <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Erro de conexão</span>
+                    <button class="btn btn-link btn-sm text-primary p-0 ms-2 retry-send-btn" title="Tentar novamente">
+                        <i class="ki-duotone ki-arrows-circle fs-7"><span class="path1"></span><span class="path2"></span></i> Reenviar
+                    </button>
+                `;
+                errorEl.querySelector('.retry-send-btn').addEventListener('click', arguments.callee);
+            });
+        });
+    }
+    
+    // Marcar bolha como erro
+    const bubble = tempMsg.querySelector('.message-bubble');
+    if (bubble) bubble.style.opacity = '0.7';
 }
 
 function updateConversationInList(conversationId, lastMessage) {
@@ -19447,13 +19544,17 @@ const currentConversationId = parsePhpJson('<?= json_encode($selectedConversatio
     // Sistema de atualização periódica da lista de conversas (para badges de não lidas)
     // Apenas se WebSocket não estiver disponível ou se estiver em modo polling/auto
     if (!window.realtimeConfig || window.realtimeConfig.connectionType !== 'websocket') {
-        // Intervalo de 30 segundos para badges
         console.log('[Badges] Iniciando polling de badges a cada 30 segundos');
         let conversationListUpdateInterval = setInterval(() => {
             refreshConversationBadges();
-        }, 30000); // 30 segundos
+        }, 30000);
     } else {
-        console.log('[Badges] WebSocket ativo, polling de badges desabilitado');
+        // Mesmo com WebSocket, fazer refresh periódico para capturar mudanças
+        // que o WS pode não notificar (ex: conversa recebeu tag de outro agente)
+        console.log('[Badges] WebSocket ativo, polling de badges a cada 30 segundos como complemento');
+        let conversationListUpdateInterval = setInterval(() => {
+            refreshConversationBadges();
+        }, 30000);
     }
     
     // Atualizar tempos relativos a cada 30 segundos
@@ -19595,10 +19696,12 @@ function refreshConversationBadges() {
         }
     });
     
-    // ✅ ESCALABILIDADE: Limitar máximo de conversas para não sobrecarregar
-    // Mesmo se usuário carregou 150+ conversas, só atualiza badges das primeiras 70
-    params.set('limit', 70);  // Máximo 70 conversas
-    params.set('offset', 0);  // Sempre da primeira página
+    // Usar o maior entre o que já foi carregado e o mínimo de 70
+    // Isso garante que novas conversas que entram no filtro (ex: receberam uma tag)
+    // sejam capturadas mesmo se estiverem além das 70 primeiras por last_message_at
+    const loadedItems = document.querySelectorAll('.conversation-item[data-conversation-id]').length;
+    params.set('limit', Math.max(70, loadedItems + 20));
+    params.set('offset', 0);
     
     // Garantir que filtros bísicos tambêm sejam preservados se não estiverem na URL
     const filters = {
@@ -19642,32 +19745,31 @@ function refreshConversationBadges() {
     })
     .then(data => {
         if (data.success && data.conversations) {
-            // Obter IDs das conversas que devem estar na lista (segundo o filtro atual)
             const validConversationIds = new Set(data.conversations.map(c => c.id));
+            let listChanged = false;
             
-            // Remover conversas que NâO passam pelo filtro atual
+            // Remover conversas que não passam pelo filtro atual
             const allConversationItems = document.querySelectorAll('.conversation-item[data-conversation-id]');
             allConversationItems.forEach(item => {
                 const conversationId = parseInt(item.getAttribute('data-conversation-id'));
                 const currentConversationId = window.currentConversationId ?? parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
                 
-                // Não remover a conversa atual
                 if (conversationId === currentConversationId) {
                     return;
                 }
                 
-                // Se a conversa não está na lista vílida, removì-la
                 if (!validConversationIds.has(conversationId)) {
                     item.remove();
+                    listChanged = true;
                 }
             });
             
             // Atualizar badges de não lidas em cada conversa da lista
             data.conversations.forEach(conv => {
                 const conversationItem = document.querySelector(`[data-conversation-id="${conv.id}"]`);
-                // Se a conversa passou pelo filtro, mas ainda não está renderizada, adicionar agora
                 if (!conversationItem) {
                     addConversationToList(conv);
+                    listChanged = true;
                     return;
                 }
                 if (conversationItem) {
@@ -19728,6 +19830,13 @@ function refreshConversationBadges() {
                     sortConversationList();
                 }
             });
+
+            // Se houve mudanças na lista (adições/remoções), invalidar signature
+            // para que o próximo refreshConversationList faça re-render completo
+            if (listChanged) {
+                window.lastConversationListSignature = null;
+                console.log('[refreshConversationBadges] Lista mudou, signature invalidada');
+            }
 
             // Atualizar todos os indicadores SLA após atualizar a lista
             if (window.SLAIndicator) {

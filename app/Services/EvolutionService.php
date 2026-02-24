@@ -139,13 +139,31 @@ class EvolutionService
 
     /**
      * Resolver o nome da instância a partir da conta
+     * Sanitiza para garantir que seja compatível com a Evolution API (alfanumérico + hífens/underscores)
      */
     private static function getInstanceName(array $account): string
     {
         $name = $account['instance_id'] ?? '';
+        if (!empty($name)) {
+            $name = self::sanitizeInstanceName($name);
+        }
         if (empty($name)) {
             $name = 'chat_' . ($account['id'] ?? 'unknown');
         }
+        return $name;
+    }
+
+    /**
+     * Sanitizar nome de instância para formato válido na Evolution API
+     */
+    private static function sanitizeInstanceName(string $name): string
+    {
+        $name = strtolower(trim($name));
+        // Remover tudo que não seja alfanumérico, hífen ou underscore
+        $name = preg_replace('/[^a-z0-9_-]/', '_', $name);
+        // Remover underscores múltiplos
+        $name = preg_replace('/_+/', '_', $name);
+        $name = trim($name, '_-');
         return $name;
     }
 
@@ -225,6 +243,13 @@ class EvolutionService
 
         $config = self::getApiConfig($account);
         $instanceName = self::getInstanceName($account);
+
+        // Se o instance_id salvo no banco era inválido (ex: email), corrigir
+        $rawInstanceId = $account['instance_id'] ?? '';
+        if (!empty($rawInstanceId) && $rawInstanceId !== $instanceName) {
+            Logger::info("EvolutionService::getQRCode - Corrigindo instance_id: '{$rawInstanceId}' -> '{$instanceName}'");
+            IntegrationAccount::updateWithSync($accountId, ['instance_id' => $instanceName]);
+        }
 
         Logger::info("EvolutionService::getQRCode - accountId={$accountId}, instance={$instanceName}, apiUrl={$config['api_url']}");
 
@@ -939,11 +964,24 @@ class EvolutionService
 
     /**
      * Buscar estado de conexão da instância
+     * Lança exceção se a instância não existe (404) ou erro de autenticação (401/403)
      */
     private static function fetchConnectionState(array $config, string $instanceName): array
     {
         $url = $config['api_url'] . '/instance/connectionState/' . urlencode($instanceName);
-        return self::request('GET', $url, $config['api_key']);
+        $result = self::request('GET', $url, $config['api_key']);
+
+        if ($result['httpCode'] === 404) {
+            throw new \Exception("Instância '{$instanceName}' não existe na Evolution API");
+        }
+        if ($result['httpCode'] === 401 || $result['httpCode'] === 403) {
+            throw new \Exception('API Key inválida ou sem permissão (HTTP ' . $result['httpCode'] . ')');
+        }
+        if ($result['httpCode'] >= 400) {
+            throw new \Exception(self::extractErrorMessage($result) . ' (HTTP ' . $result['httpCode'] . ')');
+        }
+
+        return $result;
     }
 
     /**
@@ -1068,8 +1106,10 @@ class EvolutionService
             throw new \InvalidArgumentException('Número já cadastrado');
         }
 
-        // Gerar instance_id a partir do nome (slug)
-        $instanceId = $data['instance_id'] ?? self::generateInstanceName($data['name']);
+        // Gerar instance_id a partir do nome (slug), sempre sanitizado
+        $instanceId = !empty($data['instance_id'])
+            ? self::sanitizeInstanceName($data['instance_id'])
+            : self::generateInstanceName($data['name']);
 
         $accountData = [
             'name'         => $data['name'],

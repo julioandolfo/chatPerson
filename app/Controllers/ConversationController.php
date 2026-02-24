@@ -1577,9 +1577,11 @@ class ConversationController
                         'sender_name' => $createdMessage['sender_name'] ?? 'Você',
                         'sender_type' => $createdMessage['sender_type'],
                         'attachments' => $createdMessage['attachments'] ?? [],
+                        // Campos de reply
                         'quoted_message_id' => $createdMessage['quoted_message_id'] ?? null,
                         'quoted_sender_name' => $createdMessage['quoted_sender_name'] ?? null,
                         'quoted_text' => $createdMessage['quoted_text'] ?? null,
+                        // Status
                         'status' => $createdMessage['status'] ?? 'sent',
                         'delivered_at' => $createdMessage['delivered_at'] ?? null,
                         'read_at' => $createdMessage['read_at'] ?? null,
@@ -1593,12 +1595,6 @@ class ConversationController
                     'message' => $messageData,
                     'message_id' => $messageId
                 ]);
-                
-                // Processar transcrições de áudio em background (após resposta HTTP)
-                if (function_exists('fastcgi_finish_request')) {
-                    fastcgi_finish_request();
-                }
-                ConversationService::processPendingTranscriptions();
             } else {
                 Response::json([
                     'success' => false,

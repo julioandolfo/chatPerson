@@ -366,20 +366,20 @@ ob_start();
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">URL da Evolution API</label>
                             <input type="url" name="evolution_api_url" class="form-control form-control-solid" 
-                                   placeholder="https://evolution.seudominio.com" />
-                            <div class="form-text">URL base da sua instalação Evolution API. Deixe vazio para usar a URL configurada no sistema.</div>
+                                   placeholder="http://seu-ip:porta" />
+                            <div class="form-text">URL base (sem <code>/manager</code>). Ex: <code>http://168.231.94.128:50725</code></div>
                         </div>
                         <div class="fv-row mb-7">
-                            <label class="fw-semibold fs-6 mb-2">API Key (Global)</label>
+                            <label class="required fw-semibold fs-6 mb-2">API Key (Global)</label>
                             <input type="text" name="evolution_api_key" class="form-control form-control-solid" 
-                                   placeholder="sua-api-key-aqui" />
-                            <div class="form-text">Chave de autenticação global da Evolution API. Deixe vazio para usar a chave configurada no sistema.</div>
+                                   placeholder="sua-api-key-global" />
+                            <div class="form-text">Chave <code>AUTHENTICATION_API_KEY</code> configurada no servidor Evolution API. Obrigatória.</div>
                         </div>
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Nome da Instância</label>
                             <input type="text" name="evolution_instance_id" class="form-control form-control-solid" 
                                    placeholder="minha-instancia" />
-                            <div class="form-text">Nome da instância na Evolution API. Deixe vazio para gerar automaticamente a partir do nome da conta.</div>
+                            <div class="form-text">Nome da instância na Evolution API. Deixe vazio para gerar automaticamente.</div>
                         </div>
                     </div>
                     
@@ -617,14 +617,14 @@ ob_start();
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">URL da Evolution API</label>
                             <input type="url" id="kt_edit_evolution_api_url" class="form-control form-control-solid" 
-                                   placeholder="https://evolution.seudominio.com" />
-                            <div class="form-text">URL base da sua instalação Evolution API. Deixe vazio para usar a URL configurada no sistema.</div>
+                                   placeholder="http://seu-ip:porta" />
+                            <div class="form-text">URL base (sem <code>/manager</code>). Ex: <code>http://168.231.94.128:50725</code></div>
                         </div>
                         <div class="fv-row mb-7">
-                            <label class="fw-semibold fs-6 mb-2">API Key</label>
+                            <label class="fw-semibold fs-6 mb-2">API Key (Global)</label>
                             <input type="text" id="kt_edit_evolution_api_key" class="form-control form-control-solid" 
-                                   placeholder="sua-api-key-aqui" />
-                            <div class="form-text">Chave de autenticação da Evolution API. Deixe vazio para usar a chave configurada no sistema.</div>
+                                   placeholder="sua-api-key-global" />
+                            <div class="form-text">Chave <code>AUTHENTICATION_API_KEY</code> do servidor Evolution API.</div>
                         </div>
                         <div class="fv-row mb-7">
                             <label class="fw-semibold fs-6 mb-2">Nome da Instância</label>

@@ -28,7 +28,11 @@ class EvolutionService
      */
     private static function request(string $method, string $url, ?string $apiKey, array $body = null, int $timeout = 30): array
     {
+        $bodyJson = $body !== null ? json_encode($body) : null;
         Logger::info("EvolutionService::request - {$method} {$url}");
+        if ($bodyJson) {
+            Logger::info("EvolutionService::request - Body: " . mb_substr($bodyJson, 0, 2000));
+        }
 
         $ch = curl_init($url);
         $headers = [
@@ -51,10 +55,10 @@ class EvolutionService
 
         if ($method === 'POST') {
             $opts[CURLOPT_POST] = true;
-            $opts[CURLOPT_POSTFIELDS] = $body !== null ? json_encode($body) : '{}';
+            $opts[CURLOPT_POSTFIELDS] = $bodyJson ?? '{}';
         } elseif ($method === 'PUT') {
             $opts[CURLOPT_CUSTOMREQUEST] = 'PUT';
-            $opts[CURLOPT_POSTFIELDS] = $body !== null ? json_encode($body) : '{}';
+            $opts[CURLOPT_POSTFIELDS] = $bodyJson ?? '{}';
         } elseif ($method === 'DELETE') {
             $opts[CURLOPT_CUSTOMREQUEST] = 'DELETE';
         }
@@ -62,8 +66,12 @@ class EvolutionService
         curl_setopt_array($ch, $opts);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
         $error = curl_error($ch);
         curl_close($ch);
+
+        Logger::info("EvolutionService::request - HTTP {$httpCode} | Effective URL: {$effectiveUrl}");
+        Logger::info("EvolutionService::request - Response: " . mb_substr($response ?: '(vazio)', 0, 2000));
 
         if ($error) {
             Logger::error("EvolutionService::request - cURL error: {$error}");
@@ -71,12 +79,15 @@ class EvolutionService
         }
 
         $data = json_decode($response, true);
-        if ($data === null && !empty($response)) {
-            Logger::error("EvolutionService::request - Resposta não-JSON: " . substr($response, 0, 500));
-            throw new \Exception("Resposta inválida da Evolution API (HTTP {$httpCode})");
-        }
 
-        Logger::info("EvolutionService::request - HTTP {$httpCode} | Response: " . substr($response, 0, 1000));
+        // Se a resposta contém HTML (ex: "Cannot POST /..."), tratar como erro claro
+        if ($data === null && !empty($response)) {
+            if (str_contains($response, 'Cannot') || str_contains($response, '<!DOCTYPE')) {
+                Logger::error("EvolutionService::request - Resposta HTML/texto inesperada: " . substr($response, 0, 300));
+                $cleanMsg = strip_tags($response);
+                throw new \Exception("Evolution API retornou erro: " . trim(substr($cleanMsg, 0, 200)) . " (HTTP {$httpCode}). Verifique se a URL está correta.");
+            }
+        }
 
         return [
             'httpCode' => $httpCode,
@@ -90,24 +101,38 @@ class EvolutionService
      */
     private static function getApiConfig(array $account): array
     {
-        $apiUrl = rtrim($account['api_url'] ?? '', '/');
-        $apiKey = $account['api_key'] ?? '';
+        $apiUrl = trim($account['api_url'] ?? '');
+        $apiKey = trim($account['api_key'] ?? '');
 
         if (empty($apiUrl)) {
             $services = require __DIR__ . '/../../config/services.php';
-            $apiUrl = rtrim($services['evolution']['api_url'] ?? '', '/');
+            $apiUrl = trim($services['evolution']['api_url'] ?? '');
         }
         if (empty($apiKey)) {
             $services = $services ?? require __DIR__ . '/../../config/services.php';
-            $apiKey = $services['evolution']['api_key'] ?? '';
+            $apiKey = trim($services['evolution']['api_key'] ?? '');
         }
 
         if (empty($apiUrl)) {
-            throw new \Exception('URL da Evolution API não configurada. Defina EVOLUTION_API_URL no .env ou na conta.');
+            throw new \Exception('URL da Evolution API não configurada. Preencha o campo "URL da Evolution API" na conta ou defina EVOLUTION_API_URL no .env');
         }
+
+        // Sanitizar URL: remover /manager, barras finais, barras duplas
+        $apiUrl = rtrim($apiUrl, '/');
+        $apiUrl = preg_replace('#/manager$#i', '', $apiUrl);
+        $apiUrl = rtrim($apiUrl, '/');
+        // Corrigir barras duplas no path (mas não no protocolo)
+        $apiUrl = preg_replace('#(?<!:)//+#', '/', $apiUrl);
+
         if (empty($apiKey)) {
-            throw new \Exception('API Key da Evolution API não configurada. Defina EVOLUTION_API_KEY no .env ou na conta.');
+            throw new \Exception(
+                'API Key da Evolution API não configurada. '
+                . 'Preencha o campo "API Key" na conta ou defina EVOLUTION_API_KEY no .env. '
+                . 'A API Key é a chave AUTHENTICATION_API_KEY configurada no seu servidor Evolution API.'
+            );
         }
+
+        Logger::info("EvolutionService::getApiConfig - URL: {$apiUrl} | Key: " . substr($apiKey, 0, 8) . '...');
 
         return ['api_url' => $apiUrl, 'api_key' => $apiKey];
     }
@@ -172,7 +197,7 @@ class EvolutionService
         $result = self::request('POST', $url, $config['api_key'], $body);
 
         if ($result['httpCode'] !== 201 && $result['httpCode'] !== 200) {
-            $errorMsg = $result['data']['response']['message'][0] ?? ($result['data']['error'] ?? 'Erro desconhecido');
+            $errorMsg = self::extractErrorMessage($result);
             throw new \Exception("Falha ao criar instância: {$errorMsg} (HTTP {$result['httpCode']})");
         }
 
@@ -201,10 +226,17 @@ class EvolutionService
         $config = self::getApiConfig($account);
         $instanceName = self::getInstanceName($account);
 
+        Logger::info("EvolutionService::getQRCode - accountId={$accountId}, instance={$instanceName}, apiUrl={$config['api_url']}");
+
         // Verificar se a instância já existe; se não, criar
+        $needsCreate = false;
         try {
             $state = self::fetchConnectionState($config, $instanceName);
-            if (($state['data']['state'] ?? '') === 'open') {
+            $connectionState = $state['data']['state'] ?? ($state['data']['instance']['state'] ?? 'unknown');
+            Logger::info("EvolutionService::getQRCode - Estado atual: {$connectionState}");
+
+            if ($connectionState === 'open') {
+                IntegrationAccount::updateWithSync($accountId, ['status' => 'active']);
                 return [
                     'status'  => 'connected',
                     'message' => 'Já conectado ao WhatsApp',
@@ -212,7 +244,13 @@ class EvolutionService
                 ];
             }
         } catch (\Exception $e) {
-            Logger::info("EvolutionService::getQRCode - Instância não encontrada, criando...");
+            Logger::info("EvolutionService::getQRCode - Instância '{$instanceName}' não encontrada: {$e->getMessage()}");
+            $needsCreate = true;
+        }
+
+        // Criar instância se necessário
+        if ($needsCreate) {
+            Logger::info("EvolutionService::getQRCode - Criando instância '{$instanceName}'...");
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
             $webhookUrl = "{$protocol}://{$host}/whatsapp-webhook";
@@ -228,29 +266,39 @@ class EvolutionService
             IntegrationAccount::updateWithSync($accountId, $updateData);
             $instanceName = $createResult['instanceName'];
 
-            // Se já retornou QR code na criação
-            if (!empty($createResult['qrcode']['base64'])) {
-                $base64 = $createResult['qrcode']['base64'];
-                if (!str_starts_with($base64, 'data:')) {
-                    $base64 = 'data:image/png;base64,' . $base64;
+            // Se já retornou QR code na criação (Evolution pode retornar em vários formatos)
+            $qr = $createResult['qrcode'] ?? null;
+            if ($qr) {
+                $base64 = null;
+                if (is_array($qr)) {
+                    $base64 = $qr['base64'] ?? $qr['code'] ?? null;
+                } elseif (is_string($qr)) {
+                    $base64 = $qr;
                 }
-                return [
-                    'qrcode'     => $base64,
-                    'base64'     => $base64,
-                    'expires_in' => 60,
-                ];
+
+                if (!empty($base64)) {
+                    $base64 = self::normalizeBase64Image($base64);
+                    Logger::info("EvolutionService::getQRCode - QR Code recebido na criação da instância");
+                    return [
+                        'qrcode'     => $base64,
+                        'base64'     => $base64,
+                        'expires_in' => 60,
+                    ];
+                }
             }
         }
 
-        // GET /instance/connect/{instance}
+        // GET /instance/connect/{instance} para obter QR code
         $url = $config['api_url'] . '/instance/connect/' . urlencode($instanceName);
         $result = self::request('GET', $url, $config['api_key'], null, 60);
 
         if ($result['httpCode'] !== 200) {
-            throw new \Exception("Erro ao obter QR Code (HTTP {$result['httpCode']})");
+            $errorMsg = self::extractErrorMessage($result);
+            throw new \Exception("Erro ao obter QR Code: {$errorMsg} (HTTP {$result['httpCode']})");
         }
 
         $responseData = $result['data'];
+        Logger::info("EvolutionService::getQRCode - Connect response keys: " . implode(', ', array_keys($responseData)));
 
         // A resposta pode conter base64 diretamente ou um campo code/pairingCode
         $base64 = $responseData['base64'] ?? null;
@@ -258,9 +306,7 @@ class EvolutionService
         $pairingCode = $responseData['pairingCode'] ?? null;
 
         if (!empty($base64)) {
-            if (!str_starts_with($base64, 'data:')) {
-                $base64 = 'data:image/png;base64,' . $base64;
-            }
+            $base64 = self::normalizeBase64Image($base64);
             return [
                 'qrcode'      => $base64,
                 'base64'      => $base64,
@@ -270,15 +316,18 @@ class EvolutionService
         }
 
         if (!empty($code)) {
+            // code pode ser o QR code em formato texto (precisa gerar imagem)
+            // ou já em base64
+            $normalizedCode = self::normalizeBase64Image($code);
             return [
-                'qrcode'      => $code,
-                'base64'      => $code,
+                'qrcode'      => $normalizedCode,
+                'base64'      => $normalizedCode,
                 'pairingCode' => $pairingCode,
                 'expires_in'  => 60,
             ];
         }
 
-        throw new \Exception('QR Code não disponível. Tente novamente.');
+        throw new \Exception('QR Code não disponível. Verifique se a instância está correta e tente novamente.');
     }
 
     /**
@@ -429,7 +478,7 @@ class EvolutionService
         $result = self::request('POST', $url, $config['api_key'], $body);
 
         if ($result['httpCode'] !== 201 && $result['httpCode'] !== 200) {
-            $errorMsg = $result['data']['response']['message'][0] ?? ($result['data']['message'] ?? 'Erro ao enviar mensagem');
+            $errorMsg = self::extractErrorMessage($result);
             throw new \Exception("Falha ao enviar mensagem: {$errorMsg} (HTTP {$result['httpCode']})");
         }
 
@@ -507,7 +556,7 @@ class EvolutionService
         $result = self::request('POST', $url, $config['api_key'], $body, 120);
 
         if ($result['httpCode'] !== 201 && $result['httpCode'] !== 200) {
-            throw new \Exception("Falha ao enviar mídia (HTTP {$result['httpCode']})");
+            throw new \Exception("Falha ao enviar mídia: " . self::extractErrorMessage($result) . " (HTTP {$result['httpCode']})");
         }
 
         Logger::info("EvolutionService::sendMedia - Mídia enviada para {$to}");
@@ -560,7 +609,7 @@ class EvolutionService
         $result = self::request('POST', $url, $config['api_key'], $body, 120);
 
         if ($result['httpCode'] !== 201 && $result['httpCode'] !== 200) {
-            throw new \Exception("Falha ao enviar áudio (HTTP {$result['httpCode']})");
+            throw new \Exception("Falha ao enviar áudio: " . self::extractErrorMessage($result) . " (HTTP {$result['httpCode']})");
         }
 
         Logger::info("EvolutionService::sendAudio - Áudio enviado para {$to}");
@@ -605,7 +654,7 @@ class EvolutionService
         $result = self::request('POST', $url, $config['api_key'], $body);
 
         if ($result['httpCode'] !== 201 && $result['httpCode'] !== 200) {
-            throw new \Exception("Falha ao configurar webhook (HTTP {$result['httpCode']})");
+            throw new \Exception("Falha ao configurar webhook: " . self::extractErrorMessage($result) . " (HTTP {$result['httpCode']})");
         }
 
         // Salvar webhook_url na conta
@@ -856,12 +905,63 @@ class EvolutionService
     // ================================================================
 
     /**
+     * Extrair mensagem de erro legível da resposta da Evolution API
+     */
+    private static function extractErrorMessage(array $result): string
+    {
+        $data = $result['data'] ?? [];
+        $raw = $result['raw'] ?? '';
+
+        // Formato: { "response": { "message": ["..."] } }
+        if (!empty($data['response']['message'])) {
+            $msgs = $data['response']['message'];
+            return is_array($msgs) ? implode('; ', $msgs) : (string)$msgs;
+        }
+
+        // Formato: { "message": "..." } ou { "message": ["..."] }
+        if (!empty($data['message'])) {
+            $msg = $data['message'];
+            return is_array($msg) ? implode('; ', $msg) : (string)$msg;
+        }
+
+        // Formato: { "error": "..." }
+        if (!empty($data['error'])) {
+            return (string)$data['error'];
+        }
+
+        // Texto puro (ex: "Cannot POST /...")
+        if (!empty($raw) && strlen($raw) < 300) {
+            return trim(strip_tags($raw));
+        }
+
+        return 'Erro desconhecido';
+    }
+
+    /**
      * Buscar estado de conexão da instância
      */
     private static function fetchConnectionState(array $config, string $instanceName): array
     {
         $url = $config['api_url'] . '/instance/connectionState/' . urlencode($instanceName);
         return self::request('GET', $url, $config['api_key']);
+    }
+
+    /**
+     * Normalizar string base64 para data URI de imagem
+     */
+    private static function normalizeBase64Image(string $value): string
+    {
+        $value = trim($value);
+        // Já é data URI
+        if (str_starts_with($value, 'data:image/')) {
+            return $value;
+        }
+        // É base64 puro
+        if (preg_match('/^[A-Za-z0-9+\/=]+$/', substr($value, 0, 100))) {
+            return 'data:image/png;base64,' . $value;
+        }
+        // Pode ser o QR code como texto (não base64) - retornar como está
+        return $value;
     }
 
     /**

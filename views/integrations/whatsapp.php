@@ -276,7 +276,7 @@ ob_start();
                         <select name="provider" id="kt_provider_select" class="form-select form-select-solid" required onchange="toggleProviderFields(this.value)">
                             <option value="quepasa" selected>Quepasa API</option>
                             <option value="native">WhatsApp Nativo (Baileys)</option>
-                            <option value="evolution" disabled>Evolution API (Em breve)</option>
+                            <option value="evolution">Evolution API</option>
                         </select>
                     </div>
                     
@@ -348,6 +348,38 @@ ob_start();
                                 Testar Proxy
                             </button>
                             <span id="kt_proxy_test_result" class="ms-3 fs-7"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Campos Evolution API -->
+                    <div id="kt_evolution_fields" style="display: none;">
+                        <div class="alert alert-success d-flex align-items-center p-5 mb-7">
+                            <i class="ki-duotone ki-abstract-26 fs-2x text-success me-4">
+                                <span class="path1"></span>
+                                <span class="path2"></span>
+                            </i>
+                            <div class="d-flex flex-column">
+                                <span class="fw-bold">Evolution API v2</span>
+                                <span class="fs-7">Conecta ao WhatsApp via Evolution API. Requer uma instância da Evolution API rodando.</span>
+                            </div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL da Evolution API</label>
+                            <input type="url" name="evolution_api_url" class="form-control form-control-solid" 
+                                   placeholder="https://evolution.seudominio.com" />
+                            <div class="form-text">URL base da sua instalação Evolution API. Deixe vazio para usar a URL configurada no sistema.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">API Key (Global)</label>
+                            <input type="text" name="evolution_api_key" class="form-control form-control-solid" 
+                                   placeholder="sua-api-key-aqui" />
+                            <div class="form-text">Chave de autenticação global da Evolution API. Deixe vazio para usar a chave configurada no sistema.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Nome da Instância</label>
+                            <input type="text" name="evolution_instance_id" class="form-control form-control-solid" 
+                                   placeholder="minha-instancia" />
+                            <div class="form-text">Nome da instância na Evolution API. Deixe vazio para gerar automaticamente a partir do nome da conta.</div>
                         </div>
                     </div>
                     
@@ -756,19 +788,28 @@ $scripts = '
 let currentAccountId = null;
 let qrCodeStatusInterval = null;
 
-// Toggle campos de provider (Quepasa vs Native)
+// Toggle campos de provider (Quepasa vs Native vs Evolution)
 function toggleProviderFields(provider) {
     const quepasaFields = document.getElementById("kt_quepasa_fields");
     const nativeFields = document.getElementById("kt_native_fields");
+    const evolutionFields = document.getElementById("kt_evolution_fields");
+    
+    // Esconder todos primeiro
+    if (quepasaFields) quepasaFields.style.display = "none";
+    if (nativeFields) nativeFields.style.display = "none";
+    if (evolutionFields) evolutionFields.style.display = "none";
+    
+    // Remover required de todos
+    if (quepasaFields) quepasaFields.querySelectorAll("input").forEach(i => i.removeAttribute("required"));
+    if (nativeFields) nativeFields.querySelectorAll("input").forEach(i => i.removeAttribute("required"));
+    if (evolutionFields) evolutionFields.querySelectorAll("input").forEach(i => i.removeAttribute("required"));
     
     if (provider === "native") {
-        if (quepasaFields) quepasaFields.style.display = "none";
         if (nativeFields) nativeFields.style.display = "block";
-        // Remover required dos campos Quepasa
-        quepasaFields.querySelectorAll("input").forEach(i => i.removeAttribute("required"));
+    } else if (provider === "evolution") {
+        if (evolutionFields) evolutionFields.style.display = "block";
     } else {
         if (quepasaFields) quepasaFields.style.display = "block";
-        if (nativeFields) nativeFields.style.display = "none";
     }
 }
 
@@ -960,6 +1001,19 @@ document.addEventListener("DOMContentLoaded", function() {
             submitBtn.disabled = true;
             
             const formData = new FormData(form);
+            
+            // Mapear campos Evolution para campos padrão do backend
+            if (formData.get("provider") === "evolution") {
+                const evoUrl = formData.get("evolution_api_url");
+                const evoKey = formData.get("evolution_api_key");
+                const evoInstance = formData.get("evolution_instance_id");
+                if (evoUrl) formData.set("api_url", evoUrl);
+                if (evoKey) formData.set("api_key", evoKey);
+                if (evoInstance) formData.set("instance_id", evoInstance);
+                formData.delete("evolution_api_url");
+                formData.delete("evolution_api_key");
+                formData.delete("evolution_instance_id");
+            }
             
             fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '", {
                 method: "POST",

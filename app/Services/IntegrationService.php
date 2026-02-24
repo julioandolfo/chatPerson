@@ -25,8 +25,9 @@ class IntegrationService
                 // WhatsApp Cloud API (CoEx / API Oficial Meta)
                 return new WhatsAppCloudApiService();
             case 'quepasa':
-            case 'evolution':
                 return new WhatsAppService();
+            case 'evolution':
+                return new EvolutionService();
             default:
                 throw new \InvalidArgumentException("Provider não suportado: {$provider}");
         }
@@ -74,7 +75,10 @@ class IntegrationService
             // WhatsApp Cloud API (CoEx) - webhooks processados pelo MetaWebhookController
             WhatsAppCloudService::processWebhook($payload);
             return;
-        } elseif (in_array($provider, ['quepasa', 'evolution'])) {
+        } elseif ($provider === 'evolution') {
+            EvolutionService::processWebhook($payload);
+            return;
+        } elseif ($provider === 'quepasa') {
             if (method_exists($service, 'processWebhook')) {
                 $service->processWebhook($payload);
                 return;

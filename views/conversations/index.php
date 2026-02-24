@@ -14767,10 +14767,48 @@ function hideRecordingIndicator() {
 
 // Enviar mensagem de íudio
 async function sendAudioMessage(audioBlob, conversationId) {
+    const tempId = 'temp_audio_' + Date.now();
+    const tempMessage = {
+        id: tempId,
+        content: '',
+        direction: 'outgoing',
+        type: 'message',
+        created_at: new Date().toISOString(),
+        sender_name: 'Você',
+        status: 'sending',
+        attachments: [{
+            type: 'audio',
+            url: URL.createObjectURL(audioBlob),
+            path: 'temp-audio',
+            mime_type: audioBlob.type || 'audio/webm',
+            filename: 'audio.webm'
+        }]
+    };
+    const messageDiv = addMessageToChat(tempMessage);
+    if (messageDiv) {
+        messageDiv.setAttribute('data-temp-id', tempId);
+        const timeEl = messageDiv.querySelector('.message-time');
+        if (timeEl) {
+            const sendingIndicator = document.createElement('span');
+            sendingIndicator.className = 'message-sending-indicator';
+            sendingIndicator.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:2px;"></span><span class="sending-text">Enviando áudio...</span>';
+            timeEl.appendChild(sendingIndicator);
+        }
+    }
+
+    const sendingTimer = setTimeout(() => {
+        const indicator = messageDiv?.querySelector('.sending-text');
+        if (indicator) indicator.textContent = 'Processando áudio...';
+    }, 10000);
+    const sendingTimer2 = setTimeout(() => {
+        const indicator = messageDiv?.querySelector('.sending-text');
+        if (indicator) indicator.textContent = 'Enviando (pode demorar)...';
+    }, 30000);
+
     try {
-        // Converter para formato compatível (webm para ogg ou mp3 seria ideal, mas vamos usar webm)
         const formData = new FormData();
-        formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.webm');
+        const ext = (audioBlob.type || '').includes('ogg') ? '.ogg' : '.webm';
+        formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + ext);
         formData.append('content', '');
         
         const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
@@ -14778,8 +14816,9 @@ async function sendAudioMessage(audioBlob, conversationId) {
             body: formData
         });
         
-        // Garantir que temos JSON; se não, capturar texto para debug
-        // IMPORTANTE: Ler o texto primeiro e depois tentar fazer parse JSON para evitar "body stream already read"
+        clearTimeout(sendingTimer);
+        clearTimeout(sendingTimer2);
+        
         const responseText = await response.text();
         let data;
         try {
@@ -14789,13 +14828,41 @@ async function sendAudioMessage(audioBlob, conversationId) {
         }
         
         if (data.success && data.message) {
+            const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+            if (tempMsg) tempMsg.remove();
             addMessageToChat(data.message);
+            updateConversationInList(conversationId, '🎤 Áudio');
         } else {
-            throw new Error(data.message || 'Erro ao enviar íudio');
+            throw new Error(data.message || 'Erro ao enviar áudio');
         }
     } catch (error) {
-        console.error('Erro ao enviar íudio:', error);
-        alert('Erro ao enviar íudio: ' + error.message);
+        clearTimeout(sendingTimer);
+        clearTimeout(sendingTimer2);
+        console.error('Erro ao enviar áudio:', error);
+        
+        const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+        if (tempMsg) {
+            const indicator = tempMsg.querySelector('.message-sending-indicator');
+            if (indicator) indicator.remove();
+            const timeEl = tempMsg.querySelector('.message-time');
+            if (timeEl) {
+                const errorEl = document.createElement('div');
+                errorEl.className = 'message-send-error';
+                errorEl.innerHTML = `
+                    <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Falha ao enviar áudio</span>
+                    <button class="btn btn-link btn-sm text-primary p-0 ms-2 retry-audio-btn" title="Tentar novamente">
+                        <i class="ki-duotone ki-arrows-circle fs-7"><span class="path1"></span><span class="path2"></span></i> Reenviar
+                    </button>
+                `;
+                timeEl.after(errorEl);
+                tempMsg.style.opacity = '0.7';
+                
+                errorEl.querySelector('.retry-audio-btn').addEventListener('click', function() {
+                    tempMsg.remove();
+                    sendAudioMessage(audioBlob, conversationId);
+                });
+            }
+        }
     }
 }
 
@@ -19888,13 +19955,15 @@ function refreshConversationBadges() {
                     // Reaplicar estado visual de SLA (borda verde quando última msg é do agente)
                     applySlaVisualState(conversationItem, conv);
                     
-                    // Atualizar meta e resortear
+                    // Atualizar meta
                     updateConversationMeta(conversationItem, conv);
-                    // Garantir dropdown de açÁes após updates
+                    // Garantir dropdown de ações após updates
                     ensureActionsDropdown(conversationItem, conv.pinned === 1 || conv.pinned === true, conv.id);
-                    sortConversationList();
                 }
             });
+
+            // Ordenar lista UMA vez após processar todas as conversas
+            sortConversationList();
 
             // Se houve mudanças na lista (adições/remoções), invalidar signature
             // para que o próximo refreshConversationList faça re-render completo

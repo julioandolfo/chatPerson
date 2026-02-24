@@ -685,6 +685,11 @@ class WhatsAppService
     {
         $provider = $data['provider'] ?? 'quepasa';
         
+        // Rotear para EvolutionService se for provider evolution
+        if ($provider === 'evolution') {
+            return EvolutionService::createAccount($data);
+        }
+        
         $rules = [
             'name' => 'required|string|max:255',
             'phone_number' => 'required|string',
@@ -775,9 +780,13 @@ class WhatsAppService
             return self::getQRCodeNative($account);
         }
         
+        if ($account['provider'] === 'evolution') {
+            return EvolutionService::getQRCode($accountId);
+        }
+        
         if ($account['provider'] !== 'quepasa') {
             Logger::quepasa("getQRCode - Provider inválido: {$account['provider']}");
-            throw new \InvalidArgumentException('QR Code disponível apenas para Quepasa ou Native');
+            throw new \InvalidArgumentException('QR Code disponível apenas para Quepasa, Evolution ou Native');
         }
 
         try {
@@ -960,6 +969,11 @@ class WhatsAppService
         // Rotear para provider native (Baileys)
         if ($account['provider'] === 'native') {
             return self::getConnectionStatusNative($account);
+        }
+        
+        // Rotear para provider Evolution
+        if ($account['provider'] === 'evolution') {
+            return EvolutionService::getConnectionStatus($accountId, $forceRealCheck);
         }
 
         // Se forçar verificação real, usar método dedicado
@@ -1174,6 +1188,11 @@ class WhatsAppService
         $account = IntegrationAccount::find($accountId);
         if (!$account) {
             throw new \InvalidArgumentException('Conta não encontrada');
+        }
+
+        // Rotear para provider Evolution
+        if ($account['provider'] === 'evolution') {
+            return EvolutionService::disconnect($accountId);
         }
 
         // Limpar token e chatid no banco
@@ -1449,6 +1468,12 @@ class WhatsAppService
         if ($account['provider'] === 'native') {
             Logger::quepasa("sendMessage - Roteando para Native (Baileys): accountId={$accountId}");
             return self::sendMessageNative($accountId, $to, $message, $options);
+        }
+        
+        // Rotear para provider Evolution
+        if ($account['provider'] === 'evolution') {
+            Logger::quepasa("sendMessage - Roteando para Evolution API: accountId={$accountId}");
+            return EvolutionService::sendMessage($accountId, $to, $message, $options);
         }
         
         Logger::quepasa("sendMessage - ✅ Conta encontrada: ID={$accountId}, nome={$account['name']}, phone={$account['phone_number']}");
@@ -2271,6 +2296,11 @@ class WhatsAppService
         if (!$account) {
             Logger::quepasa("configureWebhook - Conta não encontrada: {$accountId}");
             throw new \InvalidArgumentException('Conta não encontrada');
+        }
+
+        // Rotear para provider Evolution
+        if ($account['provider'] === 'evolution') {
+            return EvolutionService::configureWebhook($accountId, $webhookUrl, $options);
         }
 
         if (empty($account['quepasa_token'])) {

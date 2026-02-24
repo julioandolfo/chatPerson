@@ -89,9 +89,22 @@ class IntegrationController
         try {
             $data = Request::post();
             
-            // Validar campos obrigatórios para Quepasa
+            // Validar campos obrigatórios por provider
             if ($data['provider'] === 'quepasa' && empty($data['quepasa_user'])) {
                 throw new \InvalidArgumentException('Quepasa User é obrigatório para Quepasa API');
+            }
+            
+            if ($data['provider'] === 'evolution') {
+                // Mapear campos do formulário para formato do service
+                if (!empty($data['evolution_api_url'])) {
+                    $data['api_url'] = $data['evolution_api_url'];
+                }
+                if (!empty($data['evolution_api_key'])) {
+                    $data['api_key'] = $data['evolution_api_key'];
+                }
+                if (!empty($data['evolution_instance_id'])) {
+                    $data['instance_id'] = $data['evolution_instance_id'];
+                }
             }
             
             $accountId = WhatsAppService::createAccount($data);
@@ -414,9 +427,14 @@ class IntegrationController
         Permission::abortIfCannot('whatsapp.delete');
         
         try {
-            // Desconectar antes de deletar
+            // Desconectar e deletar instância antes de deletar conta
             try {
-                WhatsAppService::disconnect($id);
+                $account = IntegrationAccount::find($id);
+                if ($account && $account['provider'] === 'evolution') {
+                    \App\Services\EvolutionService::deleteInstance($id);
+                } else {
+                    WhatsAppService::disconnect($id);
+                }
             } catch (\Exception $e) {
                 // Ignorar erro de desconexão
             }

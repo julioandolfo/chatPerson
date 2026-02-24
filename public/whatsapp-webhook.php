@@ -1,11 +1,12 @@
 <?php
 /**
- * Webhook Handler para WhatsApp (Quepasa API)
+ * Webhook Handler para WhatsApp (Quepasa API e Evolution API)
  * 
- * Este arquivo recebe eventos do Quepasa API quando mensagens são recebidas
+ * Este arquivo recebe eventos quando mensagens são recebidas
  * 
- * Configuração no Quepasa:
- * - Webhook URL: https://seudominio.com/whatsapp-webhook.php
+ * Configuração:
+ * - Quepasa:   Webhook URL: https://seudominio.com/whatsapp-webhook
+ * - Evolution: Webhook URL: https://seudominio.com/whatsapp-webhook
  * - Método: POST
  * - Content-Type: application/json
  */
@@ -17,6 +18,7 @@ require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../config/database.php';
 
 use App\Services\WhatsAppService;
+use App\Services\EvolutionService;
 use App\Helpers\Logger;
 
 // Permitir apenas POST
@@ -47,10 +49,17 @@ Logger::quepasa("Payload decodificado - Keys: " . implode(', ', array_keys($payl
 Logger::quepasa("Payload completo: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
 
 try {
-    Logger::quepasa("Chamando WhatsAppService::processWebhook...");
+    // Detectar se é webhook da Evolution API
+    // Evolution API envia: { "event": "messages.upsert", "instance": "nome", "data": { ... } }
+    $isEvolution = isset($payload['event']) && isset($payload['instance']) && isset($payload['data']);
     
-    // Processar webhook
-    WhatsAppService::processWebhook($payload);
+    if ($isEvolution) {
+        Logger::info("Webhook Evolution API detectado - Event: {$payload['event']}, Instance: {$payload['instance']}");
+        EvolutionService::processWebhook($payload);
+    } else {
+        Logger::quepasa("Chamando WhatsAppService::processWebhook (Quepasa)...");
+        WhatsAppService::processWebhook($payload);
+    }
     
     Logger::quepasa("Webhook processado com sucesso!");
     

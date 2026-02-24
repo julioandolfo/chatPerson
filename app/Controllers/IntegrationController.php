@@ -306,6 +306,7 @@ class IntegrationController
             // Validar dados
             $errors = \App\Helpers\Validator::validate($data, [
                 'name' => 'nullable|string|max:255',
+                'provider' => 'nullable|string|in:quepasa,evolution,native',
                 'api_url' => 'nullable|string|max:500',
                 'quepasa_user' => 'nullable|string|max:255',
                 'quepasa_trackid' => 'nullable|string|max:255',

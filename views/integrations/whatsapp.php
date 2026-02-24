@@ -576,28 +576,71 @@ ob_start();
                         <div class="form-text text-warning">O número não pode ser alterado após a criação</div>
                     </div>
                     <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">URL da API</label>
-                        <input type="url" name="api_url" id="kt_edit_whatsapp_api_url" class="form-control form-control-solid" 
-                               placeholder="https://whats.seudominio.com" required />
-                        <div class="form-text">URL base da sua instalação Quepasa (ex: https://whats.seudominio.com)</div>
+                        <label class="required fw-semibold fs-6 mb-2">Provider</label>
+                        <select name="provider" id="kt_edit_provider_select" class="form-select form-select-solid" required onchange="toggleEditProviderFields(this.value)">
+                            <option value="quepasa">Quepasa API</option>
+                            <option value="native">WhatsApp Nativo (Baileys)</option>
+                            <option value="evolution">Evolution API</option>
+                        </select>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="required fw-semibold fs-6 mb-2">Quepasa User</label>
-                        <input type="text" name="quepasa_user" id="kt_edit_whatsapp_user" class="form-control form-control-solid" 
-                               placeholder="julio" required />
-                        <div class="form-text">Identificador do usuário (X-QUEPASA-USER). Ex: julio, personizi, etc.</div>
+                    
+                    <!-- Campos Quepasa (edição) -->
+                    <div id="kt_edit_quepasa_fields">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL da API</label>
+                            <input type="url" name="api_url" id="kt_edit_whatsapp_api_url" class="form-control form-control-solid" 
+                                   placeholder="https://whats.seudominio.com" />
+                            <div class="form-text">URL base da sua instalação Quepasa (ex: https://whats.seudominio.com)</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Quepasa User</label>
+                            <input type="text" name="quepasa_user" id="kt_edit_whatsapp_user" class="form-control form-control-solid" 
+                                   placeholder="julio" />
+                            <div class="form-text">Identificador do usuário (X-QUEPASA-USER). Ex: julio, personizi, etc.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Quepasa TrackId</label>
+                            <input type="text" name="quepasa_trackid" id="kt_edit_whatsapp_trackid" class="form-control form-control-solid" 
+                                   placeholder="nome_da_conta" />
+                            <div class="form-text">Identificador único para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Token da API (opcional)</label>
+                            <input type="text" name="api_key" id="kt_edit_whatsapp_api_key" class="form-control form-control-solid" 
+                                   placeholder="Token será gerado automaticamente se vazio" />
+                            <div class="form-text">Se deixar vazio, um token será gerado automaticamente ao escanear o QR Code</div>
+                        </div>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Quepasa TrackId</label>
-                        <input type="text" name="quepasa_trackid" id="kt_edit_whatsapp_trackid" class="form-control form-control-solid" 
-                               placeholder="nome_da_conta" />
-                        <div class="form-text">Identificador único para rastreamento (X-QUEPASA-TRACKID). Deixe vazio para usar o nome da conta.</div>
+                    
+                    <!-- Campos Evolution API (edição) -->
+                    <div id="kt_edit_evolution_fields" style="display: none;">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL da Evolution API</label>
+                            <input type="url" id="kt_edit_evolution_api_url" class="form-control form-control-solid" 
+                                   placeholder="https://evolution.seudominio.com" />
+                            <div class="form-text">URL base da sua instalação Evolution API. Deixe vazio para usar a URL configurada no sistema.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">API Key</label>
+                            <input type="text" id="kt_edit_evolution_api_key" class="form-control form-control-solid" 
+                                   placeholder="sua-api-key-aqui" />
+                            <div class="form-text">Chave de autenticação da Evolution API. Deixe vazio para usar a chave configurada no sistema.</div>
+                        </div>
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">Nome da Instância</label>
+                            <input type="text" id="kt_edit_evolution_instance_id" class="form-control form-control-solid" 
+                                   placeholder="minha-instancia" />
+                            <div class="form-text">Nome da instância na Evolution API.</div>
+                        </div>
                     </div>
-                    <div class="fv-row mb-7">
-                        <label class="fw-semibold fs-6 mb-2">Token da API (opcional)</label>
-                        <input type="text" name="api_key" id="kt_edit_whatsapp_api_key" class="form-control form-control-solid" 
-                               placeholder="Token será gerado automaticamente se vazio" />
-                        <div class="form-text">Se deixar vazio, um token será gerado automaticamente ao escanear o QR Code</div>
+                    
+                    <!-- Campos Native/Baileys (edição) -->
+                    <div id="kt_edit_native_fields" style="display: none;">
+                        <div class="fv-row mb-7">
+                            <label class="fw-semibold fs-6 mb-2">URL da API</label>
+                            <input type="url" id="kt_edit_native_api_url" class="form-control form-control-solid" 
+                                   placeholder="http://127.0.0.1:3100" />
+                        </div>
                     </div>
                     
                     <div class="separator separator-dashed my-5"></div>
@@ -696,7 +739,7 @@ ob_start();
                         <div class="d-flex flex-stack flex-grow-1">
                             <div class="fw-semibold">
                                 <div class="fs-6 text-gray-700">
-                                    Após alterar a URL da API, você precisará escanear o QR Code novamente para reconectar.
+                                    Após alterar o provider ou URL da API, você precisará escanear o QR Code novamente para reconectar.
                                 </div>
                             </div>
                         </div>
@@ -900,35 +943,70 @@ function loadFunnelStages(funnelId, targetSelectId, callback) {
     });
 }
 
+// Toggle campos de provider no modal de edição
+function toggleEditProviderFields(provider) {
+    const quepasaFields = document.getElementById("kt_edit_quepasa_fields");
+    const evolutionFields = document.getElementById("kt_edit_evolution_fields");
+    const nativeFields = document.getElementById("kt_edit_native_fields");
+    const proxySection = document.getElementById("kt_edit_proxy_section");
+    
+    // Esconder todos
+    if (quepasaFields) quepasaFields.style.display = "none";
+    if (evolutionFields) evolutionFields.style.display = "none";
+    if (nativeFields) nativeFields.style.display = "none";
+    if (proxySection) proxySection.style.display = "none";
+    
+    if (provider === "evolution") {
+        if (evolutionFields) evolutionFields.style.display = "block";
+    } else if (provider === "native") {
+        if (nativeFields) nativeFields.style.display = "block";
+        if (proxySection) proxySection.style.display = "block";
+    } else {
+        if (quepasaFields) quepasaFields.style.display = "block";
+    }
+}
+
 // Abrir modal de edição da conta (campos principais)
 function editAccount(account) {
     document.getElementById("kt_edit_whatsapp_id").value = account.id;
     document.getElementById("kt_edit_whatsapp_name").value = account.name || "";
     document.getElementById("kt_edit_whatsapp_phone").value = account.phone_number || "";
+    
+    // Selecionar provider
+    const providerSelect = document.getElementById("kt_edit_provider_select");
+    const provider = account.provider || "quepasa";
+    providerSelect.value = provider;
+    toggleEditProviderFields(provider);
+    
+    // Preencher campos Quepasa
     document.getElementById("kt_edit_whatsapp_api_url").value = account.api_url || "";
     document.getElementById("kt_edit_whatsapp_user").value = account.quepasa_user || "";
     document.getElementById("kt_edit_whatsapp_trackid").value = account.quepasa_trackid || "";
-    document.getElementById("kt_edit_whatsapp_api_key").value = ""; // Não exibir token por segurança
+    document.getElementById("kt_edit_whatsapp_api_key").value = "";
+    
+    // Preencher campos Evolution
+    document.getElementById("kt_edit_evolution_api_url").value = account.api_url || "";
+    document.getElementById("kt_edit_evolution_api_key").value = account.api_key || "";
+    document.getElementById("kt_edit_evolution_instance_id").value = account.instance_id || "";
+    
+    // Preencher campos Native
+    document.getElementById("kt_edit_native_api_url").value = account.api_url || account.native_service_url || "http://127.0.0.1:3100";
     
     // Exibir status atual
     const statusDisplay = document.getElementById("kt_edit_whatsapp_status_display");
     const statusLabels = {
-        "active": "✅ Conectado",
-        "inactive": "⚪ Inativo",
-        "disconnected": "❌ Desconectado"
+        "active": "Conectado",
+        "inactive": "Inativo",
+        "disconnected": "Desconectado"
     };
     statusDisplay.textContent = statusLabels[account.status] || account.status || "Desconhecido";
     
-    // Mostrar/ocultar seção de proxy baseado no provider
-    const proxySection = document.getElementById("kt_edit_proxy_section");
-    if (account.provider === "native") {
-        proxySection.style.display = "block";
+    // Preencher proxy (Native)
+    if (provider === "native") {
         document.getElementById("kt_edit_whatsapp_native_url").value = account.native_service_url || "http://127.0.0.1:3100";
         document.getElementById("kt_edit_whatsapp_proxy_host").value = account.proxy_host || "";
         document.getElementById("kt_edit_whatsapp_proxy_user").value = account.proxy_user || "";
-        document.getElementById("kt_edit_whatsapp_proxy_pass").value = ""; // Não exibir senha
-    } else {
-        proxySection.style.display = "none";
+        document.getElementById("kt_edit_whatsapp_proxy_pass").value = "";
     }
     
     // Preencher campos de limite de novas conversas
@@ -1142,6 +1220,17 @@ document.addEventListener("DOMContentLoaded", function() {
             const limitCheckbox = document.getElementById("kt_edit_whatsapp_limit_enabled");
             if (limitCheckbox) {
                 formData.set("new_conv_limit_enabled", limitCheckbox.checked ? "1" : "0");
+            }
+            
+            // Mapear campos do provider ativo para os nomes corretos
+            const editProvider = formData.get("provider") || "quepasa";
+            if (editProvider === "evolution") {
+                // Usar valores dos campos Evolution
+                formData.set("api_url", document.getElementById("kt_edit_evolution_api_url").value || "");
+                formData.set("api_key", document.getElementById("kt_edit_evolution_api_key").value || "");
+                formData.set("instance_id", document.getElementById("kt_edit_evolution_instance_id").value || "");
+            } else if (editProvider === "native") {
+                formData.set("api_url", document.getElementById("kt_edit_native_api_url").value || "");
             }
             
             fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId, {

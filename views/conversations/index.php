@@ -7728,6 +7728,71 @@ window.removeAIAgent = function() {
 // VARIüVEIS E OUTRAS FUNÇòES
 // ============================================
 
+// Recuperação ao voltar para a aba do navegador
+// Quando o navegador congela a aba inativa, WebSocket desconecta e polling para.
+// Ao voltar, precisamos recarregar os dados.
+(function() {
+    let lastVisibleTime = Date.now();
+    let tabHiddenSince = null;
+    
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+            tabHiddenSince = Date.now();
+            return;
+        }
+        
+        // Aba voltou a ficar visível
+        const hiddenDuration = tabHiddenSince ? (Date.now() - tabHiddenSince) : 0;
+        tabHiddenSince = null;
+        
+        console.log(`[Tab] Aba visível novamente após ${Math.round(hiddenDuration/1000)}s`);
+        
+        // Se ficou escondida por mais de 30s, fazer refresh dos dados
+        if (hiddenDuration > 30000) {
+            console.log('[Tab] Aba ficou inativa por muito tempo, recuperando dados...');
+            
+            // Invalidar cache de signature para forçar re-render
+            window.lastConversationListSignature = null;
+            
+            // Reconectar WebSocket se necessário
+            if (typeof window.wsClient !== 'undefined' && window.wsClient) {
+                if (!window.wsClient.isConnected) {
+                    console.log('[Tab] WebSocket desconectado, reconectando...');
+                    window.wsClient.reconnectAttempts = 0;
+                    if (window.wsClient.userId) {
+                        window.wsClient.connect(window.wsClient.userId);
+                    }
+                }
+                // Re-inscrever nas conversas visíveis
+                subscribeVisibleConversations();
+            }
+            
+            // Atualizar lista de conversas
+            try { refreshConversationBadges(); } catch(e) {}
+            
+            // Atualizar abas
+            try { refreshConversationTabs(); } catch(e) {}
+            
+            // Se tem conversa aberta, atualizar mensagens
+            if (window.currentConversationId) {
+                try { checkForNewMessages(); } catch(e) {}
+            }
+            
+            // Atualizar tempos relativos
+            try { updateConversationTimes(); } catch(e) {}
+        }
+        
+        // Se ficou escondida por mais de 5 minutos, forçar refresh completo da lista
+        if (hiddenDuration > 300000) {
+            console.log('[Tab] Aba ficou inativa por mais de 5min, refresh completo da lista');
+            const urlParams = new URLSearchParams(window.location.search);
+            try { refreshConversationList(urlParams); } catch(e) {}
+        }
+        
+        lastVisibleTime = Date.now();
+    });
+})();
+
 // Capturar erros globais para diagnosticar rapidamente
 window.onerror = function(message, source, lineno, colno, error) {
     console.error('Erro global capturado:', { message, source, lineno, colno, error });

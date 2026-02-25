@@ -1590,17 +1590,28 @@ class ConversationController
                     ];
                 }
                 
-                Response::json([
+                $responseData = json_encode([
                     'success' => true,
                     'message' => $messageData,
                     'message_id' => $messageId
-                ]);
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 
-                // Processar envio WhatsApp + transcrição em background (após resposta HTTP)
+                // Enviar resposta HTTP imediatamente sem chamar exit()
+                while (ob_get_level() > 0) { ob_end_clean(); }
+                http_response_code(200);
+                header('Content-Type: application/json; charset=utf-8');
+                header('Content-Length: ' . strlen($responseData));
+                header('Connection: close');
+                echo $responseData;
+                flush();
+                
+                // Encerrar conexão HTTP e processar envio WhatsApp em background
                 if (function_exists('fastcgi_finish_request')) {
                     fastcgi_finish_request();
                 }
+                
                 ConversationService::processBackgroundTasks();
+                exit;
             } else {
                 Response::json([
                     'success' => false,

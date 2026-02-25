@@ -14702,37 +14702,109 @@ function hideRecordingIndicator() {
     }
 }
 
-// Enviar mensagem de íudio
-async function sendAudioMessage(audioBlob, conversationId) {
-    try {
-        // Converter para formato compatível (webm para ogg ou mp3 seria ideal, mas vamos usar webm)
-        const formData = new FormData();
-        formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.webm');
-        formData.append('content', '');
-        
-        const response = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
-            method: 'POST',
-            body: formData
+// Enviar mensagem de áudio com UI otimista
+function sendAudioMessage(audioBlob, conversationId) {
+    const tempId = 'temp_audio_' + Date.now();
+    const blobUrl = URL.createObjectURL(audioBlob);
+    
+    // Mensagem otimista com player de áudio local
+    const tempMessage = {
+        id: tempId,
+        content: '',
+        direction: 'outgoing',
+        type: 'message',
+        message_type: 'audio',
+        created_at: new Date().toISOString(),
+        sender_name: 'Você',
+        status: 'sending',
+        attachments: [{ type: 'audio', url: blobUrl, mime_type: 'audio/webm' }]
+    };
+    const messageDiv = addMessageToChat(tempMessage);
+    if (messageDiv) {
+        messageDiv.setAttribute('data-temp-id', tempId);
+        const timeEl = messageDiv.querySelector('.message-time');
+        if (timeEl) {
+            const sendingIndicator = document.createElement('span');
+            sendingIndicator.className = 'message-sending-indicator';
+            sendingIndicator.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width:12px;height:12px;border-width:2px;"></span><span class="sending-text">Enviando áudio...</span>';
+            timeEl.appendChild(sendingIndicator);
+        }
+    }
+
+    // Timers para feedback progressivo
+    const timer1 = setTimeout(() => {
+        const el = messageDiv?.querySelector('.sending-text');
+        if (el) el.textContent = 'Processando áudio...';
+    }, 8000);
+    const timer2 = setTimeout(() => {
+        const el = messageDiv?.querySelector('.sending-text');
+        if (el) el.textContent = 'Enviando (pode demorar)...';
+    }, 20000);
+
+    const formData = new FormData();
+    formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.webm');
+    formData.append('content', '');
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+        body: formData
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => { throw new Error(`Erro ${response.status}: ${text.substring(0, 200)}`); });
+        }
+        return response.text().then(text => {
+            try { return JSON.parse(text); }
+            catch (e) { throw new Error(`Resposta não é JSON: ${text.substring(0, 200)}`); }
         });
-        
-        // Garantir que temos JSON; se não, capturar texto para debug
-        // IMPORTANTE: Ler o texto primeiro e depois tentar fazer parse JSON para evitar "body stream already read"
-        const responseText = await response.text();
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (jsonErr) {
-            throw new Error(`Resposta não é JSON. HTTP ${response.status}. Corpo: ${responseText.substring(0, 500)}`);
-        }
-        
-        if (data.success && data.message) {
-            addMessageToChat(data.message);
+    })
+    .then(data => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        URL.revokeObjectURL(blobUrl);
+
+        if (data.success) {
+            const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+            if (tempMsg) tempMsg.remove();
+            if (data.message) addMessageToChat(data.message);
+            updateConversationInList(conversationId, '🎤 Áudio');
         } else {
-            throw new Error(data.message || 'Erro ao enviar íudio');
+            _showAudioError(tempId, data.message || 'Erro desconhecido', audioBlob, conversationId, blobUrl);
         }
-    } catch (error) {
-        console.error('Erro ao enviar íudio:', error);
-        alert('Erro ao enviar íudio: ' + error.message);
+    })
+    .catch(error => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+        console.error('Erro ao enviar áudio:', error);
+        _showAudioError(tempId, error.message || 'Erro de conexão', audioBlob, conversationId, blobUrl);
+    });
+}
+
+function _showAudioError(tempId, errorMsg, audioBlob, conversationId, blobUrl) {
+    const tempMsg = document.querySelector(`[data-temp-id="${tempId}"]`);
+    if (!tempMsg) return;
+
+    const indicator = tempMsg.querySelector('.message-sending-indicator');
+    if (indicator) indicator.remove();
+
+    const timeEl = tempMsg.querySelector('.message-time');
+    if (timeEl) {
+        const errorEl = document.createElement('div');
+        errorEl.className = 'message-send-error';
+        errorEl.innerHTML = `
+            <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Falha</span>
+            <button class="btn btn-link btn-sm text-primary p-0 ms-2 retry-audio-btn" title="Tentar novamente">
+                <i class="ki-duotone ki-arrows-circle fs-7"><span class="path1"></span><span class="path2"></span></i> Reenviar
+            </button>`;
+        timeEl.parentNode.appendChild(errorEl);
+
+        errorEl.querySelector('.retry-audio-btn').addEventListener('click', () => {
+            errorEl.remove();
+            tempMsg.remove();
+            URL.revokeObjectURL(blobUrl);
+            sendAudioMessage(audioBlob, conversationId);
+        });
     }
 }
 

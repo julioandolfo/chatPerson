@@ -1678,7 +1678,7 @@ class ConversationService
         // - Conversa está fechada
         // - Mensagem é de agente humano (não IA)
         // - Usuário está logado via interface web (sessão ativa, NÃO via API)
-        $hasActiveWebSession = session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['user_id']);
+        $hasActiveWebSession = \App\Helpers\Auth::check();
         if ($conversation['status'] === 'closed' && $senderType === 'agent' && $aiAgentId === null && $hasActiveWebSession) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Reabrindo conversa fechada via interface web (conv={$conversationId}, sender={$senderId})");
             Conversation::reopen($conversationId);

@@ -164,6 +164,11 @@ class Router
                     self::logExternalSources("Middlewares executados, chamando controller...");
                 }
 
+                // Liberar lock da sessão após middlewares (autenticação já leu os dados)
+                // Isso permite que outras requisições do mesmo usuário não fiquem bloqueadas
+                // enquanto operações longas (upload de áudio, envio WhatsApp) estão em andamento
+                \App\Helpers\Auth::cacheSessionAndRelease();
+
                 // Extrair parâmetros
                 array_shift($matches);
                 $params = array_values($matches);

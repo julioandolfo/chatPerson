@@ -82,7 +82,8 @@ class MetaOAuthController
             $scopes = array_merge($scopes, self::$config['whatsapp']['scopes'] ?? []);
         }
         
-        // Gerar state para segurança
+        // Gerar state para segurança (reabrir sessão para escrita)
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
         $state = bin2hex(random_bytes(16));
         $_SESSION['meta_oauth_state'] = $state;
         $_SESSION['meta_oauth_type'] = $type;
@@ -132,7 +133,8 @@ class MetaOAuthController
             return;
         }
         
-        // Validar state
+        // Validar state (reabrir sessão para leitura e escrita)
+        if (session_status() === PHP_SESSION_NONE) { session_start(); }
         if (!isset($_SESSION['meta_oauth_state']) || $state !== $_SESSION['meta_oauth_state']) {
             Response::json([
                 'success' => false,
@@ -157,7 +159,8 @@ class MetaOAuthController
             // Salvar token no banco
             $this->saveToken($tokenData, $userData, $type);
             
-            // Redirecionar para página de sucesso
+            // Redirecionar para página de sucesso (reabrir sessão para escrita)
+            if (session_status() === PHP_SESSION_NONE) { session_start(); }
             $_SESSION['meta_oauth_success'] = true;
             Response::redirect('/integrations/meta?success=1');
             

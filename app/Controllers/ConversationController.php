@@ -1552,10 +1552,13 @@ class ConversationController
             // Obter quoted_message_id se houver
             $quotedMessageId = $data['quoted_message_id'] ?? null;
             
-            $messageId = ConversationService::sendMessage($id, $content, 'agent', $userId, $attachments, $messageType, $quotedMessageId);
+            // deferIntegrationSend=true: salva no banco, enfileira envio WhatsApp para background
+            $messageId = ConversationService::sendMessage(
+                $id, $content, 'agent', $userId, $attachments, $messageType, $quotedMessageId,
+                null, null, false, true
+            );
             
             if ($messageId) {
-                // Buscar mensagem criada com detalhes
                 $messages = \App\Models\Message::getMessagesWithSenderDetails($id);
                 $createdMessage = null;
                 foreach ($messages as $msg) {
@@ -1565,7 +1568,6 @@ class ConversationController
                     }
                 }
                 
-                // Formatar mensagem para o frontend
                 $messageData = null;
                 if ($createdMessage) {
                     $messageData = [
@@ -1577,12 +1579,10 @@ class ConversationController
                         'sender_name' => $createdMessage['sender_name'] ?? 'Você',
                         'sender_type' => $createdMessage['sender_type'],
                         'attachments' => $createdMessage['attachments'] ?? [],
-                        // Campos de reply
                         'quoted_message_id' => $createdMessage['quoted_message_id'] ?? null,
                         'quoted_sender_name' => $createdMessage['quoted_sender_name'] ?? null,
                         'quoted_text' => $createdMessage['quoted_text'] ?? null,
-                        // Status
-                        'status' => $createdMessage['status'] ?? 'sent',
+                        'status' => $createdMessage['status'] ?? 'pending',
                         'delivered_at' => $createdMessage['delivered_at'] ?? null,
                         'read_at' => $createdMessage['read_at'] ?? null,
                         'error_message' => $createdMessage['error_message'] ?? null,
@@ -1595,6 +1595,12 @@ class ConversationController
                     'message' => $messageData,
                     'message_id' => $messageId
                 ]);
+                
+                // Processar envio WhatsApp + transcrição em background (após resposta HTTP)
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                }
+                ConversationService::processBackgroundTasks();
             } else {
                 Response::json([
                     'success' => false,

@@ -26,7 +26,288 @@ class ConversationService
     /**
      * TTL do cache em segundos (5 minutos)
      */
-    private static int $cacheTTL = 900; // ✅ OTIMIZADO: 15 minutos (antes: 5 minutos)
+    private static int $cacheTTL = 900;
+    
+    private static array $_pendingBackgroundTasks = [];
+    
+    /**
+     * Queue a background task (transcription or integration send) for after HTTP response
+     */
+    public static function queueBackgroundTask(string $type, array $data): void
+    {
+        self::$_pendingBackgroundTasks[] = array_merge(['_type' => $type], $data);
+    }
+    
+    /**
+     * Process all pending background tasks (call after fastcgi_finish_request)
+     */
+    public static function processBackgroundTasks(): void
+    {
+        if (empty(self::$_pendingBackgroundTasks)) return;
+        
+        \App\Helpers\Logger::info("[BACKGROUND] Processando " . count(self::$_pendingBackgroundTasks) . " tarefa(s) em background");
+        
+        foreach (self::$_pendingBackgroundTasks as $task) {
+            $type = $task['_type'];
+            try {
+                if ($type === 'transcription') {
+                    self::processAudioTranscription($task['messageId'], $task['conversationId'], $task['attachmentsData'], $task['senderType']);
+                } elseif ($type === 'integration_send') {
+                    self::processIntegrationSend($task['messageId']);
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("[BACKGROUND] Erro ao processar task {$type}: " . $e->getMessage());
+            }
+        }
+        
+        self::$_pendingBackgroundTasks = [];
+    }
+    
+    /**
+     * Process audio transcription (sync)
+     */
+    public static function processAudioTranscription(int $messageId, int $conversationId, array $attachmentsData, string $senderType): void
+    {
+        \App\Helpers\Logger::info("[TRANSCRICAO-BG] Iniciando: messageId={$messageId}, convId={$conversationId}");
+        
+        try {
+            $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
+            
+            if (empty($transcriptionSettings['enabled']) || empty($transcriptionSettings['auto_transcribe'])) {
+                \App\Helpers\Logger::info("[TRANSCRICAO-BG] SKIP: desabilitada");
+                return;
+            }
+            
+            if ($senderType === 'agent') {
+                if (empty($transcriptionSettings['transcribe_agent_messages'] ?? false)) {
+                    \App\Helpers\Logger::info("[TRANSCRICAO-BG] SKIP: transcribe_agent_messages desabilitado");
+                    return;
+                }
+            }
+            
+            if (!empty($transcriptionSettings['only_for_ai_agents'])) {
+                $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+                if (!$aiConversation || $aiConversation['status'] !== 'active') {
+                    \App\Helpers\Logger::info("[TRANSCRICAO-BG] SKIP: only_for_ai_agents mas sem IA ativa");
+                    return;
+                }
+            }
+            
+            $audioAttachment = null;
+            $audioAttachmentIndex = null;
+            foreach ($attachmentsData as $idx => $att) {
+                if (($att['type'] ?? '') === 'audio') {
+                    $audioAttachment = $att;
+                    $audioAttachmentIndex = $idx;
+                    break;
+                }
+            }
+            
+            if (!$audioAttachment || empty($audioAttachment['path'])) return;
+            
+            $audioFilePath = __DIR__ . '/../../public/' . ltrim($audioAttachment['path'], '/');
+            if (!file_exists($audioFilePath)) {
+                \App\Helpers\Logger::error("[TRANSCRICAO-BG] Arquivo não encontrado: {$audioFilePath}");
+                return;
+            }
+            
+            $transcriptionResult = \App\Services\TranscriptionService::transcribe($audioFilePath, [
+                'language' => $transcriptionSettings['language'] ?? 'pt',
+                'model' => $transcriptionSettings['model'] ?? 'whisper-1'
+            ]);
+            
+            if ($transcriptionResult['success'] && !empty($transcriptionResult['text'])) {
+                $currentMsg = Message::find($messageId);
+                if ($currentMsg) {
+                    $currentAttachments = $currentMsg['attachments'] ?? [];
+                    if (is_string($currentAttachments)) $currentAttachments = json_decode($currentAttachments, true) ?? [];
+                    if (isset($currentAttachments[$audioAttachmentIndex])) {
+                        $currentAttachments[$audioAttachmentIndex]['transcription'] = [
+                            'text' => $transcriptionResult['text'],
+                            'cost' => $transcriptionResult['cost'] ?? 0,
+                            'duration' => $transcriptionResult['duration'] ?? null,
+                            'created_at' => date('Y-m-d H:i:s')
+                        ];
+                    }
+                    $updateFields = ['attachments' => json_encode($currentAttachments, JSON_UNESCAPED_UNICODE)];
+                    if (!empty($transcriptionSettings['update_message_content'])) {
+                        $updateFields['content'] = $transcriptionResult['text'];
+                    }
+                    Message::update($messageId, $updateFields);
+                    \App\Helpers\Logger::info("[TRANSCRICAO-BG] ✅ Transcrição salva (msg={$messageId})");
+                }
+            } else {
+                \App\Helpers\Logger::error("[TRANSCRICAO-BG] ❌ Falha: " . ($transcriptionResult['error'] ?? 'vazio'));
+            }
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[TRANSCRICAO-BG] EXCEPTION: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Process integration send in background (re-reads message/conversation from DB)
+     */
+    public static function processIntegrationSend(int $messageId): void
+    {
+        \App\Helpers\Logger::info("[INTEGRATION-BG] Iniciando envio em background: messageId={$messageId}");
+        
+        try {
+            $message = Message::find($messageId);
+            if (!$message) {
+                \App\Helpers\Logger::error("[INTEGRATION-BG] Mensagem não encontrada: {$messageId}");
+                return;
+            }
+            
+            $conversationId = $message['conversation_id'];
+            $conversation = Conversation::find($conversationId);
+            if (!$conversation) return;
+            
+            $senderType = $message['sender_type'];
+            $content = $message['content'] ?? '';
+            $messageType = $message['message_type'] ?? null;
+            $quotedMessageId = $message['quoted_message_id'] ?? null;
+            
+            $attachmentsData = $message['attachments'] ?? [];
+            if (is_string($attachmentsData)) $attachmentsData = json_decode($attachmentsData, true) ?? [];
+            
+            // Resolver integration account
+            $integrationAccountId = $conversation['integration_account_id'] ?? null;
+            $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null;
+            
+            if (!$integrationAccountId && $whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+                $resolvedId = \App\Models\IntegrationAccount::getIntegrationIdFromWhatsAppId($whatsappAccountId);
+                if ($resolvedId) {
+                    $integrationAccountId = $resolvedId;
+                    Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
+                }
+            }
+            
+            if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+                $lastAccount = \App\Models\IntegrationAccount::find((int)$conversation['last_customer_account_id']);
+                if ($lastAccount) {
+                    $integrationAccountId = (int)$conversation['last_customer_account_id'];
+                    $whatsappAccountId = null;
+                }
+            }
+            
+            if ($messageType === 'note') return;
+            if ($senderType !== 'agent') return;
+            if (!$integrationAccountId && !($conversation['channel'] === 'whatsapp' && $whatsappAccountId)) return;
+            
+            $contact = \App\Models\Contact::find($conversation['contact_id']);
+            if (!$contact || (empty($contact['phone']) && empty($contact['identifier']) && empty($contact['email']))) {
+                \App\Helpers\Logger::error("[INTEGRATION-BG] Contato sem destinatário para msg {$messageId}");
+                return;
+            }
+            
+            $options = [];
+            
+            if ($quotedMessageId) {
+                $quoted = Message::find((int)$quotedMessageId);
+                if (!empty($quoted['external_id'])) {
+                    $options['quoted_message_external_id'] = $quoted['external_id'];
+                }
+            }
+            
+            if (!empty($attachmentsData)) {
+                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                $baseUrl = $protocol . '://' . $host;
+                
+                $firstAttachment = $attachmentsData[0];
+                $attachmentPath = '/' . ltrim($firstAttachment['path'], '/');
+                $options['media_url'] = $baseUrl . $attachmentPath;
+                $options['media_type'] = $firstAttachment['type'] ?? 'document';
+                if (!empty($firstAttachment['mime_type'])) $options['media_mime'] = $firstAttachment['mime_type'];
+                $options['media_name'] = $firstAttachment['filename'] ?? basename($firstAttachment['path']);
+                if (!empty($content)) $options['caption'] = $content;
+            }
+            
+            $sendResult = null;
+            $recipient = '';
+            
+            if ($integrationAccountId) {
+                $channel = $conversation['channel'] ?? 'whatsapp';
+                $nonPhoneChannels = ['instagram', 'instagram_comment', 'facebook', 'telegram', 'twitter', 'linkedin', 'tiktok'];
+                $recipient = in_array($channel, $nonPhoneChannels)
+                    ? ($contact['identifier'] ?? $contact['phone'] ?? '')
+                    : ($contact['phone'] ?? $contact['email'] ?? $contact['identifier'] ?? '');
+                
+                if (empty($recipient)) {
+                    \App\Helpers\Logger::error("[INTEGRATION-BG] Destinatário vazio para msg {$messageId}");
+                    Message::update($messageId, ['status' => 'error', 'error_message' => 'Destinatário não encontrado']);
+                    return;
+                }
+                
+                $sendResult = \App\Services\IntegrationService::sendMessage($integrationAccountId, $recipient, $content, $options);
+            } elseif ($whatsappAccountId && $conversation['channel'] === 'whatsapp') {
+                $recipient = $contact['phone'];
+                $sendResult = \App\Services\WhatsAppService::sendMessage($whatsappAccountId, $contact['phone'], $content, $options);
+            }
+            
+            if ($sendResult && ($sendResult['success'] ?? false)) {
+                Message::update($messageId, [
+                    'external_id' => $sendResult['message_id'] ?? null,
+                    'status' => 'sent'
+                ]);
+                \App\Helpers\Logger::info("[INTEGRATION-BG] ✅ Enviado: msg={$messageId}, external_id=" . ($sendResult['message_id'] ?? 'NULL'));
+                
+                // Enviar anexos adicionais (2+) como mensagens separadas
+                if (!empty($attachmentsData) && count($attachmentsData) > 1) {
+                    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost';
+                    $baseUrl = $protocol . '://' . $host;
+                    
+                    for ($i = 1; $i < count($attachmentsData); $i++) {
+                        $att = $attachmentsData[$i];
+                        try {
+                            $extraMsgData = [
+                                'conversation_id' => $conversationId,
+                                'sender_type' => $senderType,
+                                'sender_id' => $message['sender_id'],
+                                'content' => '',
+                                'message_type' => $att['type'] ?? 'document',
+                                'attachments' => [$att],
+                                'status' => 'pending'
+                            ];
+                            $extraMsgId = Message::createMessage($extraMsgData);
+                            
+                            $extraOptions = [
+                                'media_url' => $baseUrl . '/' . ltrim($att['path'], '/'),
+                                'media_type' => $att['type'] ?? 'document',
+                                'media_name' => $att['filename'] ?? basename($att['path'])
+                            ];
+                            if (!empty($att['mime_type'])) $extraOptions['media_mime'] = $att['mime_type'];
+                            
+                            $extraResult = $integrationAccountId
+                                ? \App\Services\IntegrationService::sendMessage($integrationAccountId, $recipient, '', $extraOptions)
+                                : \App\Services\WhatsAppService::sendMessage($whatsappAccountId, $contact['phone'], '', $extraOptions);
+                            
+                            Message::update($extraMsgId, $extraResult && ($extraResult['success'] ?? false)
+                                ? ['external_id' => $extraResult['message_id'] ?? null, 'status' => 'sent']
+                                : ['status' => 'failed']
+                            );
+                        } catch (\Exception $e) {
+                            \App\Helpers\Logger::error("[INTEGRATION-BG] Erro anexo extra: " . $e->getMessage());
+                        }
+                    }
+                }
+            } elseif ($sendResult && ($sendResult['status'] ?? '') === 'queued') {
+                Message::update($messageId, ['status' => 'queued']);
+            } else {
+                Message::update($messageId, [
+                    'status' => 'error',
+                    'error_message' => $sendResult['error'] ?? 'Falha no envio'
+                ]);
+                \App\Helpers\Logger::error("[INTEGRATION-BG] ❌ Falha: msg={$messageId}");
+            }
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[INTEGRATION-BG] EXCEPTION msg={$messageId}: " . $e->getMessage());
+            try {
+                Message::update($messageId, ['status' => 'error', 'error_message' => $e->getMessage()]);
+            } catch (\Exception $e2) {}
+        }
+    }
     
     /**
      * Criar nova conversa
@@ -1365,7 +1646,7 @@ class ConversationService
     /**
      * Enviar mensagem na conversa
      */
-    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false): ?int
+    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false, bool $deferIntegrationSend = false): ?int
     {
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══ conv={$conversationId}, type={$senderType}, sender={$senderId}, aiAgent={$aiAgentId}, contentLen=" . strlen($content) . ", attachments=" . count($attachments));
         
@@ -1503,175 +1784,48 @@ class ConversationService
             self::stopActiveAutomations($conversationId);
         }
 
-        // === TRANSCRIÇÃO DE ÁUDIO - DEBUG DETALHADO ===
-        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ══════════════════════════════════════");
-        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] messageType={$messageType}, senderType={$senderType}, attachmentsCount=" . count($attachmentsData) . ", messageId={$messageId}, convId={$conversationId}");
-        
-        $shouldAttemptTranscription = false;
-        if ($messageType !== 'audio') {
-            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: messageType não é 'audio' (é '{$messageType}')");
-        } elseif (empty($attachmentsData)) {
-            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: attachmentsData está vazio");
-        } else {
-            if ($senderType === 'contact') {
-                $shouldAttemptTranscription = true;
-                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] OK: senderType=contact, prosseguindo");
-            } elseif ($senderType === 'agent') {
-                $agentTranscribeConfig = \App\Services\TranscriptionService::getSettings()['transcribe_agent_messages'] ?? false;
-                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] senderType=agent, transcribe_agent_messages=" . ($agentTranscribeConfig ? 'true' : 'false'));
-                if (!empty($agentTranscribeConfig)) {
-                    $shouldAttemptTranscription = true;
-                } else {
-                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: transcribe_agent_messages está desabilitado");
-                }
+        // === TRANSCRIÇÃO DE ÁUDIO ===
+        if ($messageType === 'audio' && !empty($attachmentsData)) {
+            if ($deferIntegrationSend) {
+                self::queueBackgroundTask('transcription', [
+                    'messageId' => $messageId,
+                    'conversationId' => $conversationId,
+                    'attachmentsData' => $attachmentsData,
+                    'senderType' => $senderType
+                ]);
+                \App\Helpers\Logger::info("[TRANSCRICAO] Agendada em background para msgId={$messageId}");
             } else {
-                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: senderType='{$senderType}' não é contact nem agent");
+                self::processAudioTranscription($messageId, $conversationId, $attachmentsData, $senderType);
             }
         }
-        
-        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] shouldAttemptTranscription=" . ($shouldAttemptTranscription ? 'true' : 'false'));
-        
-        if ($shouldAttemptTranscription) {
-            try {
-                $transcriptionSettings = \App\Services\TranscriptionService::getSettings();
-                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Settings: enabled=" . ($transcriptionSettings['enabled'] ? 'true' : 'false') . ", auto_transcribe=" . ($transcriptionSettings['auto_transcribe'] ? 'true' : 'false') . ", only_for_ai_agents=" . ($transcriptionSettings['only_for_ai_agents'] ? 'true' : 'false') . ", language=" . ($transcriptionSettings['language'] ?? '?'));
-                
-                if (empty($transcriptionSettings['enabled'])) {
-                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: transcrição DESABILITADA (enabled=false)");
-                } elseif (empty($transcriptionSettings['auto_transcribe'])) {
-                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: auto_transcribe DESABILITADO");
-                } else {
-                    $shouldTranscribe = true;
-                    if (!empty($transcriptionSettings['only_for_ai_agents'])) {
-                        $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
-                        $hasActiveAI = ($aiConversation && $aiConversation['status'] === 'active');
-                        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] only_for_ai_agents=true, aiConversation=" . ($aiConversation ? "status={$aiConversation['status']}" : 'NULL') . ", hasActiveAI=" . ($hasActiveAI ? 'true' : 'false'));
-                        $shouldTranscribe = $hasActiveAI;
-                        if (!$shouldTranscribe) {
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: only_for_ai_agents=true mas conversa NÃO tem IA ativa");
-                        }
-                    }
-                    
-                    if ($shouldTranscribe) {
-                        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ✅ Prosseguindo com transcrição!");
-                        
-                        $audioAttachment = null;
-                        $audioAttachmentIndex = null;
-                        foreach ($attachmentsData as $idx => $att) {
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Attachment[$idx]: type=" . ($att['type'] ?? 'NULL') . ", path=" . ($att['path'] ?? 'NULL') . ", mime=" . ($att['mime_type'] ?? $att['mimetype'] ?? 'NULL'));
-                            if (($att['type'] ?? '') === 'audio') {
-                                $audioAttachment = $att;
-                                $audioAttachmentIndex = $idx;
-                                break;
-                            }
-                        }
-                        
-                        if (!$audioAttachment) {
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: Nenhum attachment com type=audio encontrado nos attachments");
-                        } elseif (empty($audioAttachment['path'])) {
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] SKIP: audioAttachment encontrado mas sem 'path'");
-                        } else {
-                            $audioFilePath = __DIR__ . '/../../public/' . ltrim($audioAttachment['path'], '/');
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] audioFilePath={$audioFilePath}");
-                            \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] file_exists=" . (file_exists($audioFilePath) ? 'true' : 'false'));
-                            
-                            if (!file_exists($audioFilePath)) {
-                                \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ERRO: Arquivo de áudio NÃO encontrado: {$audioFilePath}");
-                            } else {
-                                $fileSize = filesize($audioFilePath);
-                                $fileExt = pathinfo($audioFilePath, PATHINFO_EXTENSION);
-                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Arquivo OK: size={$fileSize} bytes, extension={$fileExt}");
-                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Chamando TranscriptionService::transcribe()...");
-                                
-                                $transcriptionResult = \App\Services\TranscriptionService::transcribe($audioFilePath, [
-                                    'language' => $transcriptionSettings['language'] ?? 'pt',
-                                    'model' => $transcriptionSettings['model'] ?? 'whisper-1'
-                                ]);
-                                
-                                \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] Resultado: success=" . ($transcriptionResult['success'] ? 'true' : 'false') . ", textLen=" . strlen($transcriptionResult['text'] ?? '') . ", error=" . ($transcriptionResult['error'] ?? 'NULL'));
-                                
-                                if ($transcriptionResult['success'] && !empty($transcriptionResult['text'])) {
-                                    $transcriptionData = [
-                                        'text' => $transcriptionResult['text'],
-                                        'cost' => $transcriptionResult['cost'] ?? 0,
-                                        'duration' => $transcriptionResult['duration'] ?? null,
-                                        'created_at' => date('Y-m-d H:i:s')
-                                    ];
-                                    
-                                    $attachmentsData[$audioAttachmentIndex]['transcription'] = $transcriptionData;
-                                    
-                                    $updateFields = [
-                                        'attachments' => json_encode($attachmentsData, JSON_UNESCAPED_UNICODE)
-                                    ];
-                                    
-                                    if (!empty($transcriptionSettings['update_message_content'])) {
-                                        $updateFields['content'] = $transcriptionResult['text'];
-                                        $content = $transcriptionResult['text'];
-                                    }
-                                    
-                                    Message::update($messageId, $updateFields);
-                                    
-                                    \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ✅ SUCESSO! Transcrição salva no attachment JSON (msg={$messageId}, textLen=" . strlen($transcriptionResult['text']) . ")");
-                                } else {
-                                    \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ❌ FALHA na transcrição: " . ($transcriptionResult['error'] ?? 'Texto vazio'));
-                                }
-                            }
-                        }
-                    }
-                }
-            } catch (\Exception $e) {
-                \App\Helpers\Logger::error("[TRANSCRICAO-DEBUG] ❌ EXCEPTION: " . $e->getMessage() . " | File: " . $e->getFile() . ":" . $e->getLine());
-            }
-        }
-        \App\Helpers\Logger::info("[TRANSCRICAO-DEBUG] ══════════════════════════════════════ FIM");
 
-        // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente (MAS NÃO SE FOR NOTA INTERNA)
-        // ✅ CORREÇÃO: Resolver integration_account_id em PHP puro
-        // Garante que usamos a conta correta sem depender de colunas SQL especiais
-        
+        // **ENVIAR PARA INTEGRAÇÃO** se a mensagem for do agente
+        // Para agentes humanos: enfileirar envio em background (não bloquear resposta HTTP)
+        // Para contatos/IA: enviar imediatamente (chamados via webhook, sem resposta HTTP)
         $integrationAccountId = $conversation['integration_account_id'] ?? null;
         $whatsappAccountId = $conversation['whatsapp_account_id'] ?? null;
         
-        // ✅ LOG: IDs da conversa para diagnóstico
-        \App\Helpers\Logger::info("ConversationService::sendMessage - 📞 IDs da conversa {$conversationId}: " .
-            "integration_account_id=" . ($integrationAccountId ?? 'NULL') . 
-            ", whatsapp_account_id=" . ($whatsappAccountId ?? 'NULL') . 
-            ", channel=" . ($conversation['channel'] ?? 'NULL'));
-        
-        // ✅ UNIFICADO: Usar integration_account_id como fonte primária
-        // Se não tem integration_account_id, tentar resolver pelo whatsapp_account_id
         if (!$integrationAccountId && $whatsappAccountId && $conversation['channel'] === 'whatsapp') {
-            \App\Helpers\Logger::unificacao("[SEND] Conversa #{$conversationId}: sem integration_account_id, resolvendo via whatsapp_account_id={$whatsappAccountId}");
             $resolvedId = \App\Models\IntegrationAccount::getIntegrationIdFromWhatsAppId($whatsappAccountId);
             if ($resolvedId) {
                 $integrationAccountId = $resolvedId;
-                \App\Helpers\Logger::unificacao("[SEND] Conversa #{$conversationId}: ✅ Resolvido → integration_account_id={$integrationAccountId}");
-                \App\Helpers\Logger::info("ConversationService::sendMessage - Resolvido whatsapp_account_id={$whatsappAccountId} -> integration_account_id={$integrationAccountId}");
                 Conversation::update($conversationId, ['integration_account_id' => $integrationAccountId]);
-            } else {
-                \App\Helpers\Logger::unificacao("[SEND] Conversa #{$conversationId}: ❌ ERRO - Não resolveu whatsapp_account_id={$whatsappAccountId}");
             }
         }
         
-        // Para conversas MESCLADAS, usar o último número que o cliente usou
         if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
-            $lastAccountId = (int)$conversation['last_customer_account_id'];
-            \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa MESCLADA, usando último número do cliente: account_id={$lastAccountId}");
-            
-            // Tentar encontrar em integration_accounts
-            $lastAccount = \App\Models\IntegrationAccount::find($lastAccountId);
+            $lastAccount = \App\Models\IntegrationAccount::find((int)$conversation['last_customer_account_id']);
             if ($lastAccount) {
-                $integrationAccountId = $lastAccountId;
+                $integrationAccountId = (int)$conversation['last_customer_account_id'];
                 $whatsappAccountId = null;
-                \App\Helpers\Logger::info("ConversationService::sendMessage - Conta é integração: integration_id={$lastAccountId}");
             }
         }
         
-        \App\Helpers\Logger::info("ConversationService::sendMessage - ✅ FINAL: integration_id=" . ($integrationAccountId ?? 'NULL') . ", wa_id=" . ($whatsappAccountId ?? 'NULL') . ", channel=" . ($conversation['channel'] ?? 'NULL'));
-        
-        // ✅ CORREÇÃO: NÃO enviar notas internas para o cliente via WhatsApp
         if ($messageType === 'note') {
-            \App\Helpers\Logger::info("ConversationService::sendMessage - 📝 Nota interna detectada (message_type=note). NÃO será enviada ao cliente via WhatsApp.");
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Nota interna, não envia WhatsApp");
+        } elseif ($deferIntegrationSend && $senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
+            self::queueBackgroundTask('integration_send', ['messageId' => $messageId]);
+            \App\Helpers\Logger::info("ConversationService::sendMessage - Envio WhatsApp enfileirado em background para msgId={$messageId}");
         } elseif ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
             try {

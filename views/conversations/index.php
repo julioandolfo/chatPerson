@@ -14568,7 +14568,9 @@ async function toggleAudioRecording() {
                 mimeType = fallback;
             }
 
-            mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+            const recorderOptions = { audioBitsPerSecond: 24000 };
+            if (mimeType) recorderOptions.mimeType = mimeType;
+            mediaRecorder = new MediaRecorder(stream, recorderOptions);
             audioChunks = [];
             
             mediaRecorder.ondataavailable = (event) => {
@@ -14576,14 +14578,14 @@ async function toggleAudioRecording() {
             };
             
             mediaRecorder.onstop = async () => {
-                // Se cancelado, não enviar
                 if (recordingCanceled) {
                     recordingCanceled = false;
                     audioChunks = [];
                 } else {
                     const recordedType = mediaRecorder.mimeType || 'audio/webm';
                     const audioBlob = new Blob(audioChunks, { type: recordedType });
-                    await sendAudioMessage(audioBlob, conversationId);
+                    console.log(`[Audio] Tamanho gravado: ${(audioBlob.size / 1024).toFixed(1)}KB (${recorderOptions.audioBitsPerSecond / 1000}kbps)`);
+                    sendAudioMessage(audioBlob, conversationId);
                 }
                 
                 // Parar stream

@@ -29,9 +29,9 @@ class EvolutionService
     private static function request(string $method, string $url, ?string $apiKey, array $body = null, int $timeout = 30): array
     {
         $bodyJson = $body !== null ? json_encode($body) : null;
-        Logger::info("EvolutionService::request - {$method} {$url}");
+        Logger::evolution("[INFO] EvolutionService::request - {$method} {$url}");
         if ($bodyJson) {
-            Logger::info("EvolutionService::request - Body: " . mb_substr($bodyJson, 0, 2000));
+            Logger::evolution("[INFO] EvolutionService::request - Body: " . mb_substr($bodyJson, 0, 2000));
         }
 
         $ch = curl_init($url);
@@ -70,11 +70,11 @@ class EvolutionService
         $error = curl_error($ch);
         curl_close($ch);
 
-        Logger::info("EvolutionService::request - HTTP {$httpCode} | Effective URL: {$effectiveUrl}");
-        Logger::info("EvolutionService::request - Response: " . mb_substr($response ?: '(vazio)', 0, 2000));
+        Logger::evolution("[INFO] EvolutionService::request - HTTP {$httpCode} | Effective URL: {$effectiveUrl}");
+        Logger::evolution("[INFO] EvolutionService::request - Response: " . mb_substr($response ?: '(vazio)', 0, 2000));
 
         if ($error) {
-            Logger::error("EvolutionService::request - cURL error: {$error}");
+            Logger::evolution("[ERROR] EvolutionService::request - cURL error: {$error}");
             throw new \Exception("Erro na comunicação com Evolution API: {$error}");
         }
 
@@ -83,7 +83,7 @@ class EvolutionService
         // Se a resposta contém HTML (ex: "Cannot POST /..."), tratar como erro claro
         if ($data === null && !empty($response)) {
             if (str_contains($response, 'Cannot') || str_contains($response, '<!DOCTYPE')) {
-                Logger::error("EvolutionService::request - Resposta HTML/texto inesperada: " . substr($response, 0, 300));
+                Logger::evolution("[ERROR] EvolutionService::request - Resposta HTML/texto inesperada: " . substr($response, 0, 300));
                 $cleanMsg = strip_tags($response);
                 throw new \Exception("Evolution API retornou erro: " . trim(substr($cleanMsg, 0, 200)) . " (HTTP {$httpCode}). Verifique se a URL está correta.");
             }
@@ -132,7 +132,7 @@ class EvolutionService
             );
         }
 
-        Logger::info("EvolutionService::getApiConfig - URL: {$apiUrl} | Key: " . substr($apiKey, 0, 8) . '...');
+        Logger::evolution("[INFO] EvolutionService::getApiConfig - URL: {$apiUrl} | Key: " . substr($apiKey, 0, 8) . '...');
 
         return ['api_url' => $apiUrl, 'api_key' => $apiKey];
     }
@@ -219,7 +219,7 @@ class EvolutionService
             throw new \Exception("Falha ao criar instância: {$errorMsg} (HTTP {$result['httpCode']})");
         }
 
-        Logger::info("EvolutionService::createInstance - Instância criada: {$instanceName}");
+        Logger::evolution("[INFO] EvolutionService::createInstance - Instância criada: {$instanceName}");
 
         return [
             'instanceName' => $result['data']['instance']['instanceName'] ?? $instanceName,
@@ -247,18 +247,17 @@ class EvolutionService
         // Se o instance_id salvo no banco era inválido (ex: email), corrigir
         $rawInstanceId = $account['instance_id'] ?? '';
         if (!empty($rawInstanceId) && $rawInstanceId !== $instanceName) {
-            Logger::info("EvolutionService::getQRCode - Corrigindo instance_id: '{$rawInstanceId}' -> '{$instanceName}'");
+            Logger::evolution("[INFO] EvolutionService::getQRCode - Corrigindo instance_id: '{$rawInstanceId}' -> '{$instanceName}'");
             IntegrationAccount::updateWithSync($accountId, ['instance_id' => $instanceName]);
         }
 
-        Logger::info("EvolutionService::getQRCode - accountId={$accountId}, instance={$instanceName}, apiUrl={$config['api_url']}");
+        Logger::evolution("[INFO] EvolutionService::getQRCode - accountId={$accountId}, instance={$instanceName}, apiUrl={$config['api_url']}");
 
         // Verificar se a instância já existe; se não, criar
         $needsCreate = false;
         try {
-            $state = self::fetchConnectionState($config, $instanceName);
-            $connectionState = $state['data']['state'] ?? ($state['data']['instance']['state'] ?? 'unknown');
-            Logger::info("EvolutionService::getQRCode - Estado atual: {$connectionState}");
+            $connectionState = self::resolveConnectionState($config, $instanceName);
+            Logger::evolution("[INFO] EvolutionService::getQRCode - Estado atual: {$connectionState}");
 
             if ($connectionState === 'open') {
                 IntegrationAccount::updateWithSync($accountId, ['status' => 'active']);
@@ -269,13 +268,13 @@ class EvolutionService
                 ];
             }
         } catch (\Exception $e) {
-            Logger::info("EvolutionService::getQRCode - Instância '{$instanceName}' não encontrada: {$e->getMessage()}");
+            Logger::evolution("[INFO] EvolutionService::getQRCode - Instância '{$instanceName}' não encontrada: {$e->getMessage()}");
             $needsCreate = true;
         }
 
         // Criar instância se necessário
         if ($needsCreate) {
-            Logger::info("EvolutionService::getQRCode - Criando instância '{$instanceName}'...");
+            Logger::evolution("[INFO] EvolutionService::getQRCode - Criando instância '{$instanceName}'...");
             $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
             $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
             $webhookUrl = "{$protocol}://{$host}/whatsapp-webhook";
@@ -303,7 +302,7 @@ class EvolutionService
 
                 if (!empty($base64)) {
                     $base64 = self::normalizeBase64Image($base64);
-                    Logger::info("EvolutionService::getQRCode - QR Code recebido na criação da instância");
+                    Logger::evolution("[INFO] EvolutionService::getQRCode - QR Code recebido na criação da instância");
                     return [
                         'qrcode'     => $base64,
                         'base64'     => $base64,
@@ -323,7 +322,7 @@ class EvolutionService
         }
 
         $responseData = $result['data'];
-        Logger::info("EvolutionService::getQRCode - Connect response keys: " . implode(', ', array_keys($responseData)));
+        Logger::evolution("[INFO] EvolutionService::getQRCode - Connect response keys: " . implode(', ', array_keys($responseData)));
 
         // A resposta pode conter base64 diretamente ou um campo code/pairingCode
         $base64 = $responseData['base64'] ?? null;
@@ -378,9 +377,11 @@ class EvolutionService
         try {
             $config = self::getApiConfig($account);
             $instanceName = self::getInstanceName($account);
-            $state = self::fetchConnectionState($config, $instanceName);
 
-            $connectionState = $state['data']['state'] ?? 'unknown';
+            // Tentar connectionState primeiro
+            $connectionState = self::resolveConnectionState($config, $instanceName);
+
+            Logger::evolution("[INFO] EvolutionService::getConnectionStatus - accountId={$accountId}, instance={$instanceName}, state={$connectionState}");
 
             if ($connectionState === 'open') {
                 if ($account['status'] !== 'active') {
@@ -409,10 +410,10 @@ class EvolutionService
             return [
                 'connected' => false,
                 'status'    => 'disconnected',
-                'message'   => 'Desconectado - Escaneie o QR Code',
+                'message'   => "Desconectado (state: {$connectionState}) - Escaneie o QR Code",
             ];
         } catch (\Exception $e) {
-            Logger::error("EvolutionService::getConnectionStatus - {$e->getMessage()}");
+            Logger::evolution("[ERROR] EvolutionService::getConnectionStatus - {$e->getMessage()}");
             return [
                 'connected' => false,
                 'status'    => 'error',
@@ -447,14 +448,14 @@ class EvolutionService
             $url = $config['api_url'] . '/instance/logout/' . urlencode($instanceName);
             self::request('DELETE', $url, $config['api_key']);
         } catch (\Exception $e) {
-            Logger::error("EvolutionService::disconnect - {$e->getMessage()}");
+            Logger::evolution("[ERROR] EvolutionService::disconnect - {$e->getMessage()}");
         }
 
         IntegrationAccount::updateWithSync($accountId, [
             'status' => 'disconnected',
         ]);
 
-        Logger::info("EvolutionService::disconnect - Conta {$accountId} desconectada");
+        Logger::evolution("[INFO] EvolutionService::disconnect - Conta {$accountId} desconectada");
         return true;
     }
 
@@ -507,7 +508,7 @@ class EvolutionService
             throw new \Exception("Falha ao enviar mensagem: {$errorMsg} (HTTP {$result['httpCode']})");
         }
 
-        Logger::info("EvolutionService::sendMessage - Mensagem enviada para {$to}");
+        Logger::evolution("[INFO] EvolutionService::sendMessage - Mensagem enviada para {$to}");
 
         return [
             'success'    => true,
@@ -584,7 +585,7 @@ class EvolutionService
             throw new \Exception("Falha ao enviar mídia: " . self::extractErrorMessage($result) . " (HTTP {$result['httpCode']})");
         }
 
-        Logger::info("EvolutionService::sendMedia - Mídia enviada para {$to}");
+        Logger::evolution("[INFO] EvolutionService::sendMedia - Mídia enviada para {$to}");
 
         return [
             'success'    => true,
@@ -637,7 +638,7 @@ class EvolutionService
             throw new \Exception("Falha ao enviar áudio: " . self::extractErrorMessage($result) . " (HTTP {$result['httpCode']})");
         }
 
-        Logger::info("EvolutionService::sendAudio - Áudio enviado para {$to}");
+        Logger::evolution("[INFO] EvolutionService::sendAudio - Áudio enviado para {$to}");
 
         return [
             'success'    => true,
@@ -685,7 +686,7 @@ class EvolutionService
         // Salvar webhook_url na conta
         IntegrationAccount::updateWithSync($accountId, ['webhook_url' => $webhookUrl]);
 
-        Logger::info("EvolutionService::configureWebhook - Webhook configurado: {$webhookUrl}");
+        Logger::evolution("[INFO] EvolutionService::configureWebhook - Webhook configurado: {$webhookUrl}");
         return true;
     }
 
@@ -711,8 +712,8 @@ class EvolutionService
         $instanceName = $payload['instance'] ?? '';
         $data = $payload['data'] ?? [];
 
-        Logger::info("EvolutionService::processWebhook - Event: {$event}, Instance: {$instanceName}");
-        Logger::info("EvolutionService::processWebhook - Payload: " . mb_substr(json_encode($payload, JSON_UNESCAPED_UNICODE), 0, 4000));
+        Logger::evolution("[INFO] EvolutionService::processWebhook - Event: {$event}, Instance: {$instanceName}");
+        Logger::evolution("[INFO] EvolutionService::processWebhook - Payload: " . mb_substr(json_encode($payload, JSON_UNESCAPED_UNICODE), 0, 4000));
 
         // Identificar a conta pelo instance_id
         $account = null;
@@ -722,35 +723,37 @@ class EvolutionService
         }
 
         if (!$account) {
-            Logger::error("EvolutionService::processWebhook - Conta não encontrada para instância: {$instanceName}");
+            Logger::evolution("[ERROR] EvolutionService::processWebhook - Conta não encontrada para instância: {$instanceName}");
             // Tentar por apikey se estiver no header da request
             return;
         }
 
-        switch ($event) {
-            case 'connection.update':
+        // Normalizar nome do evento para maiúsculo com underscore
+        $normalizedEvent = strtoupper(str_replace('.', '_', $event));
+
+        switch ($normalizedEvent) {
+            case 'CONNECTION_UPDATE':
                 self::handleConnectionUpdate($account, $data);
                 break;
 
-            case 'qrcode.updated':
-                // QR code atualizado - nada a fazer server-side, frontend busca via polling
-                Logger::info("EvolutionService::processWebhook - QR Code atualizado para {$instanceName}");
+            case 'QRCODE_UPDATED':
+                Logger::evolution("[INFO] EvolutionService::processWebhook - QR Code atualizado para {$instanceName}");
                 break;
 
-            case 'messages.upsert':
+            case 'MESSAGES_UPSERT':
                 self::handleMessageUpsert($account, $data);
                 break;
 
-            case 'messages.update':
+            case 'MESSAGES_UPDATE':
                 self::handleMessageUpdate($account, $data);
                 break;
 
-            case 'send.message':
+            case 'SEND_MESSAGE':
                 self::handleSentMessage($account, $data);
                 break;
 
             default:
-                Logger::info("EvolutionService::processWebhook - Evento não tratado: {$event}");
+                Logger::evolution("[INFO] EvolutionService::processWebhook - Evento não tratado: {$event} (normalizado: {$normalizedEvent})");
                 break;
         }
     }
@@ -764,17 +767,29 @@ class EvolutionService
      */
     private static function handleConnectionUpdate(array $account, array $data): void
     {
-        $state = $data['state'] ?? 'unknown';
         $accountId = $account['id'];
 
-        Logger::info("EvolutionService::handleConnectionUpdate - Conta #{$accountId}: state={$state}");
+        // Evolution API v2 pode enviar o state em vários formatos:
+        // { "state": "open" }
+        // { "instance": { "state": "open" } }
+        // { "connection": "open" }  (alguns payloads v2.3+)
+        // { "status": "open" }
+        $state = $data['state']
+            ?? $data['instance']['state']
+            ?? $data['connection']
+            ?? $data['status']
+            ?? 'unknown';
 
-        if ($state === 'open') {
+        Logger::evolution("[INFO] EvolutionService::handleConnectionUpdate - Conta #{$accountId}: state={$state}, data=" . json_encode($data));
+
+        if (in_array($state, ['open', 'connected'])) {
             IntegrationAccount::updateWithSync($accountId, ['status' => 'active']);
-            Logger::info("EvolutionService - Conta #{$accountId} conectada");
-        } elseif ($state === 'close') {
+            Logger::evolution("[INFO] EvolutionService - Conta #{$accountId} conectada");
+        } elseif (in_array($state, ['close', 'closed', 'disconnected'])) {
             IntegrationAccount::updateWithSync($accountId, ['status' => 'disconnected']);
-            Logger::info("EvolutionService - Conta #{$accountId} desconectada");
+            Logger::evolution("[INFO] EvolutionService - Conta #{$accountId} desconectada");
+        } else {
+            Logger::evolution("[INFO] EvolutionService - Conta #{$accountId} estado não mapeado: {$state}");
         }
     }
 
@@ -795,7 +810,7 @@ class EvolutionService
 
         // Ignorar mensagens de grupo (terminam com @g.us)
         if (str_ends_with($remoteJid, '@g.us')) {
-            Logger::info("EvolutionService::handleMessageUpsert - Ignorando mensagem de grupo: {$remoteJid}");
+            Logger::evolution("[INFO] EvolutionService::handleMessageUpsert - Ignorando mensagem de grupo: {$remoteJid}");
             return;
         }
 
@@ -894,7 +909,7 @@ class EvolutionService
             $normalizedPayload['media_name'] = $mediaName;
         }
 
-        Logger::info("EvolutionService::handleMessageUpsert - Encaminhando para WhatsAppService: from={$phoneNumber}, text=" . substr($text, 0, 100));
+        Logger::evolution("[INFO] EvolutionService::handleMessageUpsert - Encaminhando para WhatsAppService: from={$phoneNumber}, text=" . substr($text, 0, 100));
 
         // Repassar para o WhatsAppService que já tem toda a lógica de processamento
         WhatsAppService::processWebhook($normalizedPayload);
@@ -910,7 +925,7 @@ class EvolutionService
         $status = $data['update']['status'] ?? null;
 
         if ($messageId && $status) {
-            Logger::info("EvolutionService::handleMessageUpdate - Msg {$messageId} status: {$status}");
+            Logger::evolution("[INFO] EvolutionService::handleMessageUpdate - Msg {$messageId} status: {$status}");
         }
     }
 
@@ -922,7 +937,7 @@ class EvolutionService
         $key = $data['key'] ?? [];
         $messageId = $key['id'] ?? '';
 
-        Logger::info("EvolutionService::handleSentMessage - Msg enviada confirmada: {$messageId}");
+        Logger::evolution("[INFO] EvolutionService::handleSentMessage - Msg enviada confirmada: {$messageId}");
     }
 
     // ================================================================
@@ -982,6 +997,73 @@ class EvolutionService
         }
 
         return $result;
+    }
+
+    /**
+     * Resolver o estado de conexão real, suportando múltiplos formatos de resposta da Evolution API
+     * 
+     * Formatos possíveis:
+     * - v2.x: { "state": "open" }
+     * - v2.x: { "instance": { "state": "open" } }
+     * - v2.x: { "instanceName": "...", "state": "open" }
+     */
+    private static function resolveConnectionState(array $config, string $instanceName): string
+    {
+        // Tentar /instance/connectionState/{instance}
+        try {
+            $result = self::fetchConnectionState($config, $instanceName);
+            $data = $result['data'] ?? [];
+
+            Logger::evolution("[INFO] EvolutionService::resolveConnectionState - Response data keys: " . implode(', ', array_keys($data)));
+            Logger::evolution("[INFO] EvolutionService::resolveConnectionState - Full response: " . json_encode($data));
+
+            // Formato direto: { "state": "open" }
+            if (!empty($data['state'])) {
+                return $data['state'];
+            }
+
+            // Formato aninhado: { "instance": { "state": "open" } }
+            if (!empty($data['instance']['state'])) {
+                return $data['instance']['state'];
+            }
+
+            // Formato aninhado alternativo: { "instance": { "instanceName": "...", "status": "open" } }
+            if (!empty($data['instance']['status'])) {
+                return $data['instance']['status'];
+            }
+
+            // Formato com status: { "status": "open" }
+            if (!empty($data['status']) && is_string($data['status'])) {
+                return $data['status'];
+            }
+
+            Logger::evolution("[INFO] EvolutionService::resolveConnectionState - Nenhum campo state encontrado, retornando 'unknown'");
+            return 'unknown';
+        } catch (\Exception $e) {
+            Logger::evolution("[INFO] EvolutionService::resolveConnectionState - connectionState falhou: {$e->getMessage()}");
+
+            // Fallback: tentar /instance/fetchInstances?instanceName={instance}
+            try {
+                $url = $config['api_url'] . '/instance/fetchInstances?instanceName=' . urlencode($instanceName);
+                $result = self::request('GET', $url, $config['api_key']);
+
+                if ($result['httpCode'] === 200 && !empty($result['data'])) {
+                    $instances = $result['data'];
+                    // Pode ser array de instâncias ou objeto direto
+                    $inst = is_array($instances) && isset($instances[0]) ? $instances[0] : $instances;
+
+                    $state = $inst['connectionStatus'] ?? $inst['state'] ?? ($inst['instance']['state'] ?? null);
+                    if ($state) {
+                        Logger::evolution("[INFO] EvolutionService::resolveConnectionState - Via fetchInstances: state={$state}");
+                        return $state;
+                    }
+                }
+            } catch (\Exception $e2) {
+                Logger::evolution("[INFO] EvolutionService::resolveConnectionState - fetchInstances também falhou: {$e2->getMessage()}");
+            }
+
+            throw $e;
+        }
     }
 
     /**
@@ -1049,7 +1131,7 @@ class EvolutionService
 
             return '/' . $dir . '/' . $name;
         } catch (\Exception $e) {
-            Logger::error("EvolutionService::saveBase64Media - {$e->getMessage()}");
+            Logger::evolution("[ERROR] EvolutionService::saveBase64Media - {$e->getMessage()}");
             return null;
         }
     }
@@ -1136,7 +1218,7 @@ class EvolutionService
         }
 
         $accountId = IntegrationAccount::createWhatsApp($accountData);
-        Logger::info("EvolutionService::createAccount - Conta criada: ID={$accountId}, instance={$instanceId}");
+        Logger::evolution("[INFO] EvolutionService::createAccount - Conta criada: ID={$accountId}, instance={$instanceId}");
 
         return $accountId;
     }
@@ -1169,9 +1251,9 @@ class EvolutionService
 
             $url = $config['api_url'] . '/instance/delete/' . urlencode($instanceName);
             self::request('DELETE', $url, $config['api_key']);
-            Logger::info("EvolutionService::deleteInstance - Instância {$instanceName} deletada");
+            Logger::evolution("[INFO] EvolutionService::deleteInstance - Instância {$instanceName} deletada");
         } catch (\Exception $e) {
-            Logger::error("EvolutionService::deleteInstance - {$e->getMessage()}");
+            Logger::evolution("[ERROR] EvolutionService::deleteInstance - {$e->getMessage()}");
         }
 
         return true;

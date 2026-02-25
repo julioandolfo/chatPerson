@@ -76,6 +76,11 @@ class Logger
         self::log($message, 'notificame.log');
     }
 
+    public static function evolution(string $message): void
+    {
+        self::log($message, 'evolution.log');
+    }
+
     /**
      * Log específico para AI Tools (ferramentas de IA)
      */

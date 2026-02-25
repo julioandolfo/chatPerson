@@ -50,11 +50,16 @@ Logger::quepasa("Payload completo: " . json_encode($payload, JSON_UNESCAPED_UNIC
 
 try {
     // Detectar se é webhook da Evolution API
-    // Evolution API envia: { "event": "messages.upsert", "instance": "nome", "data": { ... } }
-    $isEvolution = isset($payload['event']) && isset($payload['instance']) && isset($payload['data']);
+    // Evolution API envia: { "event": "CONNECTION_UPDATE", "instance": "nome", "data": { ... } }
+    // Nota: nem todos os eventos têm 'data', mas 'event' e 'instance' são sempre presentes
+    $isEvolution = isset($payload['event']) && isset($payload['instance']);
     
     if ($isEvolution) {
-        Logger::info("Webhook Evolution API detectado - Event: {$payload['event']}, Instance: {$payload['instance']}");
+        // Garantir que data exista como array (pode estar ausente em alguns eventos)
+        if (!isset($payload['data'])) {
+            $payload['data'] = [];
+        }
+        Logger::evolution("[INFO] Webhook Evolution API detectado - Event: {$payload['event']}, Instance: {$payload['instance']}");
         EvolutionService::processWebhook($payload);
     } else {
         Logger::quepasa("Chamando WhatsAppService::processWebhook (Quepasa)...");

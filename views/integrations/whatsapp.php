@@ -1345,7 +1345,7 @@ function getQRCode(accountId) {
 function startQRCodeStatusPolling(accountId) {
     const statusMessage = document.getElementById("qrCodeStatusMessage");
     let attempts = 0;
-    const maxAttempts = 300; // 5 minutos (300 * 1 segundo)
+    const maxAttempts = 100; // 5 minutos (100 * 3 segundos)
     
     qrCodeStatusInterval = setInterval(function() {
         attempts++;
@@ -1366,8 +1366,8 @@ function startQRCodeStatusPolling(accountId) {
             `;
         }
         
-        // Verificar status da conexão
-        fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status", {
+        // Verificar status real da conexão na Evolution API
+        fetch("' . \App\Helpers\Url::to('/integrations/whatsapp') . '/" + accountId + "/status?force_real_check=1", {
             headers: {
                 "X-Requested-With": "XMLHttpRequest",
                 "Accept": "application/json"
@@ -1427,7 +1427,7 @@ function startQRCodeStatusPolling(accountId) {
                 `;
             }
         }
-    }, 1000); // Verificar a cada 1 segundo
+    }, 3000); // Verificar a cada 3 segundos
 }
 
 function refreshQRCode() {

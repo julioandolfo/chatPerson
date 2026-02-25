@@ -1824,8 +1824,34 @@ class ConversationService
         if ($messageType === 'note') {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Nota interna, não envia WhatsApp");
         } elseif ($deferIntegrationSend && $senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
+            // Enfileirar envio da mensagem principal (com o 1º anexo)
             self::queueBackgroundTask('integration_send', ['messageId' => $messageId]);
             \App\Helpers\Logger::info("ConversationService::sendMessage - Envio WhatsApp enfileirado em background para msgId={$messageId}");
+            
+            // Criar mensagens separadas para anexos 2+ e enfileirar cada uma
+            if (!empty($attachmentsData) && count($attachmentsData) > 1) {
+                \App\Helpers\Logger::info("ConversationService::sendMessage - Criando " . (count($attachmentsData) - 1) . " mensagens extras para anexos adicionais (deferred)");
+                for ($i = 1; $i < count($attachmentsData); $i++) {
+                    $att = $attachmentsData[$i];
+                    try {
+                        $extraMsgData = [
+                            'conversation_id' => $conversationId,
+                            'sender_type' => $senderType,
+                            'sender_id' => $senderId,
+                            'content' => '',
+                            'message_type' => $att['type'] ?? 'document',
+                            'attachments' => [$att],
+                            'status' => 'pending'
+                        ];
+                        if ($aiAgentId) $extraMsgData['ai_agent_id'] = $aiAgentId;
+                        $extraMsgId = Message::createMessage($extraMsgData);
+                        self::queueBackgroundTask('integration_send', ['messageId' => $extraMsgId]);
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Anexo extra " . ($i + 1) . "/" . count($attachmentsData) . " criado como msgId={$extraMsgId} e enfileirado");
+                    } catch (\Exception $e) {
+                        \App\Helpers\Logger::error("ConversationService::sendMessage - Erro ao criar msg extra para anexo {$i}: " . $e->getMessage());
+                    }
+                }
+            }
         } elseif ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
             try {

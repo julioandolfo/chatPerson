@@ -130,201 +130,136 @@ class MessagesController
     public function send(): void
     {
         try {
-            // Obter dados do body
             $input = json_decode(file_get_contents('php://input'), true);
             
             if (!$input) {
                 ApiResponse::validationError('Dados inválidos', ['body' => ['JSON inválido']]);
             }
             
-            // Validar campos obrigatórios
             $errors = [];
+            if (empty($input['to'])) $errors['to'] = ['Campo obrigatório'];
+            if (empty($input['from'])) $errors['from'] = ['Campo obrigatório'];
+            if (empty($input['message'])) $errors['message'] = ['Campo obrigatório'];
+            if (!empty($errors)) ApiResponse::validationError('Dados inválidos', $errors);
             
-            if (empty($input['to'])) {
-                $errors['to'] = ['Campo obrigatório'];
-            }
-            
-            if (empty($input['from'])) {
-                $errors['from'] = ['Campo obrigatório'];
-            }
-            
-            if (empty($input['message'])) {
-                $errors['message'] = ['Campo obrigatório'];
-            }
-            
-            if (!empty($errors)) {
-                ApiResponse::validationError('Dados inválidos', $errors);
-            }
-            
-            // Limpar números (remover caracteres não numéricos)
             $to = preg_replace('/[^0-9]/', '', $input['to']);
             $from = preg_replace('/[^0-9]/', '', $input['from']);
             $message = $input['message'];
-            $contactName = $input['contact_name'] ?? '';
+            $contactName = trim($input['contact_name'] ?? '');
             
-            // Validar formato dos números
-            if (strlen($to) < 10) {
-                ApiResponse::validationError('Número de destino inválido', ['to' => ['Número muito curto']]);
-            }
+            if (strlen($to) < 10) ApiResponse::validationError('Número de destino inválido', ['to' => ['Número muito curto']]);
+            if (strlen($from) < 10) ApiResponse::validationError('Número de origem inválido', ['from' => ['Número muito curto']]);
             
-            if (strlen($from) < 10) {
-                ApiResponse::validationError('Número de origem inválido', ['from' => ['Número muito curto']]);
-            }
-            
-            $db = \App\Helpers\Database::getInstance();
-            
-            // Buscar conta WhatsApp pelo número "from" (integration_accounts unificado)
-            $stmt = $db->prepare("
-                SELECT id, name, api_url, api_token as api_key, provider, status, api_token as quepasa_token, username as quepasa_user
-                FROM integration_accounts 
-                WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active'
-                LIMIT 1
-            ");
-            
-            $stmt->execute([$from]);
-            $account = $stmt->fetch(\PDO::FETCH_ASSOC);
-            
+            // Buscar conta WhatsApp via Model
+            $account = \App\Models\IntegrationAccount::findWhatsAppByPhone($from);
             if (!$account) {
                 ApiResponse::validationError('Conta WhatsApp não encontrada ou inativa', [
                     'from' => ['Nenhuma conta WhatsApp ativa encontrada para o número: ' . $from]
                 ]);
             }
             
-            // Buscar ou criar contato
-            $stmt = $db->prepare("SELECT id FROM contacts WHERE phone_number = ? LIMIT 1");
-            $stmt->execute([$to]);
-            $contact = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($account['status'] !== 'active' && $account['status'] !== 'connected') {
+                ApiResponse::validationError('Integração não está ativa', [
+                    'from' => ["Integração WhatsApp não está ativa (status: {$account['status']})"]
+                ]);
+            }
+            
+            // Buscar ou criar contato via Model
+            $contact = \App\Models\Contact::findByPhoneNormalized($to);
+            $isNewContact = false;
             
             if (!$contact) {
-                // Criar novo contato
-                $stmt = $db->prepare("
-                    INSERT INTO contacts (phone_number, name, channel, created_at, updated_at)
-                    VALUES (?, ?, 'whatsapp', NOW(), NOW())
-                ");
-                $stmt->execute([$to, $contactName ?: $to]);
-                $contactId = $db->lastInsertId();
+                $normalizedPhone = \App\Models\Contact::normalizePhoneNumber($to);
+                $contactId = \App\Models\Contact::create([
+                    'name' => !empty($contactName) ? $contactName : $normalizedPhone,
+                    'phone' => $normalizedPhone
+                ]);
+                $contact = \App\Models\Contact::find($contactId);
+                $isNewContact = true;
             } else {
-                $contactId = $contact['id'];
-                
-                // Atualizar nome se fornecido
-                if (!empty($contactName)) {
-                    $stmt = $db->prepare("UPDATE contacts SET name = ?, updated_at = NOW() WHERE id = ?");
-                    $stmt->execute([$contactName, $contactId]);
+                if (!empty($contactName) && (empty($contact['name']) || $contact['name'] === $contact['phone'])) {
+                    \App\Models\Contact::update($contact['id'], ['name' => $contactName]);
+                    $contact['name'] = $contactName;
                 }
             }
             
-            // Buscar conversa existente (incluindo fechadas) ou criar nova
-            $stmt = $db->prepare("
-                SELECT id, status 
-                FROM conversations 
-                WHERE contact_id = ? AND channel = 'whatsapp'
-                ORDER BY updated_at DESC
-                LIMIT 1
-            ");
-            $stmt->execute([$contactId]);
-            $conversation = $stmt->fetch(\PDO::FETCH_ASSOC);
+            // Buscar ou criar conversa via Model
+            $conversation = Conversation::findByContactAndChannel($contact['id'], 'whatsapp', $account['id']);
+            $isNewConversation = false;
             
             if (!$conversation) {
-                // Criar nova conversa
-                $stmt = $db->prepare("
-                    INSERT INTO conversations (
-                        contact_id, 
-                        channel, 
-                        status, 
-                        contact_name,
-                        contact_phone,
-                        integration_account_id,
-                        created_at, 
-                        updated_at
-                    ) VALUES (?, 'whatsapp', 'open', ?, ?, ?, NOW(), NOW())
-                ");
-                $stmt->execute([$contactId, $contactName ?: $to, $to, $account['id']]);
-                $conversationId = $db->lastInsertId();
+                $conversationId = Conversation::create([
+                    'contact_id' => $contact['id'],
+                    'channel' => 'whatsapp',
+                    'integration_account_id' => $account['id'],
+                    'status' => 'open',
+                    'funnel_id' => $account['default_funnel_id'] ?? null,
+                    'funnel_stage_id' => $account['default_stage_id'] ?? null
+                ]);
+                $conversation = Conversation::find($conversationId);
+                $isNewConversation = true;
             } else {
                 $conversationId = $conversation['id'];
-                
-                // Se a conversa estava fechada, reabrir
                 if ($conversation['status'] === 'closed' || $conversation['status'] === 'resolved') {
-                    $stmt = $db->prepare("UPDATE conversations SET status = 'open', updated_at = NOW() WHERE id = ?");
-                    $stmt->execute([$conversationId]);
+                    Conversation::reopen($conversationId);
+                    $conversation['status'] = 'open';
                 }
             }
             
-            // Inserir mensagem no banco
-            $stmt = $db->prepare("
-                INSERT INTO messages (
-                    conversation_id,
-                    sender_type,
-                    content,
-                    message_type,
-                    status,
-                    created_at
-                ) VALUES (?, 'agent', ?, 'text', 'sent', NOW())
-            ");
-            $stmt->execute([$conversationId, $message]);
-            $messageId = $db->lastInsertId();
+            // Enviar mensagem via WhatsAppService (com retry, error handling, etc.)
+            $sendResult = \App\Services\WhatsAppService::sendMessage(
+                $account['id'],
+                $to,
+                $message,
+                []
+            );
             
-            // Atualizar updated_at da conversa
-            $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW() WHERE id = ?");
-            $stmt->execute([$conversationId]);
+            // Salvar mensagem no banco APÓS envio (com status real)
+            $messageData = [
+                'conversation_id' => $conversation['id'],
+                'sender_type' => 'agent',
+                'sender_id' => ApiAuthMiddleware::userId(),
+                'content' => $message,
+                'message_type' => 'text',
+                'external_id' => $sendResult['message_id'] ?? null,
+                'status' => ($sendResult['success'] ?? false) ? 'sent' : 'error'
+            ];
             
-            // Enviar mensagem via provedor (Quepasa, etc)
-            $messageSent = false;
-            $externalMessageId = null;
+            $messageId = Message::createMessage($messageData);
             
-            if ($account['provider'] === 'quepasa' && !empty($account['api_url'])) {
-                try {
-                    // Enviar via Quepasa
-                    $quepasaUrl = rtrim($account['api_url'], '/') . '/send';
-                    
-                    $headers = [
-                        'Content-Type: application/json',
-                        'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
-                        'X-QUEPASA-USER: ' . ($account['quepasa_user'] ?? 'system')
-                    ];
-                    
-                    $payload = [
-                        'chatid' => $to . '@s.whatsapp.net',
-                        'text' => $message
-                    ];
-                    
-                    $ch = curl_init($quepasaUrl);
-                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                    curl_setopt($ch, CURLOPT_POST, true);
-                    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-                    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-                    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-                    
-                    $response = curl_exec($ch);
-                    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                    curl_close($ch);
-                    
-                    if ($httpCode >= 200 && $httpCode < 300) {
-                        $messageSent = true;
-                        $responseData = json_decode($response, true);
-                        $externalMessageId = $responseData['id'] ?? null;
-                    }
-                } catch (\Exception $e) {
-                    // Log erro mas não falha a requisição
-                    error_log("Erro ao enviar mensagem via Quepasa: " . $e->getMessage());
-                }
+            // Atualizar last_message_at da conversa
+            Conversation::update($conversation['id'], [
+                'last_message_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            $success = $sendResult['success'] ?? false;
+            
+            if (!$success) {
+                ApiResponse::error(
+                    'Mensagem salva mas falhou ao enviar via WhatsApp: ' . ($sendResult['error'] ?? 'Erro desconhecido'),
+                    502,
+                    'WHATSAPP_SEND_FAILED',
+                    [
+                        'message_id' => (string) $messageId,
+                        'conversation_id' => (string) $conversation['id'],
+                        'status' => 'error'
+                    ]
+                );
+                return;
             }
             
-            // Atualizar status da mensagem
-            if ($messageSent) {
-                $stmt = $db->prepare("UPDATE messages SET status = 'delivered' WHERE id = ?");
-                $stmt->execute([$messageId]);
-            }
-            
-            // Retornar sucesso
             ApiResponse::created([
                 'message_id' => (string) $messageId,
-                'conversation_id' => (string) $conversationId,
-                'status' => $messageSent ? 'sent' : 'queued',
-                'external_message_id' => $externalMessageId
+                'external_id' => $sendResult['message_id'] ?? null,
+                'conversation_id' => (string) $conversation['id'],
+                'contact_id' => (string) $contact['id'],
+                'status' => 'sent',
+                'is_new_contact' => $isNewContact,
+                'is_new_conversation' => $isNewConversation
             ], 'Mensagem enviada com sucesso');
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[API-V1-SEND] Exception: " . $e->getMessage());
             ApiResponse::serverError('Erro ao enviar mensagem', $e);
         }
     }

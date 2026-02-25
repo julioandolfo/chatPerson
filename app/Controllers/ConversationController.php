@@ -1596,6 +1596,9 @@ class ConversationController
                     'message_id' => $messageId
                 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 
+                // Garantir que o script continue mesmo após desconexão do cliente (Apache mod_php)
+                ignore_user_abort(true);
+                
                 // Enviar resposta HTTP imediatamente sem chamar exit()
                 while (ob_get_level() > 0) { ob_end_clean(); }
                 http_response_code(200);

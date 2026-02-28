@@ -118,16 +118,25 @@ class AgentConversionService
     
     /**
      * Total de conversas do agente no período
+     * Baseado na data de criação da conversa, não na atribuição
      */
     private static function getTotalConversations(int $agentId, string $dateFrom, string $dateTo): int
     {
-        // Usar tabela de histórico de atribuições para contar todas as conversas
-        // que foram atribuídas ao agente no período, mesmo que tenham sido reatribuídas
-        return \App\Models\ConversationAssignment::countAgentConversations(
-            $agentId,
-            $dateFrom,
-            $dateTo
-        );
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+
+        // Contar conversas criadas no período onde o agente está atribuído
+        // Isso alinha com os badges de iniciador (agente/cliente)
+        $sql = "SELECT COUNT(DISTINCT c.id) as total
+                FROM conversations c
+                WHERE c.agent_id = ?
+                AND c.created_at >= ?
+                AND c.created_at <= ?";
+
+        $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
     }
     
     /**

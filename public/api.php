@@ -871,81 +871,71 @@ try {
                 }
             }
             
-            // Inserir mensagem
+            // Enviar mensagem via WhatsAppService (com retry, error handling, etc.)
+            apiLog('INFO', '📡 Enviando via WhatsAppService...');
+            
+            $sendResult = \App\Services\WhatsAppService::sendMessage(
+                (int)$account['id'],
+                $to,
+                $message,
+                []
+            );
+            
+            $messageSent = $sendResult['success'] ?? false;
+            $externalId = $sendResult['message_id'] ?? null;
+            
+            apiLog('INFO', "📡 WhatsAppService respondeu: success=" . ($messageSent ? 'true' : 'false') . ", external_id=" . ($externalId ?? 'NULL'));
+            
+            if (!$messageSent) {
+                apiLog('ERROR', "❌ WhatsApp falhou: " . ($sendResult['error'] ?? 'Erro desconhecido'));
+            }
+            
+            // Inserir mensagem no banco APÓS envio (com status real)
             apiLog('INFO', '📝 Inserindo mensagem no banco...');
             
-            // Gerar ID externo único para evitar duplicatas do webhook
-            $externalId = 'api_' . time() . '_' . uniqid();
-            
             $stmt = $db->prepare("
-                INSERT INTO messages (conversation_id, sender_type, content, message_type, status, external_id, created_at)
-                VALUES (?, 'agent', ?, 'text', 'sent', ?, NOW())
+                INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, status, external_id, created_at)
+                VALUES (?, 'agent', ?, ?, 'text', ?, ?, NOW())
             ");
-            $stmt->execute([$conversationId, $message, $externalId]);
+            $stmt->execute([
+                $conversationId,
+                $tokenInfo['user_id'] ?? null,
+                $message,
+                $messageSent ? 'sent' : 'error',
+                $externalId
+            ]);
             $messageId = $db->lastInsertId();
-            apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId}, External ID: {$externalId})");
+            apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId}, External ID: " . ($externalId ?? 'NULL') . ", Status: " . ($messageSent ? 'sent' : 'error') . ")");
             
             // Atualizar conversa
-            apiLog('DEBUG', 'Atualizando timestamp da conversa...');
-            $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW() WHERE id = ?");
+            $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW(), last_message_at = NOW() WHERE id = ?");
             $stmt->execute([$conversationId]);
             
-            // Enviar via Quepasa
-            $messageSent = false;
-            if ($account['provider'] === 'quepasa' && !empty($account['api_url'])) {
-                apiLog('INFO', '📡 Enviando via Quepasa...');
-                apiLog('DEBUG', "Quepasa URL: {$account['api_url']}/send");
-                
-                $quepasaPayload = ['chatid' => $to . '@s.whatsapp.net', 'text' => $message];
-                apiLog('DEBUG', 'Quepasa Payload: ' . json_encode($quepasaPayload));
-                
-                $ch = curl_init(rtrim($account['api_url'], '/') . '/send');
-                curl_setopt_array($ch, [
-                    CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($quepasaPayload),
-                    CURLOPT_HTTPHEADER => [
-                        'Content-Type: application/json',
-                        'X-QUEPASA-TOKEN: ' . ($account['quepasa_token'] ?? ''),
-                        'X-QUEPASA-USER: ' . ($account['quepasa_user'] ?? 'system')
-                    ],
-                    CURLOPT_TIMEOUT => 30,
-                    CURLOPT_SSL_VERIFYPEER => false
-                ]);
-                $response = curl_exec($ch);
-                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-                $messageSent = ($httpCode >= 200 && $httpCode < 300);
-                
-                apiLog('INFO', "📡 Quepasa respondeu: HTTP {$httpCode}");
-                apiLog('DEBUG', "Quepasa Response: " . substr($response, 0, 200));
-                
-                if ($messageSent) {
-                    apiLog('INFO', '✅ Mensagem enviada via Quepasa');
-                } else {
-                    apiLog('WARNING', "⚠️ Quepasa falhou (HTTP {$httpCode})");
-                }
-            } else {
-                apiLog('WARNING', '⚠️ Quepasa não configurado ou provider diferente');
-            }
-            
-            if ($messageSent) {
-                $stmt = $db->prepare("UPDATE messages SET status = 'delivered' WHERE id = ?");
-                $stmt->execute([$messageId]);
-                apiLog('DEBUG', 'Status atualizado para delivered');
-            }
-            
-            apiLog('INFO', '✅ MENSAGEM PROCESSADA COM SUCESSO');
+            apiLog('INFO', $messageSent ? '✅ MENSAGEM ENVIADA COM SUCESSO' : '❌ MENSAGEM SALVA MAS NÃO ENVIADA');
             apiLog('INFO', "Message ID: {$messageId}, Conversation ID: {$conversationId}, Contact ID: {$contactId}");
             apiLog('INFO', "Roteamento: " . ($usedExistingConversation ? "Usou conversa existente ({$from})" : "Usou número da API ({$from})"));
             apiLog('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            
+            if (!$messageSent) {
+                errorResponse(
+                    'Mensagem salva mas falhou ao enviar via WhatsApp: ' . ($sendResult['error'] ?? 'Erro desconhecido'),
+                    'WHATSAPP_SEND_FAILED',
+                    502,
+                    [
+                        'message_id' => (string) $messageId,
+                        'conversation_id' => (string) $conversationId,
+                        'status' => 'error'
+                    ]
+                );
+            }
             
             successResponse([
                 'message_id' => (string) $messageId,
                 'conversation_id' => (string) $conversationId,
                 'contact_id' => (string) $contactId,
                 'contact_name' => $contactName,
-                'status' => $messageSent ? 'sent' : 'queued',
+                'status' => 'sent',
+                'external_id' => $externalId,
                 'routing' => [
                     'original_from' => $fromOriginal,
                     'actual_from' => $from,

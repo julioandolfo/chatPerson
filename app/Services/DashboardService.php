@@ -1191,20 +1191,20 @@ class DashboardService
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d') . ' 23:59:59';
-        
+
         // Garantir que dateTo inclui o dia inteiro
         if (!str_contains($dateTo, ':')) {
             $dateTo = $dateTo . ' 23:59:59';
         }
-        
+
         // ✅ Cache de 3 minutos por agente
-        $cacheKey = "dashboard_agent_metrics_{$agentId}_" . md5($dateFrom . $dateTo);
+        $cacheKey = "dashboard_agent_metrics_v2_{$agentId}_" . md5($dateFrom . $dateTo);
         return \App\Helpers\Cache::remember($cacheKey, 180, function() use ($agentId, $dateFrom, $dateTo) {
         $agent = User::find($agentId);
         if (!$agent) {
             return [];
         }
-        
+
         // Buscar SLA configurado
         $slaSettings = ConversationSettingsService::getSettings()['sla'] ?? [];
         $slaFirstResponseMinutes = $slaSettings['first_response_time'] ?? 15;
@@ -1212,46 +1212,65 @@ class DashboardService
         $useWorkingHours = $slaSettings['working_hours_enabled'] ?? false;
         $delayEnabled = $slaSettings['message_delay_enabled'] ?? true;
         $delayMinutes = $slaSettings['message_delay_minutes'] ?? 1;
-        
+
         if (!$delayEnabled) {
             $delayMinutes = 0;
         }
-        
-        // ===== QUERY BÁSICA para métricas gerais =====
-        $sql = "SELECT 
-                    COUNT(DISTINCT c.id) as total_conversations,
-                    COUNT(DISTINCT CASE WHEN EXISTS (
-                        SELECT 1 FROM messages m0 
-                        WHERE m0.conversation_id = c.id AND m0.sender_type = 'contact'
-                    ) THEN c.id END) as total_conversations_with_contact,
-                    COUNT(DISTINCT CASE WHEN c.status = 'open' THEN c.id END) as open_conversations,
-                    COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_conversations,
-                    COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed_conversations,
-                    AVG(TIMESTAMPDIFF(HOUR, c.created_at, COALESCE(c.resolved_at, c.updated_at))) as avg_resolution_hours
-                FROM conversations c
-                WHERE c.agent_id = ?
-                AND c.created_at >= ?
-                AND c.created_at <= ?";
-        
-        $metrics = \App\Helpers\Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
-        
-        $total = (int)($metrics['total_conversations'] ?? 0);
-        $totalWithContact = (int)($metrics['total_conversations_with_contact'] ?? 0);
-        $resolved = (int)($metrics['resolved_conversations'] ?? 0);
-        $closed = (int)($metrics['closed_conversations'] ?? 0);
-        
-        // ===== CÁLCULO DE SLA COM NOVAS REGRAS =====
-        // Buscar conversas do agente com mensagens para calcular SLA corretamente
-        $conversationsForSLA = \App\Helpers\Database::fetchAll(
-            "SELECT c.id, c.status, c.agent_id, c.sla_paused_duration
+
+        // ===== 1. CONVERSAS INTERATIVAS (trabalho real do agente no período) =====
+        // Conversas onde o agente enviou mensagens no período
+        $interactiveConversations = \App\Helpers\Database::fetchAll(
+            "SELECT DISTINCT c.id, c.status, c.sla_paused_duration, c.created_at
              FROM conversations c
-             WHERE c.agent_id = ?
-             AND c.created_at >= ?
-             AND c.created_at <= ?
-             AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact')",
+             INNER JOIN messages m ON m.conversation_id = c.id
+             WHERE m.sender_type = 'agent'
+             AND m.sender_id = ?
+             AND m.created_at >= ?
+             AND m.created_at <= ?",
             [$agentId, $dateFrom, $dateTo]
         );
-        
+
+        $interactiveCount = count($interactiveConversations);
+        $interactiveIds = array_column($interactiveConversations, 'id');
+
+        // ===== 2. CONVERSAS FECHADAS/RESOLVIDAS NO PERÍODO =====
+        $closedInPeriod = \App\Helpers\Database::fetch(
+            "SELECT COUNT(DISTINCT c.id) as total
+             FROM conversations c
+             INNER JOIN messages m ON m.conversation_id = c.id
+             WHERE m.sender_type = 'agent'
+             AND m.sender_id = ?
+             AND m.created_at >= ?
+             AND m.created_at <= ?
+             AND c.status IN ('closed', 'resolved')",
+            [$agentId, $dateFrom, $dateTo]
+        );
+        $closedCount = (int)($closedInPeriod['total'] ?? 0);
+
+        // ===== 3. CONVERSAS ATUALMENTE EM ABERTO DO AGENTE =====
+        // Isso mostra o workload atual do agente (independente de quando criadas)
+        $currentlyOpen = \App\Helpers\Database::fetch(
+            "SELECT COUNT(DISTINCT id) as total
+             FROM conversations
+             WHERE agent_id = ?
+             AND status = 'open'",
+            [$agentId]
+        );
+        $openCount = (int)($currentlyOpen['total'] ?? 0);
+
+        // ===== 4. MENSAGENS ENVIADAS NO PERÍODO =====
+        $messagesCount = \App\Helpers\Database::fetch(
+            "SELECT COUNT(*) as total
+             FROM messages
+             WHERE sender_type = 'agent'
+             AND sender_id = ?
+             AND created_at >= ?
+             AND created_at <= ?",
+            [$agentId, $dateFrom, $dateTo]
+        );
+        $totalMessages = (int)($messagesCount['total'] ?? 0);
+
+        // ===== CÁLCULO DE SLA =====
         $firstResponseWithinSla = 0;
         $firstResponseTotal = 0;
         $ongoingResponsesWithinSla = 0;
@@ -1259,18 +1278,19 @@ class DashboardService
         $totalFirstResponseSeconds = 0;
         $totalResponseSeconds = 0;
         $responseCount = 0;
-        
-        foreach ($conversationsForSLA as $conv) {
+
+        // Para cada conversa interativa, calcular SLA
+        foreach ($interactiveConversations as $conv) {
             $convId = (int)$conv['id'];
-            
+
             // REGRA 1: Verificar se cliente respondeu ao bot
             if (!self::hasClientRespondedToBot($convId)) {
                 continue;
             }
-            
+
             // Buscar períodos de atribuição
             $assignmentPeriods = self::getAllAgentAssignmentPeriods($convId, $agentId);
-            
+
             // Buscar mensagens da conversa
             $messages = \App\Helpers\Database::fetchAll(
                 "SELECT sender_type, sender_id, created_at
@@ -1279,11 +1299,11 @@ class DashboardService
                  ORDER BY created_at ASC",
                 [$convId]
             );
-            
+
             if (empty($messages)) {
                 continue;
             }
-            
+
             // Encontrar primeira mensagem do cliente
             $firstContactTime = null;
             foreach ($messages as $msg) {
@@ -1292,11 +1312,11 @@ class DashboardService
                     break;
                 }
             }
-            
+
             if (!$firstContactTime) {
                 continue;
             }
-            
+
             // CALCULAR SLA DE PRIMEIRA RESPOSTA
             $firstAgentResponse = null;
             foreach ($messages as $msg) {
@@ -1305,10 +1325,10 @@ class DashboardService
                     break;
                 }
             }
-            
+
             if ($firstAgentResponse) {
                 $startTime = clone $firstContactTime;
-                
+
                 // Ajustar início se agente foi atribuído depois
                 if (!empty($assignmentPeriods)) {
                     $firstPeriod = $assignmentPeriods[0];
@@ -1317,24 +1337,24 @@ class DashboardService
                         $startTime = $assignedTime;
                     }
                 }
-                
+
                 $endTime = new \DateTime($firstAgentResponse['created_at']);
                 $minutes = self::calculateSLAMinutes($startTime, $endTime, $useWorkingHours);
                 $minutes -= (int)($conv['sla_paused_duration'] ?? 0);
                 $minutes = max(0, $minutes);
-                
+
                 $firstResponseTotal++;
                 $totalFirstResponseSeconds += $minutes * 60;
-                
+
                 if ($minutes <= $slaFirstResponseMinutes) {
                     $firstResponseWithinSla++;
                 }
             }
-            
+
             // CALCULAR SLA ONGOING
             $lastAgentMessage = null;
             $pendingContactMessage = null;
-            
+
             foreach ($messages as $msg) {
                 if ($msg['sender_type'] === 'agent' && (int)$msg['sender_id'] === $agentId) {
                     // Agente respondeu
@@ -1342,95 +1362,99 @@ class DashboardService
                         $contactTime = new \DateTime($pendingContactMessage['created_at']);
                         $agentTime = new \DateTime($msg['created_at']);
                         $minutes = self::calculateSLAMinutes($contactTime, $agentTime, $useWorkingHours);
-                        
+
                         $ongoingResponsesTotal++;
                         $totalResponseSeconds += $minutes * 60;
                         $responseCount++;
-                        
+
                         if ($minutes <= $slaResponseMinutes) {
                             $ongoingResponsesWithinSla++;
                         }
-                        
+
                         $pendingContactMessage = null;
                     }
                     $lastAgentMessage = $msg;
-                    
+
                 } elseif ($msg['sender_type'] === 'contact' && $lastAgentMessage) {
                     // REGRA 2: Verificar período de atribuição
                     if (!empty($assignmentPeriods) && !self::isMessageInAgentPeriod($msg['created_at'], $assignmentPeriods)) {
                         continue;
                     }
-                    
+
                     // REGRA 3: Aplicar delay
                     $lastAgentTime = new \DateTime($lastAgentMessage['created_at']);
                     $contactTime = new \DateTime($msg['created_at']);
                     $diffMinutes = ($contactTime->getTimestamp() - $lastAgentTime->getTimestamp()) / 60;
-                    
+
                     if ($diffMinutes < $delayMinutes) {
                         continue;
                     }
-                    
+
                     if (!$pendingContactMessage) {
                         $pendingContactMessage = $msg;
                     }
                 }
             }
         }
-        
+
         // Calcular médias e taxas
-        $avgFirstResponseSeconds = $firstResponseTotal > 0 
-            ? $totalFirstResponseSeconds / $firstResponseTotal 
+        $avgFirstResponseSeconds = $firstResponseTotal > 0
+            ? $totalFirstResponseSeconds / $firstResponseTotal
             : 0;
         $avgFirstResponseMinutes = $avgFirstResponseSeconds > 0 ? round($avgFirstResponseSeconds / 60, 2) : 0;
-        
-        $avgResponseSeconds = $responseCount > 0 
-            ? $totalResponseSeconds / $responseCount 
+
+        $avgResponseSeconds = $responseCount > 0
+            ? $totalResponseSeconds / $responseCount
             : 0;
         $avgResponseMinutes = $avgResponseSeconds > 0 ? round($avgResponseSeconds / 60, 2) : 0;
-        
-        $slaFirstResponseRate = $firstResponseTotal > 0 
-            ? round(($firstResponseWithinSla / $firstResponseTotal) * 100, 2) 
+
+        $slaFirstResponseRate = $firstResponseTotal > 0
+            ? round(($firstResponseWithinSla / $firstResponseTotal) * 100, 2)
             : 0;
-        
-        $slaResponseRate = $ongoingResponsesTotal > 0 
-            ? round(($ongoingResponsesWithinSla / $ongoingResponsesTotal) * 100, 2) 
+
+        $slaResponseRate = $ongoingResponsesTotal > 0
+            ? round(($ongoingResponsesWithinSla / $ongoingResponsesTotal) * 100, 2)
             : 0;
-        
-        $totalResponses = $ongoingResponsesTotal;
-        $responsesWithinSla = $ongoingResponsesWithinSla;
-        
+
+        // Taxa de resolução = conversas fechadas / conversas interativas
+        $resolutionRate = $interactiveCount > 0
+            ? round(($closedCount / $interactiveCount) * 100, 2)
+            : 0;
+
         return [
             'agent_id' => $agentId,
             'agent_name' => $agent['name'] ?? 'Desconhecido',
             'agent_avatar' => $agent['avatar'] ?? null,
             'availability_status' => $agent['availability_status'] ?? 'offline',
-            'total_conversations' => $total,
-            'total_conversations_with_contact' => $totalWithContact,
-            'open_conversations' => (int)($current['total'] ?? 0),
-            'resolved_conversations' => $resolved,
-            'closed_conversations' => $closed,
-            'avg_resolution_hours' => round((float)($metrics['avg_resolution_hours'] ?? 0), 2),
-            
+
+            // NOVAS MÉTRICAS DE CONVERSAS
+            'total_conversations' => $interactiveCount, // Conversas interativas no período (trabalho real)
+            'open_conversations' => $openCount,          // Conversas atualmente em aberto (workload atual)
+            'closed_conversations' => $closedCount,       // Conversas fechadas no período
+            'total_messages_sent' => $totalMessages,    // Mensagens enviadas no período
+
             // Tempo de primeira resposta
             'avg_first_response_minutes' => $avgFirstResponseMinutes,
             'avg_first_response_seconds' => round($avgFirstResponseSeconds, 2),
-            
+
             // Tempo médio de respostas
             'avg_response_minutes' => $avgResponseMinutes,
             'avg_response_seconds' => round($avgResponseSeconds, 2),
-            
+
             // SLA de primeira resposta
             'sla_first_response_minutes' => $slaFirstResponseMinutes,
             'sla_first_response_rate' => $slaFirstResponseRate,
-            'first_response_within_sla' => (int)($metrics['first_response_within_sla'] ?? 0),
-            
+            'first_response_within_sla' => $firstResponseWithinSla,
+            'first_response_total' => $firstResponseTotal,
+
             // SLA de respostas
             'sla_response_minutes' => $slaResponseMinutes,
             'sla_response_rate' => $slaResponseRate,
-            'total_responses' => $totalResponses,
-            'responses_within_sla' => $responsesWithinSla,
-            
-            'resolution_rate' => $total > 0 ? round((($resolved + $closed) / $total) * 100, 2) : 0
+            'total_responses' => $ongoingResponsesTotal,
+            'responses_within_sla' => $ongoingResponsesWithinSla,
+
+            // Taxas
+            'resolution_rate' => $resolutionRate
         ];
         }); // ✅ Fim do Cache::remember
     }

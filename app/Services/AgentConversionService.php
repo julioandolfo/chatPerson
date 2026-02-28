@@ -230,6 +230,11 @@ class AgentConversionService
 
     /**
      * Obter métricas de conversão detalhadas com separação por iniciador
+     *
+     * Lógica dos grupos:
+     * - Apenas Receptivas: só cliente iniciou
+     * - Receptivas + Ativas: cliente iniciou + agente iniciou (novas conversas)
+     * - Interativas: todas que o agente atendeu no período (inclui antigas)
      */
     public static function getDetailedConversionMetrics(
         int $agentId,
@@ -245,39 +250,40 @@ class AgentConversionService
             $dateTo = $dateTo . ' 23:59:59';
         }
 
-        // Métricas básicas (novas conversas criadas no período)
+        // Métricas básicas
         $basicMetrics = self::getConversionMetrics($agentId, $dateFrom, $dateTo);
-
-        // Conversas por iniciador
-        $agentInitiated = self::getAgentInitiatedConversations($agentId, $dateFrom, $dateTo);
-        $clientInitiated = self::getClientInitiatedConversations($agentId, $dateFrom, $dateTo);
-
-        // Conversas interativas (todas que o agente conversou no período)
-        $interactiveConversations = self::getInteractiveConversations($agentId, $dateFrom, $dateTo);
-
-        // Calcular taxas de conversão separadas
         $totalOrders = $basicMetrics['total_orders'] ?? 0;
 
-        // Taxa de conversão geral (baseada em novas conversas)
-        $conversionRateTotal = $basicMetrics['conversion_rate'] ?? 0;
-
-        // Taxa de conversão apenas clientes (conversas iniciadas pelo cliente)
+        // 1. APENAS RECEPTIVAS - só cliente iniciou
+        $clientInitiated = self::getClientInitiatedConversations($agentId, $dateFrom, $dateTo);
         $conversionRateClientOnly = $clientInitiated > 0
             ? round(($totalOrders / $clientInitiated) * 100, 2)
             : 0;
 
-        // Taxa de conversão baseada em conversas interativas
+        // 2. RECEPTIVAS + ATIVAS - cliente + agente iniciaram (novas conversas)
+        $agentInitiated = self::getAgentInitiatedConversations($agentId, $dateFrom, $dateTo);
+        $receptivasEAtivas = $clientInitiated + $agentInitiated;
+        $conversionRateReceptivasAtivas = $receptivasEAtivas > 0
+            ? round(($totalOrders / $receptivasEAtivas) * 100, 2)
+            : 0;
+
+        // 3. INTERATIVAS - todas que o agente atendeu (inclui antigas com atividade)
+        $interactiveConversations = self::getInteractiveConversations($agentId, $dateFrom, $dateTo);
         $conversionRateInteractive = $interactiveConversations > 0
             ? round(($totalOrders / $interactiveConversations) * 100, 2)
             : 0;
 
         return array_merge($basicMetrics, [
-            'conversations_agent_initiated' => $agentInitiated,
-            'conversations_client_initiated' => $clientInitiated,
-            'interactive_conversations' => $interactiveConversations,
-            'conversion_rate_total' => $conversionRateTotal,
-            'conversion_rate_client_only' => $conversionRateClientOnly,
-            'conversion_rate_interactive' => $conversionRateInteractive,
+            // Contagens
+            'conversations_client_initiated' => $clientInitiated,      // Apenas Receptivas
+            'conversations_agent_initiated' => $agentInitiated,         // Ativas (prospecção)
+            'conversations_receptivas_ativas' => $receptivasEAtivas,   // Receptivas + Ativas
+            'interactive_conversations' => $interactiveConversations, // Interativas (todas)
+
+            // Taxas de conversão
+            'conversion_rate_client_only' => $conversionRateClientOnly,           // Apenas Receptivas
+            'conversion_rate_receptivas_ativas' => $conversionRateReceptivasAtivas, // Receptivas + Ativas
+            'conversion_rate_interactive' => $conversionRateInteractive,         // Interativas
         ]);
     }
     

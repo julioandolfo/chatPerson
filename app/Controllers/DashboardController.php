@@ -133,16 +133,20 @@ class DashboardController
                                 'agent_id' => $seller['id'],
                                 'agent_name' => $seller['name'],
                                 'seller_id' => $seller['woocommerce_seller_id'],
+                                // Contagens
                                 'total_conversations' => $metrics['total_conversations'],
-                                'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
-                                'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
-                                'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,
+                                'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,  // Apenas Receptivas
+                                'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,  // Ativas
+                                'conversations_receptivas_ativas' => $metrics['conversations_receptivas_ativas'] ?? 0, // Receptivas + Ativas
+                                'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,        // Interativas
+                                // Vendas
                                 'total_orders' => $metrics['total_orders'],
-                                'conversion_rate' => $metrics['conversion_rate'],
-                                'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
-                                'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0,
                                 'total_revenue' => $metrics['total_revenue'],
-                                'avg_ticket' => $metrics['avg_ticket']
+                                'avg_ticket' => $metrics['avg_ticket'],
+                                // Taxas
+                                'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,         // Apenas Receptivas
+                                'conversion_rate_receptivas_ativas' => $metrics['conversion_rate_receptivas_ativas'] ?? 0, // Rec+Ativas
+                                'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0        // Interativas
                             ];
                         }
                     }
@@ -176,16 +180,20 @@ class DashboardController
                                     'agent_id' => $seller['id'],
                                     'agent_name' => $seller['name'],
                                     'seller_id' => $seller['woocommerce_seller_id'],
+                                    // Contagens
                                     'total_conversations' => $metrics['total_conversations'],
-                                    'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
-                                    'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
-                                    'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,
+                                    'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,  // Apenas Receptivas
+                                    'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,  // Ativas
+                                    'conversations_receptivas_ativas' => $metrics['conversations_receptivas_ativas'] ?? 0, // Receptivas + Ativas
+                                    'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,        // Interativas
+                                    // Vendas
                                     'total_orders' => $metrics['total_orders'],
-                                    'conversion_rate' => $metrics['conversion_rate'],
-                                    'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
-                                    'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0,
                                     'total_revenue' => $metrics['total_revenue'],
-                                    'avg_ticket' => $metrics['avg_ticket']
+                                    'avg_ticket' => $metrics['avg_ticket'],
+                                    // Taxas
+                                    'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,         // Apenas Receptivas
+                                    'conversion_rate_receptivas_ativas' => $metrics['conversion_rate_receptivas_ativas'] ?? 0, // Rec+Ativas
+                                    'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0        // Interativas
                                 ];
                             }
                         }

@@ -200,9 +200,9 @@ class DashboardController
                     }
                 }
                 
-                // Ordenar por taxa de conversão (decrescente)
+                // Ordenar por taxa de conversão Rec+Ativas (decrescente)
                 usort($ranking, function($a, $b) {
-                    return $b['conversion_rate'] <=> $a['conversion_rate'];
+                    return $b['conversion_rate_receptivas_ativas'] <=> $a['conversion_rate_receptivas_ativas'];
                 });
                 
                 // Criar 3 rankings diferentes
@@ -225,10 +225,10 @@ class DashboardController
                 });
                 $rankingByRevenue = array_slice($rankingByRevenue, 0, 5);
                 
-                // Ranking por Taxa de Conversão
+                // Ranking por Taxa de Conversão (Rec+Ativas)
                 $rankingByConversion = $conversionRanking;
                 usort($rankingByConversion, function($a, $b) {
-                    return $b['conversion_rate'] <=> $a['conversion_rate'];
+                    return $b['conversion_rate_receptivas_ativas'] <=> $a['conversion_rate_receptivas_ativas'];
                 });
                 $rankingByConversion = array_slice($rankingByConversion, 0, 5);
                 

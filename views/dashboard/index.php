@@ -2268,7 +2268,7 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                         </div>
                         <div class="text-end">
                             <span class="fw-bold text-primary fs-4">
-                                <?= number_format($seller['conversion_rate'], 1) ?>%
+                                <?= number_format($seller['conversion_rate_receptivas_ativas'] ?? 0, 1) ?>%
                             </span>
                         </div>
                     </div>

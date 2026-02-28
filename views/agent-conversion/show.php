@@ -96,7 +96,7 @@ ob_start();
                     <span class="text-gray-500 fw-semibold fs-6">Taxa de Conversão</span>
                     <div class="progress h-8px w-100 mt-2">
                         <div class="progress-bar bg-<?= ($metrics['conversion_rate'] ?? 0) >= 30 ? 'success' : (($metrics['conversion_rate'] ?? 0) >= 15 ? 'warning' : 'danger') ?>" 
-                             style="width: <?= min(100, $metrics['conversion_rate'] ?? 0) ?>%">
+                             style="width: <?= min(100, (($metrics['conversion_rate'] ?? 0) / 30) * 100) ?>%">
                         </div>
                     </div>
                 </div>

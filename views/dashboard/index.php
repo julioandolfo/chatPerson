@@ -1689,7 +1689,7 @@ ob_start();
                                                     <span class="fs-9 text-muted" style="width: 70px;">Apenas Rec:</span>
                                                     <span class="fw-bold text-<?= $progressColorRec ?>"><?= number_format($conversionRateClientOnly, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
-                                                        <div class="progress-bar bg-<?= $progressColorRec ?>" style="width: <?= min(100, $conversionRateClientOnly) ?>%"></div>
+                                                        <div class="progress-bar bg-<?= $progressColorRec ?>" style="width: <?= min(100, ($conversionRateClientOnly / 30) * 100) ?>%"></div>
                                                     </div>
                                                 </div>
                                                 <!-- Taxa Rec + Ativas (todas novas conversas) -->
@@ -1697,7 +1697,7 @@ ob_start();
                                                     <span class="fs-9 text-muted" style="width: 70px;">Rec+Ativas:</span>
                                                     <span class="fw-bold text-<?= $progressColorRecAtivas ?>"><?= number_format($conversionRateRecAtivas, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
-                                                        <div class="progress-bar bg-<?= $progressColorRecAtivas ?>" style="width: <?= min(100, $conversionRateRecAtivas) ?>%"></div>
+                                                        <div class="progress-bar bg-<?= $progressColorRecAtivas ?>" style="width: <?= min(100, ($conversionRateRecAtivas / 30) * 100) ?>%"></div>
                                                     </div>
                                                 </div>
                                                 <!-- Taxa Interativas (todas atendidas) -->
@@ -1705,7 +1705,7 @@ ob_start();
                                                     <span class="fs-9 text-muted" style="width: 70px;">Interativas:</span>
                                                     <span class="fw-bold text-<?= $progressColorInteractive ?>"><?= number_format($conversionRateInteractive, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
-                                                        <div class="progress-bar bg-<?= $progressColorInteractive ?>" style="width: <?= min(100, $conversionRateInteractive) ?>%"></div>
+                                                        <div class="progress-bar bg-<?= $progressColorInteractive ?>" style="width: <?= min(100, ($conversionRateInteractive / 30) * 100) ?>%"></div>
                                                     </div>
                                                 </div>
                                             </div>

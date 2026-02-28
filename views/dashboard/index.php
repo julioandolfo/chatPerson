@@ -1543,7 +1543,7 @@ ob_start();
                                 <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
                                     <th class="min-w-180px">Vendedor</th>
                                     <th class="min-w-140px text-center">
-                                        <div class="mb-1">NOVAS CONVERSAS</div>
+                                        <div class="mb-1">APENAS RECEPTIVAS</div>
                                         <div class="fs-8 text-muted fw-normal">Criadas no período</div>
                                     </th>
                                     <th class="min-w-140px text-center">
@@ -1633,9 +1633,9 @@ ob_start();
                                         </td>
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center gap-1">
-                                                <!-- Taxa Novas Conversas -->
+                                                <!-- Taxa Apenas Receptivas -->
                                                 <div class="d-flex align-items-center gap-2 w-100">
-                                                    <span class="fs-9 text-muted" style="width: 70px;">Novas:</span>
+                                                    <span class="fs-9 text-muted" style="width: 70px;">Apenas Rec:</span>
                                                     <span class="fw-bold text-gray-800"><?= number_format($conversionRate, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
                                                         <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min(100, $conversionRate) ?>%"></div>
@@ -1649,9 +1649,9 @@ ob_start();
                                                         <div class="progress-bar bg-<?= $progressColorInteractive ?>" style="width: <?= min(100, $conversionRateInteractive) ?>%"></div>
                                                     </div>
                                                 </div>
-                                                <!-- Taxa só Clientes -->
+                                                <!-- Taxa Receptivas + Ativas -->
                                                 <div class="d-flex align-items-center gap-2 w-100">
-                                                    <span class="fs-9 text-muted" style="width: 70px;">Clientes:</span>
+                                                    <span class="fs-9 text-muted" style="width: 70px;">Rec+Ativas:</span>
                                                     <span class="fw-bold text-<?= $progressColorClient ?>"><?= number_format($conversionRateClientOnly, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
                                                         <div class="progress-bar bg-<?= $progressColorClient ?>" style="width: <?= min(100, $conversionRateClientOnly) ?>%"></div>

@@ -206,6 +206,29 @@ class AgentConversionService
     }
     
     /**
+     * Contar conversas interativas - onde o agente enviou mensagens no período
+     * Independente de quando a conversa foi criada ou quem iniciou
+     */
+    public static function getInteractiveConversations(int $agentId, string $dateFrom, string $dateTo): int
+    {
+        // Garantir que dateTo inclui o dia inteiro
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+
+        // Contar conversas onde o agente enviou pelo menos uma mensagem no período
+        $sql = "SELECT COUNT(DISTINCT m.conversation_id) as total
+                FROM messages m
+                WHERE m.sender_type = 'agent'
+                AND m.sender_id = ?
+                AND m.created_at >= ?
+                AND m.created_at <= ?";
+
+        $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
+        return (int)($result['total'] ?? 0);
+    }
+
+    /**
      * Obter métricas de conversão detalhadas com separação por iniciador
      */
     public static function getDetailedConversionMetrics(
@@ -216,36 +239,45 @@ class AgentConversionService
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
         $dateTo = $dateTo ?? date('Y-m-d H:i:s');
-        
+
         // Garantir que dateTo inclui o dia inteiro
         if (!str_contains($dateTo, ':')) {
             $dateTo = $dateTo . ' 23:59:59';
         }
-        
-        // Métricas básicas
+
+        // Métricas básicas (novas conversas criadas no período)
         $basicMetrics = self::getConversionMetrics($agentId, $dateFrom, $dateTo);
-        
+
         // Conversas por iniciador
         $agentInitiated = self::getAgentInitiatedConversations($agentId, $dateFrom, $dateTo);
         $clientInitiated = self::getClientInitiatedConversations($agentId, $dateFrom, $dateTo);
-        
+
+        // Conversas interativas (todas que o agente conversou no período)
+        $interactiveConversations = self::getInteractiveConversations($agentId, $dateFrom, $dateTo);
+
         // Calcular taxas de conversão separadas
         $totalOrders = $basicMetrics['total_orders'] ?? 0;
-        
-        // Taxa de conversão geral (já calculada)
+
+        // Taxa de conversão geral (baseada em novas conversas)
         $conversionRateTotal = $basicMetrics['conversion_rate'] ?? 0;
-        
+
         // Taxa de conversão apenas clientes (conversas iniciadas pelo cliente)
-        // Considera que a maioria das vendas vem de clientes que entraram em contato
-        $conversionRateClientOnly = $clientInitiated > 0 
-            ? round(($totalOrders / $clientInitiated) * 100, 2) 
+        $conversionRateClientOnly = $clientInitiated > 0
+            ? round(($totalOrders / $clientInitiated) * 100, 2)
             : 0;
-        
+
+        // Taxa de conversão baseada em conversas interativas
+        $conversionRateInteractive = $interactiveConversations > 0
+            ? round(($totalOrders / $interactiveConversations) * 100, 2)
+            : 0;
+
         return array_merge($basicMetrics, [
             'conversations_agent_initiated' => $agentInitiated,
             'conversations_client_initiated' => $clientInitiated,
+            'interactive_conversations' => $interactiveConversations,
             'conversion_rate_total' => $conversionRateTotal,
             'conversion_rate_client_only' => $conversionRateClientOnly,
+            'conversion_rate_interactive' => $conversionRateInteractive,
         ]);
     }
     

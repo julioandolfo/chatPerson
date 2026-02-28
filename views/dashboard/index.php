@@ -1542,15 +1542,16 @@ ob_start();
                             <thead>
                                 <tr class="text-start text-muted fw-bold fs-7 text-uppercase gs-0">
                                     <th class="min-w-180px">Vendedor</th>
-                                    <th class="min-w-100px text-center">
-                                        Conversas
-                                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Total / Iniciadas pelo agente / Iniciadas pelo cliente"></i>
+                                    <th class="min-w-140px text-center">
+                                        <div class="mb-1">NOVAS CONVERSAS</div>
+                                        <div class="fs-8 text-muted fw-normal">Criadas no período</div>
+                                    </th>
+                                    <th class="min-w-140px text-center">
+                                        <div class="mb-1">CONVERSAS INTERATIVAS</div>
+                                        <div class="fs-8 text-muted fw-normal">Todas que atendeu</div>
                                     </th>
                                     <th class="min-w-60px text-center">Vendas</th>
-                                    <th class="min-w-140px text-center">
-                                        Taxa Conversão
-                                        <i class="bi bi-info-circle ms-1" data-bs-toggle="tooltip" title="Geral (todas) / Apenas clientes que chamaram"></i>
-                                    </th>
+                                    <th class="min-w-180px text-center">Taxa Conversão</th>
                                     <th class="min-w-100px text-end">Valor Total</th>
                                     <th class="text-end min-w-70px">Ações</th>
                                 </tr>
@@ -1560,21 +1561,31 @@ ob_start();
                                     <?php
                                         $conversionRate = $seller['conversion_rate'] ?? 0;
                                         $conversionRateClientOnly = $seller['conversion_rate_client_only'] ?? 0;
+                                        $conversionRateInteractive = $seller['conversion_rate_interactive'] ?? 0;
                                         $agentInitiated = $seller['conversations_agent_initiated'] ?? 0;
                                         $clientInitiated = $seller['conversations_client_initiated'] ?? 0;
-                                        
+                                        $interactiveConversations = $seller['interactive_conversations'] ?? 0;
+
+                                        // Cores para progress bars
                                         $progressColor = 'danger';
                                         if ($conversionRate >= 30) {
                                             $progressColor = 'success';
                                         } elseif ($conversionRate >= 15) {
                                             $progressColor = 'warning';
                                         }
-                                        
+
                                         $progressColorClient = 'danger';
                                         if ($conversionRateClientOnly >= 30) {
                                             $progressColorClient = 'success';
                                         } elseif ($conversionRateClientOnly >= 15) {
                                             $progressColorClient = 'warning';
+                                        }
+
+                                        $progressColorInteractive = 'danger';
+                                        if ($conversionRateInteractive >= 30) {
+                                            $progressColorInteractive = 'success';
+                                        } elseif ($conversionRateInteractive >= 15) {
+                                            $progressColorInteractive = 'warning';
                                         }
                                     ?>
                                     <tr>
@@ -1588,9 +1599,10 @@ ob_start();
                                                 </div>
                                             </div>
                                         </td>
+                                        <!-- NOVAS CONVERSAS CRIADAS -->
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
-                                                <span class="fw-bold text-gray-800"><?= $seller['total_conversations'] ?? 0 ?></span>
+                                                <span class="fw-bold text-gray-800 fs-5"><?= $seller['total_conversations'] ?? 0 ?></span>
                                                 <div class="d-flex gap-2 fs-8 mt-1">
                                                     <span class="badge badge-light-primary" title="Iniciadas pelo agente">
                                                         <i class="bi bi-person-fill fs-9"></i> <?= $agentInitiated ?>
@@ -1599,6 +1611,21 @@ ob_start();
                                                         <i class="bi bi-chat-fill fs-9"></i> <?= $clientInitiated ?>
                                                     </span>
                                                 </div>
+                                                <div class="fs-9 text-muted mt-1">
+                                                    Taxa: <span class="fw-bold text-<?= $progressColor ?>"><?= number_format($conversionRate, 1) ?>%</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <!-- CONVERSAS INTERATIVAS -->
+                                        <td class="text-center">
+                                            <div class="d-flex flex-column align-items-center">
+                                                <span class="fw-bold text-primary fs-5"><?= $interactiveConversations ?></span>
+                                                <div class="fs-9 text-muted mt-1">
+                                                    <i class="bi bi-arrow-repeat me-1"></i>Ativas no período
+                                                </div>
+                                                <div class="fs-9 text-muted mt-1">
+                                                    Taxa: <span class="fw-bold text-<?= $progressColorInteractive ?>"><?= number_format($conversionRateInteractive, 1) ?>%</span>
+                                                </div>
                                             </div>
                                         </td>
                                         <td class="text-center">
@@ -1606,17 +1633,25 @@ ob_start();
                                         </td>
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center gap-1">
-                                                <!-- Taxa Geral -->
+                                                <!-- Taxa Novas Conversas -->
                                                 <div class="d-flex align-items-center gap-2 w-100">
-                                                    <span class="fs-9 text-muted" style="width: 40px;">Geral:</span>
+                                                    <span class="fs-9 text-muted" style="width: 70px;">Novas:</span>
                                                     <span class="fw-bold text-gray-800"><?= number_format($conversionRate, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
                                                         <div class="progress-bar bg-<?= $progressColor ?>" style="width: <?= min(100, $conversionRate) ?>%"></div>
                                                     </div>
                                                 </div>
+                                                <!-- Taxa Interativas -->
+                                                <div class="d-flex align-items-center gap-2 w-100">
+                                                    <span class="fs-9 text-muted" style="width: 70px;">Interativas:</span>
+                                                    <span class="fw-bold text-<?= $progressColorInteractive ?>"><?= number_format($conversionRateInteractive, 1) ?>%</span>
+                                                    <div class="progress h-4px flex-grow-1">
+                                                        <div class="progress-bar bg-<?= $progressColorInteractive ?>" style="width: <?= min(100, $conversionRateInteractive) ?>%"></div>
+                                                    </div>
+                                                </div>
                                                 <!-- Taxa só Clientes -->
                                                 <div class="d-flex align-items-center gap-2 w-100">
-                                                    <span class="fs-9 text-muted" style="width: 40px;">Cliente:</span>
+                                                    <span class="fs-9 text-muted" style="width: 70px;">Clientes:</span>
                                                     <span class="fw-bold text-<?= $progressColorClient ?>"><?= number_format($conversionRateClientOnly, 1) ?>%</span>
                                                     <div class="progress h-4px flex-grow-1">
                                                         <div class="progress-bar bg-<?= $progressColorClient ?>" style="width: <?= min(100, $conversionRateClientOnly) ?>%"></div>

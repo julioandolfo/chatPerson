@@ -128,7 +128,7 @@ class DashboardController
                             str_replace(' 23:59:59', '', $dateTo)
                         );
                         
-                        if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0) {
+                        if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0 || $metrics['interactive_conversations'] > 0) {
                             $ranking[] = [
                                 'agent_id' => $seller['id'],
                                 'agent_name' => $seller['name'],
@@ -136,9 +136,11 @@ class DashboardController
                                 'total_conversations' => $metrics['total_conversations'],
                                 'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
                                 'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
+                                'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,
                                 'total_orders' => $metrics['total_orders'],
                                 'conversion_rate' => $metrics['conversion_rate'],
                                 'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
+                                'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0,
                                 'total_revenue' => $metrics['total_revenue'],
                                 'avg_ticket' => $metrics['avg_ticket']
                             ];
@@ -169,7 +171,7 @@ class DashboardController
                                 str_replace(' 23:59:59', '', $dateTo)
                             );
                             
-                            if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0) {
+                            if ($metrics['total_conversations'] > 0 || $metrics['total_orders'] > 0 || $metrics['interactive_conversations'] > 0) {
                                 $ranking[] = [
                                     'agent_id' => $seller['id'],
                                     'agent_name' => $seller['name'],
@@ -177,9 +179,11 @@ class DashboardController
                                     'total_conversations' => $metrics['total_conversations'],
                                     'conversations_agent_initiated' => $metrics['conversations_agent_initiated'] ?? 0,
                                     'conversations_client_initiated' => $metrics['conversations_client_initiated'] ?? 0,
+                                    'interactive_conversations' => $metrics['interactive_conversations'] ?? 0,
                                     'total_orders' => $metrics['total_orders'],
                                     'conversion_rate' => $metrics['conversion_rate'],
                                     'conversion_rate_client_only' => $metrics['conversion_rate_client_only'] ?? 0,
+                                    'conversion_rate_interactive' => $metrics['conversion_rate_interactive'] ?? 0,
                                     'total_revenue' => $metrics['total_revenue'],
                                     'avg_ticket' => $metrics['avg_ticket']
                                 ];

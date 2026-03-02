@@ -908,7 +908,7 @@ try {
             apiLog('INFO', "✅ Mensagem inserida (ID: {$messageId}, External ID: " . ($externalId ?? 'NULL') . ", Status: " . ($messageSent ? 'sent' : 'error') . ")");
             
             // Atualizar conversa
-            $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW(), last_message_at = NOW() WHERE id = ?");
+            $stmt = $db->prepare("UPDATE conversations SET updated_at = NOW() WHERE id = ?");
             $stmt->execute([$conversationId]);
             
             apiLog('INFO', $messageSent ? '✅ MENSAGEM ENVIADA COM SUCESSO' : '❌ MENSAGEM SALVA MAS NÃO ENVIADA');

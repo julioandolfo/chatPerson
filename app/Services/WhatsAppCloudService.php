@@ -713,6 +713,19 @@ class WhatsAppCloudService extends MetaIntegrationService
                 'started_at' => date('Y-m-d H:i:s', (int)$timestamp),
             ];
             
+            // Aplicar funil/etapa padrão da integration_account, se configurados
+            if ($integrationAccountId) {
+                $ia = \App\Models\IntegrationAccount::find($integrationAccountId);
+                if ($ia) {
+                    if (!empty($ia['default_funnel_id'])) {
+                        $conversationData['funnel_id'] = $ia['default_funnel_id'];
+                    }
+                    if (!empty($ia['default_stage_id'])) {
+                        $conversationData['stage_id'] = $ia['default_stage_id'];
+                    }
+                }
+            }
+            
             $conversationId = Conversation::create($conversationData);
             $conversation = Conversation::find($conversationId);
             

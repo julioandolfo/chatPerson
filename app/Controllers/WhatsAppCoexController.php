@@ -135,9 +135,10 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
-            $code = $data['code'] ?? '';
-            $sessionInfo = $data['session_info'] ?? [];
+            $code = Request::post('code', '');
+            $sessionInfo = Request::post('session_info', []);
+            $signupData = Request::post('signup_data', []);
+            $eventType = Request::post('event_type', '');
             
             if (empty($code)) {
                 Response::json(['success' => false, 'error' => 'Código não fornecido']);
@@ -148,11 +149,19 @@ class WhatsAppCoexController
             $tokenResult = WhatsAppCoexService::processEmbeddedSignupCallback($code);
             $accessToken = $tokenResult['access_token'];
             
-            // Obter info das contas
+            // Determinar se veio via CoEx (QR Code) baseado no session data
+            $isCoex = ($eventType === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') 
+                      || !empty($signupData['is_coex']);
+            
+            // Se o session listener capturou phone_number_id e waba_id diretamente, usar
+            $directPhoneId = $signupData['phone_number_id'] ?? null;
+            $directWabaId = $signupData['waba_id'] ?? null;
+            
+            // Obter info das contas via API (sempre necessário para dados completos)
             $accountInfo = WhatsAppCoexService::getSignupAccountInfo($accessToken);
             
             if (empty($accountInfo)) {
-                Response::json(['success' => false, 'error' => 'Nenhuma conta WhatsApp encontrada']);
+                Response::json(['success' => false, 'error' => 'Nenhuma conta WhatsApp encontrada. Verifique se o número tem pelo menos 7 dias de atividade no app.']);
                 return;
             }
             
@@ -160,18 +169,36 @@ class WhatsAppCoexController
             
             foreach ($accountInfo as $waba) {
                 foreach ($waba['phones'] as $phone) {
-                    // Salvar token OAuth
-                    $tokenId = MetaOAuthToken::create([
-                        'meta_user_id' => $phone['id'],
-                        'app_type' => 'whatsapp_coex',
-                        'access_token' => $accessToken,
-                        'token_type' => 'bearer',
-                        'expires_at' => !empty($tokenResult['expires_in']) 
-                            ? date('Y-m-d H:i:s', time() + $tokenResult['expires_in']) 
-                            : null,
-                        'scopes' => 'whatsapp_business_management,whatsapp_business_messaging',
-                        'is_valid' => true,
-                    ]);
+                    // Se temos dados diretos do session listener, filtrar para registrar apenas esse número
+                    if ($directPhoneId && $phone['id'] !== $directPhoneId) {
+                        continue;
+                    }
+                    
+                    // Salvar/atualizar token OAuth
+                    $existingToken = MetaOAuthToken::getByMetaUserId($phone['id']);
+                    if ($existingToken) {
+                        MetaOAuthToken::update($existingToken['id'], [
+                            'access_token' => $accessToken,
+                            'app_type' => $isCoex ? 'whatsapp_coex' : 'whatsapp',
+                            'is_valid' => true,
+                            'expires_at' => !empty($tokenResult['expires_in']) 
+                                ? date('Y-m-d H:i:s', time() + $tokenResult['expires_in']) 
+                                : null,
+                        ]);
+                        $tokenId = $existingToken['id'];
+                    } else {
+                        $tokenId = MetaOAuthToken::create([
+                            'meta_user_id' => $phone['id'],
+                            'app_type' => $isCoex ? 'whatsapp_coex' : 'whatsapp',
+                            'access_token' => $accessToken,
+                            'token_type' => 'bearer',
+                            'expires_at' => !empty($tokenResult['expires_in']) 
+                                ? date('Y-m-d H:i:s', time() + $tokenResult['expires_in']) 
+                                : null,
+                            'scopes' => 'whatsapp_business_management,whatsapp_business_messaging',
+                            'is_valid' => true,
+                        ]);
+                    }
                     
                     // Registrar número CoEx
                     $phoneId = WhatsAppCoexService::registerCoexPhone([
@@ -185,13 +212,36 @@ class WhatsAppCoexController
                         'meta_oauth_token_id' => $tokenId,
                     ]);
                     
-                    // Criar integration_account
+                    // Se veio via CoEx QR Code, marcar como ativo imediatamente
+                    if ($isCoex) {
+                        WhatsAppPhone::update($phoneId, [
+                            'coex_enabled' => true,
+                            'coex_status' => 'active',
+                            'coex_activated_at' => date('Y-m-d H:i:s'),
+                        ]);
+                    }
+                    
+                    // Criar/atualizar integration_account
                     $existingIA = IntegrationAccount::findByPhone(
                         $phone['display_phone_number'] ?? '',
                         'whatsapp'
                     );
                     
-                    if (!$existingIA) {
+                    if ($existingIA) {
+                        IntegrationAccount::update($existingIA['id'], [
+                            'name' => $phone['verified_name'] ?? 'WhatsApp CoEx',
+                            'provider' => 'meta_coex',
+                            'status' => 'active',
+                            'config' => json_encode([
+                                'coex_enabled' => $isCoex,
+                                'waba_id' => $waba['waba_id'],
+                                'phone_number_id' => $phone['id'],
+                                'onboarding_type' => $eventType,
+                            ]),
+                        ]);
+                        $iaId = $existingIA['id'];
+                        WhatsAppPhone::update($phoneId, ['integration_account_id' => $iaId]);
+                    } else {
                         $iaId = IntegrationAccount::create([
                             'name' => $phone['verified_name'] ?? 'WhatsApp CoEx',
                             'provider' => 'meta_coex',
@@ -200,17 +250,18 @@ class WhatsAppCoexController
                             'account_id' => $waba['waba_id'],
                             'status' => 'active',
                             'config' => json_encode([
-                                'coex_enabled' => true,
+                                'coex_enabled' => $isCoex,
                                 'waba_id' => $waba['waba_id'],
                                 'phone_number_id' => $phone['id'],
+                                'onboarding_type' => $eventType,
                             ]),
                         ]);
                         
-                        // Vincular ao WhatsAppPhone
-                        WhatsAppPhone::update($phoneId, [
-                            'integration_account_id' => $iaId,
-                        ]);
+                        WhatsAppPhone::update($phoneId, ['integration_account_id' => $iaId]);
                     }
+                    
+                    // Vincular token à integration_account
+                    MetaOAuthToken::update($tokenId, ['integration_account_id' => $iaId]);
                     
                     // Subscrever webhook
                     WhatsAppCoexService::subscribeCoexWebhookFields($waba['waba_id'], $accessToken);
@@ -218,14 +269,24 @@ class WhatsAppCoexController
                     $registered[] = [
                         'phone' => $phone['display_phone_number'] ?? '',
                         'name' => $phone['verified_name'] ?? '',
+                        'coex' => $isCoex,
                     ];
                 }
             }
             
+            if (empty($registered)) {
+                Response::json([
+                    'success' => false, 
+                    'error' => 'Nenhum número foi registrado. Verifique se o número é elegível para CoEx.'
+                ]);
+                return;
+            }
+            
+            $coexLabel = $isCoex ? ' com CoEx (QR Code)' : '';
             Response::json([
                 'success' => true,
                 'registered' => $registered,
-                'message' => count($registered) . ' número(s) registrado(s) com CoEx',
+                'message' => count($registered) . ' número(s) registrado(s)' . $coexLabel,
             ]);
             
         } catch (\Exception $e) {

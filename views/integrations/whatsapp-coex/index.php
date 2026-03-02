@@ -786,7 +786,38 @@ ob_start();
 </div>
 
 <script>
-// ==================== EMBEDDED SIGNUP ====================
+// ==================== EMBEDDED SIGNUP (CoEx com QR Code) ====================
+
+// Armazena dados capturados pelo session logging listener
+let embeddedSignupSessionData = null;
+
+// Session Logging Event Listener (oficial Meta)
+// Captura phone_number_id, waba_id e tipo de onboarding do popup da Meta
+window.addEventListener('message', (event) => {
+    if (!event.origin || !event.origin.endsWith('facebook.com')) return;
+    try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+            console.log('[CoEx] Embedded Signup event:', data);
+            
+            if (data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' || data.event === 'FINISH') {
+                // Onboarding concluído - salvar dados para usar no callback
+                embeddedSignupSessionData = {
+                    phone_number_id: data.data?.phone_number_id || null,
+                    waba_id: data.data?.waba_id || null,
+                    business_id: data.data?.business_id || null,
+                    event_type: data.event,
+                    is_coex: data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING',
+                };
+                console.log('[CoEx] Dados capturados:', embeddedSignupSessionData);
+            } else if (data.event === 'CANCEL') {
+                console.log('[CoEx] Signup cancelado na tela:', data.data?.current_step);
+            }
+        }
+    } catch {
+        // Ignora mensagens que não são JSON
+    }
+});
 
 function launchEmbeddedSignup() {
     const appId = '<?= htmlspecialchars($metaConfig['app_id'] ?? '') ?>';
@@ -797,49 +828,95 @@ function launchEmbeddedSignup() {
     }
     
     Swal.fire({
-        title: 'Conectar WhatsApp via CoEx',
+        title: '<span style="color:#25D366"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#25D366" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>Conectar via CoEx</span>',
         html: `
             <div class="text-start">
-                <p class="text-muted mb-3">O Embedded Signup da Meta será aberto para vincular seu número WhatsApp Business.</p>
-                <div class="alert alert-info p-3 fs-7">
-                    <strong>O que acontecerá:</strong>
-                    <ol class="mb-0 mt-2">
-                        <li>Uma janela da Meta será aberta</li>
-                        <li>Faça login com sua conta Meta/Facebook</li>
-                        <li>Selecione ou crie uma conta WhatsApp Business</li>
-                        <li>Vincule seu número (escaneie o QR Code no app)</li>
-                        <li>O CoEx será ativado automaticamente</li>
-                    </ol>
+                <p class="text-muted mb-4">O Embedded Signup da Meta será aberto para vincular seu WhatsApp Business com CoEx.</p>
+                
+                <div class="d-flex flex-column gap-3 mb-4">
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#1877f2;flex-shrink:0">
+                            <span class="text-white fw-bold">1</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Login com Facebook</div>
+                            <div class="text-muted fs-7">Faça login na conta Meta que gerencia o WhatsApp Business</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#25D366;flex-shrink:0">
+                            <span class="text-white fw-bold">2</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Escanear QR Code</div>
+                            <div class="text-muted fs-7">Abra o app WhatsApp Business e escaneie o QR Code exibido pela Meta</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#00a884;flex-shrink:0">
+                            <span class="text-white fw-bold">3</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Sincronização automática</div>
+                            <div class="text-muted fs-7">O histórico de mensagens será sincronizado e o CoEx ativado automaticamente</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4">
+                    <i class="ki-duotone ki-information-5 fs-2tx text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div class="d-flex flex-stack flex-grow-1">
+                        <div class="fs-7 text-gray-700">
+                            <strong>Requisito:</strong> O número precisa ter pelo menos <strong>7 dias de atividade</strong> no app WhatsApp Business.
+                        </div>
+                    </div>
                 </div>
             </div>
         `,
+        width: '550px',
         showCancelButton: true,
-        confirmButtonText: 'Iniciar Embedded Signup',
+        confirmButtonText: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-2"><path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0 0 3.603 0 8.05 0 12.07 2.93 15.44 6.75 16v-5.625h-2.03v-2.33h2.03V6.272c0-2 1.194-3.105 3.015-3.105.874 0 1.79.156 1.79.156v1.964h-1.009c-.993 0-1.303.616-1.303 1.248v1.5h2.219l-.355 2.326H10.24V16c3.824-.56 6.762-3.927 6.762-7.951z"/></svg> Iniciar Embedded Signup',
         cancelButtonText: 'Cancelar',
         confirmButtonColor: '#25D366',
+        customClass: {
+            confirmButton: 'btn btn-success px-6',
+            cancelButton: 'btn btn-light'
+        }
     }).then((result) => {
         if (result.isConfirmed) {
+            embeddedSignupSessionData = null;
             startEmbeddedSignup(appId);
         }
     });
 }
 
 function startEmbeddedSignup(appId) {
-    // Carregar Facebook SDK se não carregado
     if (typeof FB === 'undefined') {
-        const script = document.createElement('script');
-        script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
-        script.async = true;
-        script.defer = true;
-        script.crossOrigin = 'anonymous';
-        script.onload = () => {
+        Swal.fire({
+            title: 'Carregando...',
+            text: 'Inicializando Facebook SDK',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        window.fbAsyncInit = function() {
             FB.init({
                 appId: appId,
                 autoLogAppEvents: true,
                 xfbml: true,
                 version: 'v21.0'
             });
+            Swal.close();
             doEmbeddedSignup();
+        };
+        
+        const script = document.createElement('script');
+        script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = 'anonymous';
+        script.onerror = () => {
+            Swal.fire('Erro', 'Não foi possível carregar o Facebook SDK. Verifique sua conexão.', 'error');
         };
         document.body.appendChild(script);
     } else {
@@ -849,45 +926,101 @@ function startEmbeddedSignup(appId) {
 
 function doEmbeddedSignup() {
     FB.login(function(response) {
-        if (response.authResponse) {
+        if (response.authResponse && response.authResponse.code) {
             const code = response.authResponse.code;
             
+            // Determinar se foi CoEx (QR Code) ou Cloud API normal
+            const isCoex = embeddedSignupSessionData?.is_coex || false;
+            const eventType = embeddedSignupSessionData?.event_type || 'UNKNOWN';
+            
             Swal.fire({
-                title: 'Processando...',
-                text: 'Registrando número WhatsApp CoEx',
+                title: isCoex ? 'Registrando CoEx...' : 'Conectando WhatsApp...',
+                html: `
+                    <div class="d-flex flex-column align-items-center gap-3">
+                        <div class="spinner-border text-success" role="status" style="width:3rem;height:3rem">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="text-muted">
+                            <div class="fw-semibold">${isCoex ? 'Ativando Coexistência e sincronizando histórico...' : 'Trocando código por token de acesso...'}</div>
+                            <div class="text-muted fs-7 mt-1">Isso pode levar alguns segundos</div>
+                        </div>
+                    </div>
+                `,
                 allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
+                showConfirmButton: false
             });
             
             fetch('<?= \App\Helpers\Url::to('/integrations/whatsapp-coex/embedded-signup') ?>', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                body: JSON.stringify({ code: code, session_info: response })
+                body: JSON.stringify({ 
+                    code: code, 
+                    session_info: response,
+                    signup_data: embeddedSignupSessionData,
+                    event_type: eventType,
+                })
             })
             .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    Swal.fire('Sucesso!', data.message || 'Número registrado com sucesso', 'success')
-                        .then(() => location.reload());
+                    const count = data.registered?.length || 0;
+                    const phones = (data.registered || []).map(r => 
+                        `<div class="d-flex align-items-center gap-2 p-2 rounded mb-1" style="background:var(--bs-gray-100)">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#25D366" viewBox="0 0 16 16">
+                                <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326z"/>
+                            </svg>
+                            <div>
+                                <div class="fw-semibold">${r.name || 'WhatsApp'}</div>
+                                <div class="text-muted fs-7">${r.phone}</div>
+                            </div>
+                            <span class="badge badge-light-success ms-auto">CoEx Ativo</span>
+                        </div>`
+                    ).join('');
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'WhatsApp CoEx Conectado!',
+                        html: `
+                            <div class="text-start">
+                                <p class="text-muted">${count} número(s) conectado(s) com CoEx:</p>
+                                ${phones}
+                                <div class="notice d-flex bg-light-success rounded border-success border border-dashed p-3 mt-3">
+                                    <i class="ki-duotone ki-check-circle fs-2x text-success me-3"><span class="path1"></span><span class="path2"></span></i>
+                                    <div class="fs-7">Seu app WhatsApp Business e a API Oficial agora funcionam simultaneamente no mesmo número.</div>
+                                </div>
+                            </div>
+                        `,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#25D366'
+                    }).then(() => location.reload());
                 } else {
-                    Swal.fire('Erro', data.error || 'Erro ao registrar', 'error');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Erro ao Conectar',
+                        text: data.error || 'Erro desconhecido ao processar o signup.',
+                        confirmButtonColor: '#dc3545'
+                    });
                 }
             })
             .catch(err => {
                 Swal.fire('Erro', 'Erro na requisição: ' + err.message, 'error');
             });
         } else {
-            Swal.fire('Cancelado', 'O processo de login foi cancelado', 'info');
+            Swal.fire({
+                icon: 'info',
+                title: 'Cancelado',
+                text: 'O processo de Embedded Signup foi cancelado ou não foi autorizado.',
+                confirmButtonColor: '#6c757d'
+            });
         }
     }, {
-        config_id: '', // Se tiver config_id do Embedded Signup
+        config_id: '', // Config ID do Embedded Signup (se tiver)
         response_type: 'code',
         override_default_response_type: true,
         extras: {
             setup: {
-                // CoEx: smbiz params
                 smbiz: {
-                    coexistence: true // Flag CoEx!
+                    coexistence: true
                 }
             }
         }

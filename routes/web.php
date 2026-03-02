@@ -172,6 +172,9 @@ Router::post('/conversations/requests/{requestId}/reject', [ConversationControll
 // Rotas de ações de conversa
 Router::post('/conversations/{id}/mark-read', [ConversationController::class, 'markRead'], ['Authentication']);
 Router::post('/conversations/{id}/mark-unread', [ConversationController::class, 'markUnread'], ['Authentication']);
+// Rotas WhatsApp Cloud API (janela 24h + templates)
+Router::get('/conversations/{id}/cloud-window', [ConversationController::class, 'checkCloudWindow'], ['Authentication']);
+Router::post('/conversations/{id}/send-cloud-template', [ConversationController::class, 'sendCloudTemplate'], ['Authentication']);
 // Rotas de mensagens agendadas
 Router::post('/conversations/{id}/schedule-message', [ConversationController::class, 'scheduleMessage'], ['Authentication']);
 Router::get('/conversations/{id}/scheduled-messages', [ConversationController::class, 'getScheduledMessages'], ['Authentication']);
@@ -345,6 +348,7 @@ Router::post('/integrations/meta/config/save', [MetaIntegrationController::class
 Router::post('/integrations/meta/instagram/sync', [MetaIntegrationController::class, 'syncInstagram'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/whatsapp/sync', [MetaIntegrationController::class, 'syncWhatsApp'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/whatsapp/add', [MetaIntegrationController::class, 'addWhatsAppPhone'], ['Authentication', 'Permission:integrations.manage']);
+Router::post('/integrations/meta/whatsapp/signup', [MetaIntegrationController::class, 'embeddedSignup'], ['Authentication', 'Permission:integrations.manage']);
 Router::post('/integrations/meta/test-message', [MetaIntegrationController::class, 'testMessage'], ['Authentication', 'Permission:integrations.manage']);
 Router::get('/integrations/meta/logs', [MetaIntegrationController::class, 'logs'], ['Authentication', 'Permission:integrations.view']);
 

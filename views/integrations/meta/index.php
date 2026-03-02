@@ -370,8 +370,10 @@ ob_start();
             </h3>
         </div>
         <div class="card-toolbar">
-            <button class="btn btn-sm btn-light-success" onclick="addWhatsAppPhone()">
-                <i class="ki-duotone ki-plus fs-3"></i>
+            <button class="btn btn-sm btn-light-success" onclick="addWhatsAppPhone()" <?= empty($metaConfig['app_id']) ? 'disabled title="Configure o App ID primeiro"' : '' ?>>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="me-1">
+                    <path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0 0 3.603 0 8.05 0 12.07 2.93 15.44 6.75 16v-5.625h-2.03v-2.33h2.03V6.272c0-2 1.194-3.105 3.015-3.105.874 0 1.79.156 1.79.156v1.964h-1.009c-.993 0-1.303.616-1.303 1.248v1.5h2.219l-.355 2.326H10.24V16c3.824-.56 6.762-3.927 6.762-7.951z"/>
+                </svg>
                 Adicionar Número
             </button>
         </div>
@@ -390,77 +392,171 @@ ob_start();
             </div>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
-                    <thead>
-                        <tr class="fw-bold text-muted">
-                            <th class="min-w-200px">Número</th>
-                            <th class="min-w-150px">Nome Verificado</th>
-                            <th class="min-w-100px">Qualidade</th>
-                            <th class="min-w-80px">Modo</th>
-                            <th class="min-w-100px">Status</th>
-                            <th class="min-w-100px text-end">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($whatsappPhones as $phone): ?>
-                        <tr>
-                            <td>
-                                <div class="d-flex flex-column">
-                                    <span class="text-dark fw-bold fs-6"><?= htmlspecialchars($phone['display_phone_number'] ?? $phone['phone_number']) ?></span>
-                                    <span class="text-muted fw-semibold d-block fs-7">ID: <?= htmlspecialchars($phone['phone_number_id']) ?></span>
+                <div class="row g-5">
+                    <?php foreach ($whatsappPhones as $phone): 
+                        $qualityColors = ['GREEN' => 'success', 'YELLOW' => 'warning', 'RED' => 'danger', 'UNKNOWN' => 'secondary'];
+                        $color = $qualityColors[$phone['quality_rating']] ?? 'secondary';
+                        $isConnected = $phone['has_valid_token'] && $phone['is_connected'];
+                        $iaId = $phone['integration_account_id'] ?? null;
+                        $ia = $phone['integration_account'] ?? null;
+                    ?>
+                    <div class="col-md-6 col-xl-4">
+                        <div class="card border border-<?= $isConnected ? 'success' : 'danger' ?> border-dashed h-100">
+                            <div class="card-body p-6">
+                                <!-- Header: Número + Status -->
+                                <div class="d-flex align-items-center mb-4">
+                                    <div class="symbol symbol-45px me-4">
+                                        <div class="symbol-label bg-light-success">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="#25D366" viewBox="0 0 24 24">
+                                                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="flex-grow-1">
+                                        <span class="text-dark fw-bold fs-5 d-block"><?= htmlspecialchars($phone['verified_name'] ?? 'WhatsApp') ?></span>
+                                        <span class="text-muted fw-semibold fs-7"><?= htmlspecialchars($phone['display_phone_number'] ?? $phone['phone_number']) ?></span>
+                                    </div>
+                                    <span class="badge badge-light-<?= $isConnected ? 'success' : 'danger' ?>">
+                                        <?= $isConnected ? 'Conectado' : 'Desconectado' ?>
+                                    </span>
                                 </div>
-                            </td>
-                            <td>
-                                <span class="text-dark fw-bold"><?= htmlspecialchars($phone['verified_name'] ?? '-') ?></span>
-                            </td>
-                            <td>
-                                <?php
-                                $qualityColors = [
-                                    'GREEN' => 'success',
-                                    'YELLOW' => 'warning',
-                                    'RED' => 'danger',
-                                    'UNKNOWN' => 'secondary'
-                                ];
-                                $color = $qualityColors[$phone['quality_rating']] ?? 'secondary';
-                                ?>
-                                <span class="badge badge-light-<?= $color ?>"><?= $phone['quality_rating'] ?></span>
-                            </td>
-                            <td>
-                                <span class="badge badge-light-<?= $phone['account_mode'] === 'LIVE' ? 'primary' : 'warning' ?>">
-                                    <?= $phone['account_mode'] ?>
-                                </span>
-                            </td>
-                            <td>
-                                <?php if ($phone['has_valid_token'] && $phone['is_connected']): ?>
-                                    <span class="badge badge-light-success">Conectado</span>
-                                <?php else: ?>
-                                    <span class="badge badge-light-danger">Desconectado</span>
+                                
+                                <!-- Info badges -->
+                                <div class="d-flex flex-wrap gap-2 mb-4">
+                                    <span class="badge badge-light-<?= $color ?> fs-8">
+                                        <i class="ki-duotone ki-chart-simple fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                        <?= $phone['quality_rating'] ?>
+                                    </span>
+                                    <span class="badge badge-light-<?= $phone['account_mode'] === 'LIVE' ? 'primary' : 'warning' ?> fs-8">
+                                        <?= $phone['account_mode'] ?>
+                                    </span>
+                                    <span class="badge badge-light-secondary fs-8" title="Phone Number ID">
+                                        ID: <?= htmlspecialchars($phone['phone_number_id']) ?>
+                                    </span>
+                                </div>
+                                
+                                <!-- Funil/Etapa configurados -->
+                                <div class="separator separator-dashed mb-4"></div>
+                                <?php if (!empty($phone['default_funnel_name'])): ?>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="ki-duotone ki-element-11 fs-5 text-primary me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                    <span class="text-muted fw-semibold fs-7 me-2">Funil:</span>
+                                    <span class="fw-bold fs-7"><?= htmlspecialchars($phone['default_funnel_name']) ?></span>
+                                </div>
+                                <?php if (!empty($phone['default_stage_name'])): ?>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="ki-duotone ki-abstract-26 fs-5 text-info me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    <span class="text-muted fw-semibold fs-7 me-2">Etapa:</span>
+                                    <span class="fw-bold fs-7"><?= htmlspecialchars($phone['default_stage_name']) ?></span>
+                                </div>
                                 <?php endif; ?>
-                            </td>
-                            <td class="text-end">
-                                <button class="btn btn-icon btn-light-primary btn-sm me-2" 
-                                        onclick="syncWhatsApp(<?= $phone['id'] ?>)" 
-                                        title="Sincronizar">
-                                    <i class="ki-duotone ki-arrows-circle fs-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
-                                <button class="btn btn-icon btn-light-info btn-sm" 
-                                        onclick="testMessage('whatsapp', <?= $phone['id'] ?>)" 
-                                        title="Testar Mensagem">
-                                    <i class="ki-duotone ki-send fs-3">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                </button>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                                <?php else: ?>
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="ki-duotone ki-information-5 fs-5 text-muted me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                    <span class="text-muted fs-8">Usando funil/etapa padrão do sistema</span>
+                                </div>
+                                <?php endif; ?>
+                                
+                                <!-- Ações -->
+                                <div class="separator separator-dashed my-4"></div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <?php if ($iaId): ?>
+                                    <button class="btn btn-light-success btn-sm flex-grow-1"
+                                            onclick="editPhoneSettings(<?= $phone['id'] ?>, <?= $iaId ?>, '<?= htmlspecialchars($phone['verified_name'] ?? $phone['phone_number'], ENT_QUOTES) ?>', <?= $ia['default_funnel_id'] ?? 'null' ?>, <?= $ia['default_stage_id'] ?? 'null' ?>)"
+                                            title="Configurar Funil/Etapa">
+                                        <i class="ki-duotone ki-setting-2 fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                        Configurar
+                                    </button>
+                                    <?php endif; ?>
+                                    <button class="btn btn-light-primary btn-sm" 
+                                            onclick="syncWhatsApp(<?= $phone['id'] ?>)" 
+                                            title="Sincronizar">
+                                        <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                    </button>
+                                    <button class="btn btn-light-info btn-sm" 
+                                            onclick="testMessage('whatsapp', <?= $phone['id'] ?>)" 
+                                            title="Testar Mensagem">
+                                        <i class="ki-duotone ki-send fs-4"><span class="path1"></span><span class="path2"></span></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
         <?php endif; ?>
+    </div>
+</div>
+
+<!-- Modal: Configurar Funil/Etapa do Número WhatsApp -->
+<div class="modal fade" id="kt_modal_phone_settings" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="fw-bold">
+                    <i class="ki-duotone ki-setting-2 fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                    Configurar Número
+                </h3>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <form id="phoneSettingsForm">
+                <div class="modal-body py-6 px-lg-10">
+                    <input type="hidden" id="ps_phone_id" name="phone_id">
+                    <input type="hidden" id="ps_account_id" name="account_id">
+                    
+                    <div class="d-flex align-items-center p-4 rounded mb-6" style="background: var(--bs-gray-100);">
+                        <div class="symbol symbol-40px me-3">
+                            <div class="symbol-label bg-light-success">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="#25D366" viewBox="0 0 24 24">
+                                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div>
+                            <span class="fw-bold fs-6" id="ps_phone_name"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4 mb-6">
+                        <i class="ki-duotone ki-information fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div class="d-flex flex-column">
+                            <span class="fs-7">Conversas criadas por este número entrarão automaticamente neste funil/etapa quando não houver automação específica.</span>
+                        </div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Funil Padrão</label>
+                        <select name="default_funnel_id" id="ps_funnel_select" class="form-select form-select-solid" onchange="loadPhoneFunnelStages(this.value)">
+                            <option value="">Usar padrão do sistema</option>
+                            <?php if (!empty($funnels)): ?>
+                                <?php foreach ($funnels as $funnel): ?>
+                                    <option value="<?= $funnel['id'] ?>"><?= htmlspecialchars($funnel['name']) ?></option>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar o funil padrão do sistema</div>
+                    </div>
+                    
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Etapa Padrão</label>
+                        <select name="default_stage_id" id="ps_stage_select" class="form-select form-select-solid">
+                            <option value="">Selecione um funil primeiro</option>
+                        </select>
+                        <div class="form-text">Deixe vazio para usar a primeira etapa do funil</div>
+                    </div>
+                </div>
+                <div class="modal-footer flex-center">
+                    <button type="button" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="ki-duotone ki-check fs-3 me-1"></i>
+                        Salvar Configurações
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -634,66 +730,224 @@ function syncWhatsApp(id) {
 }
 
 function addWhatsAppPhone() {
+    const appId = '<?= htmlspecialchars($metaConfig['app_id'] ?? '') ?>';
+    
+    if (!appId) {
+        Swal.fire('Configuração Necessária', 'Configure o App ID da Meta nas configurações acima primeiro.', 'warning');
+        return;
+    }
+    
     Swal.fire({
-        title: 'Adicionar Número WhatsApp',
+        title: '<span style="color:#25D366"><svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="#25D366" viewBox="0 0 24 24" style="vertical-align:middle;margin-right:8px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/></svg>Conectar WhatsApp</span>',
         html: `
-            <div class="mb-3 text-start">
-                <label class="form-label required">Phone Number ID (Meta)</label>
-                <input type="text" id="phoneNumberId" class="form-control" placeholder="123456789012345">
-            </div>
-            <div class="mb-3 text-start">
-                <label class="form-label required">Número de Telefone</label>
-                <input type="text" id="phoneNumber" class="form-control" placeholder="+5511999999999">
-            </div>
-            <div class="mb-3 text-start">
-                <label class="form-label required">WABA ID</label>
-                <input type="text" id="wabaId" class="form-control" placeholder="123456789012345">
-            </div>
-            <div class="mb-3 text-start">
-                <label class="form-label required">Meta User ID (do token OAuth)</label>
-                <input type="text" id="metaUserId" class="form-control" placeholder="123456789012345">
+            <div class="text-start">
+                <p class="text-muted mb-4">Clique no botão abaixo para conectar seu número WhatsApp via <strong>Facebook Login</strong>. O processo é seguro e automático.</p>
+                
+                <div class="d-flex flex-column gap-3 mb-4">
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#1877f2;flex-shrink:0">
+                            <span class="text-white fw-bold">1</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Login com Facebook</div>
+                            <div class="text-muted fs-7">Faça login na conta Meta que gerencia o WhatsApp Business</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#25D366;flex-shrink:0">
+                            <span class="text-white fw-bold">2</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Selecione o Número</div>
+                            <div class="text-muted fs-7">Escolha qual conta WhatsApp Business e número deseja conectar</div>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 p-3 rounded" style="background: var(--bs-gray-100);">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:#00a884;flex-shrink:0">
+                            <span class="text-white fw-bold">3</span>
+                        </div>
+                        <div>
+                            <div class="fw-semibold">Pronto!</div>
+                            <div class="text-muted fs-7">Seu número será conectado automaticamente com token e webhook configurados</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-4">
+                    <i class="ki-duotone ki-information-5 fs-2tx text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div class="d-flex flex-stack flex-grow-1">
+                        <div class="fs-7 text-gray-700">
+                            <strong>Requisitos:</strong> Seu app Meta deve ter os produtos <em>WhatsApp</em> e <em>Facebook Login for Business</em> configurados.
+                        </div>
+                    </div>
+                </div>
             </div>
         `,
-        width: '600px',
+        width: '550px',
         showCancelButton: true,
-        confirmButtonText: 'Adicionar',
+        confirmButtonText: '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-2"><path d="M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0 0 3.603 0 8.05 0 12.07 2.93 15.44 6.75 16v-5.625h-2.03v-2.33h2.03V6.272c0-2 1.194-3.105 3.015-3.105.874 0 1.79.156 1.79.156v1.964h-1.009c-.993 0-1.303.616-1.303 1.248v1.5h2.219l-.355 2.326H10.24V16c3.824-.56 6.762-3.927 6.762-7.951z"/></svg> Conectar com Facebook',
         cancelButtonText: 'Cancelar',
-        preConfirm: () => {
-            return {
-                phone_number_id: document.getElementById('phoneNumberId').value,
-                phone_number: document.getElementById('phoneNumber').value,
-                waba_id: document.getElementById('wabaId').value,
-                meta_user_id: document.getElementById('metaUserId').value
-            };
+        confirmButtonColor: '#1877f2',
+        customClass: {
+            confirmButton: 'btn btn-primary px-6',
+            cancelButton: 'btn btn-light'
         }
     }).then((result) => {
         if (result.isConfirmed) {
-            Swal.fire({
-                title: 'Adicionando...',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
+            initFacebookSignup(appId);
+        }
+    });
+}
+
+// Session Logging Event Listener (oficial Meta) - captura dados do Embedded Signup
+let metaSignupSessionData = null;
+window.addEventListener('message', (event) => {
+    if (!event.origin || !event.origin.endsWith('facebook.com')) return;
+    try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+            console.log('[Meta Signup] event:', data);
+            if (data.event === 'FINISH' || data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING') {
+                metaSignupSessionData = {
+                    phone_number_id: data.data?.phone_number_id || null,
+                    waba_id: data.data?.waba_id || null,
+                    event_type: data.event,
+                };
+            }
+        }
+    } catch {}
+});
+
+function initFacebookSignup(appId) {
+    if (typeof FB === 'undefined') {
+        Swal.fire({
+            title: 'Carregando...',
+            text: 'Inicializando Facebook SDK',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        window.fbAsyncInit = function() {
+            FB.init({
+                appId: appId,
+                autoLogAppEvents: true,
+                xfbml: true,
+                version: 'v21.0'
             });
-            
-            fetch('/integrations/meta/whatsapp/add', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(result.value)
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire('Sucesso!', 'Número adicionado com sucesso', 'success')
-                        .then(() => location.reload());
-                } else {
-                    Swal.fire('Erro', data.error || 'Erro ao adicionar', 'error');
-                }
-            })
-            .catch(err => {
-                Swal.fire('Erro', 'Erro na requisição', 'error');
+            Swal.close();
+            executeFBLogin();
+        };
+        
+        const script = document.createElement('script');
+        script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+        script.async = true;
+        script.defer = true;
+        script.crossOrigin = 'anonymous';
+        script.onerror = () => {
+            Swal.fire('Erro', 'Não foi possível carregar o Facebook SDK. Verifique sua conexão.', 'error');
+        };
+        document.body.appendChild(script);
+    } else {
+        executeFBLogin();
+    }
+}
+
+function executeFBLogin() {
+    FB.login(function(response) {
+        if (response.authResponse && response.authResponse.code) {
+            processSignupCode(response.authResponse.code, response);
+        } else {
+            Swal.fire({
+                icon: 'info',
+                title: 'Cancelado',
+                text: 'O processo de login foi cancelado ou não foi autorizado.',
+                confirmButtonColor: '#6c757d'
             });
         }
+    }, {
+        config_id: '',
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: {
+            setup: {}
+        }
+    });
+}
+
+function processSignupCode(code, fullResponse) {
+    Swal.fire({
+        title: 'Conectando WhatsApp...',
+        html: `
+            <div class="d-flex flex-column align-items-center gap-3">
+                <div class="spinner-border text-success" role="status" style="width:3rem;height:3rem">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <div class="text-muted">
+                    <div id="signup-step" class="fw-semibold">Trocando código por token de acesso...</div>
+                    <div class="text-muted fs-7 mt-1">Isso pode levar alguns segundos</div>
+                </div>
+            </div>
+        `,
+        allowOutsideClick: false,
+        showConfirmButton: false
+    });
+    
+    fetch('<?= \App\Helpers\Url::to('/integrations/meta/whatsapp/signup') ?>', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ 
+            code: code, 
+            session_info: fullResponse 
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const count = data.registered?.length || 0;
+            const phones = (data.registered || []).map(r => 
+                `<div class="d-flex align-items-center gap-2 p-2 rounded mb-1" style="background:var(--bs-gray-100)">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#25D366" viewBox="0 0 16 16">
+                        <path d="M13.601 2.326A7.854 7.854 0 0 0 7.994 0C3.627 0 .068 3.558.064 7.926c0 1.399.366 2.76 1.057 3.965L0 16l4.204-1.102a7.933 7.933 0 0 0 3.79.965h.004c4.368 0 7.926-3.558 7.93-7.93A7.898 7.898 0 0 0 13.6 2.326z"/>
+                    </svg>
+                    <div>
+                        <div class="fw-semibold">${r.name || 'WhatsApp'}</div>
+                        <div class="text-muted fs-7">${r.phone}</div>
+                    </div>
+                    <span class="badge badge-light-success ms-auto">Conectado</span>
+                </div>`
+            ).join('');
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'WhatsApp Conectado!',
+                html: `
+                    <div class="text-start">
+                        <p class="text-muted">${count} número(s) conectado(s) com sucesso:</p>
+                        ${phones}
+                    </div>
+                `,
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#25D366'
+            }).then(() => location.reload());
+        } else {
+            Swal.fire({
+                icon: 'error',
+                title: 'Erro ao Conectar',
+                text: data.error || 'Erro desconhecido ao processar o signup.',
+                confirmButtonColor: '#dc3545'
+            });
+        }
+    })
+    .catch(err => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Erro de Conexão',
+            text: 'Erro na requisição: ' + err.message,
+            confirmButtonColor: '#dc3545'
+        });
     });
 }
 
@@ -813,6 +1067,92 @@ function copyToClipboard(fieldId, button) {
         Swal.fire('Erro', 'Não foi possível copiar', 'error');
     }
 }
+
+// ==================== CONFIGURAÇÕES DO NÚMERO (FUNIL/ETAPA) ====================
+
+function editPhoneSettings(phoneId, accountId, phoneName, currentFunnelId, currentStageId) {
+    document.getElementById('ps_phone_id').value = phoneId;
+    document.getElementById('ps_account_id').value = accountId;
+    document.getElementById('ps_phone_name').textContent = phoneName;
+    
+    const funnelSelect = document.getElementById('ps_funnel_select');
+    funnelSelect.value = currentFunnelId || '';
+    
+    if (currentFunnelId) {
+        loadPhoneFunnelStages(currentFunnelId, currentStageId);
+    } else {
+        document.getElementById('ps_stage_select').innerHTML = '<option value="">Selecione um funil primeiro</option>';
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_phone_settings'));
+    modal.show();
+}
+
+function loadPhoneFunnelStages(funnelId, selectedStageId = null) {
+    const stageSelect = document.getElementById('ps_stage_select');
+    
+    if (!funnelId) {
+        stageSelect.innerHTML = '<option value="">Selecione um funil primeiro</option>';
+        return;
+    }
+    
+    stageSelect.innerHTML = '<option value="">Carregando...</option>';
+    stageSelect.disabled = true;
+    
+    fetch(`<?= \App\Helpers\Url::to('/funnels') ?>/${funnelId}/stages`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const stages = data.stages || data.data || [];
+        let html = '<option value="">Usar primeira etapa</option>';
+        
+        if (Array.isArray(stages)) {
+            stages.forEach(s => {
+                const selected = (selectedStageId && s.id == selectedStageId) ? ' selected' : '';
+                html += `<option value="${s.id}"${selected}>${s.name || 'Etapa #' + s.id}</option>`;
+            });
+        }
+        
+        stageSelect.innerHTML = html;
+        stageSelect.disabled = false;
+    })
+    .catch(() => {
+        stageSelect.innerHTML = '<option value="">Erro ao carregar etapas</option>';
+        stageSelect.disabled = false;
+    });
+}
+
+document.getElementById('phoneSettingsForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const accountId = document.getElementById('ps_account_id').value;
+    const funnelId = document.getElementById('ps_funnel_select').value;
+    const stageId = document.getElementById('ps_stage_select').value;
+    
+    Swal.fire({ title: 'Salvando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+    
+    fetch(`<?= \App\Helpers\Url::to('/integrations/whatsapp') ?>/${accountId}/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({
+            default_funnel_id: funnelId || null,
+            default_stage_id: stageId || null
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            Swal.fire('Salvo!', 'Configurações atualizadas com sucesso', 'success')
+                .then(() => location.reload());
+        } else {
+            Swal.fire('Erro', data.error || 'Erro ao salvar configurações', 'error');
+        }
+    })
+    .catch(err => {
+        Swal.fire('Erro', 'Erro na requisição: ' + err.message, 'error');
+    });
+});
 </script>
 
 <?php

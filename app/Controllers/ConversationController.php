@@ -1549,6 +1549,28 @@ class ConversationController
             // Determinar tipo de mensagem
             $messageType = $isNote ? 'note' : null;
             
+            // Verificar janela de 24h para Cloud API (somente mensagens, não notas)
+            if (!$isNote && !($data['skip_window_check'] ?? false)) {
+                $iaId = $conversation['integration_account_id'] ?? null;
+                if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+                    $iaId = (int) $conversation['last_customer_account_id'];
+                }
+                if ($iaId) {
+                    $ia = \App\Models\IntegrationAccount::find($iaId);
+                    if ($ia && in_array($ia['provider'] ?? '', ['meta_cloud', 'meta_coex'])) {
+                        $viaId = !empty($conversation['is_merged']) ? $iaId : null;
+                        if (!\App\Services\WhatsAppCloudService::isWithin24hWindow($id, $viaId)) {
+                            Response::json([
+                                'success' => false,
+                                'outside_24h_window' => true,
+                                'message' => 'Fora da janela de 24 horas. Use um template aprovado para iniciar a conversa.',
+                            ], 200);
+                            return;
+                        }
+                    }
+                }
+            }
+
             // Obter quoted_message_id se houver
             $quotedMessageId = $data['quoted_message_id'] ?? null;
             
@@ -4272,6 +4294,251 @@ class ConversationController
         try {
             $stats = \App\Models\MediaQueue::getStats();
             Response::json(['success' => true, 'data' => $stats]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Verificar janela de 24h e retornar templates WhatsApp aprovados
+     */
+    public function checkCloudWindow(int $id): void
+    {
+        try {
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+
+            $integrationAccountId = $conversation['integration_account_id'] ?? null;
+
+            if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+                $integrationAccountId = (int) $conversation['last_customer_account_id'];
+            }
+
+            if (!$integrationAccountId) {
+                Response::json([
+                    'success' => true,
+                    'is_cloud_api' => false,
+                    'within_24h' => true,
+                    'templates' => [],
+                ]);
+                return;
+            }
+
+            $account = \App\Models\IntegrationAccount::find($integrationAccountId);
+            if (!$account || !in_array($account['provider'] ?? '', ['meta_cloud', 'meta_coex'])) {
+                Response::json([
+                    'success' => true,
+                    'is_cloud_api' => false,
+                    'within_24h' => true,
+                    'templates' => [],
+                ]);
+                return;
+            }
+
+            $viaAccountId = !empty($conversation['is_merged']) ? $integrationAccountId : null;
+            $within24h = \App\Services\WhatsAppCloudService::isWithin24hWindow($id, $viaAccountId);
+
+            $templates = [];
+            if (!$within24h) {
+                $phone = \App\Models\WhatsAppPhone::findByIntegrationAccount($integrationAccountId);
+                $wabaId = $phone['waba_id'] ?? ($account['account_id'] ?? null);
+                if ($wabaId) {
+                    $approved = \App\Models\WhatsAppTemplate::getApproved($wabaId);
+                    foreach ($approved as $tpl) {
+                        $templates[] = [
+                            'id' => $tpl['id'],
+                            'name' => $tpl['name'],
+                            'display_name' => $tpl['display_name'] ?: $tpl['name'],
+                            'language' => $tpl['language'],
+                            'category' => $tpl['category'],
+                            'body_text' => $tpl['body_text'],
+                            'header_type' => $tpl['header_type'],
+                            'header_text' => $tpl['header_text'],
+                            'footer_text' => $tpl['footer_text'],
+                            'buttons' => \App\Models\WhatsAppTemplate::getButtons($tpl),
+                            'variables_count' => \App\Models\WhatsAppTemplate::countVariables($tpl),
+                        ];
+                    }
+                }
+            }
+
+            $windowInfo = null;
+            if ($within24h) {
+                $lastMsg = \App\Helpers\Database::fetch(
+                    "SELECT sent_at FROM messages WHERE conversation_id = ? AND sender_type = 'contact' ORDER BY sent_at DESC LIMIT 1",
+                    [$id]
+                );
+                if ($lastMsg && !empty($lastMsg['sent_at'])) {
+                    $expiresAt = strtotime($lastMsg['sent_at']) + (24 * 60 * 60);
+                    $windowInfo = [
+                        'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+                        'remaining_minutes' => max(0, round(($expiresAt - time()) / 60)),
+                    ];
+                }
+            }
+
+            Response::json([
+                'success' => true,
+                'is_cloud_api' => true,
+                'within_24h' => $within24h,
+                'window_info' => $windowInfo,
+                'templates' => $templates,
+                'account_name' => $account['name'] ?? '',
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Enviar template WhatsApp Cloud API em uma conversa
+     */
+    public function sendCloudTemplate(int $id): void
+    {
+        try {
+            $conversation = ConversationService::getConversation($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+
+            if (!Permission::canSendMessage($conversation)) {
+                Response::json(['success' => false, 'message' => 'Sem permissão'], 403);
+                return;
+            }
+
+            $data = \App\Helpers\Request::post();
+            $templateId = (int) ($data['template_id'] ?? 0);
+            $parameters = $data['parameters'] ?? [];
+
+            if (!$templateId) {
+                throw new \Exception('Template não informado');
+            }
+
+            $template = \App\Models\WhatsAppTemplate::find($templateId);
+            if (!$template || $template['status'] !== 'APPROVED') {
+                throw new \Exception('Template não encontrado ou não aprovado');
+            }
+
+            $integrationAccountId = $conversation['integration_account_id'] ?? null;
+            if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+                $integrationAccountId = (int) $conversation['last_customer_account_id'];
+            }
+
+            if (!$integrationAccountId) {
+                throw new \Exception('Conversa sem integração Cloud API vinculada');
+            }
+
+            $account = \App\Models\IntegrationAccount::find($integrationAccountId);
+            if (!$account || !in_array($account['provider'] ?? '', ['meta_cloud', 'meta_coex'])) {
+                throw new \Exception('Integração não é Cloud API');
+            }
+
+            $contact = \App\Models\Contact::find($conversation['contact_id']);
+            if (!$contact || empty($contact['phone'])) {
+                throw new \Exception('Contato sem número de telefone');
+            }
+
+            $userId = \App\Helpers\Auth::id();
+
+            // Auto-atribuição
+            $assignedTo = $conversation['agent_id'] ?? null;
+            if (($assignedTo === null || $assignedTo === '' || $assignedTo === 0) && $userId) {
+                try {
+                    ConversationService::assignToAgent($id, $userId, true);
+                } catch (\Exception $e) {
+                    // Não bloquear envio
+                }
+            }
+
+            // Montar preview do template para salvar como mensagem
+            $bodyText = $template['body_text'] ?? '';
+            if (!empty($parameters)) {
+                foreach ($parameters as $i => $value) {
+                    $bodyText = str_replace('{{' . ($i + 1) . '}}', $value, $bodyText);
+                }
+            }
+
+            $displayContent = $bodyText;
+            if (!empty($template['header_text'])) {
+                $displayContent = "*{$template['header_text']}*\n\n" . $displayContent;
+            }
+            if (!empty($template['footer_text'])) {
+                $displayContent .= "\n\n_{$template['footer_text']}_";
+            }
+
+            // Salvar mensagem no banco
+            $messageData = [
+                'conversation_id' => $id,
+                'sender_id' => $userId ?? 0,
+                'sender_type' => 'agent',
+                'content' => $displayContent,
+                'message_type' => 'text',
+                'status' => 'pending',
+            ];
+            $messageId = \App\Models\Message::createMessage($messageData);
+
+            // Enviar via integração
+            $options = [
+                'template_name' => $template['name'],
+                'template_language' => $template['language'],
+                'template_parameters' => $parameters,
+            ];
+
+            $to = preg_replace('/[^0-9]/', '', $contact['phone']);
+            $service = new \App\Services\WhatsAppCloudApiService();
+            $result = $service->sendMessage($integrationAccountId, $to, '', $options);
+
+            if ($result && ($result['success'] ?? false)) {
+                \App\Models\Message::update($messageId, [
+                    'external_id' => $result['message_id'] ?? null,
+                    'status' => 'sent',
+                ]);
+                \App\Models\WhatsAppTemplate::incrementSent($templateId);
+            } else {
+                \App\Models\Message::update($messageId, ['status' => 'failed']);
+                \App\Models\WhatsAppTemplate::incrementFailed($templateId);
+            }
+
+            // Atualizar conversa
+            \App\Models\Conversation::update($id, [
+                'last_message_at' => date('Y-m-d H:i:s'),
+                'status' => 'open',
+            ]);
+
+            $messages = \App\Models\Message::getMessagesWithSenderDetails($id);
+            $createdMessage = null;
+            foreach ($messages as $msg) {
+                if ($msg['id'] == $messageId) {
+                    $createdMessage = $msg;
+                    break;
+                }
+            }
+
+            $messageOut = null;
+            if ($createdMessage) {
+                $messageOut = [
+                    'id' => $createdMessage['id'],
+                    'content' => $createdMessage['content'],
+                    'direction' => 'outgoing',
+                    'type' => 'message',
+                    'created_at' => $createdMessage['created_at'],
+                    'sender_name' => $createdMessage['sender_name'] ?? 'Você',
+                    'sender_type' => $createdMessage['sender_type'],
+                    'status' => $createdMessage['status'] ?? 'sent',
+                    'message_type' => 'template',
+                ];
+            }
+
+            Response::json([
+                'success' => true,
+                'message' => $messageOut,
+                'message_id' => $messageId,
+                'template_name' => $template['name'],
+            ]);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }

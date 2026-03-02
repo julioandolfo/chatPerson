@@ -2307,6 +2307,17 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     margin-top: 4px;
 }
 
+.wa-cloud-tpl-item {
+    transition: background-color 0.15s ease;
+}
+.wa-cloud-tpl-item:hover {
+    background-color: var(--bs-gray-100);
+}
+.wa-cloud-tpl-item.bg-light-primary {
+    background-color: var(--bs-primary-light) !important;
+    border-left: 3px solid var(--bs-primary) !important;
+}
+
 .chat-input-footer {
     display: flex;
     justify-content: space-between;
@@ -3955,6 +3966,16 @@ function getChannelInfo(channel) {
             <?php endif; ?>
         </div>
         
+        <!-- Banner janela 24h Cloud API -->
+        <div id="cloudWindowBanner" class="d-none" style="padding: 8px 16px; background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-top: 1px solid #ffc107; display: flex; align-items: center; gap: 10px;">
+            <i class="ki-duotone ki-time fs-4 text-warning"><span class="path1"></span><span class="path2"></span></i>
+            <span class="fs-7 text-gray-700" id="cloudWindowBannerText">Fora da janela de 24h</span>
+            <button class="btn btn-sm btn-warning ms-auto" onclick="showWaCloudTemplateModal()">
+                <i class="ki-duotone ki-message-text fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                Enviar Template
+            </button>
+        </div>
+
         <!-- Campo de Envio (sempre presente, mas pode estar oculto) -->
         <div class="chat-input" id="chatInput" style="<?= (empty($selectedConversation) || !empty($accessRestricted)) ? 'display: none;' : '' ?>">
                 <!-- Preview de Reply -->
@@ -5965,6 +5986,65 @@ function getChannelInfo(channel) {
                         <div id="pendingRequestsList"></div>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL: Enviar Template WhatsApp Cloud API (fora da janela 24h) -->
+<div class="modal fade" id="kt_modal_wa_cloud_template" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold">
+                    <i class="ki-duotone ki-whatsapp fs-2 text-success me-2"><span class="path1"></span><span class="path2"></span></i>
+                    Enviar Template WhatsApp
+                </h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="notice d-flex bg-light-warning rounded border-warning border border-dashed p-4 mb-5">
+                    <i class="ki-duotone ki-information-5 fs-2tx text-warning me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    <div class="d-flex flex-stack flex-grow-1">
+                        <div class="fw-semibold">
+                            <div class="fs-6 text-gray-700">
+                                A janela de 24 horas expirou. Para enviar uma mensagem, 
+                                é necessário usar um <strong>template aprovado pela Meta</strong>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <input type="text" id="waCloudTemplateSearch" class="form-control form-control-solid" placeholder="Buscar template...">
+                </div>
+
+                <div id="waCloudTemplateList" style="max-height: 350px; overflow-y: auto;">
+                    <div class="text-center text-muted py-10">
+                        <span class="spinner-border spinner-border-sm text-primary mb-3"></span>
+                        <div>Carregando templates aprovados...</div>
+                    </div>
+                </div>
+
+                <div id="waCloudTemplateParams" class="d-none mt-5">
+                    <div class="separator my-4"></div>
+                    <h5 class="fw-bold mb-3">Preencher variáveis</h5>
+                    <div id="waCloudTemplateParamFields"></div>
+                    
+                    <div class="bg-light rounded p-4 mt-4">
+                        <label class="form-label fw-semibold text-gray-600 fs-7">Pré-visualização:</label>
+                        <div id="waCloudTemplatePreview" class="fs-6 text-gray-800" style="white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button class="btn btn-success" id="btnSendWaCloudTemplate" onclick="submitWaCloudTemplate()" disabled>
+                    <i class="ki-duotone ki-send fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                    Enviar Template
+                </button>
             </div>
         </div>
     </div>
@@ -8595,6 +8675,9 @@ function selectConversation(id) {
             if (typeof loadAutomationStatus === 'function') {
                 loadAutomationStatus(id);
             }
+
+            // Verificar janela 24h para conversas Cloud API
+            checkAndShowCloudWindowBanner(id);
             
             // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);
@@ -14956,6 +15039,13 @@ function sendMessage() {
         clearTimeout(sendingTimer);
         clearTimeout(sendingTimer2);
         
+        if (data.outside_24h_window) {
+            const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
+            if (tempMsg) tempMsg.remove();
+            showWaCloudTemplateModal(conversationId);
+            return;
+        }
+
         if (data.success) {
             const tempMsg = document.querySelector(`[data-temp-id="${tempMessage.id}"]`);
             if (tempMsg) tempMsg.remove();
@@ -24007,6 +24097,271 @@ document.addEventListener('DOMContentLoaded', function() {
         if (cid) window._mediaQueuePoll(cid);
     });
 })();
+</script>
+
+<script>
+// ============================================
+// TEMPLATES WHATSAPP CLOUD API - JANELA 24H
+// ============================================
+let _waCloudTemplates = [];
+let _waCloudSelectedTemplate = null;
+let _waCloudConversationId = null;
+
+function showWaCloudTemplateModal(conversationId) {
+    _waCloudConversationId = conversationId || window.currentConversationId;
+    _waCloudSelectedTemplate = null;
+    _waCloudTemplates = [];
+
+    const list = document.getElementById('waCloudTemplateList');
+    const params = document.getElementById('waCloudTemplateParams');
+    const btn = document.getElementById('btnSendWaCloudTemplate');
+    if (list) list.innerHTML = '<div class="text-center text-muted py-10"><span class="spinner-border spinner-border-sm text-primary mb-3"></span><div>Carregando templates aprovados...</div></div>';
+    if (params) params.classList.add('d-none');
+    if (btn) btn.disabled = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('kt_modal_wa_cloud_template'));
+    modal.show();
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${_waCloudConversationId}/cloud-window`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            list.innerHTML = '<div class="text-center text-danger py-10">Erro: ' + (data.message || 'Erro desconhecido') + '</div>';
+            return;
+        }
+        if (data.within_24h) {
+            list.innerHTML = '<div class="text-center text-success py-10"><i class="ki-duotone ki-check-circle fs-3x mb-3"><span class="path1"></span><span class="path2"></span></i><div>A janela de 24h está aberta. Você pode enviar mensagens normalmente.</div></div>';
+            setTimeout(() => { modal.hide(); }, 2000);
+            return;
+        }
+        _waCloudTemplates = data.templates || [];
+        renderWaCloudTemplates(_waCloudTemplates);
+    })
+    .catch(err => {
+        list.innerHTML = '<div class="text-center text-danger py-10">Erro ao carregar: ' + err.message + '</div>';
+    });
+}
+
+function renderWaCloudTemplates(templates) {
+    const list = document.getElementById('waCloudTemplateList');
+    if (!templates.length) {
+        list.innerHTML = '<div class="text-center text-muted py-10"><i class="ki-duotone ki-information-5 fs-3x mb-3 text-warning"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><div>Nenhum template aprovado encontrado.<br><small class="text-gray-500">Crie e aprove templates em <strong>WhatsApp CoEx &gt; Templates</strong></small></div></div>';
+        return;
+    }
+
+    const grouped = {};
+    templates.forEach(t => {
+        const cat = t.category || 'OUTROS';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(t);
+    });
+
+    let html = '';
+    for (const [cat, tpls] of Object.entries(grouped)) {
+        const catLabels = { MARKETING: 'Marketing', UTILITY: 'Utilidade', AUTHENTICATION: 'Autenticação' };
+        html += `<div class="fw-bold text-gray-500 fs-7 px-4 py-2 bg-light border-bottom">${catLabels[cat] || cat}</div>`;
+        tpls.forEach(t => {
+            const preview = (t.body_text || '').substring(0, 80) + ((t.body_text || '').length > 80 ? '...' : '');
+            html += `
+                <div class="wa-cloud-tpl-item px-4 py-3 border-bottom cursor-pointer" 
+                     data-tpl-id="${t.id}" onclick="selectWaCloudTemplate(${t.id})">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="fw-semibold text-gray-800">${escapeHtml(t.display_name || t.name)}</div>
+                        <span class="badge badge-light-primary fs-8">${t.language || 'pt_BR'}</span>
+                    </div>
+                    <div class="text-gray-500 fs-7 mt-1">${escapeHtml(preview)}</div>
+                    ${t.variables_count > 0 ? `<span class="badge badge-light-warning fs-9 mt-1">${t.variables_count} variável(is)</span>` : ''}
+                </div>`;
+        });
+    }
+    list.innerHTML = html;
+}
+
+function selectWaCloudTemplate(templateId) {
+    const tpl = _waCloudTemplates.find(t => t.id === templateId);
+    if (!tpl) return;
+
+    _waCloudSelectedTemplate = tpl;
+
+    document.querySelectorAll('.wa-cloud-tpl-item').forEach(el => el.classList.remove('bg-light-primary'));
+    const selected = document.querySelector(`.wa-cloud-tpl-item[data-tpl-id="${templateId}"]`);
+    if (selected) selected.classList.add('bg-light-primary');
+
+    const paramsDiv = document.getElementById('waCloudTemplateParams');
+    const fieldsDiv = document.getElementById('waCloudTemplateParamFields');
+    const btn = document.getElementById('btnSendWaCloudTemplate');
+
+    if (tpl.variables_count > 0) {
+        paramsDiv.classList.remove('d-none');
+        let fieldsHtml = '';
+        for (let i = 1; i <= tpl.variables_count; i++) {
+            fieldsHtml += `
+                <div class="mb-3">
+                    <label class="form-label fs-7">Variável {{${i}}}</label>
+                    <input type="text" class="form-control form-control-solid form-control-sm wa-cloud-param" 
+                           data-index="${i}" placeholder="Valor para {{${i}}}" 
+                           oninput="updateWaCloudPreview()">
+                </div>`;
+        }
+        fieldsDiv.innerHTML = fieldsHtml;
+        updateWaCloudPreview();
+    } else {
+        paramsDiv.classList.remove('d-none');
+        fieldsDiv.innerHTML = '';
+        updateWaCloudPreview();
+    }
+
+    btn.disabled = false;
+}
+
+function updateWaCloudPreview() {
+    if (!_waCloudSelectedTemplate) return;
+    let preview = _waCloudSelectedTemplate.body_text || '';
+    document.querySelectorAll('.wa-cloud-param').forEach(input => {
+        const idx = input.dataset.index;
+        const val = input.value || `{{${idx}}}`;
+        preview = preview.replace(`{{${idx}}}`, val);
+    });
+
+    let fullPreview = '';
+    if (_waCloudSelectedTemplate.header_text) {
+        fullPreview += `*${_waCloudSelectedTemplate.header_text}*\n\n`;
+    }
+    fullPreview += preview;
+    if (_waCloudSelectedTemplate.footer_text) {
+        fullPreview += `\n\n_${_waCloudSelectedTemplate.footer_text}_`;
+    }
+
+    document.getElementById('waCloudTemplatePreview').textContent = fullPreview;
+}
+
+function submitWaCloudTemplate() {
+    if (!_waCloudSelectedTemplate || !_waCloudConversationId) return;
+
+    const btn = document.getElementById('btnSendWaCloudTemplate');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+
+    const parameters = [];
+    document.querySelectorAll('.wa-cloud-param').forEach(input => {
+        parameters.push(input.value || '');
+    });
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${_waCloudConversationId}/send-cloud-template`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            template_id: _waCloudSelectedTemplate.id,
+            parameters: parameters
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_wa_cloud_template'));
+            if (modal) modal.hide();
+
+            if (data.message) {
+                addMessageToChat(data.message);
+            }
+            updateConversationInList(_waCloudConversationId, 'Template: ' + _waCloudSelectedTemplate.display_name);
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Template enviado!',
+                    text: `Template "${_waCloudSelectedTemplate.display_name || _waCloudSelectedTemplate.name}" enviado com sucesso.`,
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+            }
+        } else {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Erro', data.message || 'Erro ao enviar template', 'error');
+            } else {
+                alert(data.message || 'Erro ao enviar template');
+            }
+        }
+    })
+    .catch(err => {
+        console.error('Erro ao enviar template:', err);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire('Erro', 'Erro de conexão: ' + err.message, 'error');
+        }
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="ki-duotone ki-send fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Enviar Template';
+    });
+}
+
+// Verificar janela 24h e mostrar/ocultar banner
+function checkAndShowCloudWindowBanner(conversationId) {
+    const banner = document.getElementById('cloudWindowBanner');
+    if (!banner) return;
+
+    banner.classList.add('d-none');
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/cloud-window`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.is_cloud_api) {
+            banner.classList.add('d-none');
+            return;
+        }
+
+        if (data.within_24h) {
+            banner.classList.add('d-none');
+            if (data.window_info) {
+                const remaining = data.window_info.remaining_minutes;
+                if (remaining <= 60) {
+                    banner.classList.remove('d-none');
+                    banner.style.background = 'linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%)';
+                    banner.style.borderTopColor = '#17a2b8';
+                    const text = document.getElementById('cloudWindowBannerText');
+                    if (text) text.innerHTML = `<span class="text-info">Janela de 24h expira em <strong>${remaining} min</strong>. Após isso, será necessário usar template.</span>`;
+                    const btn = banner.querySelector('button');
+                    if (btn) btn.classList.add('d-none');
+                }
+            }
+        } else {
+            banner.classList.remove('d-none');
+            banner.style.background = 'linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%)';
+            banner.style.borderTopColor = '#ffc107';
+            const text = document.getElementById('cloudWindowBannerText');
+            if (text) text.innerHTML = 'Janela de 24h expirada. Use um <strong>template aprovado</strong> para reabrir a conversa.';
+            const btn = banner.querySelector('button');
+            if (btn) btn.classList.remove('d-none');
+        }
+    })
+    .catch(() => {
+        banner.classList.add('d-none');
+    });
+}
+
+// Busca dentro do modal
+document.getElementById('waCloudTemplateSearch')?.addEventListener('input', function(e) {
+    const q = e.target.value.toLowerCase().trim();
+    if (!q) {
+        renderWaCloudTemplates(_waCloudTemplates);
+        return;
+    }
+    const filtered = _waCloudTemplates.filter(t => 
+        (t.name || '').toLowerCase().includes(q) || 
+        (t.display_name || '').toLowerCase().includes(q) || 
+        (t.body_text || '').toLowerCase().includes(q) ||
+        (t.category || '').toLowerCase().includes(q)
+    );
+    renderWaCloudTemplates(filtered);
+});
 </script>
 
 <?php $content = ob_get_clean(); ?>

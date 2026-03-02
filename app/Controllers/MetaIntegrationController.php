@@ -44,16 +44,33 @@ class MetaIntegrationController
         
         foreach ($whatsappPhones as &$phone) {
             $phone['has_valid_token'] = WhatsAppPhone::hasValidToken($phone['id']);
+            // Buscar dados da integration_account vinculada (funil/etapa padrão)
+            if (!empty($phone['integration_account_id'])) {
+                $ia = IntegrationAccount::find($phone['integration_account_id']);
+                if ($ia) {
+                    $phone['integration_account'] = $ia;
+                    if (!empty($ia['default_funnel_id'])) {
+                        $funnel = \App\Models\Funnel::find($ia['default_funnel_id']);
+                        $phone['default_funnel_name'] = $funnel['name'] ?? null;
+                    }
+                    if (!empty($ia['default_stage_id'])) {
+                        $stage = \App\Helpers\Database::fetch("SELECT name FROM funnel_stages WHERE id = ?", [$ia['default_stage_id']]);
+                        $phone['default_stage_name'] = $stage['name'] ?? null;
+                    }
+                }
+            }
         }
         
-        // Carregar configurações Meta
+        // Carregar configurações Meta e funis
         $metaConfig = self::getMetaConfig();
+        $funnels = \App\Models\Funnel::whereActive();
         
         Response::view('integrations/meta/index', [
             'instagramAccounts' => $instagramAccounts,
             'whatsappPhones' => $whatsappPhones,
             'tokens' => $tokens,
             'metaConfig' => $metaConfig,
+            'funnels' => $funnels,
         ]);
     }
     
@@ -531,6 +548,213 @@ class MetaIntegrationController
         Response::view('integrations/meta/logs', [
             'logs' => $logs
         ]);
+    }
+    
+    /**
+     * Embedded Signup - Conectar WhatsApp via Facebook Login (OAuth visual)
+     * 
+     * POST /integrations/meta/whatsapp/signup
+     */
+    public function embeddedSignup(): void
+    {
+        Permission::abortIfCannot('integrations.manage');
+        
+        try {
+            $code = Request::post('code', '');
+            
+            if (empty($code)) {
+                Response::json(['success' => false, 'error' => 'Código de autorização não fornecido'], 400);
+                return;
+            }
+            
+            $metaConfig = require __DIR__ . '/../../config/meta.php';
+            $apiVersion = $metaConfig['whatsapp']['api_version'] ?? 'v21.0';
+            
+            // 1. Trocar authorization code por access token
+            $tokenUrl = "https://graph.facebook.com/{$apiVersion}/oauth/access_token?" . http_build_query([
+                'client_id' => $metaConfig['app_id'],
+                'client_secret' => $metaConfig['app_secret'],
+                'code' => $code,
+            ]);
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $tokenUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_TIMEOUT => 30,
+            ]);
+            $tokenResponse = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            $tokenData = json_decode($tokenResponse, true);
+            
+            if ($httpCode !== 200 || empty($tokenData['access_token'])) {
+                $error = $tokenData['error']['message'] ?? 'Falha ao obter token de acesso';
+                Response::json(['success' => false, 'error' => "OAuth falhou: {$error}"], 400);
+                return;
+            }
+            
+            $accessToken = $tokenData['access_token'];
+            
+            // 2. Buscar WABAs vinculadas ao token
+            $wabasUrl = "https://graph.facebook.com/{$apiVersion}/me/whatsapp_business_accounts?" . http_build_query([
+                'fields' => 'id,name,account_review_status,message_template_namespace',
+                'access_token' => $accessToken,
+            ]);
+            
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $wabasUrl,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_SSL_VERIFYPEER => true,
+                CURLOPT_TIMEOUT => 30,
+            ]);
+            $wabasResponse = curl_exec($ch);
+            curl_close($ch);
+            
+            $wabasData = json_decode($wabasResponse, true);
+            $wabas = $wabasData['data'] ?? [];
+            
+            if (empty($wabas)) {
+                Response::json(['success' => false, 'error' => 'Nenhuma conta WhatsApp Business encontrada nesta conta Meta. Verifique se o WhatsApp Business está configurado.'], 400);
+                return;
+            }
+            
+            $registered = [];
+            
+            foreach ($wabas as $waba) {
+                $wabaId = $waba['id'];
+                $wabaName = $waba['name'] ?? '';
+                
+                // 3. Buscar números de cada WABA
+                $phonesUrl = "https://graph.facebook.com/{$apiVersion}/{$wabaId}/phone_numbers?" . http_build_query([
+                    'fields' => 'id,display_phone_number,verified_name,quality_rating,account_mode,code_verification_status',
+                    'access_token' => $accessToken,
+                ]);
+                
+                $ch = curl_init();
+                curl_setopt_array($ch, [
+                    CURLOPT_URL => $phonesUrl,
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_SSL_VERIFYPEER => true,
+                    CURLOPT_TIMEOUT => 30,
+                ]);
+                $phonesResponse = curl_exec($ch);
+                curl_close($ch);
+                
+                $phonesData = json_decode($phonesResponse, true);
+                $phones = $phonesData['data'] ?? [];
+                
+                foreach ($phones as $phone) {
+                    $phoneNumberId = $phone['id'];
+                    $displayPhone = $phone['display_phone_number'] ?? '';
+                    $verifiedName = $phone['verified_name'] ?? $wabaName ?: 'WhatsApp';
+                    
+                    // 4. Salvar/atualizar token OAuth
+                    $existingToken = MetaOAuthToken::getByMetaUserId($phoneNumberId);
+                    if ($existingToken) {
+                        MetaOAuthToken::update($existingToken['id'], [
+                            'access_token' => $accessToken,
+                            'is_valid' => true,
+                            'expires_at' => !empty($tokenData['expires_in'])
+                                ? date('Y-m-d H:i:s', time() + $tokenData['expires_in'])
+                                : null,
+                        ]);
+                        $tokenId = $existingToken['id'];
+                    } else {
+                        $tokenId = MetaOAuthToken::create([
+                            'meta_user_id' => $phoneNumberId,
+                            'app_type' => 'whatsapp',
+                            'access_token' => $accessToken,
+                            'token_type' => 'bearer',
+                            'expires_at' => !empty($tokenData['expires_in'])
+                                ? date('Y-m-d H:i:s', time() + $tokenData['expires_in'])
+                                : null,
+                            'scopes' => 'whatsapp_business_management,whatsapp_business_messaging',
+                            'is_valid' => true,
+                        ]);
+                    }
+                    
+                    // 5. Criar/atualizar WhatsAppPhone
+                    $existingPhone = WhatsAppPhone::findByPhoneNumberId($phoneNumberId);
+                    $phoneData = [
+                        'phone_number_id' => $phoneNumberId,
+                        'phone_number' => $displayPhone,
+                        'display_phone_number' => $displayPhone,
+                        'waba_id' => $wabaId,
+                        'verified_name' => $verifiedName,
+                        'quality_rating' => $phone['quality_rating'] ?? 'UNKNOWN',
+                        'account_mode' => $phone['account_mode'] ?? 'SANDBOX',
+                        'meta_oauth_token_id' => $tokenId,
+                        'is_active' => true,
+                        'is_connected' => true,
+                    ];
+                    
+                    if ($existingPhone) {
+                        WhatsAppPhone::update($existingPhone['id'], $phoneData);
+                        $phoneId = $existingPhone['id'];
+                    } else {
+                        $phoneId = WhatsAppPhone::create($phoneData);
+                    }
+                    
+                    // 6. Criar/atualizar IntegrationAccount
+                    $existingIA = IntegrationAccount::findByPhone($displayPhone, 'whatsapp');
+                    if ($existingIA) {
+                        IntegrationAccount::update($existingIA['id'], [
+                            'name' => $verifiedName,
+                            'status' => 'active',
+                            'provider' => 'meta_cloud',
+                            'config' => json_encode([
+                                'waba_id' => $wabaId,
+                                'phone_number_id' => $phoneNumberId,
+                            ]),
+                        ]);
+                        $iaId = $existingIA['id'];
+                    } else {
+                        $iaId = IntegrationAccount::create([
+                            'name' => $verifiedName,
+                            'provider' => 'meta_cloud',
+                            'channel' => 'whatsapp',
+                            'phone_number' => $displayPhone,
+                            'account_id' => $wabaId,
+                            'status' => 'active',
+                            'config' => json_encode([
+                                'waba_id' => $wabaId,
+                                'phone_number_id' => $phoneNumberId,
+                            ]),
+                        ]);
+                    }
+                    
+                    // 7. Vincular tudo
+                    WhatsAppPhone::update($phoneId, ['integration_account_id' => $iaId]);
+                    MetaOAuthToken::update($tokenId, ['integration_account_id' => $iaId]);
+                    
+                    $registered[] = [
+                        'phone' => $displayPhone,
+                        'name' => $verifiedName,
+                    ];
+                }
+            }
+            
+            if (empty($registered)) {
+                Response::json(['success' => false, 'error' => 'Nenhum número de telefone encontrado nas contas WhatsApp Business.'], 400);
+                return;
+            }
+            
+            Response::json([
+                'success' => true,
+                'registered' => $registered,
+                'message' => count($registered) . ' número(s) conectado(s) com sucesso',
+            ]);
+            
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'error' => 'Erro ao processar: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
 

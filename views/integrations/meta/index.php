@@ -180,6 +180,25 @@ ob_start();
                 </div>
                 
                 <div class="col-md-6">
+                    <label class="form-label required">Configuration ID (Facebook Login for Business)</label>
+                    <input type="text" name="config_id" class="form-control form-control-solid" 
+                           value="<?= htmlspecialchars($metaConfig['config_id'] ?? '') ?>" 
+                           placeholder="123456789012345">
+                    <div class="form-text">
+                        <a href="https://developers.facebook.com/apps/" target="_blank">developers.facebook.com</a> → 
+                        Seu App → Menu lateral <strong>"Casos de uso"</strong> → 
+                        Clique em <strong>"Personalizar"</strong> ao lado de "WhatsApp Embedded Signup" → 
+                        Copie o <strong>Configuration ID</strong> exibido.
+                        <br>
+                        <small class="text-muted">
+                            Se não existir, clique em "Criar configuração", selecione as permissões 
+                            <code>whatsapp_business_management</code> e <code>whatsapp_business_messaging</code>, 
+                            e salve.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
                     <label class="form-label">Redirect URI (OAuth)</label>
                     <div class="input-group">
                         <input type="text" class="form-control form-control-solid" 

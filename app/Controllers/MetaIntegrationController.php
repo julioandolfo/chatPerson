@@ -101,15 +101,17 @@ class MetaIntegrationController
             $appId = $data['app_id'] ?? null;
             $appSecret = $data['app_secret'] ?? null;
             $webhookVerifyToken = $data['webhook_verify_token'] ?? null;
+            $configId = $data['config_id'] ?? '';
             
             error_log("Meta saveConfig - app_id: " . ($appId ? 'OK' : 'VAZIO'));
             error_log("Meta saveConfig - app_secret: " . ($appSecret ? 'OK' : 'VAZIO'));
             error_log("Meta saveConfig - webhook_verify_token: " . ($webhookVerifyToken ? 'OK' : 'VAZIO'));
+            error_log("Meta saveConfig - config_id: " . ($configId ? 'OK' : 'VAZIO'));
             
             if (empty($appId) || empty($appSecret) || empty($webhookVerifyToken)) {
                 Response::json([
                     'success' => false,
-                    'error' => 'Todos os campos são obrigatórios'
+                    'error' => 'Todos os campos são obrigatórios (App ID, App Secret e Webhook Verify Token)'
                 ], 400);
                 return;
             }
@@ -150,6 +152,7 @@ class MetaIntegrationController
                 'app_id' => $appId,
                 'app_secret' => $appSecret,
                 'webhook_verify_token' => $webhookVerifyToken,
+                'config_id' => $configId,
                 'updated_at' => date('Y-m-d H:i:s'),
             ];
             
@@ -569,8 +572,13 @@ class MetaIntegrationController
                 return;
             }
             
-            $metaConfig = require __DIR__ . '/../../config/meta.php';
-            $apiVersion = $metaConfig['whatsapp']['api_version'] ?? 'v21.0';
+            $metaConfig = self::getMetaConfig();
+            $phpConfig = [];
+            $phpConfigFile = __DIR__ . '/../../config/meta.php';
+            if (file_exists($phpConfigFile)) {
+                $phpConfig = require $phpConfigFile;
+            }
+            $apiVersion = $phpConfig['whatsapp']['api_version'] ?? 'v21.0';
             
             // 1. Trocar authorization code por access token
             $tokenUrl = "https://graph.facebook.com/{$apiVersion}/oauth/access_token?" . http_build_query([

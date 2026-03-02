@@ -533,7 +533,21 @@ class WhatsAppCoexController
      */
     private static function getMetaConfig(): array
     {
-        $configFile = __DIR__ . '/../../config/meta.php';
+        $rootPath = dirname(dirname(__DIR__));
+        
+        // Priorizar JSON salvo pela interface
+        $jsonFile = $rootPath . '/storage/config/meta.json';
+        if (file_exists($jsonFile)) {
+            $json = file_get_contents($jsonFile);
+            $config = json_decode($json, true);
+            if ($config && !empty($config['app_id'])) {
+                $config['app_secret'] = !empty($config['app_secret']) ? '***configurado***' : '';
+                return $config;
+            }
+        }
+        
+        // Fallback para config/meta.php
+        $configFile = $rootPath . '/config/meta.php';
         if (file_exists($configFile)) {
             $config = require $configFile;
             return [

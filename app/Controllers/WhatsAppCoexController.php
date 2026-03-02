@@ -540,6 +540,7 @@ class WhatsAppCoexController
                 'app_id' => $config['app_id'] ?? '',
                 'app_secret' => !empty($config['app_secret']) ? '***configurado***' : '',
                 'webhook_verify_token' => $config['webhooks']['verify_token'] ?? '',
+                'config_id' => $config['whatsapp']['config_id'] ?? '',
             ];
         }
         return [];

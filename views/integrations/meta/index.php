@@ -865,7 +865,7 @@ function executeFBLogin() {
             });
         }
     }, {
-        config_id: '',
+        config_id: '<?= htmlspecialchars($metaConfig['config_id'] ?? '') ?>',
         response_type: 'code',
         override_default_response_type: true,
         extras: {

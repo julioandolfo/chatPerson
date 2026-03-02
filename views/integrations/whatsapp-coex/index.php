@@ -1014,7 +1014,7 @@ function doEmbeddedSignup() {
             });
         }
     }, {
-        config_id: '', // Config ID do Embedded Signup (se tiver)
+        config_id: '<?= htmlspecialchars($metaConfig['config_id'] ?? '') ?>',
         response_type: 'code',
         override_default_response_type: true,
         extras: {

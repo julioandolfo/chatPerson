@@ -212,6 +212,7 @@ class MetaIntegrationController
                 'app_id' => $metaConfig['app_id'] ?? '',
                 'app_secret' => $metaConfig['app_secret'] ?? '',
                 'webhook_verify_token' => $metaConfig['webhooks']['verify_token'] ?? '',
+                'config_id' => $metaConfig['whatsapp']['config_id'] ?? '',
             ];
         }
         
@@ -220,6 +221,7 @@ class MetaIntegrationController
             'app_id' => '',
             'app_secret' => '',
             'webhook_verify_token' => '',
+            'config_id' => '',
         ];
     }
     

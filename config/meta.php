@@ -61,6 +61,11 @@ return [
             'whatsapp_business_messaging',
         ],
         
+        // Configuration ID do Facebook Login for Business
+        // Criar em: Meta Developers > Seu App > Facebook Login for Business > Configuration
+        // Deve incluir permissões: whatsapp_business_management, whatsapp_business_messaging
+        'config_id' => getenv('META_WHATSAPP_CONFIG_ID') ?: '',
+        
         // Configurações
         'webhook_verify_token' => getenv('META_WEBHOOK_VERIFY_TOKEN') ?: 'seu_token_verificacao_aqui_' . bin2hex(random_bytes(16)),
     ],

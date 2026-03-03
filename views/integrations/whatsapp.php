@@ -967,30 +967,46 @@ function toggleEditProviderFields(provider) {
 }
 
 // Abrir modal de edição da conta (campos principais)
+let _editAccountData = null; // Armazenar dados da conta para restauração de URLs por provider
+
 function editAccount(account) {
+    _editAccountData = account;
     document.getElementById("kt_edit_whatsapp_id").value = account.id;
     document.getElementById("kt_edit_whatsapp_name").value = account.name || "";
     document.getElementById("kt_edit_whatsapp_phone").value = account.phone_number || "";
     
+    // Extrair URLs salvas por provider do config JSON
+    let config = {};
+    try { config = typeof account.config === "string" ? JSON.parse(account.config || "{}") : (account.config || {}); } catch(e) {}
+    
+    const provider = account.provider || "quepasa";
+    const savedQuepasa = config.provider_urls_quepasa || {};
+    const savedEvolution = config.provider_urls_evolution || {};
+    const savedNative = config.provider_urls_native || {};
+    
     // Selecionar provider
     const providerSelect = document.getElementById("kt_edit_provider_select");
-    const provider = account.provider || "quepasa";
     providerSelect.value = provider;
     toggleEditProviderFields(provider);
     
-    // Preencher campos Quepasa
-    document.getElementById("kt_edit_whatsapp_api_url").value = account.api_url || "";
+    // Preencher campos Quepasa com URL correta
+    const quepasaUrl = provider === "quepasa" ? (account.api_url || "") : (savedQuepasa.api_url || "");
+    document.getElementById("kt_edit_whatsapp_api_url").value = quepasaUrl;
     document.getElementById("kt_edit_whatsapp_user").value = account.quepasa_user || "";
     document.getElementById("kt_edit_whatsapp_trackid").value = account.quepasa_trackid || "";
     document.getElementById("kt_edit_whatsapp_api_key").value = "";
     
-    // Preencher campos Evolution
-    document.getElementById("kt_edit_evolution_api_url").value = account.api_url || "";
-    document.getElementById("kt_edit_evolution_api_key").value = account.api_key || "";
-    document.getElementById("kt_edit_evolution_instance_id").value = account.instance_id || "";
+    // Preencher campos Evolution com URL correta
+    const evoUrl = provider === "evolution" ? (account.api_url || "") : (savedEvolution.api_url || "");
+    const evoKey = provider === "evolution" ? (account.api_key || "") : (savedEvolution.api_key || "");
+    const evoInstance = provider === "evolution" ? (account.instance_id || "") : (savedEvolution.instance_id || "");
+    document.getElementById("kt_edit_evolution_api_url").value = evoUrl;
+    document.getElementById("kt_edit_evolution_api_key").value = evoKey;
+    document.getElementById("kt_edit_evolution_instance_id").value = evoInstance;
     
     // Preencher campos Native
-    document.getElementById("kt_edit_native_api_url").value = account.api_url || account.native_service_url || "http://127.0.0.1:3100";
+    const nativeUrl = provider === "native" ? (account.api_url || account.native_service_url || "http://127.0.0.1:3100") : (savedNative.api_url || account.native_service_url || "http://127.0.0.1:3100");
+    document.getElementById("kt_edit_native_api_url").value = nativeUrl;
     
     // Exibir status atual
     const statusDisplay = document.getElementById("kt_edit_whatsapp_status_display");

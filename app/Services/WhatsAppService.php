@@ -2277,6 +2277,14 @@ class WhatsAppService
     /**
      * Obter URL do webhook (da configuração ou gerar automaticamente)
      */
+    public static function configureWebhookUrl(): string
+    {
+        return self::getWebhookUrl();
+    }
+
+    /**
+     * Obter URL do webhook (da configuração ou gerar automaticamente)
+     */
     private static function getWebhookUrl(): string
     {
         // Tentar obter da configuração primeiro

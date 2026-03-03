@@ -358,8 +358,49 @@ class IntegrationController
                 $data = array_merge($data, $rateLimitFields);
             }
 
+            // Detectar mudança de provider e gerenciar URLs/webhook
+            $currentAccount = IntegrationAccount::find($id);
+            $newProvider = $data['provider'] ?? $currentAccount['provider'] ?? 'quepasa';
+            $oldProvider = $currentAccount['provider'] ?? 'quepasa';
+
+            if ($currentAccount && $newProvider !== $oldProvider) {
+                \App\Helpers\Logger::info("updateWhatsAppAccount: Provider alterado de '{$oldProvider}' para '{$newProvider}' (Conta #{$id})");
+
+                // Salvar URLs do provider anterior no config para restauração futura
+                $config = json_decode($currentAccount['config'] ?? '{}', true) ?: [];
+                $config["provider_urls_{$oldProvider}"] = [
+                    'api_url'     => $currentAccount['api_url'] ?? '',
+                    'api_key'     => $currentAccount['api_key'] ?? '',
+                    'instance_id' => $currentAccount['instance_id'] ?? '',
+                ];
+
+                // Resetar flag de webhook configurado para forçar reconfiguração
+                $config['webhook_configured'] = false;
+
+                // Tentar restaurar URLs do provider de destino (se tiver salvo anteriormente)
+                $savedUrls = $config["provider_urls_{$newProvider}"] ?? null;
+                if ($savedUrls && empty($data['api_url'])) {
+                    $data['api_url'] = $savedUrls['api_url'] ?? '';
+                }
+
+                $data['config'] = json_encode($config);
+            }
+
             if (IntegrationAccount::updateWithSync($id, $data)) {
                 \App\Helpers\Logger::unificacao("[CRUD] updateWhatsAppAccount: Conta IA#{$id} atualizada (com sync)");
+
+                // Se o provider mudou, tentar reconfigurar webhook automaticamente
+                if ($newProvider !== $oldProvider) {
+                    try {
+                        $webhookUrl = WhatsAppService::configureWebhookUrl();
+                        if ($webhookUrl) {
+                            WhatsAppService::configureWebhook($id, $webhookUrl);
+                            \App\Helpers\Logger::info("updateWhatsAppAccount: Webhook reconfigurado para conta #{$id} após mudança de provider");
+                        }
+                    } catch (\Exception $e) {
+                        \App\Helpers\Logger::info("updateWhatsAppAccount: Falha ao reconfigurar webhook (será tentado no próximo status check): {$e->getMessage()}");
+                    }
+                }
                 
                 Response::json([
                     'success' => true,

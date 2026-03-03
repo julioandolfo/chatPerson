@@ -1503,14 +1503,24 @@ class WhatsAppService
             $chatId = $to . '@s.whatsapp.net';
             Logger::quepasa("sendMessage - Resolvendo chatId para: {$to}");
             
-            // Se existir contato com whatsapp_id, usar
+            // Se existir contato com whatsapp_id, usar APENAS se corresponder ao telefone de destino
             try {
                 $contact = \App\Models\Contact::findByPhoneNormalized($to);
                 if ($contact) {
                     Logger::quepasa("sendMessage - Contato encontrado: ID={$contact['id']}, whatsapp_id=" . ($contact['whatsapp_id'] ?? 'NULL'));
                     if (!empty($contact['whatsapp_id'])) {
-                        $chatId = $contact['whatsapp_id'];
-                        Logger::quepasa("sendMessage - ✅ Usando whatsapp_id do contato: {$chatId}");
+                        // Extrair número do whatsapp_id para validar (ex: 5535991340446@s.whatsapp.net → 5535991340446)
+                        $whatsappPhone = preg_replace('/@.*$/', '', $contact['whatsapp_id']);
+                        $toNormalized = preg_replace('/[^0-9]/', '', $to);
+                        
+                        // Usar whatsapp_id somente se o número bater com o destino
+                        // (previne enviar para número errado quando whatsapp_id está desatualizado)
+                        if ($whatsappPhone === $toNormalized || str_ends_with($whatsappPhone, substr($toNormalized, -8))) {
+                            $chatId = $contact['whatsapp_id'];
+                            Logger::quepasa("sendMessage - ✅ Usando whatsapp_id do contato: {$chatId}");
+                        } else {
+                            Logger::quepasa("sendMessage - ⚠️ whatsapp_id do contato ({$contact['whatsapp_id']}) NÃO corresponde ao destino ({$to}), ignorando");
+                        }
                     } else {
                         Logger::quepasa("sendMessage - ⚠️ Contato sem whatsapp_id, usando padrão");
                     }

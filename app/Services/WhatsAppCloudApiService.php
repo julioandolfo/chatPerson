@@ -114,7 +114,8 @@ class WhatsAppCloudApiService
                     $phoneNumberId,
                     $to,
                     $message,
-                    $accessToken
+                    $accessToken,
+                    $options
                 );
                 
                 return [

@@ -29,7 +29,8 @@ class WhatsAppCloudService extends MetaIntegrationService
         string $phoneNumberId,
         string $to,
         string $text,
-        string $accessToken
+        string $accessToken,
+        array $options = []
     ): array {
         self::initConfig();
         
@@ -48,6 +49,12 @@ class WhatsAppCloudService extends MetaIntegrationService
                 'body' => $text
             ]
         ];
+        
+        if (!empty($options['quoted_message_external_id'])) {
+            $data['context'] = [
+                'message_id' => $options['quoted_message_external_id']
+            ];
+        }
         
         self::logInfo("Enviando mensagem WhatsApp para: {$to}");
         

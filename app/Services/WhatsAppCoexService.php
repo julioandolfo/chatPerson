@@ -423,6 +423,7 @@ class WhatsAppCoexService extends MetaIntegrationService
             'external_id' => $messageId,
             'sent_at' => date('Y-m-d H:i:s', (int)$timestamp),
             'status' => 'sent',
+            'via_account_id' => $integrationAccountId,
             'metadata' => json_encode(['source' => 'whatsapp_app', 'coex_echo' => true]),
         ]);
         

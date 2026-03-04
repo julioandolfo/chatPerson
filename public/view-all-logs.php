@@ -428,16 +428,15 @@ if ($activeTab === 'instagram') {
             LIMIT 30
         ")->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 4. Últimas mensagens Instagram
+        // 4. Últimas mensagens Instagram (JOIN para evitar LIMIT em subquery - incompatível com MySQL < 5.7)
         $igMessages = $db->query("
             SELECT m.id, m.conversation_id, m.content, m.message_type, m.direction,
                    m.status, m.external_id, m.created_at,
                    ct.name as sender_name
             FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id
+                AND c.channel IN ('instagram', 'instagram_comment')
             LEFT JOIN contacts ct ON ct.id = m.contact_id
-            WHERE m.conversation_id IN (
-                SELECT id FROM conversations WHERE channel IN ('instagram', 'instagram_comment') LIMIT 100
-            )
             ORDER BY m.created_at DESC
             LIMIT 20
         ")->fetchAll(\PDO::FETCH_ASSOC);

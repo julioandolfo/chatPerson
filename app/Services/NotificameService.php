@@ -677,6 +677,28 @@ class NotificameService
         self::logInfo("========== Notificame Webhook INÍCIO ==========");
         self::logInfo("Notificame webhook recebido - Channel: {$channel}");
         self::logInfo("Notificame webhook payload completo: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // ── Tratar eventos de status de mensagem (MESSAGE_STATUS) ──────────────
+        // O Notificame envia este tipo quando uma mensagem enviada muda de status
+        // (SENT, DELIVERED, READ, REJECTED, FAILED, etc.)
+        $eventType = $payload['type'] ?? null;
+        if ($eventType === 'MESSAGE_STATUS') {
+            self::processMessageStatusEvent($payload, $channel);
+            self::logInfo("========== Notificame Webhook FIM (MESSAGE_STATUS tratado) ==========");
+            return;
+        }
+
+        // ── Ignorar outros eventos de controle que não são mensagens recebidas ──
+        $ignoredTypes = ['CONNECTION_STATUS', 'ACCOUNT_STATUS', 'SUBSCRIPTION_STATUS', 'PING'];
+        if ($eventType && in_array(strtoupper($eventType), $ignoredTypes)) {
+            self::logInfo("Notificame webhook: Evento de controle ignorado - type={$eventType}");
+            self::logInfo("========== Notificame Webhook FIM (Evento de controle ignorado) ==========");
+            return;
+        }
+
+        if ($eventType) {
+            self::logInfo("Notificame webhook: Tipo de evento detectado: {$eventType} — prosseguindo como mensagem");
+        }
         
         // Identificar conta pelo webhook URL ou outros dados do payload
         $account = self::findAccountByWebhook($payload, $channel);
@@ -980,6 +1002,106 @@ class NotificameService
         self::logInfo("========== Notificame Webhook FIM (Sucesso) ==========");
     }
     
+    /**
+     * Processar evento MESSAGE_STATUS do Notificame
+     * 
+     * Atualiza o status da mensagem no banco quando o Notificame informa
+     * que uma mensagem enviada foi entregue, lida ou rejeitada.
+     * 
+     * Códigos conhecidos: SENT, DELIVERED, READ, REJECTED, FAILED, ERROR
+     * Erro Instagram code 10 = "outside of allowed window" (janela 24h expirada)
+     */
+    private static function processMessageStatusEvent(array $payload, string $channel): void
+    {
+        $messageId    = $payload['messageId'] ?? null;
+        $statusData   = $payload['messageStatus'] ?? [];
+        $statusCode   = strtoupper($statusData['code'] ?? '');
+        $description  = $statusData['description'] ?? '';
+        $errorCode    = $statusData['error']['code'] ?? null;
+        $errorMsg     = $statusData['error']['message'] ?? null;
+        $visitorName  = $payload['visitor']['name'] ?? $payload['visitor']['firstName'] ?? null;
+
+        self::logInfo("MESSAGE_STATUS recebido:");
+        self::logInfo("  - messageId: " . ($messageId ?? 'NULL'));
+        self::logInfo("  - statusCode: {$statusCode}");
+        self::logInfo("  - description: {$description}");
+        self::logInfo("  - channel: {$channel}");
+        if ($errorCode !== null) {
+            self::logInfo("  - error.code: {$errorCode}");
+            self::logInfo("  - error.message: {$errorMsg}");
+        }
+        if ($visitorName) {
+            self::logInfo("  - visitor: {$visitorName}");
+        }
+
+        // Traduzir código para status interno
+        $internalStatus = match($statusCode) {
+            'SENT'       => 'sent',
+            'DELIVERED'  => 'delivered',
+            'READ'       => 'read',
+            'REJECTED', 'FAILED', 'ERROR' => 'failed',
+            default      => null,
+        };
+
+        if (!$messageId) {
+            self::logWarning("MESSAGE_STATUS sem messageId — impossível atualizar mensagem no banco");
+            return;
+        }
+
+        // Buscar mensagem pelo external_id
+        $message = Message::findByExternalId($messageId);
+
+        if (!$message) {
+            self::logWarning("MESSAGE_STATUS: Mensagem não encontrada no banco com external_id={$messageId}");
+            // Pode ser mensagem enviada cujo external_id não foi salvo — logar e ignorar
+            if ($statusCode === 'REJECTED' || $statusCode === 'FAILED') {
+                // Logar detalhadamente para facilitar diagnóstico
+                if ($errorCode == 10) {
+                    self::logWarning("⚠️  INSTAGRAM JANELA 24H: Mensagem rejeitada — O Instagram só permite enviar DMs dentro de 24h após a última mensagem do usuário.");
+                    self::logWarning("    Solução: Aguarde o usuário enviar uma nova mensagem antes de responder.");
+                } else {
+                    self::logError("Mensagem rejeitada pelo Instagram. Código: {$errorCode}. Motivo: {$errorMsg}");
+                }
+            }
+            return;
+        }
+
+        self::logInfo("MESSAGE_STATUS: Mensagem encontrada no banco — ID={$message['id']}, status atual={$message['status']}");
+
+        // Atualizar status se temos um mapeamento
+        if ($internalStatus) {
+            $updateData = ['status' => $internalStatus];
+
+            if ($internalStatus === 'delivered') {
+                $updateData['delivered_at'] = date('Y-m-d H:i:s');
+            } elseif ($internalStatus === 'read') {
+                $updateData['read_at'] = date('Y-m-d H:i:s');
+                $updateData['delivered_at'] = $updateData['delivered_at'] ?? date('Y-m-d H:i:s');
+            } elseif ($internalStatus === 'failed') {
+                $errorDetail = $errorMsg ?? $description;
+                if ($errorCode == 10) {
+                    $errorDetail = "Janela de 24h expirada: o Instagram não permite responder após 24h sem interação do usuário. ({$errorMsg})";
+                    self::logWarning("⚠️  INSTAGRAM JANELA 24H: " . $errorDetail);
+                } else {
+                    self::logError("Mensagem rejeitada — código: {$errorCode}, motivo: {$errorMsg}");
+                }
+                $updateData['error_message'] = substr($errorDetail, 0, 500);
+            }
+
+            Message::update($message['id'], $updateData);
+            self::logInfo("MESSAGE_STATUS: Status da mensagem ID={$message['id']} atualizado para '{$internalStatus}'");
+
+            // Notificar frontend via WebSocket sobre mudança de status
+            try {
+                \App\Helpers\WebSocket::notifyMessageStatusUpdated($message['conversation_id'], $message['id'], $internalStatus);
+            } catch (\Exception $e) {
+                self::logWarning("MESSAGE_STATUS: Erro ao notificar WebSocket: " . $e->getMessage());
+            }
+        } else {
+            self::logInfo("MESSAGE_STATUS: Código '{$statusCode}' sem mapeamento interno — nenhuma ação no banco");
+        }
+    }
+
     /**
      * Encontrar conta por webhook
      */

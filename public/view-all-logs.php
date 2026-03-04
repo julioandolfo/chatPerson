@@ -428,15 +428,15 @@ if ($activeTab === 'instagram') {
             LIMIT 30
         ")->fetchAll(\PDO::FETCH_ASSOC);
 
-        // 4. Últimas mensagens Instagram (JOIN para evitar LIMIT em subquery - incompatível com MySQL < 5.7)
+        // 4. Últimas mensagens Instagram
         $igMessages = $db->query("
-            SELECT m.id, m.conversation_id, m.content, m.message_type, m.direction,
-                   m.status, m.external_id, m.created_at,
+            SELECT m.id, m.conversation_id, m.content, m.message_type,
+                   m.sender_type, m.sender_id, m.status, m.external_id, m.created_at,
                    ct.name as sender_name
             FROM messages m
             INNER JOIN conversations c ON c.id = m.conversation_id
                 AND c.channel IN ('instagram', 'instagram_comment')
-            LEFT JOIN contacts ct ON ct.id = m.contact_id
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
             ORDER BY m.created_at DESC
             LIMIT 20
         ")->fetchAll(\PDO::FETCH_ASSOC);
@@ -2759,12 +2759,15 @@ WHERE c.whatsapp_account_id IS NOT NULL
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($instagramData['messages'] as $msg): ?>
+                        <?php foreach ($instagramData['messages'] as $msg):
+                            $isInbound = ($msg['sender_type'] ?? '') === 'contact';
+                        ?>
                         <tr style="border-bottom:1px solid #2d2d30;">
                             <td style="padding:6px 10px;color:#9cdcfe;"><?= $msg['id'] ?></td>
                             <td style="padding:6px 10px;color:#9cdcfe;"><?= $msg['conversation_id'] ?></td>
-                            <td style="padding:6px 10px;color:<?= $msg['direction'] === 'inbound' ? '#4ec9b0' : '#c586c0' ?>;">
-                                <?= $msg['direction'] === 'inbound' ? '⬇ IN' : '⬆ OUT' ?>
+                            <td style="padding:6px 10px;color:<?= $isInbound ? '#4ec9b0' : '#c586c0' ?>;">
+                                <?= $isInbound ? '⬇ IN' : '⬆ OUT' ?>
+                                <span style="color:#555;font-size:10px;">(<?= htmlspecialchars($msg['sender_type'] ?? '?') ?>)</span>
                             </td>
                             <td style="padding:6px 10px;"><?= htmlspecialchars($msg['message_type'] ?? 'text') ?></td>
                             <td style="padding:6px 10px;color:<?= $msg['status'] === 'sent' || $msg['status'] === 'delivered' ? '#4ec9b0' : ($msg['status'] === 'failed' ? '#f44747' : '#858585') ?>;"><?= htmlspecialchars($msg['status'] ?? '—') ?></td>

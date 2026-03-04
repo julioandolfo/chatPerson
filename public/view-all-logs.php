@@ -380,6 +380,141 @@ if ($activeTab === 'automacao') {
     }
 }
 
+// ── Diagnóstico Instagram/Notificame ──
+$instagramData = null;
+if ($activeTab === 'instagram') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+
+        // 1. Contas de integração Instagram (Notificame)
+        $igIntegrationAccounts = $db->query("
+            SELECT id, name, provider, channel, account_id, username, status,
+                   webhook_url, api_url, error_message, last_sync_at, created_at
+            FROM integration_accounts
+            WHERE channel = 'instagram'
+            ORDER BY id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 2. Instagram accounts (via Meta Graph API)
+        $igAccounts = [];
+        try {
+            $igAccounts = $db->query("
+                SELECT ia.id, ia.instagram_user_id, ia.username, ia.name,
+                       ia.account_type, ia.is_active, ia.is_connected,
+                       ia.integration_account_id, ia.facebook_page_id,
+                       ia.followers_count, ia.last_synced_at,
+                       intacc.name as integration_name, intacc.provider as integration_provider
+                FROM instagram_accounts ia
+                LEFT JOIN integration_accounts intacc ON intacc.id = ia.integration_account_id
+                ORDER BY ia.id
+            ")->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            $igAccounts = [['_error' => 'Tabela instagram_accounts: ' . $e->getMessage()]];
+        }
+
+        // 3. Conversas Instagram/instagram_comment
+        $igConversations = $db->query("
+            SELECT c.id, c.contact_id, c.channel, c.status, c.integration_account_id,
+                   ct.name as contact_name, ct.identifier as contact_identifier,
+                   ia.name as account_name, ia.provider as account_provider,
+                   (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as msg_count,
+                   c.created_at, c.updated_at
+            FROM conversations c
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            LEFT JOIN integration_accounts ia ON ia.id = c.integration_account_id
+            WHERE c.channel IN ('instagram', 'instagram_comment')
+            ORDER BY c.updated_at DESC
+            LIMIT 30
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 4. Últimas mensagens Instagram
+        $igMessages = $db->query("
+            SELECT m.id, m.conversation_id, m.content, m.message_type, m.direction,
+                   m.status, m.external_id, m.created_at,
+                   ct.name as sender_name
+            FROM messages m
+            LEFT JOIN contacts ct ON ct.id = m.contact_id
+            WHERE m.conversation_id IN (
+                SELECT id FROM conversations WHERE channel IN ('instagram', 'instagram_comment') LIMIT 100
+            )
+            ORDER BY m.created_at DESC
+            LIMIT 20
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 5. Contagem geral
+        $igTotalConvs = $db->query("SELECT COUNT(*) as c FROM conversations WHERE channel IN ('instagram','instagram_comment')")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $igTotalMsgs  = $db->query("SELECT COUNT(*) as c FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE channel IN ('instagram','instagram_comment'))")->fetch(\PDO::FETCH_ASSOC)['c'];
+        $igTotalConvsNoAccount = $db->query("SELECT COUNT(*) as c FROM conversations WHERE channel IN ('instagram','instagram_comment') AND integration_account_id IS NULL")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        // 6. Webhook URL configurada no servidor
+        $webhookBase = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $notificameWebhookUrl = $webhookBase . '/notificame-webhook.php';
+
+        // 7. Diagnósticos de configuração
+        $igDiag = [];
+        foreach ($igIntegrationAccounts as $acc) {
+            $diag = ['account' => $acc, 'issues' => [], 'ok' => []];
+            if (empty($acc['account_id'])) {
+                $diag['issues'][] = 'CRÍTICO: account_id vazio — obrigatório para envio de mensagens no Instagram via Notificame (campo "from")';
+            } else {
+                $diag['ok'][] = 'account_id configurado: ' . $acc['account_id'];
+            }
+            if (empty($acc['api_url'])) {
+                $diag['issues'][] = 'api_url não configurada — usando URL padrão https://api.notificame.com.br/v1/';
+            } else {
+                $diag['ok'][] = 'api_url: ' . $acc['api_url'];
+            }
+            if (empty($acc['webhook_url'])) {
+                $diag['issues'][] = 'webhook_url não configurada — webhook do Notificame não está apontando para este servidor';
+                $diag['issues'][] = 'URL sugerida: ' . $notificameWebhookUrl;
+            } else {
+                $diag['ok'][] = 'webhook_url: ' . $acc['webhook_url'];
+                if (strpos($acc['webhook_url'], 'notificame-webhook.php') === false) {
+                    $diag['issues'][] = 'webhook_url não aponta para /notificame-webhook.php — verifique se está correto';
+                }
+            }
+            if ($acc['status'] !== 'active') {
+                $diag['issues'][] = 'Status: ' . $acc['status'] . (!empty($acc['error_message']) ? ' — ' . $acc['error_message'] : '');
+            } else {
+                $diag['ok'][] = 'Status: active';
+            }
+            if ($acc['provider'] !== 'notificame') {
+                $diag['issues'][] = 'Provider inesperado: ' . $acc['provider'] . ' (esperado: notificame)';
+            } else {
+                $diag['ok'][] = 'Provider: notificame';
+            }
+            $igDiag[] = $diag;
+        }
+
+        // 8. Últimas linhas do notificame.log filtradas por instagram
+        $notificameLogFile = __DIR__ . '/../logs/notificame.log';
+        $igLogLines = [];
+        if (file_exists($notificameLogFile)) {
+            $allNotifLines = file($notificameLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $igLogLines = array_filter(array_reverse($allNotifLines), function($l) {
+                return stripos($l, 'instagram') !== false || stripos($l, 'Instagram') !== false;
+            });
+            $igLogLines = array_slice(array_values($igLogLines), 0, 100);
+        }
+
+        $instagramData = [
+            'integrationAccounts' => $igIntegrationAccounts,
+            'igAccounts' => $igAccounts,
+            'conversations' => $igConversations,
+            'messages' => $igMessages,
+            'totalConvs' => $igTotalConvs,
+            'totalMsgs' => $igTotalMsgs,
+            'totalConvsNoAccount' => $igTotalConvsNoAccount,
+            'webhookUrl' => $notificameWebhookUrl,
+            'diagnostics' => $igDiag,
+            'igLogLines' => $igLogLines,
+        ];
+    } catch (\Exception $e) {
+        $instagramData = ['error' => $e->getMessage()];
+    }
+}
+
 // ── Logs ──
 $logFileMap = [
     'logs' => __DIR__ . '/../logs/app.log',
@@ -391,6 +526,8 @@ $logFileMap = [
     'webhook' => __DIR__ . '/../logs/webhook.log',
     'media_queue' => __DIR__ . '/../logs/media_queue.log',
     'wc_sync' => __DIR__ . '/../logs/wc_sync.log',
+    'notificame' => __DIR__ . '/../logs/notificame.log',
+    'meta' => __DIR__ . '/../logs/meta.log',
 ];
 // Fallback: se não existir em logs/, tentar em storage/logs/
 foreach ($logFileMap as $key => $path) {
@@ -818,6 +955,8 @@ function colorizeLog($log) {
             <a href="?tab=unificacao_logs" class="tab <?= $activeTab === 'unificacao_logs' ? 'active' : '' ?>">📊 Logs Unificação</a>
             <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
             <a href="?tab=evolution" class="tab <?= $activeTab === 'evolution' ? 'active' : '' ?>">🔗 Logs Evolution</a>
+            <a href="?tab=instagram" class="tab <?= $activeTab === 'instagram' ? 'active' : '' ?>" style="<?= $activeTab === 'instagram' ? '' : 'border-color:#e1306c;color:#e1306c;' ?>">📷 Instagram Diagnóstico</a>
+            <a href="?tab=notificame" class="tab <?= $activeTab === 'notificame' ? 'active' : '' ?>" style="<?= $activeTab === 'notificame' ? '' : 'border-color:#6c63ff;color:#9c99ff;' ?>">🔔 Logs Notificame</a>
             <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
             <a href="?tab=wc_sync" class="tab <?= $activeTab === 'wc_sync' ? 'active' : '' ?>">🔄 Cron Sync WooCommerce</a>
@@ -2411,6 +2550,412 @@ WHERE c.whatsapp_account_id IS NOT NULL
         </div>
         <div class="footer" style="margin-top:15px;">
             <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+        </div>
+
+        <?php elseif ($activeTab === 'instagram'): ?>
+        <!-- ═══════════════ ABA INSTAGRAM DIAGNÓSTICO ═══════════════ -->
+        <header>
+            <h1>📷 Diagnóstico Instagram / Notificame</h1>
+            <p style="color:#888;margin-top:5px;font-size:13px;">Verifica configuração de contas, webhook, envio e recebimento de mensagens Instagram via Notificame.</p>
+        </header>
+
+        <?php if (!empty($instagramData['error'])): ?>
+            <div class="alert alert-error">❌ Erro ao carregar dados: <?= htmlspecialchars($instagramData['error']) ?></div>
+        <?php else: ?>
+
+        <!-- ── Totais ── -->
+        <div class="stats" style="margin-bottom:20px;">
+            <div class="stat">
+                <div class="stat-label">Contas Integração Instagram</div>
+                <div class="stat-value" style="color:#e1306c;"><?= count($instagramData['integrationAccounts']) ?></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Instagram Accounts (Meta)</div>
+                <div class="stat-value" style="color:#4ec9b0;"><?= count(array_filter($instagramData['igAccounts'], fn($r) => !isset($r['_error']))) ?></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Conversas Instagram</div>
+                <div class="stat-value"><?= $instagramData['totalConvs'] ?></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label">Mensagens Instagram</div>
+                <div class="stat-value"><?= $instagramData['totalMsgs'] ?></div>
+            </div>
+            <div class="stat <?= $instagramData['totalConvsNoAccount'] > 0 ? 'errors' : '' ?>">
+                <div class="stat-label">Conversas sem conta vinculada</div>
+                <div class="stat-value"><?= $instagramData['totalConvsNoAccount'] ?></div>
+            </div>
+        </div>
+
+        <!-- ── Diagnóstico de Configuração ── -->
+        <div style="background:#1e3a1e;border:1px solid #3a3;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#4ec9b0;margin-bottom:15px;font-size:16px;">🔍 Diagnóstico de Configuração</h2>
+
+            <?php if (empty($instagramData['integrationAccounts'])): ?>
+                <div style="color:#f44747;padding:15px;background:#2d1a1a;border-radius:6px;">
+                    ❌ <strong>Nenhuma conta de integração Instagram encontrada!</strong><br>
+                    <span style="color:#888;font-size:13px;">Acesse Configurações → Integrações → Notificame e crie uma conta com canal = instagram.</span>
+                </div>
+            <?php else: ?>
+                <?php foreach ($instagramData['diagnostics'] as $diag): ?>
+                <div style="background:#252526;border-radius:6px;padding:15px;margin-bottom:15px;border-left:4px solid <?= empty($diag['issues']) ? '#4ec9b0' : '#f44747' ?>;">
+                    <div style="font-size:15px;font-weight:bold;color:#fff;margin-bottom:10px;">
+                        <?= empty($diag['issues']) ? '✅' : '❌' ?> 
+                        Conta: <?= htmlspecialchars($diag['account']['name']) ?>
+                        <span style="color:#858585;font-size:12px;margin-left:10px;">ID: <?= $diag['account']['id'] ?> | Provider: <?= $diag['account']['provider'] ?></span>
+                    </div>
+
+                    <?php if (!empty($diag['issues'])): ?>
+                    <div style="margin-bottom:10px;">
+                        <div style="color:#f44747;font-size:12px;font-weight:bold;margin-bottom:5px;">PROBLEMAS ENCONTRADOS:</div>
+                        <?php foreach ($diag['issues'] as $issue): ?>
+                            <div style="color:#f88;font-size:13px;padding:3px 0;">⚠️ <?= htmlspecialchars($issue) ?></div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if (!empty($diag['ok'])): ?>
+                    <div>
+                        <div style="color:#4ec9b0;font-size:12px;font-weight:bold;margin-bottom:5px;">OK:</div>
+                        <?php foreach ($diag['ok'] as $ok): ?>
+                            <div style="color:#aaa;font-size:12px;padding:2px 0;">✓ <?= htmlspecialchars($ok) ?></div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+
+                    <div style="margin-top:12px;padding-top:10px;border-top:1px solid #333;">
+                        <div style="color:#858585;font-size:11px;margin-bottom:4px;">DETALHES DA CONTA:</div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:6px;">
+                            <div style="font-size:12px;color:#ccc;">account_id: <span style="color:<?= empty($diag['account']['account_id']) ? '#f44747' : '#4ec9b0' ?>"><?= htmlspecialchars($diag['account']['account_id'] ?? '(vazio)') ?></span></div>
+                            <div style="font-size:12px;color:#ccc;">username: <span style="color:#dcdcaa;"><?= htmlspecialchars($diag['account']['username'] ?? '(vazio)') ?></span></div>
+                            <div style="font-size:12px;color:#ccc;">api_url: <span style="color:#9cdcfe;"><?= htmlspecialchars($diag['account']['api_url'] ?? '(padrão)') ?></span></div>
+                            <div style="font-size:12px;color:#ccc;">webhook_url: <span style="color:<?= empty($diag['account']['webhook_url']) ? '#f44747' : '#9cdcfe' ?>"><?= htmlspecialchars($diag['account']['webhook_url'] ?? '(não configurado)') ?></span></div>
+                            <div style="font-size:12px;color:#ccc;">status: <span style="color:<?= $diag['account']['status'] === 'active' ? '#4ec9b0' : '#f44747' ?>"><?= htmlspecialchars($diag['account']['status']) ?></span></div>
+                            <div style="font-size:12px;color:#ccc;">last_sync: <span style="color:#858585;"><?= htmlspecialchars($diag['account']['last_sync_at'] ?? 'nunca') ?></span></div>
+                        </div>
+                        <?php if (!empty($diag['account']['error_message'])): ?>
+                        <div style="color:#f44747;font-size:12px;margin-top:6px;">Último erro: <?= htmlspecialchars($diag['account']['error_message']) ?></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <!-- ── Webhook Info ── -->
+        <div style="background:#252526;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#dcdcaa;margin-bottom:12px;font-size:16px;">🔗 Configuração do Webhook Notificame</h2>
+            <p style="color:#aaa;font-size:13px;margin-bottom:10px;">O Notificame precisa enviar webhooks para esta URL:</p>
+            <div style="background:#1e1e1e;padding:10px 15px;border-radius:4px;border-left:3px solid #dcdcaa;margin-bottom:15px;">
+                <code style="color:#4ec9b0;font-size:14px;"><?= htmlspecialchars($instagramData['webhookUrl']) ?></code>
+            </div>
+            <div style="color:#888;font-size:12px;line-height:1.8;">
+                <div>• O canal Instagram no webhook é identificado pelo campo <code style="color:#dcdcaa;">channel</code> no payload</div>
+                <div>• O endpoint aceita: <code style="color:#9cdcfe;">POST /notificame-webhook.php</code></div>
+                <div>• Para configurar via API: use <code style="color:#9cdcfe;">POST /subscriptions/</code> com <code style="color:#dcdcaa;">criteria.channel = {account_id}</code></div>
+                <div>• O <code style="color:#e1306c;">account_id</code> da conta de integração é usado como campo <strong>from</strong> no envio de mensagens</div>
+            </div>
+        </div>
+
+        <!-- ── Contas Instagram (Meta Graph API) ── -->
+        <?php if (!empty($instagramData['igAccounts'])): ?>
+        <div style="background:#252526;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#c586c0;margin-bottom:12px;font-size:16px;">🎭 Instagram Accounts (Meta Graph API)</h2>
+            <?php if (isset($instagramData['igAccounts'][0]['_error'])): ?>
+                <div style="color:#f44747;font-size:13px;">⚠️ <?= htmlspecialchars($instagramData['igAccounts'][0]['_error']) ?></div>
+            <?php else: ?>
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                        <tr style="color:#858585;border-bottom:1px solid #3c3c3c;">
+                            <th style="text-align:left;padding:6px 10px;">ID</th>
+                            <th style="text-align:left;padding:6px 10px;">instagram_user_id</th>
+                            <th style="text-align:left;padding:6px 10px;">username</th>
+                            <th style="text-align:left;padding:6px 10px;">account_type</th>
+                            <th style="text-align:left;padding:6px 10px;">integration_account_id</th>
+                            <th style="text-align:left;padding:6px 10px;">is_active</th>
+                            <th style="text-align:left;padding:6px 10px;">is_connected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($instagramData['igAccounts'] as $ig): ?>
+                        <tr style="border-bottom:1px solid #2d2d30;">
+                            <td style="padding:6px 10px;color:#9cdcfe;"><?= $ig['id'] ?></td>
+                            <td style="padding:6px 10px;color:#dcdcaa;"><?= htmlspecialchars($ig['instagram_user_id'] ?? '') ?></td>
+                            <td style="padding:6px 10px;color:#e1306c;">@<?= htmlspecialchars($ig['username'] ?? '') ?></td>
+                            <td style="padding:6px 10px;"><?= htmlspecialchars($ig['account_type'] ?? '') ?></td>
+                            <td style="padding:6px 10px;color:<?= empty($ig['integration_account_id']) ? '#f44747' : '#4ec9b0' ?>;">
+                                <?= $ig['integration_account_id'] ?? '❌ NULL' ?>
+                                <?php if (!empty($ig['integration_name'])): ?>
+                                    <span style="color:#888;"> (<?= htmlspecialchars($ig['integration_name']) ?>)</span>
+                                <?php endif; ?>
+                            </td>
+                            <td style="padding:6px 10px;color:<?= $ig['is_active'] ? '#4ec9b0' : '#f44747' ?>;"><?= $ig['is_active'] ? 'Sim' : 'Não' ?></td>
+                            <td style="padding:6px 10px;color:<?= $ig['is_connected'] ? '#4ec9b0' : '#f44747' ?>;"><?= $ig['is_connected'] ? 'Sim' : 'Não' ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- ── Conversas Recentes ── -->
+        <div style="background:#252526;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#569cd6;margin-bottom:12px;font-size:16px;">💬 Conversas Instagram Recentes (últimas 30)</h2>
+            <?php if (empty($instagramData['conversations'])): ?>
+                <p style="color:#858585;font-size:13px;">Nenhuma conversa Instagram encontrada. Aguardando primeiro contato via webhook.</p>
+            <?php else: ?>
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                        <tr style="color:#858585;border-bottom:1px solid #3c3c3c;">
+                            <th style="text-align:left;padding:6px 10px;">Conv ID</th>
+                            <th style="text-align:left;padding:6px 10px;">Canal</th>
+                            <th style="text-align:left;padding:6px 10px;">Contato</th>
+                            <th style="text-align:left;padding:6px 10px;">Identifier</th>
+                            <th style="text-align:left;padding:6px 10px;">Conta Integração</th>
+                            <th style="text-align:left;padding:6px 10px;">Status</th>
+                            <th style="text-align:left;padding:6px 10px;">Msgs</th>
+                            <th style="text-align:left;padding:6px 10px;">Atualizado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($instagramData['conversations'] as $conv): ?>
+                        <tr style="border-bottom:1px solid #2d2d30;">
+                            <td style="padding:6px 10px;color:#9cdcfe;"><?= $conv['id'] ?></td>
+                            <td style="padding:6px 10px;color:<?= $conv['channel'] === 'instagram_comment' ? '#dcdcaa' : '#e1306c' ?>;"><?= htmlspecialchars($conv['channel']) ?></td>
+                            <td style="padding:6px 10px;"><?= htmlspecialchars($conv['contact_name'] ?? '—') ?></td>
+                            <td style="padding:6px 10px;color:#858585;font-size:11px;"><?= htmlspecialchars($conv['contact_identifier'] ?? '—') ?></td>
+                            <td style="padding:6px 10px;color:<?= empty($conv['integration_account_id']) ? '#f44747' : '#4ec9b0' ?>;">
+                                <?= empty($conv['integration_account_id']) ? '❌ NULL' : ($conv['account_name'] ?? $conv['integration_account_id']) ?>
+                            </td>
+                            <td style="padding:6px 10px;"><?= htmlspecialchars($conv['status']) ?></td>
+                            <td style="padding:6px 10px;color:#9cdcfe;"><?= $conv['msg_count'] ?></td>
+                            <td style="padding:6px 10px;color:#858585;font-size:11px;"><?= $conv['updated_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- ── Últimas Mensagens ── -->
+        <?php if (!empty($instagramData['messages'])): ?>
+        <div style="background:#252526;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#b5cea8;margin-bottom:12px;font-size:16px;">📨 Últimas Mensagens Instagram</h2>
+            <div style="overflow-x:auto;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                        <tr style="color:#858585;border-bottom:1px solid #3c3c3c;">
+                            <th style="text-align:left;padding:6px 10px;">ID</th>
+                            <th style="text-align:left;padding:6px 10px;">Conv</th>
+                            <th style="text-align:left;padding:6px 10px;">Direção</th>
+                            <th style="text-align:left;padding:6px 10px;">Tipo</th>
+                            <th style="text-align:left;padding:6px 10px;">Status</th>
+                            <th style="text-align:left;padding:6px 10px;">Conteúdo</th>
+                            <th style="text-align:left;padding:6px 10px;">Criado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($instagramData['messages'] as $msg): ?>
+                        <tr style="border-bottom:1px solid #2d2d30;">
+                            <td style="padding:6px 10px;color:#9cdcfe;"><?= $msg['id'] ?></td>
+                            <td style="padding:6px 10px;color:#9cdcfe;"><?= $msg['conversation_id'] ?></td>
+                            <td style="padding:6px 10px;color:<?= $msg['direction'] === 'inbound' ? '#4ec9b0' : '#c586c0' ?>;">
+                                <?= $msg['direction'] === 'inbound' ? '⬇ IN' : '⬆ OUT' ?>
+                            </td>
+                            <td style="padding:6px 10px;"><?= htmlspecialchars($msg['message_type'] ?? 'text') ?></td>
+                            <td style="padding:6px 10px;color:<?= $msg['status'] === 'sent' || $msg['status'] === 'delivered' ? '#4ec9b0' : ($msg['status'] === 'failed' ? '#f44747' : '#858585') ?>;"><?= htmlspecialchars($msg['status'] ?? '—') ?></td>
+                            <td style="padding:6px 10px;color:#d4d4d4;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($msg['content'] ?? '') ?>">
+                                <?= htmlspecialchars(mb_substr($msg['content'] ?? '', 0, 80)) ?>
+                            </td>
+                            <td style="padding:6px 10px;color:#858585;font-size:11px;"><?= $msg['created_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- ── Logs Notificame (filtrado Instagram) ── -->
+        <div style="background:#252526;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#6c63ff;margin-bottom:12px;font-size:16px;">
+                📋 Últimas Entradas no notificame.log (filtradas: instagram)
+                <a href="?tab=notificame" style="font-size:12px;color:#9c99ff;margin-left:10px;">Ver log completo →</a>
+            </h2>
+            <?php if (empty($instagramData['igLogLines'])): ?>
+                <div style="color:#858585;font-size:13px;">
+                    <p>Nenhuma linha com "instagram" encontrada no notificame.log.</p>
+                    <?php $logPath = realpath(__DIR__ . '/../logs/notificame.log'); ?>
+                    <p style="margin-top:5px;">Arquivo: <code style="color:#4ec9b0;"><?= $logPath ?: '(não existe ainda — será criado na primeira requisição)' ?></code></p>
+                    <p style="margin-top:8px;color:#dcdcaa;">💡 Para testar, envie uma mensagem de DM no Instagram para o perfil conectado.</p>
+                </div>
+            <?php else: ?>
+                <div style="font-size:11px;color:#858585;margin-bottom:8px;">Exibindo últimas <?= count($instagramData['igLogLines']) ?> linhas com "instagram"</div>
+                <div style="background:#1e1e1e;border-radius:4px;padding:10px;max-height:400px;overflow-y:auto;">
+                    <?php foreach ($instagramData['igLogLines'] as $line):
+                        $lineColor = '#d4d4d4';
+                        if (stripos($line, '[ERROR]') !== false) $lineColor = '#f44747';
+                        elseif (stripos($line, '[WARNING]') !== false) $lineColor = '#dcdcaa';
+                        elseif (stripos($line, '[INFO]') !== false) $lineColor = '#569cd6';
+                    ?>
+                        <div style="color:<?= $lineColor ?>;font-size:11px;line-height:1.7;border-bottom:1px solid #2d2d2d;padding:2px 0;word-break:break-all;">
+                            <?= htmlspecialchars($line) ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- ── Guia de Troubleshooting ── -->
+        <div style="background:#1a1a2e;border:1px solid #6c63ff;border-radius:8px;padding:20px;margin-bottom:20px;">
+            <h2 style="color:#9c99ff;margin-bottom:15px;font-size:16px;">🛠️ Guia de Troubleshooting Instagram + Notificame</h2>
+            <div style="color:#ccc;font-size:13px;line-height:2;">
+                <div style="margin-bottom:10px;"><span style="color:#f44747;font-weight:bold;">❌ Não recebe mensagens?</span></div>
+                <div style="padding-left:15px;color:#aaa;">
+                    1. Verifique se o <strong style="color:#dcdcaa;">webhook_url</strong> está configurado na conta de integração<br>
+                    2. O Notificame precisa apontar o webhook para: <code style="color:#4ec9b0;"><?= htmlspecialchars($instagramData['webhookUrl']) ?></code><br>
+                    3. Configure via API Notificame: <code style="color:#9cdcfe;">POST /subscriptions/</code> com <code>criteria.channel = {account_id}</code><br>
+                    4. Verifique se o <strong style="color:#e1306c;">account_id</strong> da conta de integração está preenchido (ID do canal Instagram no Notificame)<br>
+                    5. Confirme no painel Notificame que o canal Instagram está conectado e ativo<br>
+                    6. Verifique os logs: <a href="?tab=notificame" style="color:#9c99ff;">Aba Logs Notificame</a>
+                </div>
+                <div style="margin-top:15px;margin-bottom:10px;"><span style="color:#f44747;font-weight:bold;">❌ Não envia mensagens?</span></div>
+                <div style="padding-left:15px;color:#aaa;">
+                    1. O campo <strong style="color:#e1306c;">account_id</strong> é obrigatório para envio (usado como <code>from</code> no payload)<br>
+                    2. Endpoint usado: <code style="color:#4ec9b0;">POST /channels/instagram/messages</code><br>
+                    3. Payload esperado: <code style="color:#dcdcaa;">{"from": "{account_id}", "to": "{instagram_user_id}", "contents": [{"type":"text","text":"..."}]}</code><br>
+                    4. Verifique se o token API está correto e tem permissão para enviar mensagens<br>
+                    5. Verifique os logs de envio na <a href="?tab=notificame" style="color:#9c99ff;">aba Notificame</a> — procure por "sendMessage"
+                </div>
+                <div style="margin-top:15px;margin-bottom:10px;"><span style="color:#dcdcaa;font-weight:bold;">⚠️ Tabela instagram_accounts vazia?</span></div>
+                <div style="padding-left:15px;color:#aaa;">
+                    A tabela <code>instagram_accounts</code> é usada pela integração <strong>Meta Graph API direta</strong> (não Notificame).<br>
+                    Se você usa Notificame, apenas a tabela <code>integration_accounts</code> (com channel=instagram) é necessária.
+                </div>
+            </div>
+        </div>
+
+        <?php endif; // instagramData error check ?>
+
+        <div class="footer">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=instagram" style="color:#e1306c;">🔄 Atualizar</a></p>
+        </div>
+
+        <?php elseif ($activeTab === 'notificame'): ?>
+        <!-- ═══════════════ ABA LOGS NOTIFICAME ═══════════════ -->
+        <?php
+            $notifLogFile  = $logFileMap['notificame'] ?? '';
+            $notifTitle    = '🔔 Logs Notificame';
+            $notifDesc     = 'Todos os eventos de webhook, envio e recebimento de mensagens via Notificame (WhatsApp, Instagram, Facebook, etc).';
+            $notifLines    = [];
+            if (file_exists($notifLogFile)) {
+                $allNotifRaw = file($notifLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $notifLines  = array_slice(array_reverse($allNotifRaw), 0, $maxLines);
+            }
+            if (!empty($filter)) {
+                $notifLines = array_filter($notifLines, fn($l) => stripos($l, $filter) !== false);
+            }
+            if (!empty($level)) {
+                $notifLines = array_filter($notifLines, fn($l) => stripos($l, "[$level]") !== false);
+            }
+            $notifTotal   = count($notifLines);
+            $notifErrors  = count(array_filter($notifLines, fn($l) => stripos($l, '[ERROR]') !== false));
+            $notifWarns   = count(array_filter($notifLines, fn($l) => stripos($l, '[WARNING]') !== false));
+            $notifWebhook = count(array_filter($notifLines, fn($l) => stripos($l, 'Webhook') !== false));
+            $notifSend    = count(array_filter($notifLines, fn($l) => stripos($l, 'sendMessage') !== false));
+            $notifInsta   = count(array_filter($notifLines, fn($l) => stripos($l, 'instagram') !== false));
+        ?>
+
+        <header>
+            <h1><?= $notifTitle ?></h1>
+            <p style="color:#888;margin-top:5px;font-size:13px;"><?= $notifDesc ?></p>
+            <div class="stats" style="margin-top:15px;">
+                <div class="stat"><div class="stat-label">Total</div><div class="stat-value"><?= $notifTotal ?></div></div>
+                <div class="stat errors"><div class="stat-label">Erros</div><div class="stat-value"><?= $notifErrors ?></div></div>
+                <div class="stat warnings"><div class="stat-label">Warnings</div><div class="stat-value"><?= $notifWarns ?></div></div>
+                <div class="stat"><div class="stat-label">Webhooks</div><div class="stat-value" style="color:#c586c0;"><?= $notifWebhook ?></div></div>
+                <div class="stat"><div class="stat-label">SendMessage</div><div class="stat-value" style="color:#4ec9b0;"><?= $notifSend ?></div></div>
+                <div class="stat"><div class="stat-label">Instagram</div><div class="stat-value" style="color:#e1306c;"><?= $notifInsta ?></div></div>
+            </div>
+        </header>
+
+        <div class="filters">
+            <form method="GET">
+                <input type="hidden" name="tab" value="notificame">
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label>Buscar</label>
+                        <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="instagram, sendMessage, webhook, ERROR..." style="min-width:280px;">
+                    </div>
+                    <div class="filter-group">
+                        <label>Nível</label>
+                        <select name="level">
+                            <option value="">Todos</option>
+                            <option value="ERROR" <?= $level === 'ERROR' ? 'selected' : '' ?>>ERROR</option>
+                            <option value="WARNING" <?= $level === 'WARNING' ? 'selected' : '' ?>>WARNING</option>
+                            <option value="INFO" <?= $level === 'INFO' ? 'selected' : '' ?>>INFO</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label>Linhas</label>
+                        <select name="lines">
+                            <option value="200" <?= $maxLines == 200 ? 'selected' : '' ?>>200</option>
+                            <option value="500" <?= $maxLines == 500 ? 'selected' : '' ?>>500</option>
+                            <option value="1000" <?= $maxLines == 1000 ? 'selected' : '' ?>>1000</option>
+                            <option value="3000" <?= $maxLines == 3000 ? 'selected' : '' ?>>3000</option>
+                        </select>
+                    </div>
+                    <div class="actions">
+                        <button type="submit">🔍 Filtrar</button>
+                        <button type="button" class="secondary" onclick="window.location.href='?tab=notificame'">🔄 Limpar</button>
+                        <a href="?tab=instagram" style="color:#e1306c;font-size:13px;margin-left:10px;">📷 Diagnóstico Instagram</a>
+                    </div>
+                </div>
+                <!-- Atalhos rápidos por canal -->
+                <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <span style="color:#858585;font-size:11px;align-self:center;">Filtrar:</span>
+                    <?php foreach (['instagram','whatsapp','facebook','Webhook INÍCIO','sendMessage','ERROR','Contact','Conversa'] as $quick): ?>
+                        <a href="?tab=notificame&filter=<?= urlencode($quick) ?>&lines=<?= $maxLines ?>"
+                           style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#<?= $filter === $quick ? 'fff' : '9cdcfe' ?>;text-decoration:none;">
+                            <?= htmlspecialchars($quick) ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </form>
+        </div>
+
+        <div class="logs-container">
+            <?php if (!file_exists($notifLogFile)): ?>
+                <div class="no-logs">
+                    <h2>Arquivo notificame.log ainda não existe</h2>
+                    <p>Será criado automaticamente na primeira requisição/webhook do Notificame.</p>
+                    <p style="color:#858585;margin-top:10px;">Caminho esperado: <code style="color:#4ec9b0;"><?= realpath(__DIR__ . '/../logs') ?>/notificame.log</code></p>
+                </div>
+            <?php elseif (empty($notifLines)): ?>
+                <div class="no-logs">
+                    <h2>Nenhum log encontrado</h2>
+                    <p>Tente remover os filtros ou aguarde novos eventos do Notificame.</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($notifLines as $line):
+                    $cls = '';
+                    if (stripos($line, '[ERROR]') !== false) $cls = 'error';
+                    elseif (stripos($line, '[WARNING]') !== false) $cls = 'warning';
+                    elseif (stripos($line, '[INFO]') !== false) $cls = 'info';
+                ?>
+                    <div class="log-line <?= $cls ?>"><?= colorizeLog($line) ?></div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="footer">
+            <p>Arquivo: <?= $notifLogFile ?></p>
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=notificame&filter=<?= urlencode($filter) ?>&lines=<?= $maxLines ?>" style="color:#9c99ff;">🔄 Atualizar</a></p>
         </div>
 
         <?php elseif ($activeTab === 'unificacao_logs' || $activeTab === 'quepasa'): ?>

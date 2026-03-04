@@ -802,7 +802,7 @@ $autoCloseSettings = $cs['auto_close'] ?? [];
                         <select name="auto_close_agent_inactivity_target_id_automation" class="form-select form-select-solid">
                             <option value="">Selecione uma automação</option>
                             <?php
-                            $automations = \App\Models\Automation::getAll(['is_active' => true]);
+                            $automations = \App\Models\Automation::where('is_active', '=', 1);
                             foreach ($automations as $auto): ?>
                                 <option value="<?= $auto['id'] ?>" <?= ($autoCloseSettings['agent_inactivity_target_id'] ?? '') == $auto['id'] && ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'automation' ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($auto['name']) ?>

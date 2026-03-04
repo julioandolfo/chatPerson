@@ -213,9 +213,9 @@ class Contact extends Model
         
         // Remover sufixos comuns do WhatsApp
         $phone = str_replace('@s.whatsapp.net', '', $phone);
-        $phone = str_replace('@lid', '', $phone); // Linked ID (contatos não salvos)
-        $phone = str_replace('@c.us', '', $phone); // Contato comum
-        $phone = str_replace('@g.us', '', $phone); // Grupo
+        $phone = str_replace('@lid', '', $phone);
+        $phone = str_replace('@c.us', '', $phone);
+        $phone = str_replace('@g.us', '', $phone);
         
         // Remover caracteres especiais comuns
         $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
@@ -228,28 +228,53 @@ class Contact extends Model
         // Remover + se ainda estiver presente
         $phone = ltrim($phone, '+');
         
-        // ✅ NORMALIZAR 9º DÍGITO PARA NÚMEROS BRASILEIROS
-        // Formato: 55 (país) + DD (2 dígitos DDD) + 9XXXXXXXX (9 dígitos com 9º adicional)
-        if (strlen($phone) == 12 && substr($phone, 0, 2) === '55') {
-            // Já tem 12 dígitos (formato correto com 9º dígito)
-            // Exemplo: 5535991970289
+        // Se começa com 0, remover (formato antigo de discagem)
+        if (strpos($phone, '0') === 0 && strlen($phone) >= 11) {
+            $phone = substr($phone, 1);
+        }
+        
+        $len = strlen($phone);
+        
+        // Números que JÁ começam com 55 (código do Brasil)
+        if (substr($phone, 0, 2) === '55') {
+            if ($len == 12) {
+                // 55 + DDD(2) + número(8) = 12 dígitos — formato fixo OU celular sem 9º dígito
+                $ddd = substr($phone, 2, 2);
+                $numero = substr($phone, 4);
+                if (strlen($numero) === 8 && in_array($numero[0], ['6', '7', '8', '9'])) {
+                    return '55' . $ddd . '9' . $numero;
+                }
+                return $phone;
+            } elseif ($len == 13) {
+                // 55 + DDD(2) + 9 + número(8) = 13 dígitos — formato completo celular
+                // Ou pode ter 0 extra no DDD: 55 + 0DDD + número → remover 0
+                $afterCountry = substr($phone, 2);
+                if (strpos($afterCountry, '0') === 0) {
+                    return '55' . ltrim($afterCountry, '0');
+                }
+                return $phone;
+            } elseif ($len == 11 && substr($phone, 2, 1) !== '0') {
+                // 55 + DDD(1?) + número — provavelmente incompleto, retornar como está
+                return $phone;
+            }
             return $phone;
-        } elseif (strlen($phone) == 13 && substr($phone, 0, 2) === '55') {
-            // 13 dígitos? Pode ter 0 extra no DDD antigo, remover
-            // Exemplo: 55035991970289 -> 5535991970289
-            return '55' . ltrim(substr($phone, 2), '0');
-        } elseif (strlen($phone) == 11 && substr($phone, 0, 2) === '55') {
-            // 11 dígitos: falta o 9º dígito adicional
-            // Exemplo: 553591970289 -> 5535991970289
-            $ddd = substr($phone, 2, 2);
-            $numero = substr($phone, 4);
-            
-            // Adicionar 9º dígito se o número começar com 6-9 (celular)
-            if (strlen($numero) === 8 && in_array($numero[0], ['6', '7', '8', '9'])) {
+        }
+        
+        // Números SEM código do país (10 ou 11 dígitos) — adicionar "55"
+        if ($len == 11) {
+            // DDD(2) + 9 + número(8) = 11 dígitos — celular completo sem código do país
+            // Ex: 34993180666 → 5534993180666
+            return '55' . $phone;
+        } elseif ($len == 10) {
+            // DDD(2) + número(8) = 10 dígitos — pode ser fixo ou celular sem 9º dígito
+            // Ex: 3493180666 → 55 + 34 + 9 + 93180666 (se celular)
+            $ddd = substr($phone, 0, 2);
+            $numero = substr($phone, 2);
+            if (in_array($numero[0], ['6', '7', '8', '9'])) {
                 return '55' . $ddd . '9' . $numero;
             }
-            
-            return $phone; // Número fixo ou já normalizado
+            // Fixo: adicionar 55 sem 9º dígito
+            return '55' . $phone;
         }
         
         return $phone;

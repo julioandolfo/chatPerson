@@ -437,20 +437,24 @@ class FollowupService
         );
         
         if ($lastConversation) {
-            // Usar conversa existente
             self::processFollowup($lastConversation, 'reengagement');
         } else {
-            // Criar nova conversa de reengajamento
-            $conversationId = Conversation::create([
-                'contact_id' => $contact['contact_id'],
-                'channel' => 'whatsapp', // ou detectar canal preferido
-                'status' => 'open',
-                'subject' => 'Reengajamento'
-            ]);
-            
-            $conversation = Conversation::find($conversationId);
-            if ($conversation) {
-                self::processFollowup($conversation, 'reengagement');
+            // Verificar se já existe conversa aberta antes de criar
+            $existingOpen = Conversation::findAnyOpenByContact($contact['contact_id'], 'whatsapp');
+            if ($existingOpen) {
+                self::processFollowup($existingOpen, 'reengagement');
+            } else {
+                $conversationId = Conversation::create([
+                    'contact_id' => $contact['contact_id'],
+                    'channel' => 'whatsapp',
+                    'status' => 'open',
+                    'subject' => 'Reengajamento'
+                ]);
+                
+                $conversation = Conversation::find($conversationId);
+                if ($conversation) {
+                    self::processFollowup($conversation, 'reengagement');
+                }
             }
         }
     }

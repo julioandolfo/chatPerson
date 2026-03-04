@@ -1,8 +1,9 @@
 <?php
 /**
  * Script para normalizar números de telefone na tabela contacts
- * Remove sufixos como @lid, @s.whatsapp.net, etc.
- * Identifica e lista contatos duplicados
+ * - Remove sufixos como @lid, @s.whatsapp.net, etc.
+ * - Adiciona código do país "55" para números brasileiros sem prefixo
+ * - Identifica e lista contatos duplicados
  */
 
 require_once __DIR__ . '/../../config/bootstrap.php';
@@ -12,10 +13,24 @@ use App\Models\Contact;
 
 echo "=== Normalização de Números de Telefone ===\n\n";
 
-// 1. Listar contatos com números não normalizados
+// 1. Buscar contatos com números não normalizados:
+// - Contêm sufixos WhatsApp (@, +, :)
+// - Têm 10-11 dígitos (falta código do país "55")
+// - Começam com 0 (formato antigo de discagem)
 echo "1. Buscando contatos com números não normalizados...\n";
-$sql = "SELECT id, name, phone FROM contacts WHERE phone LIKE '%@%' OR phone LIKE '%+%' OR phone LIKE '%:%'";
-$contacts = Database::query($sql);
+$sql = "SELECT id, name, phone FROM contacts 
+        WHERE phone IS NOT NULL 
+        AND phone != '' 
+        AND phone != 'system' 
+        AND phone != '0'
+        AND (
+            phone LIKE '%@%' 
+            OR phone LIKE '%+%' 
+            OR phone LIKE '%:%'
+            OR (phone REGEXP '^[0-9]+$' AND CHAR_LENGTH(phone) IN (10, 11))
+            OR (phone REGEXP '^0[0-9]+$')
+        )";
+$contacts = Database::fetchAll($sql);
 
 echo "   Encontrados " . count($contacts) . " contatos com números não normalizados.\n\n";
 

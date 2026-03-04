@@ -53,25 +53,7 @@ class NotificameService
      */
     public static function normalizePhoneNumber(string $phone): string
     {
-        if (empty($phone)) {
-            return '';
-        }
-        
-        // Remover caracteres especiais
-        $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
-        
-        // Remover sufixos comuns
-        $phone = str_replace('@s.whatsapp.net', '', $phone);
-        $phone = str_replace('@lid', '', $phone);
-        $phone = str_replace('@c.us', '', $phone);
-        $phone = str_replace('@g.us', '', $phone);
-        
-        // Extrair apenas dígitos (pode ter : para separar device ID)
-        if (strpos($phone, ':') !== false) {
-            $phone = explode(':', $phone)[0];
-        }
-        
-        return ltrim($phone, '+');
+        return \App\Models\Contact::normalizePhoneNumber($phone);
     }
     
     /**

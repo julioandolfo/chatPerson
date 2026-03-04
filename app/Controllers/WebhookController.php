@@ -9,6 +9,7 @@ namespace App\Controllers;
 use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Database;
+use App\Services\EvolutionService;
 use App\Models\WooCommerceIntegration;
 use App\Models\WooCommerceOrderCache;
 use App\Models\Contact;
@@ -113,8 +114,19 @@ class WebhookController
                 return;
             }
             
-            // Processar webhook via WhatsAppService
-            \App\Services\WhatsAppService::processWebhook($data);
+            // Detectar se é webhook da Evolution API
+            // Evolution envia: { "event": "CONNECTION_UPDATE", "instance": "nome", "data": { ... } }
+            $isEvolution = isset($data['event']) && isset($data['instance']);
+            
+            if ($isEvolution) {
+                if (!isset($data['data'])) {
+                    $data['data'] = [];
+                }
+                \App\Helpers\Logger::evolution("[INFO] Webhook Evolution recebido via WebhookController - Event: {$data['event']}, Instance: {$data['instance']}");
+                \App\Services\EvolutionService::processWebhook($data);
+            } else {
+                \App\Services\WhatsAppService::processWebhook($data);
+            }
             
             // Responder com sucesso
             Response::json(['success' => true]);

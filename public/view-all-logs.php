@@ -385,6 +385,7 @@ $logFileMap = [
     'logs' => __DIR__ . '/../logs/app.log',
     'automacao' => __DIR__ . '/../logs/automacao.log',
     'quepasa' => __DIR__ . '/../logs/quepasa.log',
+    'evolution' => __DIR__ . '/../logs/evolution.log',
     'conversas' => __DIR__ . '/../logs/conversas.log',
     'unificacao_logs' => __DIR__ . '/../logs/unificacao.log',
     'webhook' => __DIR__ . '/../logs/webhook.log',
@@ -816,6 +817,7 @@ function colorizeLog($log) {
             <a href="?tab=unificacao" class="tab <?= $activeTab === 'unificacao' ? 'active' : '' ?>">🔗 Unificação Contas</a>
             <a href="?tab=unificacao_logs" class="tab <?= $activeTab === 'unificacao_logs' ? 'active' : '' ?>">📊 Logs Unificação</a>
             <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
+            <a href="?tab=evolution" class="tab <?= $activeTab === 'evolution' ? 'active' : '' ?>">🔗 Logs Evolution</a>
             <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
             <a href="?tab=wc_sync" class="tab <?= $activeTab === 'wc_sync' ? 'active' : '' ?>">🔄 Cron Sync WooCommerce</a>
@@ -2603,6 +2605,162 @@ WHERE c.whatsapp_account_id IS NOT NULL
             </p>
         </div>
         
+        <?php elseif ($activeTab === 'evolution'): ?>
+        <!-- ═══════════════ ABA LOGS EVOLUTION ═══════════════ -->
+        <?php
+            $evoLogFile = $logFileMap['evolution'] ?? '';
+            $evoLogs = [];
+            if (file_exists($evoLogFile)) {
+                $allEvoLines = file($evoLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $evoLogs = array_slice(array_reverse($allEvoLines), 0, $maxLines);
+            }
+            if (!empty($filter)) {
+                $evoLogs = array_filter($evoLogs, function($line) use ($filter) {
+                    return stripos($line, $filter) !== false;
+                });
+            }
+            $evoLevelFilter = $_GET['tipo'] ?? '';
+            if (!empty($evoLevelFilter)) {
+                $evoLogs = array_filter($evoLogs, function($line) use ($evoLevelFilter) {
+                    return stripos($line, $evoLevelFilter) !== false;
+                });
+            }
+            $evoTotal = count($evoLogs);
+
+            // Stats por categoria
+            $evoStats = ['INFO' => 0, 'ERROR' => 0, 'getQRCode' => 0, 'getConnectionStatus' => 0, 'handleMessageUpsert' => 0, 'handleConnectionUpdate' => 0, 'processWebhook' => 0, 'sendMessage' => 0, 'createInstance' => 0];
+            if (!empty($allEvoLines)) {
+                foreach (array_slice(array_reverse($allEvoLines), 0, 5000) as $l) {
+                    foreach ($evoStats as $cat => $_) {
+                        if (stripos($l, $cat) !== false) $evoStats[$cat]++;
+                    }
+                }
+            }
+        ?>
+
+        <header>
+            <h1>🔗 Logs Evolution API</h1>
+            <p style="color: #888; margin-top: 5px; font-size: 13px;">Logs de comunicação com a Evolution API: instâncias, QR codes, webhooks, envio/recebimento de mensagens.</p>
+        </header>
+
+        <!-- Stats -->
+        <div class="stats" style="margin-bottom: 15px;">
+            <?php
+            $evoCatLabels = [
+                'INFO' => ['label' => 'Info', 'color' => '#569cd6'],
+                'ERROR' => ['label' => 'Erros', 'color' => '#f44747'],
+                'processWebhook' => ['label' => 'Webhooks', 'color' => '#c586c0'],
+                'handleMessageUpsert' => ['label' => 'Msgs Recebidas', 'color' => '#4ec9b0'],
+                'sendMessage' => ['label' => 'Msgs Enviadas', 'color' => '#b5cea8'],
+                'handleConnectionUpdate' => ['label' => 'Conexão', 'color' => '#dcdcaa'],
+                'getQRCode' => ['label' => 'QR Code', 'color' => '#9cdcfe'],
+                'createInstance' => ['label' => 'Criar Instância', 'color' => '#ce9178'],
+                'getConnectionStatus' => ['label' => 'Check Status', 'color' => '#d4d4d4'],
+            ];
+            foreach ($evoCatLabels as $cat => $info): ?>
+                <div class="stat" style="cursor:pointer;" onclick="window.location.href='?tab=evolution&tipo=<?= urlencode($cat) ?>&lines=<?= $maxLines ?>'">
+                    <div class="stat-label"><?= $info['label'] ?></div>
+                    <div class="stat-value" style="color: <?= $info['color'] ?>"><?= $evoStats[$cat] ?? 0 ?></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Filtros -->
+        <div style="background: #252526; padding: 12px; border-radius: 6px; margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <form method="GET" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; width: 100%;">
+                <input type="hidden" name="tab" value="evolution">
+                <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="Buscar nos logs Evolution..."
+                    style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px; flex: 1; min-width: 200px;">
+                <select name="tipo" style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px;">
+                    <option value="">Todos</option>
+                    <option value="ERROR" <?= $evoLevelFilter === 'ERROR' ? 'selected' : '' ?>>Erros</option>
+                    <option value="processWebhook" <?= $evoLevelFilter === 'processWebhook' ? 'selected' : '' ?>>Webhooks</option>
+                    <option value="handleMessageUpsert" <?= $evoLevelFilter === 'handleMessageUpsert' ? 'selected' : '' ?>>Msgs Recebidas</option>
+                    <option value="sendMessage" <?= $evoLevelFilter === 'sendMessage' ? 'selected' : '' ?>>Msgs Enviadas</option>
+                    <option value="handleConnectionUpdate" <?= $evoLevelFilter === 'handleConnectionUpdate' ? 'selected' : '' ?>>Conexão</option>
+                    <option value="getQRCode" <?= $evoLevelFilter === 'getQRCode' ? 'selected' : '' ?>>QR Code</option>
+                    <option value="createInstance" <?= $evoLevelFilter === 'createInstance' ? 'selected' : '' ?>>Criar Instância</option>
+                    <option value="getConnectionStatus" <?= $evoLevelFilter === 'getConnectionStatus' ? 'selected' : '' ?>>Check Status</option>
+                </select>
+                <select name="lines" style="background: #1e1e1e; color: #d4d4d4; border: 1px solid #3c3c3c; padding: 6px 12px; border-radius: 4px;">
+                    <option value="100" <?= $maxLines == 100 ? 'selected' : '' ?>>100 linhas</option>
+                    <option value="500" <?= $maxLines == 500 ? 'selected' : '' ?>>500 linhas</option>
+                    <option value="1000" <?= $maxLines == 1000 ? 'selected' : '' ?>>1000 linhas</option>
+                    <option value="5000" <?= $maxLines == 5000 ? 'selected' : '' ?>>5000 linhas</option>
+                </select>
+                <button type="submit" style="background: #0e639c; color: white; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">Filtrar</button>
+                <button type="button" onclick="window.location.href='?tab=evolution'" style="background: #3c3c3c; color: #d4d4d4; border: none; padding: 6px 16px; border-radius: 4px; cursor: pointer;">Limpar</button>
+            </form>
+        </div>
+
+        <!-- Info do arquivo -->
+        <div style="background: #252526; padding: 8px 15px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; color: #888;">
+            📁 Arquivo: <span style="color: #d4d4d4;"><?= htmlspecialchars($evoLogFile) ?></span> |
+            <?php if (file_exists($evoLogFile)): ?>
+                Tamanho: <span style="color: #d4d4d4;"><?= number_format(filesize($evoLogFile) / 1024, 1) ?> KB</span> |
+                Última modificação: <span style="color: #d4d4d4;"><?= date('d/m/Y H:i:s', filemtime($evoLogFile)) ?></span> |
+            <?php endif; ?>
+            Exibindo: <span style="color: #4ec9b0;"><?= $evoTotal ?></span> linhas
+            <?php if (!empty($evoLevelFilter)): ?>
+                | Filtro: <span style="color: #dcdcaa;"><?= htmlspecialchars($evoLevelFilter) ?></span>
+            <?php endif; ?>
+        </div>
+
+        <!-- Logs -->
+        <div class="log-container" style="max-height: 70vh; overflow-y: auto; background: #1e1e1e; border-radius: 6px; padding: 10px;">
+            <?php if (empty($evoLogs)): ?>
+                <div style="text-align: center; padding: 40px; color: #888;">
+                    <?php if (!file_exists($evoLogFile)): ?>
+                        <p style="font-size: 18px;">📭 Arquivo de log ainda não existe</p>
+                        <p style="margin-top: 10px;">O arquivo <code style="color: #4ec9b0;">evolution.log</code> será criado automaticamente quando a primeira operação com Evolution API for realizada.</p>
+                        <p style="margin-top: 5px; font-size: 12px;">Conecte uma conta Evolution, envie uma mensagem ou receba um webhook para gerar os primeiros logs.</p>
+                    <?php else: ?>
+                        <p style="font-size: 18px;">🔍 Nenhum log encontrado</p>
+                        <p style="margin-top: 10px;">Nenhum registro corresponde aos filtros aplicados.</p>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <?php foreach ($evoLogs as $line): ?>
+                    <?php
+                    $lineColor = '#d4d4d4';
+                    $bgColor = 'transparent';
+                    if (stripos($line, '[ERROR]') !== false || stripos($line, 'Falha') !== false || stripos($line, 'Erro') !== false) {
+                        $lineColor = '#f44747';
+                        $bgColor = 'rgba(244, 71, 71, 0.05)';
+                    } elseif (stripos($line, 'processWebhook') !== false) {
+                        $lineColor = '#c586c0';
+                    } elseif (stripos($line, 'handleMessageUpsert') !== false || stripos($line, 'Encaminhando para WhatsAppService') !== false) {
+                        $lineColor = '#4ec9b0';
+                        $bgColor = 'rgba(78, 201, 176, 0.05)';
+                    } elseif (stripos($line, 'sendMessage') !== false || stripos($line, 'Mensagem enviada') !== false) {
+                        $lineColor = '#b5cea8';
+                    } elseif (stripos($line, 'handleConnectionUpdate') !== false || stripos($line, 'conectada') !== false || stripos($line, 'desconectada') !== false) {
+                        $lineColor = '#dcdcaa';
+                    } elseif (stripos($line, 'getQRCode') !== false) {
+                        $lineColor = '#9cdcfe';
+                    } elseif (stripos($line, 'createInstance') !== false) {
+                        $lineColor = '#ce9178';
+                    } elseif (stripos($line, 'getConnectionStatus') !== false || stripos($line, 'resolveConnectionState') !== false) {
+                        $lineColor = '#569cd6';
+                    }
+                    ?>
+                    <div style="padding: 3px 8px; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; color: <?= $lineColor ?>; background: <?= $bgColor ?>; border-bottom: 1px solid #2a2a2a; word-break: break-all;">
+                        <?= htmlspecialchars($line) ?>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
+
+        <div class="footer" style="margin-top: 15px;">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?></p>
+            <p style="margin-top: 5px; font-size: 12px; color: #888;">
+                Auto-refresh:
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 5000)" style="color: #4ec9b0;">5s</a> |
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 15000)" style="color: #4ec9b0;">15s</a> |
+                <a href="javascript:void(0)" onclick="setInterval(()=>location.reload(), 30000)" style="color: #4ec9b0;">30s</a>
+            </p>
+        </div>
+
         <?php else: ?>
         <!-- ═══════════════ ABA LOGS ═══════════════ -->
         <header>

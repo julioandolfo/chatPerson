@@ -188,16 +188,23 @@ class MessagesController
             $isNewConversation = false;
             
             if (!$conversation) {
-                $conversationId = Conversation::create([
-                    'contact_id' => $contact['id'],
-                    'channel' => 'whatsapp',
-                    'integration_account_id' => $account['id'],
-                    'status' => 'open',
-                    'funnel_id' => $account['default_funnel_id'] ?? null,
-                    'funnel_stage_id' => $account['default_stage_id'] ?? null
-                ]);
-                $conversation = Conversation::find($conversationId);
-                $isNewConversation = true;
+                $existingOpen = Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                if ($existingOpen) {
+                    $conversation = $existingOpen;
+                    $conversationId = $existingOpen['id'];
+                    $isNewConversation = false;
+                } else {
+                    $conversationId = Conversation::create([
+                        'contact_id' => $contact['id'],
+                        'channel' => 'whatsapp',
+                        'integration_account_id' => $account['id'],
+                        'status' => 'open',
+                        'funnel_id' => $account['default_funnel_id'] ?? null,
+                        'funnel_stage_id' => $account['default_stage_id'] ?? null
+                    ]);
+                    $conversation = Conversation::find($conversationId);
+                    $isNewConversation = true;
+                }
             } else {
                 $conversationId = $conversation['id'];
                 if ($conversation['status'] === 'closed' || $conversation['status'] === 'resolved') {

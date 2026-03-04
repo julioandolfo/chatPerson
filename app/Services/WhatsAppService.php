@@ -653,29 +653,8 @@ class WhatsAppService
      */
     public static function normalizePhoneNumber(string $phone): string
     {
-        if (empty($phone)) {
-            return '';
-        }
-        
-        // Remover sufixos comuns do WhatsApp
-        $phone = str_replace('@s.whatsapp.net', '', $phone);
-        $phone = str_replace('@lid', '', $phone); // Linked ID (contatos não salvos)
-        $phone = str_replace('@c.us', '', $phone); // Contato comum
-        $phone = str_replace('@g.us', '', $phone); // Grupo
-        
-        // Remover caracteres especiais comuns
-        $phone = str_replace(['+', '-', ' ', '(', ')', '.', '_'], '', $phone);
-        
-        // Extrair apenas dígitos (pode ter : para separar device ID)
-        // Ex: "553591970289:86" -> extrair apenas "553591970289"
-        if (strpos($phone, ':') !== false) {
-            $phone = explode(':', $phone)[0];
-        }
-        
-        // Remover + se ainda estiver presente
-        $phone = ltrim($phone, '+');
-        
-        return $phone;
+        // Delega para Contact::normalizePhoneNumber() para manter lógica centralizada
+        return \App\Models\Contact::normalizePhoneNumber($phone);
     }
 
     /**
@@ -1403,6 +1382,18 @@ class WhatsAppService
         }
         
         if ($connected) {
+            // Verificar e reconfigurar webhook se necessário
+            $config = json_decode($account['config'] ?? '{}', true) ?: [];
+            $webhookConfigured = $config['webhook_configured'] ?? false;
+            if (!$webhookConfigured) {
+                try {
+                    self::configureWebhookAutomatically($accountId);
+                    Logger::quepasa("verifyRealConnection - Webhook reconfigurado automaticamente para conta {$accountId}");
+                } catch (\Exception $e) {
+                    Logger::quepasa("verifyRealConnection - Falha ao reconfigurar webhook: " . $e->getMessage());
+                }
+            }
+
             return [
                 'connected' => true,
                 'status' => 'connected',
@@ -3323,17 +3314,24 @@ class WhatsAppService
                         $conversation = \App\Services\ConversationService::create($conversationData, false);
                     } catch (\Exception $e) {
                         Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
-                        $fallbackData = [
-                            'contact_id' => $contact['id'],
-                            'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
-                            'status' => 'open'
-                        ];
-                        if (!empty($account['integration_account_id'])) {
-                            $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                        // Verificar se já existe conversa aberta antes de fallback
+                        $existingFallback = \App\Models\Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                        if ($existingFallback) {
+                            $conversation = $existingFallback;
+                            Logger::quepasa("processWebhook - Fallback: usando conversa aberta existente ID={$existingFallback['id']}");
+                        } else {
+                            $fallbackData = [
+                                'contact_id' => $contact['id'],
+                                'channel' => 'whatsapp',
+                                'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
+                                'status' => 'open'
+                            ];
+                            if (!empty($account['integration_account_id'])) {
+                                $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                            }
+                            $conversationId = \App\Models\Conversation::create($fallbackData);
+                            $conversation = \App\Models\Conversation::find($conversationId);
                         }
-                        $conversationId = \App\Models\Conversation::create($fallbackData);
-                        $conversation = \App\Models\Conversation::find($conversationId);
                     }
                 }
                 
@@ -3929,27 +3927,32 @@ class WhatsAppService
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                     Logger::quepasa("Stack trace: " . $e->getTraceAsString());
-                    try {
-                        $fallbackData = [
-                            'contact_id' => $contact['id'],
-                            'channel' => 'whatsapp',
-                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
-                            'status' => 'open'
-                        ];
-                        // ✅ CORREÇÃO: Também incluir integration_account_id no fallback
-                        if (!empty($account['integration_account_id'])) {
-                            $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                    $existingFallback = \App\Models\Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                    if ($existingFallback) {
+                        $conversation = $existingFallback;
+                        Logger::quepasa("processWebhook - Fallback (lock): usando conversa aberta existente ID={$existingFallback['id']}");
+                    } else {
+                        try {
+                            $fallbackData = [
+                                'contact_id' => $contact['id'],
+                                'channel' => 'whatsapp',
+                                'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
+                                'status' => 'open'
+                            ];
+                            if (!empty($account['integration_account_id'])) {
+                                $fallbackData['integration_account_id'] = $account['integration_account_id'];
+                            }
+                            $conversationId = \App\Models\Conversation::create($fallbackData);
+                            $conversation = \App\Models\Conversation::find($conversationId);
+                            $isNewConversation = true;
+                            Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
+                        } catch (\Exception $e2) {
+                            Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
+                            if ($usedLock && $db->inTransaction()) {
+                                $db->rollBack();
+                            }
+                            throw $e2;
                         }
-                        $conversationId = \App\Models\Conversation::create($fallbackData);
-                        $conversation = \App\Models\Conversation::find($conversationId);
-                        $isNewConversation = true;
-                        Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
-                    } catch (\Exception $e2) {
-                        Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
-                        if ($usedLock && $db->inTransaction()) {
-                            $db->rollBack();
-                        }
-                        throw $e2;
                     }
                 }
             }
@@ -3995,15 +3998,25 @@ class WhatsAppService
                 Logger::quepasa("🔢 Cálculo: {$minutesSinceClosure} >= {$gracePeriodMinutes} ?");
                 
                 if ($minutesSinceClosure >= $gracePeriodMinutes) {
-                    // Passou do período de graça - REABRIR como NOVA conversa
+                    // Passou do período de graça - verificar se já existe OUTRA conversa aberta
                     Logger::quepasa("✅ SIM → Passou do período de graça");
-                    Logger::quepasa("🔄 Ação: REABRIR como NOVA conversa (aplicar regras completas)");
-                    Logger::quepasa("   - Auto-atribuição: SIM");
-                    Logger::quepasa("   - Funil/Etapa padrão: SIM");
-                    Logger::quepasa("   - Automações: SIM");
-                    Logger::quepasa("========================================");
-                    $conversation = null; // Forçar criação de nova conversa
-                    $shouldReopenAsNew = true;
+                    
+                    $existingOpenConv = \App\Models\Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                    
+                    if ($existingOpenConv) {
+                        // Já existe conversa aberta — usar ela em vez de criar duplicata
+                        Logger::quepasa("⚠️ DUPLICATA PREVENIDA: Já existe conversa aberta ID={$existingOpenConv['id']} (agente: " . ($existingOpenConv['agent_name'] ?? 'N/A') . "). Usando esta em vez de criar nova.");
+                        Logger::quepasa("========================================");
+                        $conversation = $existingOpenConv;
+                    } else {
+                        Logger::quepasa("🔄 Ação: REABRIR como NOVA conversa (aplicar regras completas)");
+                        Logger::quepasa("   - Auto-atribuição: SIM");
+                        Logger::quepasa("   - Funil/Etapa padrão: SIM");
+                        Logger::quepasa("   - Automações: SIM");
+                        Logger::quepasa("========================================");
+                        $conversation = null; // Forçar criação de nova conversa
+                        $shouldReopenAsNew = true;
+                    }
                 } else {
                     // Dentro do período de graça - REABRIR mantendo configurações anteriores
                     Logger::quepasa("⏳ Dentro do período de graça");
@@ -4062,20 +4075,26 @@ class WhatsAppService
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao criar conversa via ConversationService: " . $e->getMessage());
                     Logger::quepasa("Stack trace: " . $e->getTraceAsString());
-                    // Fallback: criar diretamente se ConversationService falhar
-                    try {
-                        $conversationId = \App\Models\Conversation::create([
-                            'contact_id' => $contact['id'],
-                            'channel' => 'whatsapp',
-                            'integration_account_id' => $account['integration_account_id'] ?? $account['id'],
-                            'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
-                            'status' => 'open'
-                        ]);
-                        $conversation = \App\Models\Conversation::find($conversationId);
-                        Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
-                    } catch (\Exception $e2) {
-                        Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
-                        throw $e2;
+                    // Verificar se já existe conversa aberta antes de fallback
+                    $existingFallback = \App\Models\Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                    if ($existingFallback) {
+                        $conversation = $existingFallback;
+                        Logger::quepasa("processWebhook - Fallback: usando conversa aberta existente ID={$existingFallback['id']}");
+                    } else {
+                        try {
+                            $conversationId = \App\Models\Conversation::create([
+                                'contact_id' => $contact['id'],
+                                'channel' => 'whatsapp',
+                                'integration_account_id' => $account['integration_account_id'] ?? $account['id'],
+                                'whatsapp_account_id' => $account['whatsapp_id'] ?? null,
+                                'status' => 'open'
+                            ]);
+                            $conversation = \App\Models\Conversation::find($conversationId);
+                            Logger::quepasa("processWebhook - Conversa criada via fallback: ID={$conversationId}");
+                        } catch (\Exception $e2) {
+                            Logger::error("Erro ao criar conversa via fallback: " . $e2->getMessage());
+                            throw $e2;
+                        }
                     }
                 }
             } else {

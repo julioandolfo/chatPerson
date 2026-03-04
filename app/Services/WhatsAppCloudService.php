@@ -712,37 +712,40 @@ class WhatsAppCloudService extends MetaIntegrationService
         }
         
         if (!$conversation) {
-            $conversationData = [
-                'contact_id' => $contact['id'],
-                'channel' => 'whatsapp',
-                'status' => 'open',
-                'integration_account_id' => $integrationAccountId,
-                'started_at' => date('Y-m-d H:i:s', (int)$timestamp),
-            ];
-            
-            // Aplicar funil/etapa padrão da integration_account, se configurados
-            if ($integrationAccountId) {
-                $ia = \App\Models\IntegrationAccount::find($integrationAccountId);
-                if ($ia) {
-                    if (!empty($ia['default_funnel_id'])) {
-                        $conversationData['funnel_id'] = $ia['default_funnel_id'];
-                    }
-                    if (!empty($ia['default_stage_id'])) {
-                        $conversationData['stage_id'] = $ia['default_stage_id'];
+            // Verificar se já existe conversa aberta para este contato (prevenir duplicatas)
+            $existingOpen = Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+            if ($existingOpen) {
+                $conversation = $existingOpen;
+                self::logInfo("Usando conversa aberta existente ID={$existingOpen['id']} em vez de criar duplicata");
+            } else {
+                $conversationData = [
+                    'contact_id' => $contact['id'],
+                    'channel' => 'whatsapp',
+                    'status' => 'open',
+                    'integration_account_id' => $integrationAccountId,
+                    'started_at' => date('Y-m-d H:i:s', (int)$timestamp),
+                ];
+                
+                if ($integrationAccountId) {
+                    $ia = \App\Models\IntegrationAccount::find($integrationAccountId);
+                    if ($ia) {
+                        if (!empty($ia['default_funnel_id'])) {
+                            $conversationData['funnel_id'] = $ia['default_funnel_id'];
+                        }
+                        if (!empty($ia['default_stage_id'])) {
+                            $conversationData['stage_id'] = $ia['default_stage_id'];
+                        }
                     }
                 }
+                
+                $conversationId = Conversation::create($conversationData);
+                $conversation = Conversation::find($conversationId);
+                
+                self::logInfo("Conversa WhatsApp criada: {$conversationId}");
+                
+                WebSocket::notifyNewConversation($conversation);
+                AutomationService::executeForNewConversation($conversationId);
             }
-            
-            $conversationId = Conversation::create($conversationData);
-            $conversation = Conversation::find($conversationId);
-            
-            self::logInfo("Conversa WhatsApp criada: {$conversationId}");
-            
-            // Notificar nova conversa
-            WebSocket::notifyNewConversation($conversation);
-            
-            // Executar automações
-            AutomationService::executeForNewConversation($conversationId);
         }
         
         // Criar mensagem

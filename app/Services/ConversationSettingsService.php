@@ -288,6 +288,21 @@ class ConversationSettingsService
                 ],
             ],
             
+            // Encerramento Automático por Inatividade
+            'auto_close' => [
+                'enabled' => false,
+                'close_inactive_enabled' => true,
+                'close_inactive_days' => 7,
+                'close_waiting_client_enabled' => true,
+                'close_waiting_client_days' => 3,
+                'agent_inactivity_enabled' => false,
+                'agent_inactivity_days' => 1,
+                'agent_inactivity_action' => 'notify', // notify, reassign_specific, roundrobin, move_department, automation, close
+                'agent_inactivity_target_id' => null,
+                'send_closing_message' => true,
+                'closing_message' => 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
+            ],
+
             // Análise de Performance de Vendedores
             'realtime_coaching' => [
                 'enabled' => false,
@@ -334,6 +349,34 @@ class ConversationSettingsService
                 'play_sound' => false, // Tocar som ao receber dica
             ],
             
+            'auto_close' => [
+                'enabled' => false,
+                'close_inactive_enabled' => true,
+                'close_inactive_days' => 7,
+                'close_waiting_client_enabled' => true,
+                'close_waiting_client_days' => 3,
+                'agent_inactivity_enabled' => false,
+                'agent_inactivity_days' => 1,
+                'agent_inactivity_action' => 'notify', // notify, reassign_specific, roundrobin, move_department, automation, close
+                'agent_inactivity_target_id' => null,
+                'send_closing_message' => true,
+                'closing_message' => 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
+            ],
+
+            'auto_close' => [
+                'enabled' => false,
+                'close_inactive_enabled' => true,
+                'close_inactive_days' => 7,
+                'close_waiting_client_enabled' => true,
+                'close_waiting_client_days' => 3,
+                'agent_inactivity_enabled' => false,
+                'agent_inactivity_days' => 1,
+                'agent_inactivity_action' => 'notify', // notify, reassign_specific, roundrobin, move_department, automation, close
+                'agent_inactivity_target_id' => null,
+                'send_closing_message' => true,
+                'closing_message' => 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
+            ],
+
             'agent_performance_analysis' => [
                 'enabled' => false,
                 'model' => 'gpt-4-turbo', // gpt-4o, gpt-4-turbo, gpt-4, gpt-3.5-turbo

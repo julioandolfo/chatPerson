@@ -308,6 +308,7 @@ Router::get('/integrations/whatsapp/{id}/status', [IntegrationController::class,
 Router::post('/integrations/whatsapp/{id}/disconnect', [IntegrationController::class, 'disconnect'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/test', [IntegrationController::class, 'sendTestMessage'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/webhook', [IntegrationController::class, 'configureWebhook'], ['Authentication']);
+Router::get('/integrations/whatsapp/{id}/webhook-diagnostic', [IntegrationController::class, 'webhookDiagnostic'], ['Authentication']);
 
 // Rotas de Integrações Notificame
 Router::get('/integrations/notificame', [IntegrationController::class, 'notificame'], ['Authentication']);

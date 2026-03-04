@@ -144,20 +144,27 @@ class ApiMessageController
             );
             
             if (!$conversation) {
-                // Criar nova conversa
-                $conversationData = [
-                    'contact_id' => $contact['id'],
-                    'channel' => 'whatsapp',
-                    'integration_account_id' => $account['id'],
-                    'status' => 'open',
-                    'funnel_id' => $account['default_funnel_id'] ?? null,
-                    'funnel_stage_id' => $account['default_stage_id'] ?? null
-                ];
-                
-                $conversationId = Conversation::create($conversationData);
-                $conversation = Conversation::find($conversationId);
-                
-                $isNewConversation = true;
+                // Verificar se existe conversa aberta em qualquer conta antes de criar
+                $existingOpen = Conversation::findAnyOpenByContact($contact['id'], 'whatsapp');
+                if ($existingOpen) {
+                    $conversation = $existingOpen;
+                    $isNewConversation = false;
+                    \App\Helpers\Logger::info("[ApiMessageController] Usando conversa aberta existente ID={$existingOpen['id']} em vez de criar duplicata");
+                } else {
+                    $conversationData = [
+                        'contact_id' => $contact['id'],
+                        'channel' => 'whatsapp',
+                        'integration_account_id' => $account['id'],
+                        'status' => 'open',
+                        'funnel_id' => $account['default_funnel_id'] ?? null,
+                        'funnel_stage_id' => $account['default_stage_id'] ?? null
+                    ];
+                    
+                    $conversationId = Conversation::create($conversationData);
+                    $conversation = Conversation::find($conversationId);
+                    
+                    $isNewConversation = true;
+                }
             } else {
                 $isNewConversation = false;
                 
@@ -313,13 +320,7 @@ class ApiMessageController
      */
     private function normalizePhone(string $phone): string
     {
-        // Remover tudo que não é número
-        $phone = preg_replace('/\D/', '', $phone);
-        
-        // Remover + do início se existir
-        $phone = ltrim($phone, '+');
-        
-        return $phone;
+        return \App\Models\Contact::normalizePhoneNumber($phone);
     }
     
     /**

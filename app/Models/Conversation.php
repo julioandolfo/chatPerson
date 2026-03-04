@@ -35,6 +35,7 @@ class Conversation extends Model
         'sla_warning_sent',
         'reassignment_count',
         'last_reassignment_at',
+        'inactivity_alert_at',
         'assigned_at',
         'resolved_at',
         'moved_at',
@@ -78,13 +79,7 @@ class Conversation extends Model
             $params[] = $filters['channel'];
         }
         
-        // Ordenar já com o mesmo critério usado no frontend:
-        // 1) Fixadas primeiro
-        // 2) Dentro das fixadas, usar pinned_at DESC
-        // 3) Demais conversas por last_message_at DESC (última mensagem recebida)
-        // 4) Fallback: updated_at DESC
-        // 5) Critério de desempate: ID DESC (conversas mais recentes primeiro)
-        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         
         return Database::fetchAll($sql, $params);
     }
@@ -485,15 +480,14 @@ class Conversation extends Model
             $orderDir = !empty($filters['order_dir']) && strtoupper($filters['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
             
             if ($orderBy === 'pinned') {
-                $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
             } elseif ($orderBy === 'last_message') {
-                $sql .= " ORDER BY c.pinned DESC, last_message_at {$orderDir}, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, last_message_at {$orderDir}, c.id DESC";
             } else {
-                $sql .= " ORDER BY c.pinned DESC, c.{$orderBy} {$orderDir}, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.{$orderBy} {$orderDir}, c.id DESC";
             }
         } else {
-            // Ordenação padrão: pinned primeiro, depois last_message_at (última mensagem recebida), depois updated_at, depois ID
-            $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+            $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         }
         
         // Paginação
@@ -717,19 +711,19 @@ class Conversation extends Model
      */
     public static function findByContactAndChannel(int $contactId, string $channel, ?int $whatsappAccountId = null, ?int $integrationAccountId = null): ?array
     {
-        $sql = "SELECT * FROM conversations 
+        $sql = "SELECT * FROM conversations
                 WHERE contact_id = ? AND channel = ?";
         $params = [$contactId, $channel];
-        
-        // Unificado: usar integration_account_id
+
         $accountId = $integrationAccountId ?? $whatsappAccountId;
         if ($accountId) {
             $sql .= " AND integration_account_id = ?";
             $params[] = $accountId;
         }
-        
-        $sql .= " ORDER BY created_at DESC LIMIT 1";
-        
+
+        // Prioriza conversas abertas (status='open' primeiro), depois mais recente
+        $sql .= " ORDER BY (status = 'open') DESC, created_at DESC LIMIT 1";
+
         return Database::fetch($sql, $params);
     }
     
@@ -763,9 +757,23 @@ class Conversation extends Model
      */
     public static function hasOnlyClosedConversations(int $contactId, string $channel, ?int $whatsappAccountId = null): bool
     {
-        // Verificar se existe alguma conversa aberta
         $openConversation = self::findOpenByContactAndChannel($contactId, $channel, $whatsappAccountId);
         return $openConversation === null;
+    }
+
+    /**
+     * Buscar qualquer conversa ABERTA do contato no canal, ignorando integration_account_id.
+     * Útil para detectar duplicatas quando o contato pode ter conversas em diferentes contas.
+     */
+    public static function findAnyOpenByContact(int $contactId, string $channel = 'whatsapp'): ?array
+    {
+        $sql = "SELECT c.*, u.name as agent_name 
+                FROM conversations c
+                LEFT JOIN users u ON c.agent_id = u.id
+                WHERE c.contact_id = ? AND c.channel = ? AND c.status = 'open'
+                ORDER BY c.updated_at DESC LIMIT 1";
+        
+        return Database::fetch($sql, [$contactId, $channel]);
     }
 }
 

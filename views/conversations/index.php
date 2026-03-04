@@ -863,6 +863,30 @@ body.dark-mode .set-as-submenu,
     border-left: 3px solid rgba(255, 193, 7, 0.5);
 }
 
+.conversation-item.inactivity-alert {
+    background: rgba(220, 53, 69, 0.08);
+    border-left: 3px solid rgba(220, 53, 69, 0.6);
+}
+
+.conversation-item.inactivity-alert:hover {
+    background: rgba(220, 53, 69, 0.14);
+}
+
+.conversation-item.inactivity-alert.active {
+    background: rgba(220, 53, 69, 0.15);
+    border-left: 3px solid rgba(220, 53, 69, 0.8);
+}
+
+.conversation-item .inactivity-alert-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(220, 53, 69, 0.15);
+    color: #dc3545;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .hover-bg-light:hover {
     background-color: var(--bs-gray-100) !important;
 }
@@ -3193,8 +3217,9 @@ function getChannelInfo(channel) {
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
                     $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
                     ?>
-                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?>" 
+                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= !empty($conv['inactivity_alert_at']) ? 'inactivity-alert' : '' ?>" 
                          data-conversation-id="<?= $conv['id'] ?>"
+                         data-inactivity-alert="<?= !empty($conv['inactivity_alert_at']) ? htmlspecialchars($conv['inactivity_alert_at']) : '' ?>"
                          data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
                          data-created-at="<?= htmlspecialchars($conv['created_at'] ?? '') ?>"
                          data-first-response-at="<?= htmlspecialchars($firstResponseAt) ?>"
@@ -3230,7 +3255,13 @@ function getChannelInfo(channel) {
                                         </i>
                                         <?php endif; ?>
                                                         <?php if (!empty($conv['is_spam'])): ?>
-                                                            <span class="badge badge-sm badge-danger" title="Marcada como spam">⚠️ SPAM</span>
+                                                            <span class="badge badge-sm badge-danger" title="Marcada como spam">SPAM</span>
+                                                        <?php endif; ?>
+                                                        <?php if (!empty($conv['inactivity_alert_at'])): ?>
+                                                            <?php
+                                                            $alertDays = max(1, (int)((time() - strtotime($conv['inactivity_alert_at'])) / 86400));
+                                                            ?>
+                                                            <span class="inactivity-alert-badge" title="Conversa inativa - agente não respondeu">Inativo</span>
                                                         <?php endif; ?>
                                                         <?php
                                                         $nameRaw = $conv['contact_name'] ?? 'Sem nome';
@@ -8165,29 +8196,32 @@ function sortConversationList() {
     try {
         const list = document.querySelector('.conversations-list-items');
         if (!list) return;
-        
+
+        // Nao reordenar enquanto o usuario estiver digitando (evitar deslocamento visual que causa misclicks)
+        const messageInput = document.getElementById('messageInput');
+        if (messageInput && (messageInput.value.trim().length > 0 || document.activeElement === messageInput)) {
+            return;
+        }
+
         const items = Array.from(list.children);
         if (items.length === 0) return;
-        
-        // Ordenar: pinned primeiro, depois last_message_at desc, depois ID desc (desempate)
+
         items.sort((a, b) => {
             const pinnedA = a.classList?.contains('pinned') ? 1 : 0;
             const pinnedB = b.classList?.contains('pinned') ? 1 : 0;
             if (pinnedA !== pinnedB) return pinnedB - pinnedA;
-            
-            // Usar last-message-at (mais preciso) com fallback para updated-at
+
             const dateStrA = a.dataset?.lastMessageAt || a.dataset?.updatedAt || '';
             const dateStrB = b.dataset?.lastMessageAt || b.dataset?.updatedAt || '';
             const dateA = Date.parse(dateStrA) || 0;
             const dateB = Date.parse(dateStrB) || 0;
             if (dateA !== dateB) return dateB - dateA;
-            
-            // Critério de desempate: ID da conversa (maior primeiro = mais recente)
+
             const idA = parseInt(a.dataset?.conversationId) || 0;
             const idB = parseInt(b.dataset?.conversationId) || 0;
             return idB - idA;
         });
-        
+
         items.forEach(item => {
             if (item && list) {
                 list.appendChild(item);
@@ -8497,6 +8531,12 @@ function selectConversation(id) {
     // Atualizar conversa selecionada globalmente e resetar estado local
     resetConversationState(id);
     window.currentConversationId = currentConversationId;
+    
+    // Atualizar URL IMEDIATAMENTE (antes do AJAX) para que um eventual reload nao perca a conversa
+    const currentParams = new URLSearchParams(window.location.search);
+    currentParams.set('id', id);
+    const earlyUrl = `<?= \App\Helpers\Url::to('/conversations') ?>?${currentParams.toString()}`;
+    window.history.replaceState({ conversationId: id }, '', earlyUrl);
     
     // Disparar evento de conversa aberta (para NotificationManager limpar contador)
     document.dispatchEvent(new CustomEvent('conversation:opened', {
@@ -11687,6 +11727,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // Se não tem ID, limpar chat e resetar currentConversationId
             currentConversationId = null;
+            window.currentConversationId = null;
             const chatMessages = document.getElementById('chatMessages');
             if (chatMessages) {
                 chatMessages.innerHTML = `
@@ -12970,8 +13011,7 @@ function markConversationAsUnread(conversationId) {
 
 // Mostrar modal de agendar mensagem
 function showScheduleMessageModal() {
-    // Usar variível JavaScript global que é atualizada dinamicamente
-    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const conversationId = window.currentConversationId || currentConversationId;
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
@@ -14351,8 +14391,7 @@ function cancelReply() {
 async function forwardMessage(messageId) {
     if (!messageId) return;
     
-    // Usar variível JavaScript global que é atualizada dinamicamente
-    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const conversationId = window.currentConversationId || currentConversationId;
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
         return;
@@ -14446,7 +14485,7 @@ async function forwardMessage(messageId) {
 
 // Selecionar conversa para encaminhamento
 async function selectForwardConversation(targetConversationId, messageId) {
-const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+const conversationId = window.currentConversationId || currentConversationId;
     
     if (!conversationId || !targetConversationId || !messageId) {
         alert('Dados inválidos');
@@ -14624,11 +14663,10 @@ let isRecording = false;
 let recordingCanceled = false;
 let currentStream = null;
 
-// Gravar íudio
+// Gravar audio
 async function toggleAudioRecording() {
     const btn = document.getElementById('recordAudioBtn');
-    // Usar variível JavaScript global que é atualizada dinamicamente
-    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const conversationId = window.currentConversationId || currentConversationId;
     
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -14909,16 +14947,34 @@ function sendMessage() {
         return;
     }
     
-    // Obter conversationId da variível global atualizada ou do PHP
-    let conversationId = window.currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
-    // Fallback: tentar pegar da conversa ativa no DOM
-    if (!conversationId) {
-        const activeItem = document.querySelector('.conversation-item.active');
-        if (activeItem) {
-            conversationId = parseInt(activeItem.getAttribute('data-conversation-id'));
-            window.currentConversationId = conversationId;
-        }
+    // Obter conversationId da variavel global (fonte primaria)
+    let conversationId = window.currentConversationId;
+    
+    // Validacao cruzada: comparar com o item ativo no DOM para evitar enviar para conversa errada
+    const activeItem = document.querySelector('.conversation-item.active');
+    const domActiveId = activeItem ? parseInt(activeItem.getAttribute('data-conversation-id')) : null;
+    
+    if (conversationId && domActiveId && conversationId !== domActiveId) {
+        console.warn(`[sendMessage] MISMATCH detectado! window.currentConversationId=${conversationId}, DOM active=${domActiveId}. Usando DOM.`);
+        conversationId = domActiveId;
+        window.currentConversationId = domActiveId;
     }
+    
+    // Fallback: usar DOM se window.currentConversationId estiver vazio
+    if (!conversationId && domActiveId) {
+        conversationId = domActiveId;
+        window.currentConversationId = domActiveId;
+    }
+    
+    // Validacao adicional via header do chat (data-conversation-id no chatMessages)
+    const chatMessages = document.getElementById('chatMessages');
+    const headerConvId = chatMessages ? parseInt(chatMessages.getAttribute('data-conversation-id')) : null;
+    if (conversationId && headerConvId && conversationId !== headerConvId) {
+        console.warn(`[sendMessage] MISMATCH com header! conversationId=${conversationId}, chatMessages data-conversation-id=${headerConvId}. Usando header.`);
+        conversationId = headerConvId;
+        window.currentConversationId = headerConvId;
+    }
+    
     if (!conversationId) {
         console.error('Nenhuma conversa selecionada');
         alert('Por favor, selecione uma conversa primeiro');
@@ -16085,7 +16141,7 @@ function loadTemplates() {
 
 // Preview de template com variíveis preenchidas
 function previewTemplate(templateId) {
-const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+const conversationId = window.currentConversationId || currentConversationId;
     const previewDiv = document.getElementById(`preview-${templateId}`);
     const previewContent = previewDiv ? previewDiv.querySelector('.preview-content') : null;
     
@@ -16130,7 +16186,7 @@ const conversationId = parsePhpJson('<?= json_encode($selectedConversationId ?? 
 }
 
 function useTemplate(templateId) {
-    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const conversationId = window.currentConversationId || currentConversationId;
     
     if (!conversationId) {
         Swal.fire({
@@ -17239,10 +17295,10 @@ document.getElementById('assignForm')?.addEventListener('submit', function(e) {
             
             // Recarregar conversa para atualizar dados
             if (currentConversationId == conversationId) {
-                // Recarregar conversa completa (inclui agentes do contato)
                 selectConversation(conversationId);
             } else {
-            window.location.reload();
+                const urlParams = new URLSearchParams(window.location.search);
+                refreshConversationList(urlParams);
             }
         } else {
             alert('Erro ao atribuir conversa: ' + (data.message || 'Erro desconhecido'));
@@ -18215,8 +18271,7 @@ function attachFile() {
 
 // Upload imediato legado (mantido para compatibilidade, não usado no fluxo atual)
 function uploadFile(file) {
-    // Usar variível JavaScript global que é atualizada dinamicamente
-    const conversationId = currentConversationId || parsePhpJson('<?= json_encode($selectedConversationId ?? null, JSON_HEX_APOS | JSON_HEX_QUOT) ?>');
+    const conversationId = window.currentConversationId || currentConversationId;
     
     if (!conversationId) {
         alert('Selecione uma conversa primeiro');
@@ -19647,9 +19702,9 @@ if (typeof window.wsClient !== 'undefined') {
                 }
             }
             
-            // Recarregar página apenas se necessário (mudanças de status, atribuição)
+            // Recarregar conversa via AJAX (sem reload de pagina para evitar perder contexto)
             if (data.changes && (data.changes.status || data.changes.agent_id || data.changes.department_id)) {
-                window.location.reload();
+                selectConversation(data.conversation_id);
             }
             return; // Não atualizar badge se for a conversa atual
         }
@@ -21225,9 +21280,15 @@ async function applySuggestedTags(conversationId, tags) {
             }
         });
         
-        // Recarregar pígina após um breve delay
+        // Recarregar conversa e lista via AJAX
         setTimeout(() => {
-            window.location.reload();
+            if (window.currentConversationId && typeof selectConversation === 'function') {
+                selectConversation(window.currentConversationId);
+            }
+            const urlParams = new URLSearchParams(window.location.search);
+            if (typeof refreshConversationList === 'function') {
+                refreshConversationList(urlParams);
+            }
         }, 500);
         
     } catch (error) {
@@ -22212,9 +22273,13 @@ function renderConversationItemHtml(conv, selectedConversationId) {
             </div>`;
     }
 
+    const hasInactivityAlert = conv.inactivity_alert_at && conv.inactivity_alert_at !== '';
+    const inactivityBadge = hasInactivityAlert ? '<span class="inactivity-alert-badge" title="Conversa inativa - agente não respondeu">Inativo</span>' : '';
+
     return `
-        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''}" 
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''} ${hasInactivityAlert ? 'inactivity-alert' : ''}" 
              data-conversation-id="${conv.id}"
+             data-inactivity-alert="${escapeHtml(conv.inactivity_alert_at || '')}"
              data-status="${escapeHtml(conv.status || 'open')}"
              data-created-at="${escapeHtml(createdAt)}"
              data-first-response-at="${escapeHtml(firstResponseAt)}"
@@ -22233,6 +22298,7 @@ function renderConversationItemHtml(conv, selectedConversationId) {
                         <div class="conversation-item-name d-flex align-items-center gap-2">
                             ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
                             ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">SPAM</span>' : ''}
+                            ${inactivityBadge}
                             ${escapeHtml(name)}
                         </div>
                         <div class="conversation-item-time d-flex align-items-center gap-2">

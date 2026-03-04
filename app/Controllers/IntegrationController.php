@@ -426,6 +426,66 @@ class IntegrationController
     }
 
     /**
+     * Diagnóstico do webhook — retorna estado atual e permite forçar reconfiguração
+     */
+    public function webhookDiagnostic(int $id): void
+    {
+        Permission::abortIfCannot('whatsapp.edit');
+
+        try {
+            $account = IntegrationAccount::find($id);
+            if (!$account) {
+                Response::json(['success' => false, 'message' => 'Conta não encontrada'], 404);
+                return;
+            }
+
+            $config = json_decode($account['config'] ?? '{}', true) ?: [];
+            $forceReconfigure = Request::get('reconfigure', '0') === '1';
+
+            $diagnostic = [
+                'account_id'          => $account['id'],
+                'name'                => $account['name'],
+                'provider'            => $account['provider'],
+                'status'              => $account['status'],
+                'api_url'             => $account['api_url'],
+                'has_token'           => !empty($account['quepasa_token']),
+                'quepasa_trackid'     => $account['quepasa_trackid'] ?? null,
+                'quepasa_chatid'      => $account['quepasa_chatid'] ?? null,
+                'instance_id'         => $account['instance_id'] ?? null,
+                'webhook_configured'  => $config['webhook_configured'] ?? false,
+                'config_webhook_url'  => $config['webhook_url'] ?? null,
+                'system_webhook_url'  => WhatsAppService::configureWebhookUrl(),
+            ];
+
+            // Se solicitou reconfiguração forçada
+            if ($forceReconfigure) {
+                // Resetar flag
+                $config['webhook_configured'] = false;
+                IntegrationAccount::updateWithSync($id, ['config' => json_encode($config)]);
+
+                $webhookUrl = WhatsAppService::configureWebhookUrl();
+                try {
+                    WhatsAppService::configureWebhook($id, $webhookUrl);
+                    $diagnostic['reconfigure_result'] = 'success';
+                    $diagnostic['reconfigure_message'] = "Webhook reconfigurado para: {$webhookUrl}";
+                } catch (\Exception $e) {
+                    $diagnostic['reconfigure_result'] = 'error';
+                    $diagnostic['reconfigure_message'] = $e->getMessage();
+                }
+            }
+
+            // Verificar se webhook Quepasa está acessível (GET simples na URL do sistema)
+            $diagnostic['tip'] = $forceReconfigure
+                ? 'Webhook reconfigurado. Envie uma mensagem de teste para o número e verifique.'
+                : 'Adicione ?reconfigure=1 na URL para forçar reconfiguração do webhook.';
+
+            Response::json(['success' => true, 'diagnostic' => $diagnostic]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Configurar webhook automaticamente
      */
     public function configureWebhook(int $id): void

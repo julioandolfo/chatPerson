@@ -11,6 +11,7 @@ $reassign = $cs['reassignment'] ?? [];
 $sentiment = $cs['sentiment_analysis'] ?? [];
 $transcription = $cs['audio_transcription'] ?? [];
 $tts = $cs['text_to_speech'] ?? [];
+$autoCloseSettings = $cs['auto_close'] ?? [];
 ?>
 <form id="kt_settings_conversations_form" class="form">
     <!--begin::Configurações de Chat-->
@@ -675,6 +676,212 @@ $tts = $cs['text_to_speech'] ?? [];
         </div>
     </div>
     <!--end::Reatribuição-->
+    
+    <div class="separator separator-dashed my-10"></div>
+    
+    <!--begin::Encerramento Automático por Inatividade-->
+    <div class="mb-10">
+        <h4 class="fw-bold mb-4">Encerramento Automático por Inatividade</h4>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="auto_close_enabled" class="form-check-input me-2" 
+                       id="auto_close_enabled"
+                       <?= ($autoCloseSettings['enabled'] ?? false) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Habilitar encerramento automático por inatividade</span>
+            </label>
+            <div class="form-text">Fecha ou executa ações em conversas que ficarem inativas por um período configurável</div>
+        </div>
+        
+        <div id="auto_close_settings_container" style="display: <?= ($autoCloseSettings['enabled'] ?? false) ? 'block' : 'none' ?>;">
+            
+            <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-6 mb-7">
+                <i class="ki-duotone ki-information-5 fs-2tx text-primary me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                <div class="d-flex flex-stack flex-grow-1">
+                    <div class="fw-semibold">
+                        <div class="fs-6 text-gray-700">O sistema verifica conversas inativas a cada 30 minutos. Conversas são processadas em lotes para não sobrecarregar o sistema. O valor <strong>0</strong> em qualquer campo desativa aquela regra específica.</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card card-bordered mb-7">
+                <div class="card-header">
+                    <h5 class="card-title">Inatividade Geral</h5>
+                    <div class="card-toolbar">
+                        <label class="form-check form-switch">
+                            <input type="checkbox" name="auto_close_inactive_enabled" class="form-check-input" 
+                                   <?= ($autoCloseSettings['close_inactive_enabled'] ?? true) ? 'checked' : '' ?> />
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body py-4">
+                    <div class="fv-row">
+                        <label class="fw-semibold fs-6 mb-2">Fechar após (dias sem nenhuma mensagem)</label>
+                        <input type="number" name="auto_close_inactive_days" class="form-control form-control-solid" 
+                               value="<?= $autoCloseSettings['close_inactive_days'] ?? 7 ?>" min="0" max="365" />
+                        <div class="form-text">Conversas sem nenhuma mensagem (de ninguém) por este período serão fechadas automaticamente</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card card-bordered mb-7">
+                <div class="card-header">
+                    <h5 class="card-title">Sem Resposta do Cliente</h5>
+                    <div class="card-toolbar">
+                        <label class="form-check form-switch">
+                            <input type="checkbox" name="auto_close_waiting_client_enabled" class="form-check-input" 
+                                   <?= ($autoCloseSettings['close_waiting_client_enabled'] ?? true) ? 'checked' : '' ?> />
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body py-4">
+                    <div class="fv-row">
+                        <label class="fw-semibold fs-6 mb-2">Fechar após (dias aguardando resposta do cliente)</label>
+                        <input type="number" name="auto_close_waiting_client_days" class="form-control form-control-solid" 
+                               value="<?= $autoCloseSettings['close_waiting_client_days'] ?? 3 ?>" min="0" max="365" />
+                        <div class="form-text">Conversas onde o agente respondeu e o cliente não retornou por este período serão fechadas</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card card-bordered mb-7">
+                <div class="card-header">
+                    <h5 class="card-title">Inatividade do Agente</h5>
+                    <div class="card-toolbar">
+                        <label class="form-check form-switch">
+                            <input type="checkbox" name="auto_close_agent_inactivity_enabled" class="form-check-input" 
+                                   id="auto_close_agent_inactivity_enabled"
+                                   <?= ($autoCloseSettings['agent_inactivity_enabled'] ?? false) ? 'checked' : '' ?> />
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body py-4" id="agent_inactivity_body">
+                    <div class="fv-row mb-5">
+                        <label class="fw-semibold fs-6 mb-2">Dias sem resposta do agente</label>
+                        <input type="number" name="auto_close_agent_inactivity_days" class="form-control form-control-solid" 
+                               value="<?= $autoCloseSettings['agent_inactivity_days'] ?? 1 ?>" min="0" max="365" />
+                        <div class="form-text">Conversas onde o cliente enviou mensagem e o agente não respondeu por este período</div>
+                    </div>
+                    <div class="fv-row mb-5">
+                        <label class="fw-semibold fs-6 mb-2">Ação a executar</label>
+                        <select name="auto_close_agent_inactivity_action" class="form-select form-select-solid" id="auto_close_agent_inactivity_action">
+                            <option value="notify" <?= ($autoCloseSettings['agent_inactivity_action'] ?? 'notify') === 'notify' ? 'selected' : '' ?>>Destacar na lista (fundo vermelho)</option>
+                            <option value="reassign_specific" <?= ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'reassign_specific' ? 'selected' : '' ?>>Reatribuir para agente específico</option>
+                            <option value="roundrobin" <?= ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'roundrobin' ? 'selected' : '' ?>>Round-Robin (excluindo agente atual)</option>
+                            <option value="move_department" <?= ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'move_department' ? 'selected' : '' ?>>Mover para outro setor</option>
+                            <option value="automation" <?= ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'automation' ? 'selected' : '' ?>>Executar automação</option>
+                            <option value="close" <?= ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'close' ? 'selected' : '' ?>>Fechar conversa</option>
+                        </select>
+                    </div>
+                    
+                    <div id="agent_inactivity_target_agent" class="fv-row mb-5" style="display: none;">
+                        <label class="fw-semibold fs-6 mb-2">Agente</label>
+                        <select name="auto_close_agent_inactivity_target_id_agent" class="form-select form-select-solid">
+                            <option value="">Selecione um agente</option>
+                            <?php foreach ($users ?? [] as $user): ?>
+                                <option value="<?= $user['id'] ?>" <?= ($autoCloseSettings['agent_inactivity_target_id'] ?? '') == $user['id'] && ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'reassign_specific' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($user['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div id="agent_inactivity_target_department" class="fv-row mb-5" style="display: none;">
+                        <label class="fw-semibold fs-6 mb-2">Setor</label>
+                        <select name="auto_close_agent_inactivity_target_id_department" class="form-select form-select-solid">
+                            <option value="">Selecione um setor</option>
+                            <?php foreach ($departments ?? [] as $dept): ?>
+                                <option value="<?= $dept['id'] ?>" <?= ($autoCloseSettings['agent_inactivity_target_id'] ?? '') == $dept['id'] && ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'move_department' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($dept['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div id="agent_inactivity_target_automation" class="fv-row mb-5" style="display: none;">
+                        <label class="fw-semibold fs-6 mb-2">Automação</label>
+                        <select name="auto_close_agent_inactivity_target_id_automation" class="form-select form-select-solid">
+                            <option value="">Selecione uma automação</option>
+                            <?php
+                            $automations = \App\Models\Automation::getAll(['is_active' => true]);
+                            foreach ($automations as $auto): ?>
+                                <option value="<?= $auto['id'] ?>" <?= ($autoCloseSettings['agent_inactivity_target_id'] ?? '') == $auto['id'] && ($autoCloseSettings['agent_inactivity_action'] ?? '') === 'automation' ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($auto['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card card-bordered mb-7">
+                <div class="card-header">
+                    <h5 class="card-title">Mensagem de Encerramento</h5>
+                    <div class="card-toolbar">
+                        <label class="form-check form-switch">
+                            <input type="checkbox" name="auto_close_send_closing_message" class="form-check-input" 
+                                   <?= ($autoCloseSettings['send_closing_message'] ?? true) ? 'checked' : '' ?> />
+                        </label>
+                    </div>
+                </div>
+                <div class="card-body py-4">
+                    <div class="fv-row">
+                        <label class="fw-semibold fs-6 mb-2">Mensagem enviada antes de fechar a conversa</label>
+                        <textarea name="auto_close_closing_message" class="form-control form-control-solid" rows="3"><?= htmlspecialchars($autoCloseSettings['closing_message'] ?? 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.') ?></textarea>
+                        <div class="form-text">Esta mensagem será inserida como mensagem de sistema na conversa antes do encerramento</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <input type="hidden" name="auto_close_agent_inactivity_target_id" id="auto_close_agent_inactivity_target_id" 
+           value="<?= $autoCloseSettings['agent_inactivity_target_id'] ?? '' ?>" />
+    
+    <script>
+    (function() {
+        const masterToggle = document.getElementById('auto_close_enabled');
+        const container = document.getElementById('auto_close_settings_container');
+        const actionSelect = document.getElementById('auto_close_agent_inactivity_action');
+        const agentInactivityToggle = document.getElementById('auto_close_agent_inactivity_enabled');
+        
+        masterToggle.addEventListener('change', function() {
+            container.style.display = this.checked ? 'block' : 'none';
+        });
+        
+        function updateTargetVisibility() {
+            const action = actionSelect.value;
+            document.getElementById('agent_inactivity_target_agent').style.display = action === 'reassign_specific' ? 'block' : 'none';
+            document.getElementById('agent_inactivity_target_department').style.display = action === 'move_department' ? 'block' : 'none';
+            document.getElementById('agent_inactivity_target_automation').style.display = action === 'automation' ? 'block' : 'none';
+            
+            const hiddenInput = document.getElementById('auto_close_agent_inactivity_target_id');
+            if (action === 'reassign_specific') {
+                hiddenInput.value = document.querySelector('[name="auto_close_agent_inactivity_target_id_agent"]').value;
+            } else if (action === 'move_department') {
+                hiddenInput.value = document.querySelector('[name="auto_close_agent_inactivity_target_id_department"]').value;
+            } else if (action === 'automation') {
+                hiddenInput.value = document.querySelector('[name="auto_close_agent_inactivity_target_id_automation"]').value;
+            } else {
+                hiddenInput.value = '';
+            }
+        }
+        
+        actionSelect.addEventListener('change', updateTargetVisibility);
+        
+        document.querySelector('[name="auto_close_agent_inactivity_target_id_agent"]').addEventListener('change', function() {
+            document.getElementById('auto_close_agent_inactivity_target_id').value = this.value;
+        });
+        document.querySelector('[name="auto_close_agent_inactivity_target_id_department"]').addEventListener('change', function() {
+            document.getElementById('auto_close_agent_inactivity_target_id').value = this.value;
+        });
+        document.querySelector('[name="auto_close_agent_inactivity_target_id_automation"]').addEventListener('change', function() {
+            document.getElementById('auto_close_agent_inactivity_target_id').value = this.value;
+        });
+        
+        updateTargetVisibility();
+    })();
+    </script>
+    <!--end::Encerramento Automático por Inatividade-->
     
     <div class="separator separator-dashed my-10"></div>
     

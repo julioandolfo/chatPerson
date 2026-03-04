@@ -486,6 +486,25 @@ class ConversationService
         
         Logger::debug("ConversationService::create - FINAL: Conversa será criada em Funil ID " . ($data['funnel_id'] ?? 'NULL') . ", Etapa ID " . ($data['stage_id'] ?? 'NULL'), 'conversas.log');
 
+        // ✅ PROTEÇÃO CONTRA DUPLICATAS: verificar se já existe conversa aberta para este contato+canal
+        $accountIdForCheck = $data['integration_account_id'] ?? $data['whatsapp_account_id'] ?? null;
+        $existingOpen = Conversation::findOpenByContactAndChannel(
+            (int)$data['contact_id'],
+            $data['channel'],
+            null,
+            $accountIdForCheck ? (int)$accountIdForCheck : null
+        );
+        
+        if (!$existingOpen) {
+            // Busca mais ampla: qualquer conversa aberta do contato neste canal (ignora conta)
+            $existingOpen = Conversation::findAnyOpenByContact((int)$data['contact_id'], $data['channel']);
+        }
+        
+        if ($existingOpen) {
+            Logger::debug("ConversationService::create - ⚠️ DUPLICATA PREVENIDA: Já existe conversa aberta ID={$existingOpen['id']} para contact_id={$data['contact_id']}, channel={$data['channel']}. Retornando conversa existente.", 'conversas.log');
+            return $existingOpen;
+        }
+
         // Criar conversa
         // Verificar se deve atribuir automaticamente
         $agentId = $data['agent_id'] ?? null;
@@ -1782,6 +1801,10 @@ class ConversationService
         if ($senderType === 'agent' && $senderId > 0) {
             \App\Helpers\Logger::automation("🛑 Agente humano (ID: {$senderId}) enviou mensagem - PARANDO automações ativas...");
             self::stopActiveAutomations($conversationId);
+            
+            if (!empty($conversation['inactivity_alert_at'])) {
+                Conversation::update($conversationId, ['inactivity_alert_at' => null]);
+            }
         }
 
         // === TRANSCRIÇÃO DE ÁUDIO ===

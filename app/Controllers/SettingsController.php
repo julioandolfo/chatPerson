@@ -54,6 +54,10 @@ class SettingsController
         $funnels = \App\Models\Funnel::where('status', '=', 'active');
         $tags = \App\Services\TagService::getAll();
         
+        $automations = \App\Helpers\Database::fetchAll(
+            "SELECT id, name FROM automations WHERE status = 'active' ORDER BY name ASC"
+        );
+
         // Dados para aba Assistente IA
         $aiAssistantFeatures = \App\Services\AIAssistantFeatureService::listAll();
         $aiAgents = \App\Models\AIAgent::getAvailableAgents();
@@ -722,6 +726,45 @@ class SettingsController
                         'save_best_practices' => isset($data['agent_performance_analysis']['coaching']['save_best_practices']) && $data['agent_performance_analysis']['coaching']['save_best_practices'],
                         'min_score_for_best_practice' => isset($data['agent_performance_analysis']['coaching']['min_score_for_best_practice']) ? (float)$data['agent_performance_analysis']['coaching']['min_score_for_best_practice'] : 4.5,
                     ],
+                ],
+                'auto_close' => [
+                    'enabled' => isset($data['auto_close_enabled']),
+                    'close_inactive_enabled' => isset($data['auto_close_inactive_enabled']),
+                    'close_inactive_days' => (int)($data['auto_close_inactive_days'] ?? 7),
+                    'close_waiting_client_enabled' => isset($data['auto_close_waiting_client_enabled']),
+                    'close_waiting_client_days' => (int)($data['auto_close_waiting_client_days'] ?? 3),
+                    'agent_inactivity_enabled' => isset($data['auto_close_agent_inactivity_enabled']),
+                    'agent_inactivity_days' => (int)($data['auto_close_agent_inactivity_days'] ?? 1),
+                    'agent_inactivity_action' => $data['auto_close_agent_inactivity_action'] ?? 'notify',
+                    'agent_inactivity_target_id' => !empty($data['auto_close_agent_inactivity_target_id']) ? (int)$data['auto_close_agent_inactivity_target_id'] : null,
+                    'send_closing_message' => isset($data['auto_close_send_closing_message']),
+                    'closing_message' => $data['auto_close_closing_message'] ?? 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
+                ],
+                'auto_close' => [
+                    'enabled' => isset($data['auto_close_enabled']),
+                    'close_inactive_enabled' => isset($data['auto_close_inactive_enabled']),
+                    'close_inactive_days' => (int)($data['auto_close_inactive_days'] ?? 7),
+                    'close_waiting_client_enabled' => isset($data['auto_close_waiting_client_enabled']),
+                    'close_waiting_client_days' => (int)($data['auto_close_waiting_client_days'] ?? 3),
+                    'agent_inactivity_enabled' => isset($data['auto_close_agent_inactivity_enabled']),
+                    'agent_inactivity_days' => (int)($data['auto_close_agent_inactivity_days'] ?? 1),
+                    'agent_inactivity_action' => $data['auto_close_agent_inactivity_action'] ?? 'notify',
+                    'agent_inactivity_target_id' => !empty($data['auto_close_agent_inactivity_target_id']) ? (int)$data['auto_close_agent_inactivity_target_id'] : null,
+                    'send_closing_message' => isset($data['auto_close_send_closing_message']),
+                    'closing_message' => $data['auto_close_closing_message'] ?? 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
+                ],
+                'auto_close' => [
+                    'enabled' => isset($data['auto_close_enabled']),
+                    'close_inactive_enabled' => isset($data['auto_close_inactive_enabled']),
+                    'close_inactive_days' => (int)($data['auto_close_inactive_days'] ?? 7),
+                    'close_waiting_client_enabled' => isset($data['auto_close_waiting_client_enabled']),
+                    'close_waiting_client_days' => (int)($data['auto_close_waiting_client_days'] ?? 3),
+                    'agent_inactivity_enabled' => isset($data['auto_close_agent_inactivity_enabled']),
+                    'agent_inactivity_days' => (int)($data['auto_close_agent_inactivity_days'] ?? 1),
+                    'agent_inactivity_action' => $data['auto_close_agent_inactivity_action'] ?? 'notify',
+                    'agent_inactivity_target_id' => !empty($data['auto_close_agent_inactivity_target_id']) ? (int)$data['auto_close_agent_inactivity_target_id'] : null,
+                    'send_closing_message' => isset($data['auto_close_send_closing_message']),
+                    'closing_message' => $data['auto_close_closing_message'] ?? 'Esta conversa foi encerrada automaticamente por inatividade. Caso precise, envie uma nova mensagem para reabrir.',
                 ],
                 'audio_transcription' => [
                     'enabled' => isset($data['audio_transcription_enabled']),

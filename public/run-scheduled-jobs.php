@@ -31,8 +31,6 @@ use App\Jobs\AIFallbackMonitoringJob;
 use App\Jobs\WooCommerceSyncJob;
 use App\Jobs\ChatbotTimeoutJob;
 use App\Jobs\AutoCloseConversationsJob;
-use App\Jobs\AutoCloseConversationsJob;
-use App\Jobs\AutoCloseConversationsJob;
 
 // ✅ Garantir que diretório de cache existe
 $cacheDir = $rootDir . '/storage/cache';
@@ -274,24 +272,6 @@ try {
     //     }, 15);
     //     $state['last_followup'] = $now;
     // }
-    
-    // ✅ Encerramento automático por inatividade (a cada 30 minutos)
-    $lastAutoClose = $state['last_auto_close'] ?? 0;
-    if (($now - $lastAutoClose) >= 1800 || isset($_GET['force_auto_close'])) {
-        cronRunJob('AutoCloseConversationsJob', function() {
-            AutoCloseConversationsJob::run();
-        }, 30);
-        $state['last_auto_close'] = $now;
-    }
-    
-    // ✅ Encerramento automático por inatividade (a cada 30 minutos)
-    $lastAutoClose = $state['last_auto_close'] ?? 0;
-    if (($now - $lastAutoClose) >= 1800 || isset($_GET['force_auto_close'])) {
-        cronRunJob('AutoCloseConversationsJob', function() {
-            AutoCloseConversationsJob::run();
-        }, 30);
-        $state['last_auto_close'] = $now;
-    }
     
     // ✅ Encerramento automático por inatividade (a cada 30 minutos)
     $lastAutoClose = $state['last_auto_close'] ?? 0;

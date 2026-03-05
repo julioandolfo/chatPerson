@@ -527,6 +527,7 @@ $logFileMap = [
     'wc_sync' => __DIR__ . '/../logs/wc_sync.log',
     'notificame' => __DIR__ . '/../logs/notificame.log',
     'meta' => __DIR__ . '/../logs/meta.log',
+    'auto_close' => __DIR__ . '/../logs/auto_close.log',
 ];
 // Fallback: se não existir em logs/, tentar em storage/logs/
 foreach ($logFileMap as $key => $path) {
@@ -959,6 +960,7 @@ function colorizeLog($log) {
             <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
             <a href="?tab=wc_sync" class="tab <?= $activeTab === 'wc_sync' ? 'active' : '' ?>">🔄 Cron Sync WooCommerce</a>
+            <a href="?tab=auto_close" class="tab <?= $activeTab === 'auto_close' ? 'active' : '' ?>" style="<?= $activeTab === 'auto_close' ? '' : 'border-color:#f44747;color:#f48771;' ?>">⏰ Auto Close</a>
         </div>
         
         <?php if ($activeTab === 'unificacao'): ?>

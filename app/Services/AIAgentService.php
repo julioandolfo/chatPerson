@@ -385,11 +385,21 @@ class AIAgentService
             // ✅ NOVO: Gerar áudio se TTS estiver habilitado E (auto_generate_audio OU cliente pediu)
             $audioAttachment = null;
             $ttsSettings = \App\Services\TTSService::getSettings();
+
+            // Canais que NÃO suportam envio de áudio — forçar sempre texto
+            $conversationChannel = $conversation['channel'] ?? '';
+            $audioUnsupportedChannels = ['instagram', 'instagram_comment', 'facebook', 'email', 'webchat'];
+            $channelBlocksAudio = in_array($conversationChannel, $audioUnsupportedChannels);
+
+            if ($channelBlocksAudio) {
+                \App\Helpers\Logger::info("AIAgentService::processMessage - 🔇 Canal '{$conversationChannel}' não suporta áudio — TTS desativado para esta mensagem");
+                $clientRequestedAudio = false; // Ignorar pedido do cliente também
+            }
             
-            \App\Helpers\Logger::info("AIAgentService::processMessage - ⚙️ TTS Settings: enabled=" . ($ttsSettings['enabled'] ? 'YES' : 'NO') . ", auto=" . ($ttsSettings['auto_generate_audio'] ? 'YES' : 'NO') . ", provider=" . ($ttsSettings['provider'] ?? 'none') . ", clientRequested=" . ($clientRequestedAudio ? 'YES' : 'NO'));
+            \App\Helpers\Logger::info("AIAgentService::processMessage - ⚙️ TTS Settings: enabled=" . ($ttsSettings['enabled'] ? 'YES' : 'NO') . ", auto=" . ($ttsSettings['auto_generate_audio'] ? 'YES' : 'NO') . ", provider=" . ($ttsSettings['provider'] ?? 'none') . ", clientRequested=" . ($clientRequestedAudio ? 'YES' : 'NO') . ", channelBlocksAudio=" . ($channelBlocksAudio ? 'YES' : 'NO'));
             
-            // Gerar áudio se: (TTS habilitado E auto_generate) OU (TTS habilitado E cliente pediu)
-            $shouldGenerateAudio = !empty($ttsSettings['enabled']) && (
+            // Gerar áudio se: canal suporta E TTS habilitado E (auto_generate OU cliente pediu)
+            $shouldGenerateAudio = !$channelBlocksAudio && !empty($ttsSettings['enabled']) && (
                 !empty($ttsSettings['auto_generate_audio']) || 
                 $clientRequestedAudio
             );

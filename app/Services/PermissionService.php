@@ -296,6 +296,20 @@ class PermissionService
             return true;
         }
 
+        // Agente do contato pode editar a conversa
+        if (!empty($conversation['contact_id'])) {
+            try {
+                $contactAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
+                foreach ($contactAgents as $ca) {
+                    if ($ca['agent_id'] == $userId) {
+                        return true;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Silenciar erro
+            }
+        }
+
         // Verificar se é própria conversa
         if (isset($conversation['agent_id']) && $conversation['agent_id'] == $userId) {
             return self::hasPermission($userId, 'conversations.edit.own');
@@ -332,6 +346,20 @@ class PermissionService
         // Verificar se pode ver a conversa primeiro
         if (!self::canViewConversation($userId, $conversation)) {
             return false;
+        }
+
+        // Agente do contato SEMPRE pode enviar mensagens
+        if (!empty($conversation['contact_id'])) {
+            try {
+                $contactAgents = \App\Models\ContactAgent::getByContact($conversation['contact_id']);
+                foreach ($contactAgents as $ca) {
+                    if ($ca['agent_id'] == $userId) {
+                        return true;
+                    }
+                }
+            } catch (\Exception $e) {
+                // Silenciar erro e seguir com as outras verificações
+            }
         }
 
         // Verificar se é o agente responsável

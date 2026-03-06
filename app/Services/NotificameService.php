@@ -903,22 +903,13 @@ class NotificameService
                 $conversation = ConversationService::create($conversationData, false);
                 $isNewConversation = true;
                 self::logInfo("Notificame webhook: Nova conversa criada com SUCESSO - ConversationID={$conversation['id']}");
+                // Nota: ConversationService::create já envia notifyNewConversation via WebSocket
+                // com dados completos (findWithRelations). Não duplicar aqui.
             } catch (\Exception $e) {
                 self::logError("Notificame webhook: ERRO ao criar conversa: " . $e->getMessage());
                 self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
                 self::logInfo("========== Notificame Webhook FIM (Erro: Criação de conversa falhou) ==========");
                 return;
-            }
-            
-            // Notificar nova conversa via WebSocket
-            try {
-                $conversationFull = \App\Models\Conversation::find($conversation['id']);
-                if ($conversationFull) {
-                    \App\Helpers\WebSocket::notifyNewConversation($conversationFull);
-                    self::logInfo("Notificame webhook: WebSocket notificado sobre nova conversa");
-                }
-            } catch (\Exception $e) {
-                self::logError("Notificame webhook: Erro ao notificar nova conversa via WebSocket: " . $e->getMessage());
             }
         }
         
@@ -966,12 +957,28 @@ class NotificameService
             $message['type'] = ($message['message_type'] ?? 'text') === 'note' ? 'note' : 'message';
             $message['direction'] = 'incoming';
             
-            // Notificar via WebSocket
+            // Notificar via WebSocket sobre nova mensagem (atualiza painel de chat)
             try {
                 \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $message);
                 self::logInfo("Notificame webhook: WebSocket notificado sobre nova mensagem");
             } catch (\Exception $e) {
                 self::logError("Notificame webhook: Erro ao notificar WebSocket de mensagem: " . $e->getMessage());
+            }
+
+            // Notificar atualização da conversa na lista (atualiza last_message, unread_count e posição)
+            // Isso corrige o preview em branco na lista de conversas para todos os canais Notificame
+            try {
+                $convFull = \App\Models\Conversation::findWithRelations($conversation['id']);
+                if ($convFull) {
+                    // Adicionar last_message manualmente (findWithRelations não inclui esse campo)
+                    $convFull['last_message']    = $messageData['content'];
+                    $convFull['last_message_at'] = $message['created_at'] ?? date('Y-m-d H:i:s');
+                    $convFull['unread_count']     = ($convFull['unread_count'] ?? 0) + 1;
+                    \App\Helpers\WebSocket::notifyConversationUpdated($conversation['id'], $convFull);
+                    self::logInfo("Notificame webhook: Lista de conversas atualizada via WebSocket (last_message incluído)");
+                }
+            } catch (\Exception $e) {
+                self::logError("Notificame webhook: Erro ao notificar atualização de conversa: " . $e->getMessage());
             }
         } else {
             self::logWarning("Notificame webhook: Mensagem não encontrada após criação (MessageID={$messageId})");

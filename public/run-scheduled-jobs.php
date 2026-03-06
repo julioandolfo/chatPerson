@@ -30,7 +30,6 @@ use App\Jobs\AutomationDelayJob;
 use App\Jobs\AIFallbackMonitoringJob;
 use App\Jobs\WooCommerceSyncJob;
 use App\Jobs\ChatbotTimeoutJob;
-use App\Jobs\AutoCloseConversationsJob;
 
 // ✅ Garantir que diretório de cache existe
 $cacheDir = $rootDir . '/storage/cache';
@@ -277,7 +276,7 @@ try {
     $lastAutoClose = $state['last_auto_close'] ?? 0;
     if (($now - $lastAutoClose) >= 1800 || isset($_GET['force_auto_close'])) {
         cronRunJob('AutoCloseConversationsJob', function() {
-            AutoCloseConversationsJob::run();
+            \App\Jobs\AutoCloseConversationsJob::run();
         }, 30);
         $state['last_auto_close'] = $now;
     }

@@ -963,6 +963,88 @@ class IntegrationController
     }
 
     /**
+     * Criar template Notificame
+     */
+    public function createNotificameTemplate(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+        
+        try {
+            $data = Request::all();
+            $result = NotificameService::createTemplate($id, $data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Template criado com sucesso!',
+                'template' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Atualizar template Notificame
+     */
+    public function updateNotificameTemplate(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+        
+        try {
+            $data = Request::all();
+            $templateId = $data['template_id'] ?? '';
+            if (empty($templateId)) {
+                throw new \Exception('ID do template é obrigatório');
+            }
+            unset($data['template_id']);
+            
+            $result = NotificameService::updateTemplate($id, $templateId, $data);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Template atualizado com sucesso!',
+                'template' => $result
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * Deletar template Notificame
+     */
+    public function deleteNotificameTemplate(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+        
+        try {
+            $data = Request::all();
+            $templateId = $data['template_id'] ?? '';
+            if (empty($templateId)) {
+                throw new \Exception('ID do template é obrigatório');
+            }
+            
+            NotificameService::deleteTemplate($id, $templateId);
+            
+            Response::json([
+                'success' => true,
+                'message' => 'Template excluído com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
      * Visualizar logs do Notificame (últimas 300 linhas contendo 'Notificame')
      */
     public function notificameLogs(): void

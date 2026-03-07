@@ -130,7 +130,7 @@ ob_start();
                                 ];
                                 $currentStatus = $account['status'] ?? 'inactive';
                                 ?>
-                                <span class="badge badge-light-<?= $statusClass[$currentStatus] ?? 'warning' ?>">
+                                <span class="badge badge-light-<?= $statusClass[$currentStatus] ?? 'warning' ?>" id="status_badge_<?= $account['id'] ?>">
                                     <?= $statusText[$currentStatus] ?? 'Desconhecido' ?>
                                 </span>
                             </td>
@@ -269,6 +269,12 @@ ob_start();
                     <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
                     Sincronizar
                 </button>
+                <?php if (\App\Helpers\Permission::can('notificame.edit')): ?>
+                <button type="button" class="btn btn-sm btn-primary" onclick="showCreateTemplateModal()" id="btn_new_template">
+                    <i class="ki-duotone ki-plus fs-4"></i>
+                    Novo Template
+                </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -319,7 +325,8 @@ ob_start();
                             <th class="min-w-100px">Categoria</th>
                             <th class="min-w-80px">Idioma</th>
                             <th class="min-w-80px">Status</th>
-                            <th class="min-w-250px">Conteúdo</th>
+                            <th class="min-w-200px">Conteúdo</th>
+                            <th class="text-end min-w-120px">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="templates_tbody"></tbody>
@@ -634,6 +641,169 @@ ob_start();
 </div>
 <!--end::Modal-->
 
+<!--begin::Modal - Criar/Editar Template-->
+<div class="modal fade" id="kt_modal_template" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title fw-bold" id="kt_template_modal_title">
+                    <i class="ki-duotone ki-plus-square fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    Novo Template
+                </h3>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <form id="kt_form_template">
+                <input type="hidden" name="template_id" id="kt_tpl_id">
+                <input type="hidden" name="edit_mode" id="kt_tpl_edit_mode" value="0">
+                <div class="modal-body scroll-y" style="max-height: 70vh;">
+                    <div class="row g-5">
+                        <div class="col-md-6">
+                            <label class="form-label required">Conta</label>
+                            <select name="account_id" id="kt_tpl_account" class="form-select form-select-solid" required>
+                                <option value="">Selecione...</option>
+                                <?php foreach ($accounts as $account): ?>
+                                    <?php if (in_array($account['channel'] ?? '', ['whatsapp', 'instagram', 'facebook', 'telegram'])): ?>
+                                    <option value="<?= $account['id'] ?>" data-channel="<?= htmlspecialchars($account['channel'] ?? '') ?>">
+                                        <?= htmlspecialchars($account['name']) ?> (<?= ucfirst($account['channel'] ?? '') ?>)
+                                    </option>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Categoria</label>
+                            <select name="category" id="kt_tpl_category" class="form-select form-select-solid" required>
+                                <option value="UTILITY">Utilidade (notificações, atualizações)</option>
+                                <option value="MARKETING">Marketing (promoções, ofertas)</option>
+                                <option value="AUTHENTICATION">Autenticação (códigos, verificação)</option>
+                            </select>
+                            <div class="form-text">A categoria afeta o custo e as regras de envio</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Nome do Template</label>
+                            <input type="text" name="name" id="kt_tpl_name" class="form-control form-control-solid"
+                                   placeholder="ex: pedido_confirmado" pattern="[a-z0-9_]+" required>
+                            <div class="form-text">Apenas letras minúsculas, números e underscores</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label required">Idioma</label>
+                            <select name="language" id="kt_tpl_language" class="form-select form-select-solid" required>
+                                <option value="pt_BR" selected>Português (BR)</option>
+                                <option value="en_US">English (US)</option>
+                                <option value="es">Español</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Cabeçalho (opcional)</label>
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <select name="header_type" id="kt_tpl_header_type" class="form-select form-select-solid" onchange="toggleTplHeaderFields(this.value)">
+                                        <option value="NONE">Sem cabeçalho</option>
+                                        <option value="TEXT">Texto</option>
+                                        <option value="IMAGE">Imagem</option>
+                                        <option value="VIDEO">Vídeo</option>
+                                        <option value="DOCUMENT">Documento</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-8" id="kt_tpl_header_text_field" style="display:none;">
+                                    <input type="text" name="header_text" id="kt_tpl_header_text" class="form-control form-control-solid"
+                                           placeholder="Texto do cabeçalho" maxlength="60">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label required">Corpo da Mensagem</label>
+                            <textarea name="body_text" id="kt_tpl_body" class="form-control form-control-solid" rows="5" required
+                                      placeholder="Digite o texto da mensagem. Use {{1}}, {{2}} etc. para variáveis.&#10;&#10;Ex: Olá {{1}}, seu pedido #{{2}} foi confirmado!"
+                                      oninput="updateTplPreview()"></textarea>
+                            <div class="form-text">Use <code>{{1}}</code>, <code>{{2}}</code> etc. para variáveis dinâmicas (máx. 1024 caracteres)</div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Rodapé (opcional)</label>
+                            <input type="text" name="footer_text" id="kt_tpl_footer" class="form-control form-control-solid"
+                                   placeholder="Ex: Enviado por Sua Empresa" maxlength="60">
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Botões (opcional, máx. 3)</label>
+                            <div id="kt_tpl_buttons_container"></div>
+                            <button type="button" class="btn btn-sm btn-light-primary mt-2" onclick="addTplButton()">
+                                <i class="ki-duotone ki-plus fs-4"></i> Adicionar Botão
+                            </button>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Pré-visualização</label>
+                            <div class="bg-light rounded p-5" id="kt_tpl_preview_container">
+                                <div class="d-flex justify-content-end">
+                                    <div class="bg-success bg-opacity-15 rounded p-3" style="max-width: 350px; min-width: 250px;">
+                                        <div id="kt_tpl_preview_header" class="fw-bold mb-1" style="display:none;"></div>
+                                        <div id="kt_tpl_preview_body" class="text-dark fs-7">A mensagem aparecerá aqui...</div>
+                                        <div id="kt_tpl_preview_footer" class="text-muted fs-8 mt-1" style="display:none;"></div>
+                                        <div id="kt_tpl_preview_buttons" class="mt-2" style="display:none;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="kt_submit_template">
+                        <span class="indicator-label">Criar Template</span>
+                        <span class="indicator-progress">Aguarde...
+                            <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
+<!--begin::Modal - Visualizar Template-->
+<div class="modal fade" id="kt_modal_view_template" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title fw-bold">
+                    <i class="ki-duotone ki-document fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    Detalhes do Template
+                </h3>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body scroll-y" style="max-height: 70vh;">
+                <div id="kt_view_template_content">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <?php if (\App\Helpers\Permission::can('notificame.edit')): ?>
+                <button type="button" class="btn btn-light-primary" id="kt_view_tpl_edit_btn" onclick="editTemplateFromView()">
+                    <i class="ki-duotone ki-pencil fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                    Editar
+                </button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Fechar</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
 <script>
 // Filtrar por canal
 function filterByChannel(channel) {
@@ -717,7 +887,6 @@ function checkStatus(id) {
             try {
                 data = JSON.parse(text);
             } catch (e) {
-                // resposta não é JSON, mostrar preview
                 content.innerHTML = `<div class="alert alert-danger">A API retornou uma resposta inválida (não-JSON).<br><small>${text.substring(0, 200)}</small></div>`;
                 return;
             }
@@ -726,6 +895,13 @@ function checkStatus(id) {
                 const status = data.status;
                 const statusClass = status.connected ? 'success' : 'danger';
                 const statusIcon = status.connected ? 'check-circle' : 'cross-circle';
+
+                // Atualizar badge de status na tabela em tempo real
+                const badge = document.getElementById('status_badge_' + id);
+                if (badge) {
+                    badge.className = 'badge badge-light-' + statusClass;
+                    badge.textContent = status.connected ? 'Ativo' : 'Desconectado';
+                }
                 
                 let detailsHtml = '';
                 if (status.details) {
@@ -1185,13 +1361,14 @@ function renderTemplates(templates) {
     }
 
     let html = '';
-    templates.forEach(t => {
+    templates.forEach((t, idx) => {
         const name = t.name || t.templateName || t.id || '-';
         const category = t.category || t.type || '-';
         const language = t.language || t.lang || '-';
         const status = (t.status || 'unknown').toLowerCase();
         const content = t.body || t.text || t.content || t.components?.find(c => c.type === 'BODY')?.text || '-';
-        const truncated = content.length > 120 ? content.substring(0, 120) + '...' : content;
+        const truncated = content.length > 100 ? content.substring(0, 100) + '...' : content;
+        const tplId = t.id || t.templateId || '';
 
         const statusBadge = {
             'approved': '<span class="badge badge-light-success">Aprovado</span>',
@@ -1201,12 +1378,30 @@ function renderTemplates(templates) {
             'draft': '<span class="badge badge-light-info">Rascunho</span>'
         }[status] || `<span class="badge badge-light">${status}</span>`;
 
+        const canEdit = status === 'draft' || status === 'rejected' || status === 'pending';
+
         html += `<tr>
             <td><span class="fw-bold">${escapeHtml(name)}</span></td>
             <td>${escapeHtml(category)}</td>
             <td>${escapeHtml(language)}</td>
             <td>${statusBadge}</td>
             <td><span class="text-muted fs-7">${escapeHtml(truncated)}</span></td>
+            <td class="text-end">
+                <div class="d-flex justify-content-end gap-1">
+                    <button type="button" class="btn btn-icon btn-bg-light btn-active-color-primary btn-sm"
+                            onclick="viewTemplate(${idx})" title="Visualizar">
+                        <i class="ki-duotone ki-eye fs-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                    </button>
+                    ${canEdit ? `<button type="button" class="btn btn-icon btn-bg-light btn-active-color-warning btn-sm"
+                            onclick="editTemplate(${idx})" title="Editar">
+                        <i class="ki-duotone ki-pencil fs-2"><span class="path1"></span><span class="path2"></span></i>
+                    </button>` : ''}
+                    <button type="button" class="btn btn-icon btn-bg-light btn-active-color-danger btn-sm"
+                            onclick="deleteTemplate('${escapeAttr(tplId)}', '${escapeAttr(name)}')" title="Excluir">
+                        <i class="ki-duotone ki-trash fs-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                    </button>
+                </div>
+            </td>
         </tr>`;
     });
 
@@ -1219,6 +1414,449 @@ function escapeHtml(text) {
     div.textContent = text;
     return div.innerHTML;
 }
+
+function escapeAttr(text) {
+    return String(text || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+// ========== Template CRUD ==========
+
+function getSelectedTemplateAccountId() {
+    return document.getElementById('kt_template_account').value;
+}
+
+function showCreateTemplateModal() {
+    const accountId = getSelectedTemplateAccountId();
+    const form = document.getElementById('kt_form_template');
+    form.reset();
+    document.getElementById('kt_tpl_id').value = '';
+    document.getElementById('kt_tpl_edit_mode').value = '0';
+    document.getElementById('kt_tpl_name').readOnly = false;
+    document.getElementById('kt_template_modal_title').innerHTML = '<i class="ki-duotone ki-plus-square fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Novo Template';
+    document.getElementById('kt_submit_template').querySelector('.indicator-label').textContent = 'Criar Template';
+    document.getElementById('kt_tpl_buttons_container').innerHTML = '';
+    toggleTplHeaderFields('NONE');
+    updateTplPreview();
+
+    if (accountId) {
+        document.getElementById('kt_tpl_account').value = accountId;
+    }
+
+    new bootstrap.Modal(document.getElementById('kt_modal_template')).show();
+}
+
+function editTemplate(idx) {
+    const t = _cachedTemplates[idx];
+    if (!t) return;
+
+    const form = document.getElementById('kt_form_template');
+    form.reset();
+
+    document.getElementById('kt_tpl_id').value = t.id || t.templateId || '';
+    document.getElementById('kt_tpl_edit_mode').value = '1';
+    document.getElementById('kt_tpl_name').value = t.name || t.templateName || '';
+    document.getElementById('kt_tpl_name').readOnly = true;
+    document.getElementById('kt_tpl_category').value = (t.category || 'UTILITY').toUpperCase();
+    document.getElementById('kt_tpl_language').value = t.language || t.lang || 'pt_BR';
+    document.getElementById('kt_template_modal_title').innerHTML = '<i class="ki-duotone ki-pencil fs-2 me-2"><span class="path1"></span><span class="path2"></span></i> Editar Template';
+    document.getElementById('kt_submit_template').querySelector('.indicator-label').textContent = 'Salvar Alterações';
+
+    const accountId = getSelectedTemplateAccountId();
+    if (accountId) {
+        document.getElementById('kt_tpl_account').value = accountId;
+    }
+
+    // Body
+    const body = t.body || t.text || t.content || t.components?.find(c => c.type === 'BODY')?.text || '';
+    document.getElementById('kt_tpl_body').value = body;
+
+    // Header
+    const headerComp = t.components?.find(c => c.type === 'HEADER');
+    if (headerComp) {
+        const headerType = (headerComp.format || 'TEXT').toUpperCase();
+        document.getElementById('kt_tpl_header_type').value = headerType;
+        toggleTplHeaderFields(headerType);
+        if (headerType === 'TEXT') {
+            document.getElementById('kt_tpl_header_text').value = headerComp.text || '';
+        }
+    } else if (t.header) {
+        document.getElementById('kt_tpl_header_type').value = 'TEXT';
+        toggleTplHeaderFields('TEXT');
+        document.getElementById('kt_tpl_header_text').value = t.header || '';
+    } else {
+        toggleTplHeaderFields('NONE');
+    }
+
+    // Footer
+    const footerComp = t.components?.find(c => c.type === 'FOOTER');
+    document.getElementById('kt_tpl_footer').value = footerComp?.text || t.footer || '';
+
+    // Buttons
+    const buttonsContainer = document.getElementById('kt_tpl_buttons_container');
+    buttonsContainer.innerHTML = '';
+    const buttonComp = t.components?.find(c => c.type === 'BUTTONS');
+    if (buttonComp?.buttons) {
+        buttonComp.buttons.forEach(btn => {
+            addTplButton(btn.type || 'QUICK_REPLY', btn.text || '', btn.url || btn.phone_number || '');
+        });
+    } else if (t.buttons && Array.isArray(t.buttons)) {
+        t.buttons.forEach(btn => {
+            addTplButton(btn.type || 'QUICK_REPLY', btn.text || '', btn.url || btn.phone_number || '');
+        });
+    }
+
+    updateTplPreview();
+    new bootstrap.Modal(document.getElementById('kt_modal_template')).show();
+}
+
+let _viewingTemplateIdx = -1;
+
+function viewTemplate(idx) {
+    const t = _cachedTemplates[idx];
+    if (!t) return;
+
+    _viewingTemplateIdx = idx;
+    const content = document.getElementById('kt_view_template_content');
+
+    const name = t.name || t.templateName || t.id || '-';
+    const category = t.category || t.type || '-';
+    const language = t.language || t.lang || '-';
+    const status = (t.status || 'unknown').toLowerCase();
+    const body = t.body || t.text || t.content || t.components?.find(c => c.type === 'BODY')?.text || '-';
+    const tplId = t.id || t.templateId || '-';
+
+    const statusBadge = {
+        'approved': '<span class="badge badge-light-success">Aprovado</span>',
+        'pending': '<span class="badge badge-light-warning">Pendente</span>',
+        'rejected': '<span class="badge badge-light-danger">Rejeitado</span>',
+        'disabled': '<span class="badge badge-light-danger">Desabilitado</span>',
+        'draft': '<span class="badge badge-light-info">Rascunho</span>'
+    }[status] || `<span class="badge badge-light">${escapeHtml(status)}</span>`;
+
+    const canEdit = status === 'draft' || status === 'rejected' || status === 'pending';
+    const editBtn = document.getElementById('kt_view_tpl_edit_btn');
+    if (editBtn) editBtn.style.display = canEdit ? '' : 'none';
+
+    // Header
+    const headerComp = t.components?.find(c => c.type === 'HEADER');
+    let headerHtml = '';
+    if (headerComp) {
+        headerHtml = `<div class="mb-3"><span class="fw-semibold text-muted d-block mb-1">Cabeçalho (${escapeHtml(headerComp.format || 'TEXT')})</span><span>${escapeHtml(headerComp.text || '-')}</span></div>`;
+    } else if (t.header) {
+        headerHtml = `<div class="mb-3"><span class="fw-semibold text-muted d-block mb-1">Cabeçalho</span><span>${escapeHtml(t.header)}</span></div>`;
+    }
+
+    // Footer
+    const footerComp = t.components?.find(c => c.type === 'FOOTER');
+    const footer = footerComp?.text || t.footer || '';
+    const footerHtml = footer ? `<div class="mb-3"><span class="fw-semibold text-muted d-block mb-1">Rodapé</span><span>${escapeHtml(footer)}</span></div>` : '';
+
+    // Buttons
+    const buttonComp = t.components?.find(c => c.type === 'BUTTONS');
+    let buttonsHtml = '';
+    const buttons = buttonComp?.buttons || t.buttons || [];
+    if (buttons.length > 0) {
+        buttonsHtml = '<div class="mb-3"><span class="fw-semibold text-muted d-block mb-1">Botões</span>';
+        buttons.forEach(btn => {
+            const btnType = (btn.type || 'QUICK_REPLY').toUpperCase();
+            const typeLabel = btnType === 'URL' ? 'Link' : btnType === 'PHONE_NUMBER' ? 'Telefone' : 'Resposta Rápida';
+            buttonsHtml += `<div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge badge-light-info">${typeLabel}</span>
+                <span>${escapeHtml(btn.text || '-')}</span>
+                ${btn.url ? `<a href="${escapeHtml(btn.url)}" target="_blank" class="text-primary fs-8">${escapeHtml(btn.url)}</a>` : ''}
+                ${btn.phone_number ? `<span class="text-muted fs-8">${escapeHtml(btn.phone_number)}</span>` : ''}
+            </div>`;
+        });
+        buttonsHtml += '</div>';
+    }
+
+    // Preview WhatsApp style
+    const previewHtml = `
+        <div class="bg-light rounded p-4 mb-5">
+            <div class="d-flex justify-content-end">
+                <div class="bg-success bg-opacity-15 rounded p-3" style="max-width: 350px; min-width: 250px;">
+                    ${headerComp?.text ? `<div class="fw-bold mb-1">${escapeHtml(headerComp.text)}</div>` : ''}
+                    ${t.header ? `<div class="fw-bold mb-1">${escapeHtml(t.header)}</div>` : ''}
+                    <div class="text-dark fs-7">${escapeHtml(body).replace(/\n/g, '<br>')}</div>
+                    ${footer ? `<div class="text-muted fs-8 mt-1">${escapeHtml(footer)}</div>` : ''}
+                    ${buttons.length > 0 ? '<div class="mt-2 border-top pt-2">' + buttons.map(b => `<div class="text-center"><a class="text-primary fs-7">${escapeHtml(b.text || '')}</a></div>`).join('') + '</div>' : ''}
+                </div>
+            </div>
+        </div>`;
+
+    content.innerHTML = `
+        <div class="mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h4 class="fw-bold mb-0">${escapeHtml(name)}</h4>
+                ${statusBadge}
+            </div>
+            <div class="separator separator-dashed mb-4"></div>
+            <div class="row mb-3">
+                <div class="col-4"><span class="fw-semibold text-muted">ID:</span></div>
+                <div class="col-8"><span class="text-dark">${escapeHtml(tplId)}</span></div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-4"><span class="fw-semibold text-muted">Categoria:</span></div>
+                <div class="col-8"><span class="text-dark">${escapeHtml(category)}</span></div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-4"><span class="fw-semibold text-muted">Idioma:</span></div>
+                <div class="col-8"><span class="text-dark">${escapeHtml(language)}</span></div>
+            </div>
+        </div>
+        <div class="separator separator-dashed mb-5"></div>
+        ${headerHtml}
+        <div class="mb-3">
+            <span class="fw-semibold text-muted d-block mb-1">Corpo</span>
+            <div class="bg-light-primary rounded p-3 fs-7">${escapeHtml(body).replace(/\n/g, '<br>')}</div>
+        </div>
+        ${footerHtml}
+        ${buttonsHtml}
+        <div class="separator separator-dashed my-5"></div>
+        <span class="fw-semibold text-muted d-block mb-2">Pré-visualização</span>
+        ${previewHtml}
+    `;
+
+    new bootstrap.Modal(document.getElementById('kt_modal_view_template')).show();
+}
+
+function editTemplateFromView() {
+    bootstrap.Modal.getInstance(document.getElementById('kt_modal_view_template'))?.hide();
+    setTimeout(() => editTemplate(_viewingTemplateIdx), 300);
+}
+
+function deleteTemplate(templateId, templateName) {
+    const accountId = getSelectedTemplateAccountId();
+    if (!accountId) {
+        Swal.fire('Erro', 'Selecione uma conta primeiro', 'warning');
+        return;
+    }
+
+    Swal.fire({
+        title: 'Excluir Template?',
+        html: `Tem certeza que deseja excluir o template <strong>${templateName}</strong>?<br><small class="text-danger">Esta ação pode ser irreversível.</small>`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sim, excluir',
+        cancelButtonText: 'Cancelar',
+        buttonsStyling: false,
+        customClass: { confirmButton: 'btn btn-danger me-3', cancelButton: 'btn btn-light' }
+    }).then(result => {
+        if (!result.isConfirmed) return;
+
+        Swal.fire({ title: 'Excluindo...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        fetch(`/integrations/notificame/accounts/${accountId}/templates/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({ template_id: templateId })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                Swal.fire({ text: data.message || 'Template excluído!', icon: 'success', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+                loadTemplates(accountId);
+            } else {
+                Swal.fire({ text: data.message || 'Erro ao excluir', icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+            }
+        })
+        .catch(err => {
+            Swal.fire({ text: 'Erro: ' + err.message, icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+        });
+    });
+}
+
+// Template form submit
+document.getElementById('kt_form_template').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const accountId = document.getElementById('kt_tpl_account').value;
+    if (!accountId) {
+        Swal.fire('Erro', 'Selecione uma conta', 'warning');
+        return;
+    }
+
+    const editMode = document.getElementById('kt_tpl_edit_mode').value === '1';
+    const templateId = document.getElementById('kt_tpl_id').value;
+
+    const buttons = [];
+    document.querySelectorAll('#kt_tpl_buttons_container .tpl-button-row').forEach(row => {
+        const type = row.querySelector('[name="btn_type"]').value;
+        const text = row.querySelector('[name="btn_text"]').value;
+        const extra = row.querySelector('[name="btn_extra"]')?.value || '';
+        if (text) {
+            const btn = { type, text };
+            if (type === 'URL') btn.url = extra;
+            if (type === 'PHONE_NUMBER') btn.phone_number = extra;
+            buttons.push(btn);
+        }
+    });
+
+    const data = {
+        name: document.getElementById('kt_tpl_name').value,
+        category: document.getElementById('kt_tpl_category').value,
+        language: document.getElementById('kt_tpl_language').value,
+        body_text: document.getElementById('kt_tpl_body').value,
+        header_type: document.getElementById('kt_tpl_header_type').value,
+        header_text: document.getElementById('kt_tpl_header_text').value || '',
+        footer_text: document.getElementById('kt_tpl_footer').value || '',
+    };
+
+    if (buttons.length > 0) {
+        data.buttons = buttons;
+    }
+
+    if (editMode && templateId) {
+        data.template_id = templateId;
+    }
+
+    const submitBtn = document.getElementById('kt_submit_template');
+    submitBtn.setAttribute('data-kt-indicator', 'on');
+    submitBtn.disabled = true;
+
+    const url = editMode
+        ? `/integrations/notificame/accounts/${accountId}/templates/update`
+        : `/integrations/notificame/accounts/${accountId}/templates`;
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        submitBtn.removeAttribute('data-kt-indicator');
+        submitBtn.disabled = false;
+        if (result.success) {
+            Swal.fire({
+                text: result.message || (editMode ? 'Template atualizado!' : 'Template criado!'),
+                icon: 'success',
+                buttonsStyling: false,
+                confirmButtonText: 'OK',
+                customClass: { confirmButton: 'btn btn-primary' }
+            }).then(() => {
+                bootstrap.Modal.getInstance(document.getElementById('kt_modal_template'))?.hide();
+                document.getElementById('kt_template_account').value = accountId;
+                loadTemplates(accountId);
+            });
+        } else {
+            Swal.fire({ text: result.message || 'Erro ao salvar', icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+        }
+    })
+    .catch(err => {
+        submitBtn.removeAttribute('data-kt-indicator');
+        submitBtn.disabled = false;
+        Swal.fire({ text: 'Erro: ' + err.message, icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+    });
+});
+
+// Template header toggle
+function toggleTplHeaderFields(type) {
+    document.getElementById('kt_tpl_header_text_field').style.display = type === 'TEXT' ? 'block' : 'none';
+    updateTplPreview();
+}
+
+// Template preview
+function updateTplPreview() {
+    const body = document.getElementById('kt_tpl_body').value || 'A mensagem aparecerá aqui...';
+    const headerType = document.getElementById('kt_tpl_header_type').value;
+    const headerText = document.getElementById('kt_tpl_header_text').value;
+    const footer = document.getElementById('kt_tpl_footer').value;
+
+    const previewBody = document.getElementById('kt_tpl_preview_body');
+    const previewHeader = document.getElementById('kt_tpl_preview_header');
+    const previewFooter = document.getElementById('kt_tpl_preview_footer');
+    const previewButtons = document.getElementById('kt_tpl_preview_buttons');
+
+    previewBody.innerHTML = escapeHtml(body).replace(/\n/g, '<br>');
+
+    if (headerType === 'TEXT' && headerText) {
+        previewHeader.textContent = headerText;
+        previewHeader.style.display = 'block';
+    } else if (headerType !== 'NONE' && headerType !== 'TEXT') {
+        previewHeader.textContent = `[${headerType}]`;
+        previewHeader.style.display = 'block';
+    } else {
+        previewHeader.style.display = 'none';
+    }
+
+    if (footer) {
+        previewFooter.textContent = footer;
+        previewFooter.style.display = 'block';
+    } else {
+        previewFooter.style.display = 'none';
+    }
+
+    const buttonRows = document.querySelectorAll('#kt_tpl_buttons_container .tpl-button-row');
+    if (buttonRows.length > 0) {
+        let btnsHtml = '<div class="border-top pt-2">';
+        buttonRows.forEach(row => {
+            const text = row.querySelector('[name="btn_text"]').value || 'Botão';
+            btnsHtml += `<div class="text-center"><a class="text-primary fs-7">${escapeHtml(text)}</a></div>`;
+        });
+        btnsHtml += '</div>';
+        previewButtons.innerHTML = btnsHtml;
+        previewButtons.style.display = 'block';
+    } else {
+        previewButtons.style.display = 'none';
+    }
+}
+
+// Add button to template form
+function addTplButton(type, text, extra) {
+    const container = document.getElementById('kt_tpl_buttons_container');
+    const count = container.querySelectorAll('.tpl-button-row').length;
+    if (count >= 3) {
+        Swal.fire('Limite', 'Máximo de 3 botões', 'info');
+        return;
+    }
+
+    type = type || 'QUICK_REPLY';
+    text = text || '';
+    extra = extra || '';
+
+    const row = document.createElement('div');
+    row.className = 'tpl-button-row d-flex gap-2 mb-2 align-items-center';
+
+    const showExtra = type === 'URL' || type === 'PHONE_NUMBER';
+    const extraPlaceholder = type === 'URL' ? 'https://...' : '5511999999999';
+
+    row.innerHTML = `
+        <select name="btn_type" class="form-select form-select-sm form-select-solid" style="width: 150px;" onchange="onTplBtnTypeChange(this)">
+            <option value="QUICK_REPLY" ${type === 'QUICK_REPLY' ? 'selected' : ''}>Resposta Rápida</option>
+            <option value="URL" ${type === 'URL' ? 'selected' : ''}>Link (URL)</option>
+            <option value="PHONE_NUMBER" ${type === 'PHONE_NUMBER' ? 'selected' : ''}>Telefone</option>
+        </select>
+        <input type="text" name="btn_text" class="form-control form-control-sm form-control-solid" placeholder="Texto do botão" value="${escapeHtml(text)}" oninput="updateTplPreview()">
+        <input type="text" name="btn_extra" class="form-control form-control-sm form-control-solid" placeholder="${extraPlaceholder}" value="${escapeHtml(extra)}" style="display: ${showExtra ? 'block' : 'none'};">
+        <button type="button" class="btn btn-icon btn-sm btn-light-danger" onclick="this.closest('.tpl-button-row').remove(); updateTplPreview();">
+            <i class="ki-duotone ki-cross fs-4"><span class="path1"></span><span class="path2"></span></i>
+        </button>`;
+
+    container.appendChild(row);
+    updateTplPreview();
+}
+
+function onTplBtnTypeChange(select) {
+    const row = select.closest('.tpl-button-row');
+    const extraInput = row.querySelector('[name="btn_extra"]');
+    if (select.value === 'URL') {
+        extraInput.style.display = 'block';
+        extraInput.placeholder = 'https://...';
+    } else if (select.value === 'PHONE_NUMBER') {
+        extraInput.style.display = 'block';
+        extraInput.placeholder = '5511999999999';
+    } else {
+        extraInput.style.display = 'none';
+        extraInput.value = '';
+    }
+}
+
+// Update preview on form inputs
+document.querySelectorAll('#kt_form_template input, #kt_form_template textarea, #kt_form_template select').forEach(el => {
+    el.addEventListener('input', updateTplPreview);
+    el.addEventListener('change', updateTplPreview);
+});
 
 <?php if (\App\Helpers\Permission::can('notificame.send')): ?>
 // Testar mensagem

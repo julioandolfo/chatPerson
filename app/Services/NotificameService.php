@@ -129,8 +129,11 @@ class NotificameService
             throw new \Exception("Erro na requisição Notificame: {$error}");
         }
         
-        // Verificar se a resposta é vazia
+        // Verificar se a resposta é vazia (DELETE/204 pode retornar vazio)
         if (empty($response)) {
+            if ($httpCode >= 200 && $httpCode < 300) {
+                return ['success' => true, 'http_code' => $httpCode];
+            }
             throw new \Exception("Resposta vazia da API Notificame (HTTP {$httpCode}). URL: {$url}");
         }
         
@@ -704,8 +707,15 @@ class NotificameService
             return;
         }
 
+        // ── Tratar eventos de conexão/conta para manter status sincronizado ──
+        if ($eventType && in_array(strtoupper($eventType), ['CONNECTION_STATUS', 'ACCOUNT_STATUS'])) {
+            self::processConnectionStatusEvent($payload, $channel);
+            self::logInfo("========== Notificame Webhook FIM ({$eventType} tratado) ==========");
+            return;
+        }
+
         // ── Ignorar outros eventos de controle que não são mensagens recebidas ──
-        $ignoredTypes = ['CONNECTION_STATUS', 'ACCOUNT_STATUS', 'SUBSCRIPTION_STATUS', 'PING'];
+        $ignoredTypes = ['SUBSCRIPTION_STATUS', 'PING'];
         if ($eventType && in_array(strtoupper($eventType), $ignoredTypes)) {
             self::logInfo("Notificame webhook: Evento de controle ignorado - type={$eventType}");
             self::logInfo("========== Notificame Webhook FIM (Evento de controle ignorado) ==========");
@@ -1028,6 +1038,60 @@ class NotificameService
     /**
      * Processar evento MESSAGE_STATUS do Notificame
      * 
+     * Processar evento de status de conexão (CONNECTION_STATUS / ACCOUNT_STATUS)
+     * Atualiza o campo `status` em integration_accounts para refletir o estado real da conexão.
+     */
+    private static function processConnectionStatusEvent(array $payload, string $channel): void
+    {
+        $eventType = $payload['type'] ?? 'CONNECTION_STATUS';
+        self::logInfo("Processando evento {$eventType} para channel={$channel}");
+        self::logInfo("Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        // Extrair status: pode vir em vários formatos do Notificame
+        $connectionStatus = $payload['status']
+            ?? $payload['connectionStatus']['status']
+            ?? $payload['connection']['status']
+            ?? $payload['state']
+            ?? null;
+
+        $accountIdentifier = $payload['subscriptionId']
+            ?? $payload['account_id']
+            ?? $payload['channelId']
+            ?? null;
+
+        if (!$connectionStatus) {
+            self::logWarning("{$eventType}: Status não encontrado no payload");
+            return;
+        }
+
+        $normalizedStatus = strtolower($connectionStatus);
+        $isConnected = in_array($normalizedStatus, ['connected', 'active', 'online', 'open', 'ready']);
+        $newStatus = $isConnected ? 'active' : 'disconnected';
+
+        self::logInfo("{$eventType}: connectionStatus={$connectionStatus} -> {$newStatus}");
+
+        // Encontrar a conta correspondente
+        $account = self::findAccountByWebhook($payload, $channel);
+
+        if (!$account) {
+            self::logWarning("{$eventType}: Conta não encontrada para channel={$channel}, accountId={$accountIdentifier}");
+            return;
+        }
+
+        $currentStatus = $account['status'] ?? '';
+        if ($currentStatus !== $newStatus) {
+            IntegrationAccount::update($account['id'], [
+                'status' => $newStatus,
+                'error_message' => $isConnected ? null : "Desconectado: {$connectionStatus}",
+                'last_sync_at' => date('Y-m-d H:i:s')
+            ]);
+            self::logInfo("{$eventType}: Conta ID={$account['id']} atualizada: {$currentStatus} -> {$newStatus}");
+        } else {
+            self::logInfo("{$eventType}: Status já é {$newStatus}, sem mudança");
+        }
+    }
+
+    /**
      * Atualiza o status da mensagem no banco quando o Notificame informa
      * que uma mensagem enviada foi entregue, lida ou rejeitada.
      * 
@@ -1291,14 +1355,72 @@ class NotificameService
         
         $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
         
         $endpoint = "{$channel}/templates";
         
         try {
-            $result = self::makeRequest($endpoint, $token, 'POST', $templateData);
+            self::logInfo("Criando template Notificame - Account: {$accountId}, Channel: {$channel}");
+            self::logInfo("Template data: " . json_encode($templateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $result = self::makeRequest($endpoint, $token, 'POST', $templateData, $apiUrl);
+            self::logInfo("Template criado com sucesso: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             return $result;
         } catch (\Exception $e) {
             self::logError("Erro ao criar template Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Atualizar template
+     */
+    public static function updateTemplate(int $accountId, string $templateId, array $templateData): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+        
+        $endpoint = "{$channel}/templates/{$templateId}";
+        
+        try {
+            self::logInfo("Atualizando template Notificame - Account: {$accountId}, TemplateId: {$templateId}");
+            $result = self::makeRequest($endpoint, $token, 'PATCH', $templateData, $apiUrl);
+            self::logInfo("Template atualizado: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            return $result;
+        } catch (\Exception $e) {
+            self::logError("Erro ao atualizar template Notificame: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Deletar template
+     */
+    public static function deleteTemplate(int $accountId, string $templateId): bool
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+        
+        $channel = $account['channel'];
+        $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+        
+        $endpoint = "{$channel}/templates/{$templateId}";
+        
+        try {
+            self::logInfo("Deletando template Notificame - Account: {$accountId}, TemplateId: {$templateId}");
+            self::makeRequest($endpoint, $token, 'DELETE', [], $apiUrl);
+            self::logInfo("Template deletado com sucesso");
+            return true;
+        } catch (\Exception $e) {
+            self::logError("Erro ao deletar template Notificame: " . $e->getMessage());
             throw $e;
         }
     }

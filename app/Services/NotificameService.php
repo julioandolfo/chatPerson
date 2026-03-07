@@ -546,7 +546,7 @@ class NotificameService
     /**
      * Enviar template
      */
-    public static function sendTemplate(int $accountId, string $to, string $templateName, array $params = []): array
+    public static function sendTemplate(int $accountId, string $to, string $templateName, array $params = [], string $language = 'pt_BR'): array
     {
         $account = IntegrationAccount::find($accountId);
         if (!$account || $account['provider'] !== 'notificame') {
@@ -562,16 +562,35 @@ class NotificameService
             throw new \Exception("Notificame: campo 'account_id' é obrigatório para envio de template. Conta ID={$accountId}");
         }
 
-        // Formato conforme SDK NotificameHub: TemplateContent
+        // Conforme docs NotificaMe: POST channels/{channel}/messages
+        // Payload: {from, to, contents: [{type: "template", template: {name, components, language: {code}}}]}
         $endpoint = "channels/{$channel}/messages";
+
+        $components = [];
+        if (!empty($params)) {
+            $parameters = [];
+            foreach ($params as $value) {
+                $parameters[] = ['type' => 'text', 'text' => (string)$value];
+            }
+            $components[] = [
+                'type' => 'BODY',
+                'parameters' => $parameters,
+            ];
+        }
+
         $payload = [
             'from' => $channelId,
             'to' => $to,
             'contents' => [
                 [
                     'type' => 'template',
-                    'templateName' => $templateName,
-                    'params' => $params
+                    'template' => [
+                        'name' => $templateName,
+                        'components' => $components,
+                        'language' => [
+                            'code' => $language,
+                        ],
+                    ]
                 ]
             ]
         ];
@@ -611,13 +630,17 @@ class NotificameService
             throw new \Exception("Notificame: campo 'account_id' é obrigatório para envio interativo. Conta ID={$accountId}");
         }
         
-        // ReplyableTextContent conforme SDK NotificameHub
+        // Conforme docs NotificaMe: POST channels/{channel}/messages
+        // Payload: {from, to, contents: [{type: "interactive", interactive: {...}}]}
         $endpoint = "channels/{$channel}/messages";
         $payload = [
             'from' => $channelId,
             'to' => $to,
             'contents' => [
-                array_merge(['type' => 'text'], $interactiveData)
+                [
+                    'type' => 'interactive',
+                    'interactive' => $interactiveData,
+                ]
             ]
         ];
         
@@ -1320,7 +1343,20 @@ class NotificameService
     }
     
     /**
+     * Obter o token/ID do canal a partir da conta
+     */
+    private static function getChannelToken(array $account): string
+    {
+        $channelId = $account['account_id'] ?? '';
+        if (empty($channelId)) {
+            throw new \Exception("account_id (token do canal) não configurado para a conta #{$account['id']}. Configure o ID da conta nas configurações.");
+        }
+        return $channelId;
+    }
+
+    /**
      * Listar templates
+     * Docs: GET https://api.notificame.com.br/v1/templates/{{token_do_canal}}
      */
     public static function listTemplates(int $accountId): array
     {
@@ -1329,13 +1365,15 @@ class NotificameService
             throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
         
-        $channel = $account['channel'];
         $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+        $channelId = self::getChannelToken($account);
         
-        $endpoint = "{$channel}/templates";
+        $endpoint = "templates/{$channelId}";
         
         try {
-            $result = self::makeRequest($endpoint, $token);
+            self::logInfo("Listando templates Notificame - Account: {$accountId}, Endpoint: {$endpoint}");
+            $result = self::makeRequest($endpoint, $token, 'GET', [], $apiUrl);
             return $result['templates'] ?? $result['data'] ?? [];
         } catch (\Exception $e) {
             self::logError("Erro ao listar templates Notificame: " . $e->getMessage());
@@ -1344,7 +1382,9 @@ class NotificameService
     }
     
     /**
-     * Criar template
+     * Criar template conforme documentação NotificaMe
+     * Docs: POST https://api.notificame.com.br/v1/templates/{{token_do_canal}}
+     * Payload: {from, contents: [{template: {name, language, category, components: [...]}}]}
      */
     public static function createTemplate(int $accountId, array $templateData): array
     {
@@ -1353,16 +1393,18 @@ class NotificameService
             throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
         
-        $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
+        $channelId = self::getChannelToken($account);
         
-        $endpoint = "{$channel}/templates";
+        $endpoint = "templates/{$channelId}";
+        
+        $payload = self::buildTemplatePayload($channelId, $templateData);
         
         try {
-            self::logInfo("Criando template Notificame - Account: {$accountId}, Channel: {$channel}");
-            self::logInfo("Template data: " . json_encode($templateData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-            $result = self::makeRequest($endpoint, $token, 'POST', $templateData, $apiUrl);
+            self::logInfo("Criando template Notificame - Account: {$accountId}, Endpoint: {$endpoint}");
+            self::logInfo("Template payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             self::logInfo("Template criado com sucesso: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             return $result;
         } catch (\Exception $e) {
@@ -1372,7 +1414,126 @@ class NotificameService
     }
 
     /**
+     * Monta o payload conforme a documentação da API NotificaMe
+     */
+    private static function buildTemplatePayload(string $channelId, array $data): array
+    {
+        $name = $data['name'] ?? '';
+        $language = $data['language'] ?? 'pt_BR';
+        $category = strtoupper($data['category'] ?? 'UTILITY');
+        $bodyText = $data['body_text'] ?? $data['body'] ?? '';
+        $headerType = strtoupper($data['header_type'] ?? 'NONE');
+        $headerText = $data['header_text'] ?? '';
+        $footerText = $data['footer_text'] ?? '';
+        $buttons = $data['buttons'] ?? [];
+
+        if (empty($name)) {
+            throw new \Exception('Nome do template é obrigatório');
+        }
+        if (empty($bodyText)) {
+            throw new \Exception('Corpo da mensagem é obrigatório');
+        }
+
+        $components = [];
+
+        // HEADER component
+        if ($headerType !== 'NONE' && !empty($headerText)) {
+            $headerComponent = [
+                'type' => 'HEADER',
+                'format' => $headerType,
+            ];
+            if ($headerType === 'TEXT') {
+                $headerComponent['text'] = $headerText;
+                $headerExamples = self::extractVariableExamples($headerText);
+                if (!empty($headerExamples)) {
+                    $headerComponent['example'] = ['header_text' => $headerExamples];
+                }
+            }
+            $components[] = $headerComponent;
+        } elseif ($headerType !== 'NONE' && $headerType !== 'TEXT') {
+            $components[] = [
+                'type' => 'HEADER',
+                'format' => $headerType,
+            ];
+        }
+
+        // BODY component
+        $bodyComponent = [
+            'type' => 'BODY',
+            'text' => $bodyText,
+        ];
+        $bodyExamples = self::extractVariableExamples($bodyText);
+        if (!empty($bodyExamples)) {
+            $bodyComponent['example'] = ['body_text' => $bodyExamples];
+        }
+        $components[] = $bodyComponent;
+
+        // FOOTER component
+        if (!empty($footerText)) {
+            $components[] = [
+                'type' => 'FOOTER',
+                'text' => $footerText,
+            ];
+        }
+
+        // BUTTONS component
+        if (!empty($buttons) && is_array($buttons)) {
+            $buttonsList = [];
+            foreach ($buttons as $btn) {
+                $buttonDef = [
+                    'type' => strtoupper($btn['type'] ?? 'QUICK_REPLY'),
+                    'text' => $btn['text'] ?? '',
+                ];
+                if ($buttonDef['type'] === 'URL' && !empty($btn['url'])) {
+                    $buttonDef['url'] = $btn['url'];
+                }
+                if ($buttonDef['type'] === 'PHONE_NUMBER' && !empty($btn['phone_number'])) {
+                    $buttonDef['phone_number'] = $btn['phone_number'];
+                }
+                $buttonsList[] = $buttonDef;
+            }
+            $components[] = [
+                'type' => 'BUTTONS',
+                'buttons' => $buttonsList,
+            ];
+        }
+
+        return [
+            'from' => $channelId,
+            'contents' => [
+                [
+                    'template' => [
+                        'name' => $name,
+                        'language' => $language,
+                        'category' => $category,
+                        'components' => $components,
+                    ]
+                ]
+            ]
+        ];
+    }
+
+    /**
+     * Extrai exemplos de variáveis {{1}}, {{2}} de um texto para o campo "example"
+     */
+    private static function extractVariableExamples(string $text): array
+    {
+        $examples = [];
+        if (preg_match_all('/\{\{(\d+)\}\}/', $text, $matches)) {
+            $placeholders = [
+                1 => 'João', 2 => '12345', 3 => 'Exemplo', 4 => 'Valor',
+                5 => 'Item', 6 => 'Data', 7 => 'Hora', 8 => 'Info',
+            ];
+            foreach ($matches[1] as $num) {
+                $examples[] = $placeholders[(int)$num] ?? "Exemplo{$num}";
+            }
+        }
+        return $examples;
+    }
+
+    /**
      * Atualizar template
+     * Docs: PATCH/POST templates/{{token_do_canal}}
      */
     public static function updateTemplate(int $accountId, string $templateId, array $templateData): array
     {
@@ -1381,15 +1542,18 @@ class NotificameService
             throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
         
-        $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
+        $channelId = self::getChannelToken($account);
         
-        $endpoint = "{$channel}/templates/{$templateId}";
+        $endpoint = "templates/{$channelId}";
+        
+        $payload = self::buildTemplatePayload($channelId, $templateData);
         
         try {
             self::logInfo("Atualizando template Notificame - Account: {$accountId}, TemplateId: {$templateId}");
-            $result = self::makeRequest($endpoint, $token, 'PATCH', $templateData, $apiUrl);
+            self::logInfo("Update payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             self::logInfo("Template atualizado: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             return $result;
         } catch (\Exception $e) {
@@ -1408,14 +1572,14 @@ class NotificameService
             throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
         
-        $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
+        $channelId = self::getChannelToken($account);
         
-        $endpoint = "{$channel}/templates/{$templateId}";
+        $endpoint = "templates/{$channelId}/{$templateId}";
         
         try {
-            self::logInfo("Deletando template Notificame - Account: {$accountId}, TemplateId: {$templateId}");
+            self::logInfo("Deletando template Notificame - Account: {$accountId}, TemplateId: {$templateId}, Endpoint: {$endpoint}");
             self::makeRequest($endpoint, $token, 'DELETE', [], $apiUrl);
             self::logInfo("Template deletado com sucesso");
             return true;

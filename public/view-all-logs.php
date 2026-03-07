@@ -514,6 +514,209 @@ if ($activeTab === 'instagram') {
     }
 }
 
+// ── Diagnóstico WhatsApp Notificame ──
+$waNotificameData = null;
+if ($activeTab === 'wa_notificame') {
+    try {
+        require_once __DIR__ . '/../config/bootstrap.php';
+        $db = \App\Helpers\Database::getInstance();
+
+        // 1. Contas WhatsApp via Notificame
+        $waAccounts = $db->query("
+            SELECT id, name, provider, channel, account_id, phone_number, username, status,
+                   webhook_url, api_url, api_token, error_message, last_sync_at, created_at
+            FROM integration_accounts
+            WHERE provider = 'notificame' AND channel = 'whatsapp'
+            ORDER BY id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 2. Todas as contas Notificame (qualquer canal)
+        $allNotificameAccounts = $db->query("
+            SELECT id, name, channel, account_id, status, last_sync_at
+            FROM integration_accounts
+            WHERE provider = 'notificame'
+            ORDER BY channel, id
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 3. Conversas WhatsApp via Notificame (últimas 30)
+        $waConversations = $db->query("
+            SELECT c.id, c.contact_id, c.channel, c.status, c.integration_account_id,
+                   ct.name as contact_name, ct.phone as contact_phone,
+                   ia.name as account_name, ia.provider as account_provider,
+                   (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) as msg_count,
+                   c.created_at, c.updated_at
+            FROM conversations c
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            LEFT JOIN integration_accounts ia ON ia.id = c.integration_account_id
+            WHERE ia.provider = 'notificame' AND c.channel = 'whatsapp'
+            ORDER BY c.updated_at DESC
+            LIMIT 30
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 4. Últimas mensagens WhatsApp Notificame
+        $waMessages = $db->query("
+            SELECT m.id, m.conversation_id, m.content, m.message_type,
+                   m.sender_type, m.status as msg_status, m.external_id, m.created_at,
+                   c.channel, ct.name as contact_name, ct.phone as contact_phone
+            FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            ORDER BY m.created_at DESC
+            LIMIT 30
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 5. Mensagens com erro/falha (últimas 20)
+        $waFailedMessages = $db->query("
+            SELECT m.id, m.conversation_id, m.content, m.message_type,
+                   m.sender_type, m.status as msg_status, m.external_id, m.error_message, m.created_at,
+                   ct.name as contact_name, ct.phone as contact_phone
+            FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+            LEFT JOIN contacts ct ON ct.id = c.contact_id
+            WHERE m.status IN ('failed', 'error', 'rejected')
+            ORDER BY m.created_at DESC
+            LIMIT 20
+        ")->fetchAll(\PDO::FETCH_ASSOC);
+
+        // 6. Contagens
+        $waTotalConvs = $db->query("
+            SELECT COUNT(*) as c FROM conversations c
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id
+            WHERE ia.provider = 'notificame' AND c.channel = 'whatsapp'
+        ")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        $waTotalMsgs = $db->query("
+            SELECT COUNT(*) as c FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+        ")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        $waTotalMsgsIn = $db->query("
+            SELECT COUNT(*) as c FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+            WHERE m.sender_type = 'contact'
+        ")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        $waTotalMsgsOut = $db->query("
+            SELECT COUNT(*) as c FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+            WHERE m.sender_type IN ('user', 'agent', 'system', 'bot')
+        ")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        $waTotalFailed = $db->query("
+            SELECT COUNT(*) as c FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id AND c.channel = 'whatsapp'
+            INNER JOIN integration_accounts ia ON ia.id = c.integration_account_id AND ia.provider = 'notificame'
+            WHERE m.status IN ('failed', 'error', 'rejected')
+        ")->fetch(\PDO::FETCH_ASSOC)['c'];
+
+        // 7. Webhook URL
+        $webhookBase = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $notificameWebhookUrl = $webhookBase . '/notificame-webhook.php';
+
+        // 8. Diagnósticos de configuração por conta
+        $waDiag = [];
+        foreach ($waAccounts as $acc) {
+            $diag = ['account' => $acc, 'issues' => [], 'ok' => [], 'warnings' => []];
+
+            if (empty($acc['account_id'])) {
+                $diag['issues'][] = 'CRITICO: account_id vazio — campo "from" para API e token do canal para templates';
+            } else {
+                $diag['ok'][] = 'account_id (token do canal): ' . $acc['account_id'];
+            }
+            if (empty($acc['api_token'])) {
+                $diag['issues'][] = 'CRITICO: api_token vazio — necessario para autenticacao (X-Api-Token)';
+            } else {
+                $diag['ok'][] = 'api_token configurado (' . strlen($acc['api_token']) . ' chars)';
+            }
+            if (empty($acc['api_url'])) {
+                $diag['warnings'][] = 'api_url vazia — usando padrao https://api.notificame.com.br/v1/';
+            } else {
+                $diag['ok'][] = 'api_url: ' . $acc['api_url'];
+            }
+            if (empty($acc['webhook_url'])) {
+                $diag['warnings'][] = 'webhook_url nao configurada';
+                $diag['warnings'][] = 'URL sugerida: ' . $notificameWebhookUrl;
+            } else {
+                $diag['ok'][] = 'webhook_url: ' . $acc['webhook_url'];
+                if (strpos($acc['webhook_url'], 'notificame-webhook.php') === false) {
+                    $diag['warnings'][] = 'webhook_url nao aponta para /notificame-webhook.php';
+                }
+            }
+            if ($acc['status'] !== 'active') {
+                $diag['issues'][] = 'Status: ' . $acc['status'] . (!empty($acc['error_message']) ? ' — ' . $acc['error_message'] : '');
+            } else {
+                $diag['ok'][] = 'Status: active';
+            }
+            if (empty($acc['phone_number'])) {
+                $diag['warnings'][] = 'phone_number nao configurado';
+            } else {
+                $diag['ok'][] = 'phone_number: ' . $acc['phone_number'];
+            }
+
+            // Verificar endpoints de template e mensagem
+            $diag['endpoints'] = [
+                'templates_list' => 'GET templates/' . ($acc['account_id'] ?: '{account_id}'),
+                'templates_create' => 'POST templates/' . ($acc['account_id'] ?: '{account_id}'),
+                'send_message' => 'POST channels/whatsapp/messages',
+                'send_template' => 'POST channels/whatsapp/messages (type=template)',
+            ];
+
+            $waDiag[] = $diag;
+        }
+
+        // 9. Logs do notificame.log filtrados por whatsapp
+        $notificameLogFile = __DIR__ . '/../logs/notificame.log';
+        if (!file_exists($notificameLogFile)) {
+            $notificameLogFile = __DIR__ . '/../storage/logs/notificame.log';
+        }
+        $waLogLines = [];
+        if (file_exists($notificameLogFile)) {
+            $allNotifLines = file($notificameLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            $waLogLines = array_filter(array_reverse($allNotifLines), function($l) {
+                return stripos($l, 'whatsapp') !== false
+                    || stripos($l, 'template') !== false
+                    || stripos($l, 'sendMessage') !== false
+                    || stripos($l, 'sendTemplate') !== false;
+            });
+            $waLogLines = array_slice(array_values($waLogLines), 0, 150);
+        }
+
+        // 10. Logs de template especificamente
+        $waTemplateLogLines = [];
+        if (file_exists($notificameLogFile)) {
+            $waTemplateLogLines = array_filter(array_reverse($allNotifLines), function($l) {
+                return stripos($l, 'template') !== false;
+            });
+            $waTemplateLogLines = array_slice(array_values($waTemplateLogLines), 0, 50);
+        }
+
+        $waNotificameData = [
+            'waAccounts' => $waAccounts,
+            'allAccounts' => $allNotificameAccounts,
+            'conversations' => $waConversations,
+            'messages' => $waMessages,
+            'failedMessages' => $waFailedMessages,
+            'totalConvs' => $waTotalConvs,
+            'totalMsgs' => $waTotalMsgs,
+            'totalMsgsIn' => $waTotalMsgsIn,
+            'totalMsgsOut' => $waTotalMsgsOut,
+            'totalFailed' => $waTotalFailed,
+            'webhookUrl' => $notificameWebhookUrl,
+            'diagnostics' => $waDiag,
+            'waLogLines' => $waLogLines,
+            'templateLogLines' => $waTemplateLogLines,
+            'logFile' => $notificameLogFile,
+        ];
+    } catch (\Exception $e) {
+        $waNotificameData = ['error' => $e->getMessage()];
+    }
+}
+
 // ── Logs ──
 $logFileMap = [
     'logs' => __DIR__ . '/../logs/app.log',
@@ -956,6 +1159,7 @@ function colorizeLog($log) {
             <a href="?tab=quepasa" class="tab <?= $activeTab === 'quepasa' ? 'active' : '' ?>">📱 Logs Quepasa</a>
             <a href="?tab=evolution" class="tab <?= $activeTab === 'evolution' ? 'active' : '' ?>">🔗 Logs Evolution</a>
             <a href="?tab=instagram" class="tab <?= $activeTab === 'instagram' ? 'active' : '' ?>" style="<?= $activeTab === 'instagram' ? '' : 'border-color:#e1306c;color:#e1306c;' ?>">📷 Instagram Diagnóstico</a>
+            <a href="?tab=wa_notificame" class="tab <?= $activeTab === 'wa_notificame' ? 'active' : '' ?>" style="<?= $activeTab === 'wa_notificame' ? '' : 'border-color:#25d366;color:#25d366;' ?>">📲 WhatsApp Notificame</a>
             <a href="?tab=notificame" class="tab <?= $activeTab === 'notificame' ? 'active' : '' ?>" style="<?= $activeTab === 'notificame' ? '' : 'border-color:#6c63ff;color:#9c99ff;' ?>">🔔 Logs Notificame</a>
             <a href="?tab=media_queue" class="tab <?= $activeTab === 'media_queue' ? 'active' : '' ?>">📦 Media Queue</a>
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
@@ -2849,6 +3053,274 @@ WHERE c.whatsapp_account_id IS NOT NULL
         <div class="footer">
             <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=instagram" style="color:#e1306c;">🔄 Atualizar</a></p>
         </div>
+
+        <?php elseif ($activeTab === 'wa_notificame'): ?>
+        <!-- ═══════════════ ABA WHATSAPP NOTIFICAME DIAGNÓSTICO ═══════════════ -->
+        <?php if (isset($waNotificameData['error'])): ?>
+            <header><h1>📲 WhatsApp Notificame — Diagnóstico</h1></header>
+            <div class="log-line error">❌ Erro ao carregar dados: <?= htmlspecialchars($waNotificameData['error']) ?></div>
+        <?php else: ?>
+            <header>
+                <h1>📲 Diagnóstico WhatsApp / Notificame</h1>
+                <p style="color:#888;margin-top:5px;font-size:13px;">Contas, templates, mensagens, validações e logs do WhatsApp via NotificaMe Hub.</p>
+                <div class="stats" style="margin-top:15px;">
+                    <div class="stat"><div class="stat-label">Contas WA</div><div class="stat-value" style="color:#25d366;"><?= count($waNotificameData['waAccounts']) ?></div></div>
+                    <div class="stat"><div class="stat-label">Total Notificame</div><div class="stat-value" style="color:#6c63ff;"><?= count($waNotificameData['allAccounts']) ?></div></div>
+                    <div class="stat"><div class="stat-label">Conversas</div><div class="stat-value"><?= $waNotificameData['totalConvs'] ?></div></div>
+                    <div class="stat"><div class="stat-label">Msgs Total</div><div class="stat-value"><?= $waNotificameData['totalMsgs'] ?></div></div>
+                    <div class="stat"><div class="stat-label">Recebidas</div><div class="stat-value" style="color:#4ec9b0;"><?= $waNotificameData['totalMsgsIn'] ?></div></div>
+                    <div class="stat"><div class="stat-label">Enviadas</div><div class="stat-value" style="color:#569cd6;"><?= $waNotificameData['totalMsgsOut'] ?></div></div>
+                    <div class="stat errors"><div class="stat-label">Falhas</div><div class="stat-value"><?= $waNotificameData['totalFailed'] ?></div></div>
+                </div>
+            </header>
+
+            <!-- ── Diagnóstico de Configuração por Conta ── -->
+            <h2 style="color:#25d366;margin:20px 0 12px;font-size:16px;">🔧 Diagnóstico de Configuração</h2>
+            <?php if (empty($waNotificameData['waAccounts'])): ?>
+                <div style="background:#2d2d2d;padding:20px;border-radius:6px;text-align:center;">
+                    <p style="color:#dcdcaa;font-size:15px;">Nenhuma conta WhatsApp Notificame encontrada</p>
+                    <span style="color:#888;font-size:13px;">Acesse Integrações → Notificame e crie uma conta com canal = whatsapp.</span>
+                </div>
+            <?php else: ?>
+                <?php foreach ($waNotificameData['diagnostics'] as $diag): ?>
+                <div style="background:#2d2d2d;padding:15px;border-radius:6px;margin-bottom:12px;border-left:3px solid <?= empty($diag['issues']) ? '#25d366' : '#f44747' ?>;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                        <strong style="color:#d4d4d4;font-size:14px;"><?= htmlspecialchars($diag['account']['name']) ?> (#<?= $diag['account']['id'] ?>)</strong>
+                        <span style="font-size:12px;padding:3px 8px;border-radius:3px;background:<?= $diag['account']['status'] === 'active' ? '#1e3a1e' : '#3a1e1e' ?>;color:<?= $diag['account']['status'] === 'active' ? '#4ec9b0' : '#f44747' ?>;">
+                            <?= $diag['account']['status'] ?>
+                        </span>
+                    </div>
+                    <?php if (!empty($diag['issues'])): ?>
+                        <?php foreach ($diag['issues'] as $issue): ?>
+                            <div style="color:#f44747;font-size:12px;margin:4px 0;">❌ <?= htmlspecialchars($issue) ?></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <?php if (!empty($diag['warnings'])): ?>
+                        <?php foreach ($diag['warnings'] as $warn): ?>
+                            <div style="color:#dcdcaa;font-size:12px;margin:4px 0;">⚠️ <?= htmlspecialchars($warn) ?></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <?php if (!empty($diag['ok'])): ?>
+                        <?php foreach ($diag['ok'] as $ok): ?>
+                            <div style="color:#4ec9b0;font-size:12px;margin:4px 0;">✅ <?= htmlspecialchars($ok) ?></div>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <!-- Endpoints -->
+                    <?php if (!empty($diag['endpoints'])): ?>
+                        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #3c3c3c;">
+                            <span style="color:#858585;font-size:11px;display:block;margin-bottom:4px;">Endpoints API (conforme docs NotificaMe):</span>
+                            <?php foreach ($diag['endpoints'] as $label => $ep): ?>
+                                <div style="font-size:11px;color:#9cdcfe;margin:2px 0;font-family:monospace;"><?= $label ?>: <code style="color:#ce9178;"><?= htmlspecialchars($ep) ?></code></div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+
+            <!-- ── Webhook ── -->
+            <h2 style="color:#dcdcaa;margin:20px 0 12px;font-size:16px;">🔗 Configuração do Webhook</h2>
+            <div style="background:#2d2d2d;padding:15px;border-radius:6px;margin-bottom:15px;">
+                <div style="color:#9cdcfe;font-size:13px;margin-bottom:8px;">URL do Webhook neste servidor:</div>
+                <code style="color:#4ec9b0;font-size:14px;display:block;padding:8px;background:#1e1e1e;border-radius:4px;word-break:break-all;"><?= htmlspecialchars($waNotificameData['webhookUrl']) ?></code>
+                <div style="color:#858585;font-size:12px;margin-top:8px;">
+                    Configure esta URL no painel do NotificaMe para receber webhooks de mensagens e status.
+                </div>
+            </div>
+
+            <!-- ── Todas as Contas Notificame ── -->
+            <h2 style="color:#c586c0;margin:20px 0 12px;font-size:16px;">📋 Todas as Contas Notificame</h2>
+            <div class="table-container" style="overflow-x:auto;margin-bottom:15px;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #3c3c3c;">
+                            <th style="padding:8px;text-align:left;color:#569cd6;">ID</th>
+                            <th style="padding:8px;text-align:left;color:#569cd6;">Nome</th>
+                            <th style="padding:8px;text-align:left;color:#569cd6;">Canal</th>
+                            <th style="padding:8px;text-align:left;color:#569cd6;">Account ID</th>
+                            <th style="padding:8px;text-align:left;color:#569cd6;">Status</th>
+                            <th style="padding:8px;text-align:left;color:#569cd6;">Última Sync</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($waNotificameData['allAccounts'] as $acc): ?>
+                        <tr style="border-bottom:1px solid #2d2d2d;">
+                            <td style="padding:6px 8px;color:#d4d4d4;"><?= $acc['id'] ?></td>
+                            <td style="padding:6px 8px;color:#d4d4d4;"><?= htmlspecialchars($acc['name']) ?></td>
+                            <td style="padding:6px 8px;"><span style="color:<?= $acc['channel'] === 'whatsapp' ? '#25d366' : '#e1306c' ?>;"><?= htmlspecialchars($acc['channel']) ?></span></td>
+                            <td style="padding:6px 8px;color:#ce9178;font-family:monospace;font-size:11px;"><?= htmlspecialchars($acc['account_id'] ?: '-') ?></td>
+                            <td style="padding:6px 8px;color:<?= $acc['status'] === 'active' ? '#4ec9b0' : '#f44747' ?>;"><?= $acc['status'] ?></td>
+                            <td style="padding:6px 8px;color:#858585;"><?= $acc['last_sync_at'] ? date('d/m H:i', strtotime($acc['last_sync_at'])) : '-' ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ── Últimas Conversas WhatsApp Notificame ── -->
+            <h2 style="color:#569cd6;margin:20px 0 12px;font-size:16px;">💬 Últimas Conversas WhatsApp Notificame (<?= count($waNotificameData['conversations']) ?>)</h2>
+            <?php if (empty($waNotificameData['conversations'])): ?>
+                <div style="background:#2d2d2d;padding:15px;border-radius:6px;color:#858585;text-align:center;">Nenhuma conversa WhatsApp via Notificame encontrada</div>
+            <?php else: ?>
+                <div class="table-container" style="overflow-x:auto;margin-bottom:15px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #3c3c3c;">
+                                <th style="padding:8px;text-align:left;color:#569cd6;">ID</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Contato</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Telefone</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Conta</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Status</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Msgs</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Criada</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Atualizada</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($waNotificameData['conversations'] as $conv): ?>
+                            <tr style="border-bottom:1px solid #2d2d2d;">
+                                <td style="padding:6px 8px;color:#d4d4d4;"><?= $conv['id'] ?></td>
+                                <td style="padding:6px 8px;color:#d4d4d4;"><?= htmlspecialchars($conv['contact_name'] ?: '-') ?></td>
+                                <td style="padding:6px 8px;color:#9cdcfe;font-family:monospace;"><?= htmlspecialchars($conv['contact_phone'] ?: '-') ?></td>
+                                <td style="padding:6px 8px;color:#c586c0;"><?= htmlspecialchars($conv['account_name'] ?: '-') ?></td>
+                                <td style="padding:6px 8px;color:<?= $conv['status'] === 'open' ? '#4ec9b0' : '#858585' ?>;"><?= $conv['status'] ?></td>
+                                <td style="padding:6px 8px;color:#dcdcaa;"><?= $conv['msg_count'] ?></td>
+                                <td style="padding:6px 8px;color:#858585;font-size:11px;"><?= date('d/m H:i', strtotime($conv['created_at'])) ?></td>
+                                <td style="padding:6px 8px;color:#858585;font-size:11px;"><?= $conv['updated_at'] ? date('d/m H:i', strtotime($conv['updated_at'])) : '-' ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <!-- ── Últimas Mensagens ── -->
+            <h2 style="color:#4ec9b0;margin:20px 0 12px;font-size:16px;">📨 Últimas Mensagens (<?= count($waNotificameData['messages']) ?>)</h2>
+            <?php if (empty($waNotificameData['messages'])): ?>
+                <div style="background:#2d2d2d;padding:15px;border-radius:6px;color:#858585;text-align:center;">Nenhuma mensagem encontrada</div>
+            <?php else: ?>
+                <div class="table-container" style="overflow-x:auto;margin-bottom:15px;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                        <thead>
+                            <tr style="border-bottom:1px solid #3c3c3c;">
+                                <th style="padding:8px;text-align:left;color:#569cd6;">ID</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Conv</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Contato</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Tipo</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Direção</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Status</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Conteúdo</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">External ID</th>
+                                <th style="padding:8px;text-align:left;color:#569cd6;">Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($waNotificameData['messages'] as $msg): ?>
+                            <?php
+                                $dirColor = $msg['sender_type'] === 'contact' ? '#4ec9b0' : '#569cd6';
+                                $dirLabel = $msg['sender_type'] === 'contact' ? '← IN' : '→ OUT';
+                                $statusColor = in_array($msg['msg_status'], ['failed','error','rejected']) ? '#f44747' : ($msg['msg_status'] === 'delivered' ? '#4ec9b0' : '#858585');
+                                $contentPreview = mb_substr(strip_tags($msg['content'] ?? ''), 0, 80);
+                            ?>
+                            <tr style="border-bottom:1px solid #2d2d2d;">
+                                <td style="padding:6px 8px;color:#d4d4d4;font-size:11px;"><?= $msg['id'] ?></td>
+                                <td style="padding:6px 8px;color:#d4d4d4;"><?= $msg['conversation_id'] ?></td>
+                                <td style="padding:6px 8px;color:#d4d4d4;"><?= htmlspecialchars($msg['contact_name'] ?: ($msg['contact_phone'] ?: '-')) ?></td>
+                                <td style="padding:6px 8px;color:#dcdcaa;"><?= $msg['message_type'] ?: 'text' ?></td>
+                                <td style="padding:6px 8px;color:<?= $dirColor ?>;font-weight:bold;"><?= $dirLabel ?></td>
+                                <td style="padding:6px 8px;color:<?= $statusColor ?>;"><?= $msg['msg_status'] ?: '-' ?></td>
+                                <td style="padding:6px 8px;color:#d4d4d4;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="<?= htmlspecialchars($msg['content'] ?? '') ?>"><?= htmlspecialchars($contentPreview) ?></td>
+                                <td style="padding:6px 8px;color:#ce9178;font-family:monospace;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="<?= htmlspecialchars($msg['external_id'] ?? '') ?>"><?= htmlspecialchars(substr($msg['external_id'] ?? '-', 0, 20)) ?></td>
+                                <td style="padding:6px 8px;color:#858585;font-size:11px;white-space:nowrap;"><?= date('d/m H:i:s', strtotime($msg['created_at'])) ?></td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <!-- ── Mensagens com Erro ── -->
+            <?php if (!empty($waNotificameData['failedMessages'])): ?>
+            <h2 style="color:#f44747;margin:20px 0 12px;font-size:16px;">❌ Mensagens com Falha (<?= count($waNotificameData['failedMessages']) ?>)</h2>
+            <div class="table-container" style="overflow-x:auto;margin-bottom:15px;">
+                <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #3c3c3c;">
+                            <th style="padding:8px;text-align:left;color:#f44747;">ID</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Contato</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Tipo</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Status</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Conteúdo</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Erro</th>
+                            <th style="padding:8px;text-align:left;color:#f44747;">Data</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($waNotificameData['failedMessages'] as $msg): ?>
+                        <tr style="border-bottom:1px solid #2d2d2d;background:#2a1a1a;">
+                            <td style="padding:6px 8px;color:#d4d4d4;"><?= $msg['id'] ?></td>
+                            <td style="padding:6px 8px;color:#d4d4d4;"><?= htmlspecialchars($msg['contact_name'] ?: ($msg['contact_phone'] ?: '-')) ?></td>
+                            <td style="padding:6px 8px;color:#dcdcaa;"><?= $msg['message_type'] ?: 'text' ?></td>
+                            <td style="padding:6px 8px;color:#f44747;font-weight:bold;"><?= $msg['msg_status'] ?></td>
+                            <td style="padding:6px 8px;color:#d4d4d4;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?= htmlspecialchars(mb_substr($msg['content'] ?? '', 0, 60)) ?></td>
+                            <td style="padding:6px 8px;color:#f48771;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;" title="<?= htmlspecialchars($msg['error_message'] ?? '') ?>"><?= htmlspecialchars($msg['error_message'] ?? '-') ?></td>
+                            <td style="padding:6px 8px;color:#858585;font-size:11px;"><?= date('d/m H:i:s', strtotime($msg['created_at'])) ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── Logs de Templates ── -->
+            <h2 style="color:#dcdcaa;margin:20px 0 12px;font-size:16px;">📝 Logs de Templates (<?= count($waNotificameData['templateLogLines']) ?> entradas)</h2>
+            <div class="logs-container" style="max-height:350px;overflow-y:auto;margin-bottom:15px;">
+                <?php if (empty($waNotificameData['templateLogLines'])): ?>
+                    <div style="padding:15px;text-align:center;color:#858585;">Nenhum log de template encontrado no notificame.log</div>
+                <?php else: ?>
+                    <?php foreach ($waNotificameData['templateLogLines'] as $line):
+                        $cls = '';
+                        if (stripos($line, '[ERROR]') !== false) $cls = 'error';
+                        elseif (stripos($line, '[WARNING]') !== false) $cls = 'warning';
+                        elseif (stripos($line, '[INFO]') !== false) $cls = 'info';
+                    ?>
+                        <div class="log-line <?= $cls ?>"><?= colorizeLog($line) ?></div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <!-- ── Logs WhatsApp Notificame ── -->
+            <h2 style="color:#25d366;margin:20px 0 12px;font-size:16px;">📋 Logs WhatsApp + Templates + SendMessage (<?= count($waNotificameData['waLogLines']) ?> entradas)</h2>
+            <div style="margin-bottom:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                <a href="?tab=notificame&filter=whatsapp" style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#25d366;text-decoration:none;">Ver todos no Logs Notificame →</a>
+                <a href="?tab=notificame&filter=template" style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#dcdcaa;text-decoration:none;">Filtrar: template</a>
+                <a href="?tab=notificame&filter=sendMessage" style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#4ec9b0;text-decoration:none;">Filtrar: sendMessage</a>
+                <a href="?tab=notificame&filter=sendTemplate" style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#c586c0;text-decoration:none;">Filtrar: sendTemplate</a>
+                <a href="?tab=notificame&filter=ERROR" style="font-size:11px;padding:3px 8px;border-radius:3px;background:#3c3c3c;color:#f44747;text-decoration:none;">Filtrar: ERROR</a>
+            </div>
+            <div class="logs-container" style="max-height:500px;overflow-y:auto;">
+                <?php if (empty($waNotificameData['waLogLines'])): ?>
+                    <div style="padding:15px;text-align:center;color:#858585;">
+                        Nenhum log filtrado encontrado no notificame.log<br>
+                        <span style="font-size:12px;">Arquivo: <?= htmlspecialchars($waNotificameData['logFile']) ?></span>
+                    </div>
+                <?php else: ?>
+                    <?php foreach ($waNotificameData['waLogLines'] as $line):
+                        $cls = '';
+                        if (stripos($line, '[ERROR]') !== false) $cls = 'error';
+                        elseif (stripos($line, '[WARNING]') !== false) $cls = 'warning';
+                        elseif (stripos($line, '[INFO]') !== false) $cls = 'info';
+                    ?>
+                        <div class="log-line <?= $cls ?>"><?= colorizeLog($line) ?></div>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+
+            <div class="footer">
+                <p>Arquivo de logs: <?= htmlspecialchars($waNotificameData['logFile']) ?></p>
+                <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=wa_notificame" style="color:#25d366;">🔄 Atualizar</a></p>
+            </div>
+        <?php endif; ?>
 
         <?php elseif ($activeTab === 'notificame'): ?>
         <!-- ═══════════════ ABA LOGS NOTIFICAME ═══════════════ -->

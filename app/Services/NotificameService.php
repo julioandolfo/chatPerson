@@ -490,20 +490,27 @@ class NotificameService
         ];
 
         // Mídia/arquivo (áudio, imagem, documento, vídeo)
+        // Docs: https://hub.notificame.com.br/docs/#/api?id=-whatsapp
+        // fileMimeType deve ser simplificado: "audio", "image", "video", "document", "sticker"
         if (!empty($options['media_url'])) {
             $mediaUrl = $options['media_url'];
-            $mediaMime = $options['media_mime'] ?? $options['media_type'] ?? 'application/octet-stream';
+            $rawMime = $options['media_mime'] ?? $options['media_type'] ?? 'document';
             $mediaName = $options['media_name'] ?? null;
 
-            // Garantir que a URL é acessível externamente
-            // A API do NotificaMe precisa baixar o arquivo da URL fornecida
-            $publicBase = realpath(__DIR__ . '/../../public');
-            $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
-            $absolutePath = $publicBase ? ($publicBase . $pathFromUrl) : '';
-            $isLocalFile = ($absolutePath && file_exists($absolutePath) && filesize($absolutePath) > 0);
-
-            if ($isLocalFile) {
-                self::logInfo("Notificame sendMessage - Arquivo local encontrado: {$absolutePath} (" . filesize($absolutePath) . " bytes)");
+            // Normalizar fileMimeType para formato simplificado conforme docs NotificaMe
+            // "audio/ogg" → "audio", "image/jpeg" → "image", "video/mp4" → "video", etc.
+            $simplifiedMime = 'document';
+            $rawMimeLower = strtolower($rawMime);
+            if (str_contains($rawMimeLower, 'audio') || str_contains($rawMimeLower, 'ogg')) {
+                $simplifiedMime = 'audio';
+            } elseif (str_contains($rawMimeLower, 'image') || str_contains($rawMimeLower, 'webp')) {
+                $simplifiedMime = 'image';
+            } elseif (str_contains($rawMimeLower, 'video')) {
+                $simplifiedMime = 'video';
+            } elseif (str_contains($rawMimeLower, 'sticker')) {
+                $simplifiedMime = 'sticker';
+            } elseif (in_array($rawMimeLower, ['audio', 'image', 'video', 'document', 'sticker'])) {
+                $simplifiedMime = $rawMimeLower;
             }
 
             // Converter HTTP para HTTPS (requisito Meta/WhatsApp Business API)
@@ -516,7 +523,7 @@ class NotificameService
             $mediaContent = [
                 'type' => 'file',
                 'fileUrl' => $mediaUrl,
-                'fileMimeType' => $mediaMime,
+                'fileMimeType' => $simplifiedMime,
             ];
             if (!empty($mediaName)) {
                 $mediaContent['fileName'] = $mediaName;
@@ -524,6 +531,8 @@ class NotificameService
             if (!empty($options['caption'])) {
                 $mediaContent['fileCaption'] = $options['caption'];
             }
+
+            self::logInfo("Notificame sendMessage - Mídia: rawMime={$rawMime}, simplified={$simplifiedMime}, url=" . substr($mediaUrl, 0, 120));
 
             if (!empty($message) && empty($options['caption'])) {
                 $payload['contents'] = [
@@ -1126,27 +1135,94 @@ class NotificameService
 
         if ($fileUrl && in_array($mediaType, ['audio', 'image', 'video', 'document'])) {
             self::logInfo("Notificame webhook: 📎 Mídia detectada - tipo={$mediaType}, mime={$fileMime}, url=" . substr($fileUrl, 0, 120));
-            try {
-                $attachment = \App\Services\AttachmentService::saveFromUrl(
-                    $fileUrl,
-                    $conversation['id'],
-                    $fileName ?: null
-                );
-                if ($attachment) {
-                    // Sobrescrever tipo com o detectado pelo MIME do NotificaMe (mais confiável)
-                    $attachment['type'] = $mediaType;
-                    if ($fileMime) {
-                        $attachment['mime_type'] = $fileMime;
-                        $attachment['mimetype'] = $fileMime;
-                    }
-                    $attachments[] = $attachment;
-                    self::logInfo("Notificame webhook: ✅ Mídia salva - tipo={$attachment['type']}, path={$attachment['path']}, size={$attachment['size']}");
+
+            $downloadedContent = null;
+            $isEncryptedUrl = str_contains($fileUrl, 'lookaside.fbsbx.com') || str_contains($fileUrl, 'whatsapp_business/attachments');
+
+            if ($isEncryptedUrl) {
+                // Arquivo criptografado do WhatsApp Business — usar endpoint /media do NotificaMe
+                self::logInfo("Notificame webhook: 🔐 URL criptografada detectada, usando endpoint /media para descriptografar");
+
+                // Normalizar fileMimeType para formato simplificado (conforme docs)
+                $simpleMime = 'document';
+                $mimeLower = strtolower($fileMime ?: '');
+                if (str_contains($mimeLower, 'audio') || str_contains($mimeLower, 'ogg')) {
+                    $simpleMime = 'audio';
+                } elseif (str_contains($mimeLower, 'image')) {
+                    $simpleMime = 'image';
+                } elseif (str_contains($mimeLower, 'video')) {
+                    $simpleMime = 'video';
                 }
-            } catch (\Exception $e) {
-                self::logError("Notificame webhook: Erro ao salvar mídia: " . $e->getMessage());
-                // Fallback: armazenar URL diretamente como content
-                if (empty($messageData['content'])) {
-                    $messageData['content'] = $fileUrl;
+
+                $downloadedContent = self::downloadEncryptedMedia($account, $fileUrl, $simpleMime);
+
+                if ($downloadedContent) {
+                    self::logInfo("Notificame webhook: ✅ Arquivo descriptografado (" . strlen($downloadedContent) . " bytes)");
+
+                    // Salvar localmente
+                    try {
+                        $uploadDir = realpath(__DIR__ . '/../../public/assets/media/attachments') . '/' . $conversation['id'] . '/';
+                        if (!is_dir($uploadDir)) {
+                            @mkdir($uploadDir, 0775, true);
+                        }
+
+                        $ext = 'bin';
+                        if ($simpleMime === 'audio') $ext = 'ogg';
+                        elseif ($simpleMime === 'image') $ext = 'jpg';
+                        elseif ($simpleMime === 'video') $ext = 'mp4';
+
+                        $savedName = 'notificame_' . uniqid('', true) . '_' . time() . '.' . $ext;
+                        $savedPath = $uploadDir . $savedName;
+
+                        if (file_put_contents($savedPath, $downloadedContent) !== false) {
+                            @chmod($savedPath, 0664);
+                            $relativePath = 'assets/media/attachments/' . $conversation['id'] . '/' . $savedName;
+                            $attachments[] = [
+                                'filename' => $fileName ?: $savedName,
+                                'original_name' => $fileName ?: $savedName,
+                                'path' => $relativePath,
+                                'url' => \App\Helpers\Url::to($relativePath),
+                                'type' => $mediaType,
+                                'mime_type' => $fileMime ?: $simpleMime,
+                                'mimetype' => $fileMime ?: $simpleMime,
+                                'size' => strlen($downloadedContent),
+                                'extension' => $ext,
+                            ];
+                            self::logInfo("Notificame webhook: ✅ Mídia salva: {$relativePath} ({$mediaType}, " . strlen($downloadedContent) . " bytes)");
+                        } else {
+                            self::logError("Notificame webhook: Falha ao salvar arquivo em {$savedPath}");
+                        }
+                    } catch (\Exception $e) {
+                        self::logError("Notificame webhook: Erro ao salvar mídia descriptografada: " . $e->getMessage());
+                    }
+                } else {
+                    self::logWarning("Notificame webhook: Não foi possível descriptografar o arquivo — armazenando URL como texto");
+                    if (empty($messageData['content'])) {
+                        $messageData['content'] = $fileUrl;
+                    }
+                }
+            } else {
+                // URL pública — download direto
+                try {
+                    $attachment = \App\Services\AttachmentService::saveFromUrl(
+                        $fileUrl,
+                        $conversation['id'],
+                        $fileName ?: null
+                    );
+                    if ($attachment) {
+                        $attachment['type'] = $mediaType;
+                        if ($fileMime) {
+                            $attachment['mime_type'] = $fileMime;
+                            $attachment['mimetype'] = $fileMime;
+                        }
+                        $attachments[] = $attachment;
+                        self::logInfo("Notificame webhook: ✅ Mídia salva - tipo={$attachment['type']}, path={$attachment['path']}, size={$attachment['size']}");
+                    }
+                } catch (\Exception $e) {
+                    self::logError("Notificame webhook: Erro ao salvar mídia: " . $e->getMessage());
+                    if (empty($messageData['content'])) {
+                        $messageData['content'] = $fileUrl;
+                    }
                 }
             }
         }
@@ -1604,6 +1680,123 @@ class NotificameService
             throw new \Exception("account_id (token do canal) não configurado para a conta #{$account['id']}. Configure o ID da conta nas configurações.");
         }
         return $channelId;
+    }
+
+    /**
+     * Download de arquivo criptografado do WhatsApp Business via API NotificaMe
+     * Docs: POST https://api.notificame.com.br/v1/channels/whatsapp/media
+     *
+     * Arquivos recebidos via webhook do WhatsApp Business (URLs lookaside.fbsbx.com)
+     * são criptografados e precisam ser baixados através deste endpoint.
+     *
+     * @return string|null Conteúdo binário do arquivo, ou null se falhar
+     */
+    public static function downloadEncryptedMedia(array $account, string $fileUrl, string $fileMimeType = 'document'): ?string
+    {
+        $token = $account['api_token'] ?? '';
+        $apiUrl = $account['api_url'] ?? null;
+        $channelId = $account['account_id'] ?? '';
+
+        if (empty($token) || empty($channelId)) {
+            self::logWarning("downloadEncryptedMedia: Token ou channelId ausente, não é possível baixar mídia");
+            return null;
+        }
+
+        $channel = $account['channel'] ?? 'whatsapp';
+        $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
+        $url = $baseUrl . "channels/{$channel}/media";
+
+        $payload = [
+            'from' => $channelId,
+            'to' => $channel,
+            'contents' => [
+                [
+                    'type' => 'file',
+                    'fileUrl' => $fileUrl,
+                    'fileMimeType' => $fileMimeType,
+                ]
+            ]
+        ];
+
+        self::logInfo("downloadEncryptedMedia: POST {$url}");
+        self::logInfo("downloadEncryptedMedia: fileUrl=" . substr($fileUrl, 0, 120));
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'X-Api-Token: ' . $token,
+            ],
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '';
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            self::logError("downloadEncryptedMedia: cURL error: {$curlError}");
+            return null;
+        }
+
+        self::logInfo("downloadEncryptedMedia: HTTP {$httpCode}, Content-Type: {$contentType}, size=" . strlen($response));
+
+        if ($httpCode < 200 || $httpCode >= 300 || empty($response)) {
+            self::logError("downloadEncryptedMedia: Falha HTTP {$httpCode}, response=" . substr($response, 0, 500));
+            return null;
+        }
+
+        // Se retornou JSON, pode conter a URL descriptografada ou base64
+        if (str_contains($contentType, 'json')) {
+            $jsonData = json_decode($response, true);
+            if ($jsonData) {
+                // Pode retornar URL descriptografada ou base64
+                $decryptedUrl = $jsonData['url'] ?? $jsonData['fileUrl'] ?? $jsonData['media_url'] ?? null;
+                if ($decryptedUrl) {
+                    self::logInfo("downloadEncryptedMedia: URL descriptografada obtida, baixando...");
+                    $ch2 = curl_init($decryptedUrl);
+                    curl_setopt_array($ch2, [
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_FOLLOWLOCATION => true,
+                        CURLOPT_SSL_VERIFYPEER => false,
+                        CURLOPT_TIMEOUT => 30,
+                    ]);
+                    $fileContent = curl_exec($ch2);
+                    $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+                    curl_close($ch2);
+
+                    if ($httpCode2 === 200 && !empty($fileContent)) {
+                        self::logInfo("downloadEncryptedMedia: Arquivo baixado com sucesso (" . strlen($fileContent) . " bytes)");
+                        return $fileContent;
+                    }
+                    self::logError("downloadEncryptedMedia: Falha ao baixar URL descriptografada (HTTP {$httpCode2})");
+                }
+
+                $base64 = $jsonData['base64'] ?? $jsonData['data'] ?? $jsonData['file'] ?? null;
+                if ($base64 && is_string($base64)) {
+                    $decoded = base64_decode($base64);
+                    if ($decoded !== false) {
+                        self::logInfo("downloadEncryptedMedia: Arquivo base64 decodificado (" . strlen($decoded) . " bytes)");
+                        return $decoded;
+                    }
+                }
+
+                self::logWarning("downloadEncryptedMedia: Resposta JSON não contém URL ou base64: " . substr($response, 0, 300));
+                return null;
+            }
+        }
+
+        // Se retornou binário direto, é o conteúdo do arquivo
+        self::logInfo("downloadEncryptedMedia: Arquivo binário recebido diretamente (" . strlen($response) . " bytes)");
+        return $response;
     }
 
     /**

@@ -887,6 +887,21 @@ body.dark-mode .set-as-submenu,
     white-space: nowrap;
 }
 
+.conv-autoclose-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(0,0,0,0.06);
+}
+
+.conv-autoclose-bar-fill {
+    height: 100%;
+    border-radius: 0 2px 2px 0;
+    transition: width 0.3s ease;
+}
+
 .hover-bg-light:hover {
     background-color: var(--bs-gray-100) !important;
 }
@@ -6085,6 +6100,89 @@ function getChannelInfo(channel) {
 // ============================================
 // FUNÇòES GLOBAIS - DEFINIR PRIMEIRO
 // ============================================
+
+window.autoCloseSettings = <?= json_encode(\App\Services\ConversationSettingsService::getSettings()['auto_close'] ?? []) ?>;
+
+function getAutoCloseProgress(convEl) {
+    const cfg = window.autoCloseSettings;
+    if (!cfg || !cfg.enabled) return null;
+
+    const now = Date.now();
+    const status = convEl.dataset.status || 'open';
+    if (status !== 'open') return null;
+
+    const lastMessageAt = convEl.dataset.lastMessageAt ? new Date(convEl.dataset.lastMessageAt).getTime() : 0;
+    const lastContactAt = convEl.dataset.lastContactMessageAt ? new Date(convEl.dataset.lastContactMessageAt).getTime() : 0;
+    const lastAgentAt = convEl.dataset.lastAgentMessageAt ? new Date(convEl.dataset.lastAgentMessageAt).getTime() : 0;
+
+    let closestDeadline = Infinity;
+
+    if (cfg.close_inactive_enabled && cfg.close_inactive_days > 0 && lastMessageAt > 0) {
+        const deadline = lastMessageAt + (cfg.close_inactive_days * 86400000);
+        if (deadline < closestDeadline) closestDeadline = deadline;
+    }
+
+    if (cfg.close_waiting_client_enabled && cfg.close_waiting_client_days > 0 && lastAgentAt > 0 && lastAgentAt >= lastContactAt) {
+        const deadline = lastAgentAt + (cfg.close_waiting_client_days * 86400000);
+        if (deadline < closestDeadline) closestDeadline = deadline;
+    }
+
+    if (cfg.agent_inactivity_enabled && cfg.agent_inactivity_days > 0 && lastContactAt > 0 && lastContactAt > lastAgentAt) {
+        const deadline = lastContactAt + (cfg.agent_inactivity_days * 86400000);
+        if (deadline < closestDeadline) closestDeadline = deadline;
+    }
+
+    if (closestDeadline === Infinity) return null;
+
+    const referenceTime = Math.max(lastMessageAt, lastContactAt, lastAgentAt) || lastMessageAt;
+    if (!referenceTime) return null;
+
+    const totalDuration = closestDeadline - referenceTime;
+    const elapsed = now - referenceTime;
+    const remaining = closestDeadline - now;
+
+    if (totalDuration <= 0) return null;
+
+    const pct = Math.max(0, Math.min(100, (remaining / totalDuration) * 100));
+    const remainMs = Math.max(0, remaining);
+
+    let color;
+    if (pct > 60) color = '#50cd89';
+    else if (pct > 30) color = '#ffc700';
+    else if (pct > 10) color = '#f1a832';
+    else color = '#f1416c';
+
+    let label;
+    const hours = remainMs / 3600000;
+    if (hours >= 48) label = Math.floor(hours / 24) + 'd';
+    else if (hours >= 1) label = Math.floor(hours) + 'h';
+    else label = Math.max(1, Math.floor(remainMs / 60000)) + 'min';
+
+    return { pct, color, label, remainMs };
+}
+
+function renderAutoCloseBar(convEl) {
+    const prog = getAutoCloseProgress(convEl);
+    let bar = convEl.querySelector('.conv-autoclose-bar');
+    if (!prog) {
+        if (bar) bar.remove();
+        return;
+    }
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'conv-autoclose-bar';
+        bar.innerHTML = '<div class="conv-autoclose-bar-fill"></div>';
+        convEl.appendChild(bar);
+    }
+    const fill = bar.querySelector('.conv-autoclose-bar-fill');
+    fill.style.width = prog.pct + '%';
+    fill.style.background = prog.color;
+    bar.title = 'Encerramento automático em ' + prog.label;
+}
+
+function refreshAllAutoCloseBars() {
+    document.querySelectorAll('.conversation-item[data-status="open"]').forEach(renderAutoCloseBar);
+}
 
 // ============================================
 // SISTEMA DE MENÇòES/CONVITES DE AGENTES
@@ -12363,6 +12461,9 @@ function refreshConversationList(params = null, append = false) {
                 currentActiveItem.classList.add('active');
             }
         }
+        
+        // Atualizar barras de progresso de auto-close
+        refreshAllAutoCloseBars();
         
         // ✅ CORREÇÃO: Controlar flag de "tem mais conversas" (usa conversationPageSize = 50)
         conversationHasMore = conversations.length >= conversationPageSize;
@@ -19869,6 +19970,11 @@ function addConversationToList(conv) {
     
     // Adicionar ao topo da lista
     conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
+    
+    // Renderizar barra de auto-close para o novo item
+    const newItem = conversationsList.querySelector(`[data-conversation-id="${conv.id}"]`);
+    if (newItem) renderAutoCloseBar(newItem);
+    
     console.log('Conversa adicionada ao topo:', conv.id);
     
     // Inscrever na nova conversa para receber atualizaçÁes
@@ -21393,6 +21499,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Inicializar seletor rípido de templates
     initTemplateQuickSelect();
     
+    // Renderizar barras de progresso de auto-close
+    refreshAllAutoCloseBars();
+    
     // Controlar visibilidade do campo de integração WhatsApp baseado no canal selecionado
     const channelSelect = document.getElementById('new_conversation_channel');
     const whatsappAccountContainer = document.getElementById('new_conversation_whatsapp_account_container');
@@ -21575,32 +21684,104 @@ document.addEventListener('DOMContentLoaded', function() {
                     progress.style.display = 'none';
                     submitBtn.disabled = false;
                     
-                    // Mostrar aviso com SweetAlert
-                    const convList = checkData.conversations.map(c => 
-                        `<li><strong>${c.account_phone || c.account_name}</strong> - Agente: <strong>${c.agent_name}</strong> - Status: <span class="badge badge-${c.status === 'open' ? 'success' : 'secondary'}">${c.status === 'open' ? 'Aberta' : 'Fechada'}</span></li>`
-                    ).join('');
+                    // Montar lista de conversas com radio para seleção
+                    const openConversations = checkData.conversations.filter(c => c.status === 'open');
+                    
+                    let convListHtml = '';
+                    if (openConversations.length > 0) {
+                        convListHtml = openConversations.map((c, idx) => 
+                            `<label class="swal-conv-option d-flex align-items-center p-3 mb-2 border rounded ${idx === 0 ? 'border-primary bg-light-primary' : ''}" style="cursor:pointer" onclick="this.querySelector('input').checked=true; document.querySelectorAll('.swal-conv-option').forEach(el => el.classList.remove('border-primary','bg-light-primary')); this.classList.add('border-primary','bg-light-primary');">
+                                <input type="radio" name="swal_conv_select" value="${c.id}" ${idx === 0 ? 'checked' : ''} class="form-check-input me-3" style="min-width:18px">
+                                <div>
+                                    <div><strong>${c.account_phone || c.account_name}</strong></div>
+                                    <div class="text-muted small">Agente: <strong>${c.agent_name}</strong> - <span class="badge badge-success">Aberta</span></div>
+                                </div>
+                            </label>`
+                        ).join('');
+                    } else {
+                        convListHtml = checkData.conversations.map(c => 
+                            `<div class="p-2 mb-1 border rounded">
+                                <div><strong>${c.account_phone || c.account_name}</strong></div>
+                                <div class="text-muted small">Agente: <strong>${c.agent_name}</strong> - <span class="badge badge-secondary">${c.status}</span></div>
+                            </div>`
+                        ).join('');
+                    }
+                    
+                    const hasOpenToJoin = openConversations.length > 0;
                     
                     const result = await Swal.fire({
-                        icon: 'warning',
+                        icon: 'info',
                         title: 'Já existe conversa com este contato!',
                         html: `
                             <div class="text-start">
-                                <p><strong>Conversas encontradas:</strong></p>
-                                <ul>${convList}</ul>
-                                <p class="mt-3"><strong>Deseja continuar e criar uma nova conversa mesmo assim?</strong></p>
+                                <p class="mb-2"><strong>Conversas encontradas:</strong></p>
+                                <div class="mb-3" style="max-height:200px; overflow-y:auto">${convListHtml}</div>
+                                ${hasOpenToJoin ? '<p class="text-muted small">Selecione uma conversa acima para participar dela.</p>' : '<p class="text-muted small">Nenhuma conversa aberta encontrada para participar.</p>'}
                             </div>
                         `,
+                        showConfirmButton: hasOpenToJoin,
+                        confirmButtonText: '<i class="ki-duotone ki-user-plus fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Participar da conversa',
+                        confirmButtonColor: '#50cd89',
+                        showDenyButton: true,
+                        denyButtonText: '<i class="ki-duotone ki-plus fs-5 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i> Criar nova conversa',
+                        denyButtonColor: '#f1416c',
                         showCancelButton: true,
-                        confirmButtonText: 'Sim, criar nova conversa',
                         cancelButtonText: 'Cancelar',
-                        confirmButtonColor: '#f1416c'
+                        reverseButtons: false,
+                        customClass: {
+                            actions: 'flex-wrap gap-2'
+                        }
                     });
                     
-                    if (!result.isConfirmed) {
+                    if (result.dismiss === Swal.DismissReason.cancel || (!result.isConfirmed && !result.isDenied)) {
                         return;
                     }
                     
-                    // Reativar loading
+                    // Opção 1: Participar da conversa existente
+                    if (result.isConfirmed && hasOpenToJoin) {
+                        const selectedRadio = document.querySelector('input[name="swal_conv_select"]:checked');
+                        const selectedConvId = selectedRadio ? selectedRadio.value : openConversations[0].id;
+                        
+                        try {
+                            Swal.fire({ title: 'Entrando na conversa...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                            
+                            const joinResponse = await fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${selectedConvId}/participants`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-Requested-With': 'XMLHttpRequest',
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({ 
+                                    user_id: parseInt('<?= (int)\App\Helpers\Auth::id() ?>'),
+                                    role: 'collaborator'
+                                })
+                            });
+                            
+                            const joinData = await joinResponse.json();
+                            
+                            if (joinData.success) {
+                                Swal.fire({ icon: 'success', title: 'Você agora participa desta conversa!', timer: 1500, showConfirmButton: false });
+                                
+                                const modal = bootstrap.Modal.getInstance(document.getElementById('kt_modal_new_conversation'));
+                                if (modal) modal.hide();
+                                newConversationForm.reset();
+                                
+                                setTimeout(() => {
+                                    window.location.href = '<?= \App\Helpers\Url::to("/conversations") ?>?status=open&id=' + selectedConvId;
+                                }, 1500);
+                            } else {
+                                Swal.fire({ icon: 'error', title: 'Erro', text: joinData.message || 'Não foi possível participar da conversa' });
+                            }
+                        } catch (joinErr) {
+                            console.error('Erro ao participar:', joinErr);
+                            Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao tentar participar da conversa' });
+                        }
+                        return;
+                    }
+                    
+                    // Opção 2: Criar nova conversa (isDenied)
+                    // Reativar loading e continuar o fluxo normal
                     submitBtn.setAttribute('data-kt-indicator', 'on');
                     indicator.style.display = 'none';
                     progress.style.display = 'inline-block';

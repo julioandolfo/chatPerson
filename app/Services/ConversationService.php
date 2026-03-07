@@ -2444,6 +2444,30 @@ class ConversationService
                     \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automações: " . $e->getMessage());
                     error_log("Erro ao executar automações: " . $e->getMessage());
                 }
+                
+                // Conversa SEM agente: executar automação do funil (new_conversation)
+                // Recarregar conversa para pegar estado atualizado após executeForMessageReceived
+                $freshConversation = Conversation::find($conversationId);
+                $freshAgentId = $freshConversation['agent_id'] ?? null;
+                $isUnassigned = ($freshAgentId === null || (int)$freshAgentId === 0);
+                
+                if ($isUnassigned && !empty($freshConversation['funnel_id'])) {
+                    $freshMeta = json_decode($freshConversation['metadata'] ?? '{}', true);
+                    $chatbotActive = !empty($freshMeta['chatbot_active']);
+                    $aiBranchingActive = !empty($freshMeta['ai_branching_active']);
+                    
+                    if (!$chatbotActive && !$aiBranchingActive) {
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente (ID={$conversationId}, funil={$freshConversation['funnel_id']}). Executando automação do funil.");
+                        try {
+                            \App\Services\AutomationService::executeForNewConversation($conversationId);
+                            \App\Helpers\Logger::info("ConversationService::sendMessage - Automação do funil executada para conversa sem agente");
+                        } catch (\Exception $e) {
+                            \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automação do funil: " . $e->getMessage());
+                        }
+                    } else {
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente mas chatbot/IA já ativo. Pulando automação do funil.");
+                    }
+                }
             }
             
             // Executar automações para mensagem enviada por agente (instantâneo)

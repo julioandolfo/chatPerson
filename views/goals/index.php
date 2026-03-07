@@ -93,7 +93,7 @@ ob_start();
                                     $progress = $goal['progress'] ?? null;
                                     $percentage = $progress ? (float)$progress['percentage'] : 0;
                                     $currentValue = $progress ? (float)$progress['current_value'] : 0;
-                                    $status = $progress ? $progress['status'] : 'nao_iniciada';
+                                    $status = $progress ? ($progress['status'] ?? 'nao_iniciada') : 'nao_iniciada';
                                     
                                     // Cor do progresso
                                     if ($percentage >= 100) {

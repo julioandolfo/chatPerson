@@ -66,11 +66,18 @@ if (!$channel) {
     }
 }
 
-Logger::notificame("Canal identificado: {$channel}");
+Logger::notificame("Canal identificado (raw): {$channel}");
+
+// Normalizar canal (ex: whatsapp_business_account → whatsapp)
+$originalChannel = $channel;
+$channel = NotificameService::normalizeChannel($channel);
+if ($channel !== $originalChannel) {
+    Logger::notificame("Canal normalizado: {$originalChannel} → {$channel}");
+}
 
 // Validar canal
 if (!NotificameService::validateChannel($channel)) {
-    Logger::notificame("ERRO: Canal inválido: {$channel}. Canais aceitos: " . implode(', ', NotificameService::CHANNELS));
+    Logger::notificame("ERRO: Canal inválido: {$originalChannel} (normalizado: {$channel}). Canais aceitos: " . implode(', ', NotificameService::CHANNELS));
     Logger::notificame("========== Notificame Webhook FIM (Canal inválido) ==========");
     http_response_code(400);
     echo json_encode(['error' => "Canal inválido: {$channel}"]);

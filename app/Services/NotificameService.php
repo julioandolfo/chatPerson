@@ -24,6 +24,23 @@ class NotificameService
         'mercadolivre', 'webchat', 'email', 'olx', 
         'linkedin', 'google_business', 'youtube', 'tiktok'
     ];
+
+    // Mapa de normalização: nomes de canal enviados pelo NotificaMe → nome interno
+    const CHANNEL_ALIASES = [
+        'whatsapp_business_account' => 'whatsapp',
+        'whatsapp_business'         => 'whatsapp',
+        'waba'                      => 'whatsapp',
+        'whatsappbusiness'          => 'whatsapp',
+        'instagram_business'        => 'instagram',
+        'instagram_direct'          => 'instagram',
+        'facebook_messenger'        => 'facebook',
+        'messenger'                 => 'facebook',
+        'google_my_business'        => 'google_business',
+        'gmb'                       => 'google_business',
+        'mercado_livre'             => 'mercadolivre',
+        'web_chat'                  => 'webchat',
+        'web'                       => 'webchat',
+    ];
     
     /**
      * Helpers privados para logs Notificame
@@ -39,13 +56,23 @@ class NotificameService
     private static function logWarning(string $message): void {
         Logger::notificame("[WARNING] " . $message);
     }
+
+    /**
+     * Normalizar nome do canal: converte aliases do NotificaMe para nomes internos
+     */
+    public static function normalizeChannel(string $channel): string
+    {
+        $lower = strtolower(trim($channel));
+        return self::CHANNEL_ALIASES[$lower] ?? $lower;
+    }
     
     /**
-     * Validar canal
+     * Validar canal (aceita aliases, normaliza antes de validar)
      */
     public static function validateChannel(string $channel): bool
     {
-        return in_array($channel, self::CHANNELS);
+        $normalized = self::normalizeChannel($channel);
+        return in_array($normalized, self::CHANNELS);
     }
     
     /**

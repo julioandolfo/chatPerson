@@ -6129,7 +6129,7 @@ function getAutoCloseProgress(convEl) {
         if (deadline < closestDeadline) closestDeadline = deadline;
     }
 
-    if (cfg.agent_inactivity_enabled && cfg.agent_inactivity_days > 0 && lastContactAt > 0 && lastContactAt > lastAgentAt) {
+    if (cfg.agent_inactivity_enabled && cfg.agent_inactivity_action === 'close' && cfg.agent_inactivity_days > 0 && lastContactAt > 0 && lastContactAt > lastAgentAt) {
         const deadline = lastContactAt + (cfg.agent_inactivity_days * 86400000);
         if (deadline < closestDeadline) closestDeadline = deadline;
     }
@@ -6155,10 +6155,14 @@ function getAutoCloseProgress(convEl) {
     else color = '#f1416c';
 
     let label;
-    const hours = remainMs / 3600000;
-    if (hours >= 48) label = Math.floor(hours / 24) + 'd';
-    else if (hours >= 1) label = Math.floor(hours) + 'h';
-    else label = Math.max(1, Math.floor(remainMs / 60000)) + 'min';
+    if (remainMs <= 0) {
+        label = 'Expirado';
+    } else {
+        const hours = remainMs / 3600000;
+        if (hours >= 48) label = Math.floor(hours / 24) + 'd';
+        else if (hours >= 1) label = Math.floor(hours) + 'h';
+        else label = Math.max(1, Math.floor(remainMs / 60000)) + 'min';
+    }
 
     return { pct, color, label, remainMs };
 }

@@ -150,6 +150,9 @@ class NotificameService
         
         // Log da resposta
         self::logInfo("Notificame API Response: HTTP {$httpCode}, Content-Type: {$contentType}");
+        if ($response) {
+            self::logInfo("Notificame API Response body: " . substr($response, 0, 1000));
+        }
         
         if ($error) {
             self::logError("Notificame API cURL error: {$error}");
@@ -488,20 +491,41 @@ class NotificameService
 
         // Mídia/arquivo (áudio, imagem, documento, vídeo)
         if (!empty($options['media_url'])) {
+            $mediaUrl = $options['media_url'];
+            $mediaMime = $options['media_mime'] ?? $options['media_type'] ?? 'application/octet-stream';
+            $mediaName = $options['media_name'] ?? null;
+
+            // Garantir que a URL é acessível externamente
+            // A API do NotificaMe precisa baixar o arquivo da URL fornecida
+            $publicBase = realpath(__DIR__ . '/../../public');
+            $pathFromUrl = parse_url($mediaUrl, PHP_URL_PATH) ?: '';
+            $absolutePath = $publicBase ? ($publicBase . $pathFromUrl) : '';
+            $isLocalFile = ($absolutePath && file_exists($absolutePath) && filesize($absolutePath) > 0);
+
+            if ($isLocalFile) {
+                self::logInfo("Notificame sendMessage - Arquivo local encontrado: {$absolutePath} (" . filesize($absolutePath) . " bytes)");
+            }
+
+            // Converter HTTP para HTTPS (requisito Meta/WhatsApp Business API)
+            if (str_starts_with($mediaUrl, 'http://')) {
+                $httpsUrl = preg_replace('/^http:/i', 'https:', $mediaUrl);
+                self::logInfo("Notificame sendMessage - URL convertida para HTTPS: {$httpsUrl}");
+                $mediaUrl = $httpsUrl;
+            }
+
             $mediaContent = [
                 'type' => 'file',
-                'fileUrl' => $options['media_url'],
-                'fileMimeType' => $options['media_mime'] ?? $options['media_type'] ?? 'application/octet-stream'
+                'fileUrl' => $mediaUrl,
+                'fileMimeType' => $mediaMime,
             ];
-            if (!empty($options['media_name'])) {
-                $mediaContent['fileName'] = $options['media_name'];
+            if (!empty($mediaName)) {
+                $mediaContent['fileName'] = $mediaName;
             }
             if (!empty($options['caption'])) {
                 $mediaContent['fileCaption'] = $options['caption'];
             }
 
             if (!empty($message) && empty($options['caption'])) {
-                // Se há texto E mídia sem caption, enviar ambos como conteúdos separados
                 $payload['contents'] = [
                     $mediaContent,
                     ['type' => 'text', 'text' => $message]
@@ -1092,26 +1116,66 @@ class NotificameService
         
         // Salvar mensagem
         self::logInfo("Notificame webhook: Salvando mensagem - ConversationID={$conversation['id']}, Type={$messageData['type']}");
-        
+
+        // Processar mídia/arquivo se presente
+        $attachments = [];
+        $fileUrl = $messageData['metadata']['file_url'] ?? null;
+        $fileMime = $messageData['metadata']['file_mime'] ?? null;
+        $fileName = $messageData['metadata']['file_name'] ?? null;
+        $mediaType = $messageData['type'];
+
+        if ($fileUrl && in_array($mediaType, ['audio', 'image', 'video', 'document'])) {
+            self::logInfo("Notificame webhook: 📎 Mídia detectada - tipo={$mediaType}, mime={$fileMime}, url=" . substr($fileUrl, 0, 120));
+            try {
+                $attachment = \App\Services\AttachmentService::saveFromUrl(
+                    $fileUrl,
+                    $conversation['id'],
+                    $fileName ?: null
+                );
+                if ($attachment) {
+                    // Sobrescrever tipo com o detectado pelo MIME do NotificaMe (mais confiável)
+                    $attachment['type'] = $mediaType;
+                    if ($fileMime) {
+                        $attachment['mime_type'] = $fileMime;
+                        $attachment['mimetype'] = $fileMime;
+                    }
+                    $attachments[] = $attachment;
+                    self::logInfo("Notificame webhook: ✅ Mídia salva - tipo={$attachment['type']}, path={$attachment['path']}, size={$attachment['size']}");
+                }
+            } catch (\Exception $e) {
+                self::logError("Notificame webhook: Erro ao salvar mídia: " . $e->getMessage());
+                // Fallback: armazenar URL diretamente como content
+                if (empty($messageData['content'])) {
+                    $messageData['content'] = $fileUrl;
+                }
+            }
+        }
+
         $messageCreateData = [
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
             'sender_id' => $contact['id'],
             'sender_type' => 'contact',
             'content' => $messageData['content'],
-            'message_type' => $messageData['type'],
+            'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $mediaType) : $mediaType,
             'type' => $messageData['type'],
             'external_id' => $messageData['external_id'],
             'direction' => 'inbound',
             'status' => 'received',
             'metadata' => json_encode($messageData['metadata'] ?? [])
         ];
-        
+
+        if (!empty($attachments)) {
+            $messageCreateData['attachments'] = $attachments;
+        }
+
         self::logInfo("Notificame webhook: Dados da mensagem: " . json_encode([
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],
-            'content_length' => strlen($messageData['content']),
-            'type' => $messageData['type']
+            'content_length' => strlen($messageData['content'] ?? ''),
+            'type' => $messageData['type'],
+            'has_attachments' => !empty($attachments),
+            'attachment_count' => count($attachments)
         ], JSON_UNESCAPED_UNICODE));
         
         try {
@@ -1448,21 +1512,55 @@ class NotificameService
             // Conteúdo: se houver contents[], usar o primeiro item
             if (!empty($msg['contents']) && is_array($msg['contents'])) {
                 $contentItem = $msg['contents'][0];
-                $data['type'] = $contentItem['type'] ?? 'text';
-                
-                if (($contentItem['type'] ?? '') === 'text') {
+                $contentType = $contentItem['type'] ?? 'text';
+
+                if ($contentType === 'text') {
+                    $data['type'] = 'text';
                     $data['content'] = $contentItem['text'] ?? '';
-                } elseif (($contentItem['type'] ?? '') === 'file') {
-                    $data['content'] = $contentItem['fileUrl'] ?? ($contentItem['fileCaption'] ?? '');
+                } elseif ($contentType === 'file') {
+                    $fileUrl = $contentItem['fileUrl'] ?? '';
+                    $fileMime = $contentItem['fileMimeType'] ?? '';
+                    $fileName = $contentItem['fileName'] ?? '';
+                    $fileCaption = $contentItem['fileCaption'] ?? '';
+
+                    // Detectar tipo real baseado no MIME type
+                    $detectedType = 'document';
+                    $mimeLower = strtolower($fileMime);
+                    if (str_contains($mimeLower, 'audio') || str_contains($mimeLower, 'ogg')) {
+                        $detectedType = 'audio';
+                    } elseif (str_contains($mimeLower, 'image')) {
+                        $detectedType = 'image';
+                    } elseif (str_contains($mimeLower, 'video')) {
+                        $detectedType = 'video';
+                    }
+
+                    $data['type'] = $detectedType;
+                    $data['content'] = $fileCaption ?: '';
                     $data['metadata']['file'] = $contentItem;
-                } elseif (($contentItem['type'] ?? '') === 'comment') {
-                    // 🔥 NOVO: Comentário do Instagram
+                    $data['metadata']['file_url'] = $fileUrl;
+                    $data['metadata']['file_mime'] = $fileMime;
+                    $data['metadata']['file_name'] = $fileName;
+                    $data['metadata']['detected_type'] = $detectedType;
+                } elseif ($contentType === 'comment') {
                     $data['content'] = $contentItem['text'] ?? '';
                     $data['type'] = 'comment';
                     $data['metadata']['comment'] = $contentItem;
                     $data['metadata']['media'] = $contentItem['media'] ?? null;
+                } elseif ($contentType === 'location') {
+                    $data['type'] = 'location';
+                    $data['content'] = json_encode([
+                        'latitude' => $contentItem['latitude'] ?? null,
+                        'longitude' => $contentItem['longitude'] ?? null,
+                        'name' => $contentItem['name'] ?? null,
+                        'address' => $contentItem['address'] ?? null,
+                    ]);
+                } elseif ($contentType === 'contacts') {
+                    $data['type'] = 'contacts';
+                    $data['content'] = json_encode($contentItem['contacts'] ?? $contentItem);
                 } else {
+                    $data['type'] = $contentType;
                     $data['content'] = $contentItem['text'] ?? $contentItem['fileUrl'] ?? '';
+                    $data['metadata']['raw_content'] = $contentItem;
                 }
             } else {
                 // fallback texto simples

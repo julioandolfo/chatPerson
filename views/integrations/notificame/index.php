@@ -474,14 +474,20 @@ ob_start();
                         <div class="form-text">Use a URL base da API. Padrão: https://api.notificame.com.br/v1/</div>
                     </div>
                     <div class="mb-5">
-                        <label class="fw-semibold fs-6 mb-2">ID da Conta</label>
+                        <label class="fw-semibold fs-6 mb-2">ID da Conta (Token do Canal)</label>
                         <div class="input-group">
-                            <input type="text" name="account_id" id="kt_edit_account_id_field" class="form-control form-control-solid" placeholder="Ex: canal_123">
+                            <input type="text" name="account_id" id="kt_edit_account_id_field" class="form-control form-control-solid" placeholder="Token do canal NotificaMe">
                             <button type="button" class="btn btn-light-primary" id="kt_btn_fetch_subaccounts">
-                                <i class="ki-duotone ki-magnifier fs-3"></i> Buscar subcontas
+                                <i class="ki-duotone ki-magnifier fs-3"></i> Subcontas
+                            </button>
+                            <button type="button" class="btn btn-light-success" id="kt_btn_discover_channels">
+                                <i class="ki-duotone ki-electricity fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span><span class="path6"></span><span class="path7"></span><span class="path8"></span><span class="path9"></span><span class="path10"></span></i> Auto-detectar
                             </button>
                         </div>
-                        <div class="form-text">Para Instagram, use o ID do canal como "from".</div>
+                        <div class="form-text">
+                            Token do canal (token_do_canal) do NotificaMe. Usado como "from" para enviar mensagens e na URL de templates.
+                            <br>Encontre em: <a href="https://hub.notificame.com.br/" target="_blank" class="text-primary">hub.notificame.com.br</a> → Canais → copie o token/ID do canal.
+                        </div>
                     </div>
                     <div class="mb-5">
                         <label class="fw-semibold fs-6 mb-2">Funil Padrão</label>
@@ -1032,6 +1038,93 @@ function editAccount(id, account, funnels) {
             .catch(err => {
                 Swal.fire({
                     text: 'Erro ao buscar subcontas: ' + err.message,
+                    icon: 'error',
+                    buttonsStyling: false,
+                    confirmButtonText: 'OK',
+                    customClass: { confirmButton: 'btn btn-primary' }
+                });
+            });
+        };
+    }
+
+    // Bind auto-detectar token do canal
+    const discoverBtn = document.getElementById('kt_btn_discover_channels');
+    if (discoverBtn) {
+        discoverBtn.onclick = function() {
+            Swal.fire({ title: 'Buscando token do canal...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            fetch(`/integrations/notificame/accounts/${id}/discover-channels`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    Swal.fire({
+                        title: 'Erro',
+                        text: data.message || 'Erro ao buscar canais',
+                        icon: 'error',
+                        buttonsStyling: false,
+                        confirmButtonText: 'OK',
+                        customClass: { confirmButton: 'btn btn-primary' }
+                    });
+                    return;
+                }
+                const channels = data.channels || [];
+                if (!channels.length) {
+                    Swal.fire({
+                        title: 'Token não encontrado automaticamente',
+                        html: `<div class="text-start">
+                            <p>Não foi possível auto-detectar o token do canal via API.</p>
+                            <p class="fw-bold mt-3">Como encontrar manualmente:</p>
+                            <ol class="fs-7">
+                                <li>Acesse <a href="https://hub.notificame.com.br/" target="_blank">hub.notificame.com.br</a></li>
+                                <li>Vá em <strong>Canais</strong></li>
+                                <li>Clique no canal WhatsApp desejado</li>
+                                <li>Copie o <strong>Token</strong> ou <strong>ID do Canal</strong></li>
+                                <li>Cole no campo "ID da Conta" aqui</li>
+                            </ol>
+                            <p class="text-muted fs-8 mt-3">O token geralmente é uma string alfanumérica longa (ex: a1b2c3d4-e5f6-...).</p>
+                        </div>`,
+                        icon: 'info',
+                        buttonsStyling: false,
+                        confirmButtonText: 'Entendi',
+                        customClass: { confirmButton: 'btn btn-primary' }
+                    });
+                    return;
+                }
+
+                let html = '<div class="mb-3 text-start"><label class="fw-semibold">Token(s) encontrado(s):</label>';
+                html += '<select id="kt_discovered_channel_select" class="form-select form-select-solid mt-2">';
+                channels.forEach(ch => {
+                    const label = ch.name || ch.type || ch.source || 'Canal';
+                    const extra = ch.webhook ? ` (webhook: ${ch.webhook.substring(0, 40)}...)` : '';
+                    html += `<option value="${ch.token}">${label} — ${ch.token.substring(0, 30)}...${extra}</option>`;
+                });
+                html += '</select></div>';
+                html += '<div class="text-muted fs-8 text-start">Fonte: ' + channels.map(c => c.source).join(', ') + '</div>';
+
+                Swal.fire({
+                    title: 'Token do Canal Encontrado',
+                    html,
+                    icon: 'success',
+                    showCancelButton: true,
+                    confirmButtonText: 'Usar este token',
+                    cancelButtonText: 'Cancelar',
+                    buttonsStyling: false,
+                    customClass: { confirmButton: 'btn btn-primary', cancelButton: 'btn btn-light' }
+                }).then(res => {
+                    if (res.isConfirmed) {
+                        const select = document.getElementById('kt_discovered_channel_select');
+                        if (select) {
+                            document.getElementById('kt_edit_account_id_field').value = select.value || '';
+                        }
+                    }
+                });
+            })
+            .catch(err => {
+                Swal.fire({
+                    title: 'Erro',
+                    text: 'Erro ao buscar canais: ' + err.message,
                     icon: 'error',
                     buttonsStyling: false,
                     confirmButtonText: 'OK',

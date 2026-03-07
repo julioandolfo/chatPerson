@@ -852,6 +852,31 @@ class IntegrationController
     }
 
     /**
+     * Descobrir canais/tokens de canal Notificame
+     */
+    public function discoverNotificameChannels(int $id): void
+    {
+        Permission::abortIfCannot('notificame.view');
+
+        try {
+            $channels = NotificameService::discoverChannels($id);
+
+            Response::json([
+                'success' => true,
+                'channels' => $channels,
+                'message' => empty($channels) 
+                    ? 'Nenhum token de canal encontrado via API. Copie o token do canal manualmente do painel NotificaMe Hub (https://hub.notificame.com.br/).' 
+                    : count($channels) . ' token(s) encontrado(s)'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
      * Enviar mensagem de teste Notificame
      */
     public function sendNotificameTestMessage(int $id): void

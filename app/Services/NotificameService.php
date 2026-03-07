@@ -527,8 +527,109 @@ class NotificameService
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
 
-        // Chama /resale/ para obter lista
         return self::makeRequest('resale/', $token, 'GET', [], $apiUrl);
+    }
+
+    /**
+     * Tentar descobrir o token do canal via API
+     * Tenta vários endpoints para encontrar tokens de canais associados à conta
+     */
+    public static function discoverChannels(int $accountId): array
+    {
+        $account = IntegrationAccount::find($accountId);
+        if (!$account || $account['provider'] !== 'notificame') {
+            throw new \Exception("Conta Notificame não encontrada: {$accountId}");
+        }
+
+        $token = $account['api_token'];
+        $apiUrl = $account['api_url'] ?? null;
+        $channel = $account['channel'] ?? 'whatsapp';
+        $discovered = [];
+
+        self::logInfo("Descobrindo canais Notificame - Account: {$accountId}");
+
+        // 1. Tentar GET /subscriptions (pode listar webhooks com tokens de canais)
+        try {
+            $result = self::makeRequest('subscriptions', $token, 'GET', [], $apiUrl);
+            self::logInfo("Subscriptions response: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            if (!empty($result)) {
+                $subs = $result['data'] ?? $result['subscriptions'] ?? (is_array($result) ? $result : []);
+                foreach ($subs as $sub) {
+                    $chToken = $sub['channel'] ?? $sub['criteria']['channel'] ?? null;
+                    if ($chToken && strlen($chToken) > 10) {
+                        $discovered[] = [
+                            'token' => $chToken,
+                            'source' => 'subscription',
+                            'webhook' => $sub['webhook']['url'] ?? $sub['url'] ?? '-',
+                        ];
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            self::logInfo("Subscriptions endpoint falhou: " . $e->getMessage());
+        }
+
+        // 2. Tentar GET /channels (endpoint não documentado mas pode existir)
+        try {
+            $result = self::makeRequest('channels', $token, 'GET', [], $apiUrl);
+            self::logInfo("Channels response: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            $channels = $result['data'] ?? $result['channels'] ?? (is_array($result) ? $result : []);
+            foreach ($channels as $ch) {
+                $chToken = $ch['id'] ?? $ch['token'] ?? $ch['channel_id'] ?? null;
+                $chType = $ch['type'] ?? $ch['channel'] ?? $ch['name'] ?? '-';
+                if ($chToken) {
+                    $discovered[] = [
+                        'token' => $chToken,
+                        'source' => 'channels',
+                        'type' => $chType,
+                        'name' => $ch['name'] ?? $ch['label'] ?? '-',
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            self::logInfo("Channels endpoint falhou: " . $e->getMessage());
+        }
+
+        // 3. Tentar GET /account ou /me (pode retornar info da conta com canais)
+        foreach (['account', 'me', 'user'] as $ep) {
+            try {
+                $result = self::makeRequest($ep, $token, 'GET', [], $apiUrl);
+                self::logInfo("{$ep} response: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+                if (!empty($result['channels']) && is_array($result['channels'])) {
+                    foreach ($result['channels'] as $ch) {
+                        $chToken = $ch['id'] ?? $ch['token'] ?? $ch['channel_id'] ?? null;
+                        if ($chToken) {
+                            $discovered[] = [
+                                'token' => $chToken,
+                                'source' => $ep,
+                                'type' => $ch['type'] ?? $ch['channel'] ?? '-',
+                                'name' => $ch['name'] ?? '-',
+                            ];
+                        }
+                    }
+                }
+                if (!empty($result['channel_id'])) {
+                    $discovered[] = ['token' => $result['channel_id'], 'source' => $ep];
+                }
+                if (!empty($result['id']) && strlen($result['id']) > 10) {
+                    $discovered[] = ['token' => $result['id'], 'source' => $ep, 'name' => $result['name'] ?? '-'];
+                }
+            } catch (\Exception $e) {
+                // Silently skip
+            }
+        }
+
+        // Deduplicate
+        $seen = [];
+        $unique = [];
+        foreach ($discovered as $d) {
+            if (!in_array($d['token'], $seen)) {
+                $seen[] = $d['token'];
+                $unique[] = $d;
+            }
+        }
+
+        return $unique;
     }
     
     /**

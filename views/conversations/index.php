@@ -6107,6 +6107,8 @@ function getAutoCloseProgress(convEl) {
     const cfg = window.autoCloseSettings;
     if (!cfg || !cfg.enabled) return null;
 
+    if (!convEl.classList.contains('inactivity-alert')) return null;
+
     const now = Date.now();
     const status = convEl.dataset.status || 'open';
     if (status !== 'open') return null;

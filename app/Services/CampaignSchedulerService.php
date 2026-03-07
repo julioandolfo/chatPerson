@@ -488,18 +488,53 @@ class CampaignSchedulerService
             }
         }
 
-        // 5. ENVIAR MENSAGEM
+        // 5. ENVIAR MENSAGEM (template ou texto livre)
         Logger::campaign("Campanha {$campaignId}: [ENVIO] Iniciando envio para {$contact['phone']} via conta {$integrationAccountId}");
-        Logger::campaign("Campanha {$campaignId}: [ENVIO] Conteúdo: " . substr($messageContent, 0, 100) . "...");
         
-        $sendResult = IntegrationService::sendMessage(
-            $integrationAccountId,
-            $contact['phone'],
-            $messageContent,
-            [
-                'attachments' => !empty($message['attachments']) ? json_decode($message['attachments'], true) : []
-            ]
-        );
+        $sendResult = null;
+        $messageVars = !empty($campaign['message_variables']) ? json_decode($campaign['message_variables'], true) : [];
+        $isTemplateSend = !empty($messageVars['use_template']) && !empty($messageVars['template_name']);
+
+        if ($isTemplateSend) {
+            // Envio via template Notificame
+            $templateName = $messageVars['template_name'];
+            $rawParams = $messageVars['template_params'] ?? [];
+            
+            // Substituir variáveis nos parâmetros ({{nome}}, {{telefone}}, etc.)
+            $resolvedParams = [];
+            $contactName = $contact['name'] ?? '';
+            $contactFirstName = explode(' ', $contactName)[0] ?? $contactName;
+            foreach ($rawParams as $key => $val) {
+                $val = str_replace('{{nome}}', $contactName, $val);
+                $val = str_replace('{{primeiro_nome}}', $contactFirstName, $val);
+                $val = str_replace('{{telefone}}', $contact['phone'] ?? '', $val);
+                $val = str_replace('{{email}}', $contact['email'] ?? '', $val);
+                $resolvedParams[$key] = $val;
+            }
+            
+            $templateAccountId = !empty($messageVars['template_account_id']) ? (int)$messageVars['template_account_id'] : $integrationAccountId;
+            
+            Logger::campaign("Campanha {$campaignId}: [TEMPLATE] Template={$templateName}, Params=" . json_encode($resolvedParams));
+            
+            $sendResult = \App\Services\NotificameService::sendTemplate(
+                $templateAccountId,
+                $contact['phone'],
+                $templateName,
+                $resolvedParams
+            );
+        } else {
+            // Envio texto livre padrão
+            Logger::campaign("Campanha {$campaignId}: [ENVIO] Conteúdo: " . substr($messageContent, 0, 100) . "...");
+            
+            $sendResult = IntegrationService::sendMessage(
+                $integrationAccountId,
+                $contact['phone'],
+                $messageContent,
+                [
+                    'attachments' => !empty($message['attachments']) ? json_decode($message['attachments'], true) : []
+                ]
+            );
+        }
 
         Logger::campaign("Campanha {$campaignId}: [ENVIO] Resultado: " . json_encode($sendResult));
 

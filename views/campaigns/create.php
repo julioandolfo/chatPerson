@@ -177,13 +177,29 @@ $pageTitle = 'Nova Campanha';
                                                 <div>Selecione 2 ou mais contas para ativar a <strong>rotação automática</strong> entre elas!</div>
                                             </div>
                                             
-                                            <?php foreach ($whatsappAccounts as $account): ?>
+                                            <?php foreach ($whatsappAccounts as $account): 
+                                                $providerLabel = match($account['provider'] ?? 'quepasa') {
+                                                    'notificame' => 'Notificame',
+                                                    'whatsapp_official' => 'API Oficial',
+                                                    'meta_cloud', 'meta_coex' => 'Cloud API',
+                                                    'evolution' => 'Evolution',
+                                                    default => 'QuePasa'
+                                                };
+                                                $providerColor = match($account['provider'] ?? 'quepasa') {
+                                                    'notificame' => 'badge-light-primary',
+                                                    'whatsapp_official', 'meta_cloud', 'meta_coex' => 'badge-light-success',
+                                                    default => 'badge-light-info'
+                                                };
+                                            ?>
                                             <div class="form-check form-check-custom form-check-solid mb-3">
                                                 <input class="form-check-input" type="checkbox" name="integration_account_ids[]" 
                                                        value="<?php echo $account['id']; ?>" id="account_<?php echo $account['id']; ?>">
                                                 <label class="form-check-label" for="account_<?php echo $account['id']; ?>">
-                                                    <div class="fw-bold"><?php echo htmlspecialchars($account['name']); ?></div>
-                                                    <div class="text-muted fs-7"><?php echo htmlspecialchars($account['phone_number']); ?></div>
+                                                    <div class="fw-bold">
+                                                        <?php echo htmlspecialchars($account['name']); ?>
+                                                        <span class="badge <?php echo $providerColor; ?> ms-2 fs-8"><?php echo $providerLabel; ?></span>
+                                                    </div>
+                                                    <div class="text-muted fs-7"><?php echo htmlspecialchars($account['phone_number'] ?? $account['account_id'] ?? ''); ?></div>
                                                 </label>
                                             </div>
                                             <?php endforeach; ?>
@@ -295,7 +311,7 @@ $pageTitle = 'Nova Campanha';
                                         <div class="mb-10">
                                             <label class="form-label fw-bold fs-5">Tipo de Mensagem</label>
                                             <div class="row g-5">
-                                                <div class="col-md-6">
+                                                <div class="col-md-4">
                                                     <label class="d-flex flex-stack cursor-pointer mb-5">
                                                         <span class="d-flex align-items-center me-2">
                                                             <span class="symbol symbol-50px me-6">
@@ -313,7 +329,25 @@ $pageTitle = 'Nova Campanha';
                                                         </span>
                                                     </label>
                                                 </div>
-                                                <div class="col-md-6">
+                                                <div class="col-md-4">
+                                                    <label class="d-flex flex-stack cursor-pointer mb-5">
+                                                        <span class="d-flex align-items-center me-2">
+                                                            <span class="symbol symbol-50px me-6">
+                                                                <span class="symbol-label bg-light-info">
+                                                                    <i class="ki-duotone ki-document fs-1 text-info"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                                </span>
+                                                            </span>
+                                                            <span class="d-flex flex-column">
+                                                                <span class="fw-bold fs-6">Template Aprovado</span>
+                                                                <span class="fs-7 text-muted">Template META/Notificame</span>
+                                                            </span>
+                                                        </span>
+                                                        <span class="form-check form-check-custom form-check-solid">
+                                                            <input class="form-check-input" type="radio" name="message_type" value="template" onchange="toggleMessageType('template')" />
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                <div class="col-md-4">
                                                     <label class="d-flex flex-stack cursor-pointer mb-5">
                                                         <span class="d-flex align-items-center me-2">
                                                             <span class="symbol symbol-50px me-6">
@@ -323,7 +357,7 @@ $pageTitle = 'Nova Campanha';
                                                             </span>
                                                             <span class="d-flex flex-column">
                                                                 <span class="fw-bold fs-6">Gerar com IA</span>
-                                                                <span class="fs-7 text-muted">Mensagem única para cada contato</span>
+                                                                <span class="fs-7 text-muted">Mensagem única p/ contato</span>
                                                             </span>
                                                         </span>
                                                         <span class="form-check form-check-custom form-check-solid">
@@ -370,6 +404,70 @@ $pageTitle = 'Nova Campanha';
                                             </div>
                                         </div>
                                         
+                                        <!-- Template Aprovado (Notificame/META) -->
+                                        <div id="template_message_config" style="display: none;">
+                                            <input type="hidden" name="use_template" value="0" />
+                                            <input type="hidden" name="template_name" id="template_name_input" value="" />
+
+                                            <div class="alert alert-info d-flex align-items-center mb-10">
+                                                <i class="ki-duotone ki-information-5 fs-2 me-3 text-info"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                <div>
+                                                    <strong>Template aprovado pela META:</strong> Templates são obrigatórios para iniciar conversas via WhatsApp API Oficial. Selecione um template aprovado da sua conta Notificame.
+                                                </div>
+                                            </div>
+
+                                            <div class="mb-10">
+                                                <label class="form-label required">Conta Notificame</label>
+                                                <select class="form-select" id="template_account_select" onchange="loadCampaignTemplates(this.value)">
+                                                    <option value="">Selecione a conta...</option>
+                                                    <?php
+                                                    $notificameAccounts = array_filter($whatsappAccounts ?? [], function($a) {
+                                                        return ($a['provider'] ?? '') === 'notificame';
+                                                    });
+                                                    foreach ($notificameAccounts as $acc): ?>
+                                                        <option value="<?= $acc['id'] ?>"><?= htmlspecialchars($acc['name']) ?> (<?= htmlspecialchars($acc['phone_number'] ?? $acc['account_id'] ?? '') ?>)</option>
+                                                    <?php endforeach; ?>
+                                                    <?php if (empty($notificameAccounts)): ?>
+                                                        <option value="" disabled>Nenhuma conta Notificame encontrada</option>
+                                                    <?php endif; ?>
+                                                </select>
+                                            </div>
+
+                                            <div id="template_loading" class="text-center py-5" style="display:none;">
+                                                <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                                <span class="ms-2 text-muted">Carregando templates...</span>
+                                            </div>
+
+                                            <div id="template_select_container" class="mb-10" style="display:none;">
+                                                <label class="form-label required">Template</label>
+                                                <select class="form-select" id="template_select" onchange="selectCampaignTemplate(this.value)">
+                                                    <option value="">Selecione o template...</option>
+                                                </select>
+                                            </div>
+
+                                            <div id="template_preview_container" style="display:none;">
+                                                <div class="mb-5">
+                                                    <div class="d-flex align-items-center gap-2 mb-3">
+                                                        <span class="badge badge-light-success" id="template_status_badge">Aprovado</span>
+                                                        <span class="badge badge-light" id="template_category_badge">-</span>
+                                                        <span class="badge badge-light" id="template_language_badge">-</span>
+                                                    </div>
+                                                </div>
+                                                <div class="mb-10">
+                                                    <label class="form-label">Preview do Template</label>
+                                                    <div class="p-4 bg-light rounded border border-dashed border-info" id="template_preview" style="white-space: pre-wrap; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;">
+                                                    </div>
+                                                </div>
+                                                <div id="template_params_container" class="mb-10" style="display:none;">
+                                                    <label class="form-label">Parâmetros do Template</label>
+                                                    <div class="alert alert-light-warning border-warning border-dashed mb-3">
+                                                        <small>Preencha os parâmetros do template. Use <code>{{nome}}</code>, <code>{{telefone}}</code>, <code>{{email}}</code> para personalizar por contato.</small>
+                                                    </div>
+                                                    <div id="template_params_fields"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <!-- Mensagem com IA -->
                                         <div id="ai_message_config" style="display: none;">
                                             <input type="hidden" name="ai_message_enabled" value="0" />
@@ -659,20 +757,134 @@ function toggleIntervalType(type) {
 function toggleMessageType(type) {
     const fixedConfig = document.getElementById('fixed_message_config');
     const aiConfig = document.getElementById('ai_message_config');
+    const templateConfig = document.getElementById('template_message_config');
     const aiEnabledInput = document.querySelector('input[name="ai_message_enabled"]');
+    const useTemplateInput = document.querySelector('input[name="use_template"]');
     const messageContentInput = document.querySelector('textarea[name="message_content"]');
-    
+
+    fixedConfig.style.display = 'none';
+    aiConfig.style.display = 'none';
+    templateConfig.style.display = 'none';
+    if (aiEnabledInput) aiEnabledInput.value = '0';
+    if (useTemplateInput) useTemplateInput.value = '0';
+
     if (type === 'ai') {
-        fixedConfig.style.display = 'none';
         aiConfig.style.display = 'block';
         if (aiEnabledInput) aiEnabledInput.value = '1';
         if (messageContentInput) messageContentInput.removeAttribute('required');
+    } else if (type === 'template') {
+        templateConfig.style.display = 'block';
+        if (useTemplateInput) useTemplateInput.value = '1';
+        if (messageContentInput) messageContentInput.removeAttribute('required');
     } else {
         fixedConfig.style.display = 'block';
-        aiConfig.style.display = 'none';
-        if (aiEnabledInput) aiEnabledInput.value = '0';
         if (messageContentInput) messageContentInput.setAttribute('required', 'required');
     }
+}
+
+let _campaignTemplatesCache = {};
+
+function loadCampaignTemplates(accountId) {
+    if (!accountId) return;
+    const loading = document.getElementById('template_loading');
+    const selectContainer = document.getElementById('template_select_container');
+    const previewContainer = document.getElementById('template_preview_container');
+    const select = document.getElementById('template_select');
+
+    loading.style.display = 'block';
+    selectContainer.style.display = 'none';
+    previewContainer.style.display = 'none';
+
+    fetch(`/integrations/notificame/accounts/${accountId}/templates`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        loading.style.display = 'none';
+        if (!data.success || !data.templates) {
+            Swal.fire({ text: data.message || 'Erro ao carregar templates', icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+            return;
+        }
+        const templates = data.templates.filter(t => (t.status || '').toLowerCase() === 'approved');
+        _campaignTemplatesCache = {};
+        templates.forEach(t => {
+            const name = t.name || t.templateName || t.id;
+            _campaignTemplatesCache[name] = t;
+        });
+
+        let options = '<option value="">Selecione o template...</option>';
+        templates.forEach(t => {
+            const name = t.name || t.templateName || t.id;
+            const category = t.category || t.type || '';
+            options += `<option value="${escapeAttr(name)}">${escapeAttr(name)} ${category ? '(' + category + ')' : ''}</option>`;
+        });
+        select.innerHTML = options;
+        selectContainer.style.display = 'block';
+
+        if (templates.length === 0) {
+            select.innerHTML = '<option value="">Nenhum template aprovado encontrado</option>';
+        }
+    })
+    .catch(err => {
+        loading.style.display = 'none';
+        Swal.fire({ text: 'Erro: ' + err.message, icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+    });
+}
+
+function selectCampaignTemplate(name) {
+    const previewContainer = document.getElementById('template_preview_container');
+    const templateNameInput = document.getElementById('template_name_input');
+    if (!name) {
+        previewContainer.style.display = 'none';
+        templateNameInput.value = '';
+        return;
+    }
+    const t = _campaignTemplatesCache[name];
+    if (!t) return;
+
+    templateNameInput.value = name;
+    const body = t.body || t.text || t.content || t.components?.find(c => c.type === 'BODY')?.text || '';
+    const category = t.category || t.type || '-';
+    const language = t.language || t.lang || '-';
+    const status = (t.status || '').toLowerCase();
+
+    document.getElementById('template_status_badge').textContent = status === 'approved' ? 'Aprovado' : status;
+    document.getElementById('template_category_badge').textContent = category;
+    document.getElementById('template_language_badge').textContent = language;
+    document.getElementById('template_preview').textContent = body;
+
+    // Detectar parâmetros {{1}}, {{2}}, etc.
+    const paramRegex = /\{\{(\d+)\}\}/g;
+    const params = [];
+    let match;
+    while ((match = paramRegex.exec(body)) !== null) {
+        if (!params.includes(match[1])) params.push(match[1]);
+    }
+
+    const paramsContainer = document.getElementById('template_params_container');
+    const paramsFields = document.getElementById('template_params_fields');
+
+    if (params.length > 0) {
+        let fieldsHtml = '';
+        params.sort((a, b) => parseInt(a) - parseInt(b)).forEach(p => {
+            fieldsHtml += `
+                <div class="input-group mb-3">
+                    <span class="input-group-text fw-bold">{{${p}}}</span>
+                    <input type="text" class="form-control" name="template_params[${p}]" placeholder="Valor ou variável (ex: {{nome}})" />
+                </div>`;
+        });
+        paramsFields.innerHTML = fieldsHtml;
+        paramsContainer.style.display = 'block';
+    } else {
+        paramsContainer.style.display = 'none';
+        paramsFields.innerHTML = '';
+    }
+
+    previewContainer.style.display = 'block';
+}
+
+function escapeAttr(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 function updateTemperatureLabel(value) {
@@ -961,7 +1173,13 @@ function updateReviewSummary() {
                 
                 <hr class="my-4">
                 <h5 class="mb-4">Mensagem</h5>
-                ${aiEnabled ? `
+                ${messageType === 'template' ? `
+                <div class="alert alert-info mb-3">
+                    <strong><i class="ki-duotone ki-document fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Template Aprovado</strong> - Envio via template META/Notificame
+                </div>
+                <div class="mb-3"><strong>Template:</strong> ${formData.get('template_name') || 'Não selecionado'}</div>
+                <div class="p-3 bg-white rounded mb-3" style="white-space: pre-wrap;">${document.getElementById('template_preview')?.textContent || ''}</div>
+                ` : aiEnabled ? `
                 <div class="alert alert-success mb-3">
                     <strong><i class="fas fa-robot me-2"></i>Gerada por IA</strong> - Cada contato receberá uma mensagem única
                 </div>
@@ -998,7 +1216,19 @@ function submitCampaign() {
     
     data.channel = 'whatsapp';
     data.target_type = 'list';
-    
+
+    // Template Notificame: coletar parâmetros
+    if (data.use_template === '1' && data.template_name) {
+        const paramInputs = document.querySelectorAll('#template_params_fields input[name^="template_params"]');
+        const templateParams = {};
+        paramInputs.forEach(input => {
+            const match = input.name.match(/template_params\[(\d+)\]/);
+            if (match) templateParams[match[1]] = input.value;
+        });
+        data.template_params = templateParams;
+        data.template_account_id = document.getElementById('template_account_select')?.value || '';
+    }
+
     fetch('/campaigns', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

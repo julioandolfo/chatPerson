@@ -24,6 +24,7 @@ class CampaignService
     {
         // Verificar se está usando IA para gerar mensagem
         $aiMessageEnabled = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
+        $useTemplate = !empty($data['use_template']) && $data['use_template'] !== '0';
         
         // Validar dados básicos
         $validationRules = [
@@ -32,8 +33,10 @@ class CampaignService
             'integration_account_ids' => 'required|array',
         ];
         
-        // Se IA está habilitada, exigir prompt; senão, exigir message_content
-        if ($aiMessageEnabled) {
+        // Validação condicional do conteúdo
+        if ($useTemplate) {
+            $validationRules['template_name'] = 'required|string';
+        } elseif ($aiMessageEnabled) {
             $validationRules['ai_message_prompt'] = 'required|string';
         } else {
             $validationRules['message_content'] = 'required|string';
@@ -116,9 +119,24 @@ class CampaignService
         
         // Se IA está habilitada e message_content está vazio, usar o prompt como fallback
         if ($data['ai_message_enabled'] && empty($data['message_content'])) {
-            // Usar a mensagem de referência se existir, ou um placeholder
             $data['message_content'] = $data['ai_reference_message'] ?? '[Mensagem gerada por IA]';
         }
+        
+        // Template Notificame: salvar dados do template no message_variables
+        if ($useTemplate && !empty($data['template_name'])) {
+            $templateMeta = [
+                'use_template' => true,
+                'template_name' => $data['template_name'],
+                'template_account_id' => $data['template_account_id'] ?? null,
+                'template_params' => $data['template_params'] ?? []
+            ];
+            $data['message_variables'] = json_encode($templateMeta);
+            if (empty($data['message_content'])) {
+                $data['message_content'] = '[Template: ' . $data['template_name'] . ']';
+            }
+        }
+        // Limpar campos auxiliares que não pertencem à tabela
+        unset($data['use_template'], $data['template_name'], $data['template_params'], $data['template_account_id'], $data['message_type']);
         
         // Execução de automações
         $data['execute_automations'] = (!empty($data['execute_automations']) && $data['execute_automations'] !== '0') ? 1 : 0;

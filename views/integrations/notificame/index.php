@@ -4,6 +4,28 @@ $title = 'Notificame - Integrações';
 
 ob_start();
 ?>
+<!--begin::Tabs Navigation-->
+<ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x mb-5 fs-6">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#tab_accounts">
+            <i class="ki-duotone ki-abstract-26 fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+            Contas
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#tab_templates">
+            <i class="ki-duotone ki-document fs-4 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+            Templates
+        </a>
+    </li>
+</ul>
+<!--end::Tabs Navigation-->
+
+<!--begin::Tab Content-->
+<div class="tab-content">
+
+<!--begin::Tab Contas-->
+<div class="tab-pane fade show active" id="tab_accounts">
 <!--begin::Card-->
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -221,6 +243,96 @@ ob_start();
     </div>
 </div>
 <!--end::Card-->
+</div>
+<!--end::Tab Contas-->
+
+<!--begin::Tab Templates-->
+<div class="tab-pane fade" id="tab_templates">
+<div class="card">
+    <div class="card-header border-0 pt-6">
+        <div class="card-title">
+            <h3 class="fw-bold m-0">Templates Notificame</h3>
+        </div>
+        <div class="card-toolbar">
+            <div class="d-flex align-items-center gap-2">
+                <select id="kt_template_account" class="form-select form-select-sm form-select-solid" style="min-width: 200px;" onchange="loadTemplates(this.value)">
+                    <option value="">Selecione uma conta</option>
+                    <?php foreach ($accounts as $account): ?>
+                        <?php if (in_array($account['channel'] ?? '', ['whatsapp', 'instagram', 'facebook', 'telegram'])): ?>
+                        <option value="<?= $account['id'] ?>" data-channel="<?= htmlspecialchars($account['channel'] ?? '') ?>">
+                            <?= htmlspecialchars($account['name']) ?> (<?= ucfirst($account['channel'] ?? '') ?>)
+                        </option>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </select>
+                <button type="button" class="btn btn-sm btn-light-primary" onclick="loadTemplates(document.getElementById('kt_template_account').value)" id="btn_refresh_templates">
+                    <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                    Sincronizar
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body pt-0">
+        <div id="templates_empty" class="text-center py-15">
+            <i class="ki-duotone ki-document fs-3x text-muted mb-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+            <p class="text-muted fs-5">Selecione uma conta acima para visualizar seus templates</p>
+        </div>
+        <div id="templates_loading" class="text-center py-15" style="display:none;">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="text-muted mt-3">Carregando templates...</p>
+        </div>
+        <div id="templates_error" class="alert alert-danger" style="display:none;"></div>
+
+        <div id="templates_stats" class="row g-5 mb-8" style="display:none;">
+            <div class="col-6 col-md-3">
+                <div class="border border-dashed rounded p-4 text-center">
+                    <div class="fs-2 fw-bold text-primary" id="stat_total">0</div>
+                    <div class="fs-7 text-muted">Total</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border border-dashed rounded p-4 text-center">
+                    <div class="fs-2 fw-bold text-success" id="stat_approved">0</div>
+                    <div class="fs-7 text-muted">Aprovados</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border border-dashed rounded p-4 text-center">
+                    <div class="fs-2 fw-bold text-warning" id="stat_pending">0</div>
+                    <div class="fs-7 text-muted">Pendentes</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="border border-dashed rounded p-4 text-center">
+                    <div class="fs-2 fw-bold text-danger" id="stat_rejected">0</div>
+                    <div class="fs-7 text-muted">Rejeitados</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="templates_table_container" style="display:none;">
+            <div class="table-responsive">
+                <table class="table table-row-bordered table-row-gray-100 align-middle gs-0 gy-3">
+                    <thead>
+                        <tr class="fw-bold text-muted">
+                            <th class="min-w-150px">Nome</th>
+                            <th class="min-w-100px">Categoria</th>
+                            <th class="min-w-80px">Idioma</th>
+                            <th class="min-w-80px">Status</th>
+                            <th class="min-w-250px">Conteúdo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="templates_tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<!--end::Tab Templates-->
+
+</div>
+<!--end::Tab Content-->
 
 <?php if (\App\Helpers\Permission::can('notificame.create')): ?>
 <!--begin::Modal - Nova Conta-->
@@ -1009,6 +1121,104 @@ document.getElementById('kt_form_webhook_notificame').addEventListener('submit',
     });
 });
 <?php endif; ?>
+
+// ========== Templates ==========
+let _cachedTemplates = [];
+
+function loadTemplates(accountId) {
+    if (!accountId) return;
+    const emptyEl = document.getElementById('templates_empty');
+    const loadingEl = document.getElementById('templates_loading');
+    const errorEl = document.getElementById('templates_error');
+    const statsEl = document.getElementById('templates_stats');
+    const tableEl = document.getElementById('templates_table_container');
+
+    emptyEl.style.display = 'none';
+    errorEl.style.display = 'none';
+    statsEl.style.display = 'none';
+    tableEl.style.display = 'none';
+    loadingEl.style.display = 'block';
+
+    fetch(`/integrations/notificame/accounts/${accountId}/templates`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        loadingEl.style.display = 'none';
+        if (!data.success) {
+            errorEl.textContent = data.message || 'Erro ao carregar templates';
+            errorEl.style.display = 'block';
+            return;
+        }
+        const templates = data.templates || [];
+        _cachedTemplates = templates;
+        renderTemplates(templates);
+    })
+    .catch(err => {
+        loadingEl.style.display = 'none';
+        errorEl.textContent = 'Erro de rede: ' + err.message;
+        errorEl.style.display = 'block';
+    });
+}
+
+function renderTemplates(templates) {
+    const statsEl = document.getElementById('templates_stats');
+    const tableEl = document.getElementById('templates_table_container');
+    const tbody = document.getElementById('templates_tbody');
+
+    const total = templates.length;
+    const approved = templates.filter(t => (t.status || '').toLowerCase() === 'approved').length;
+    const pending = templates.filter(t => (t.status || '').toLowerCase() === 'pending').length;
+    const rejected = templates.filter(t => ['rejected', 'disabled'].includes((t.status || '').toLowerCase())).length;
+
+    document.getElementById('stat_total').textContent = total;
+    document.getElementById('stat_approved').textContent = approved;
+    document.getElementById('stat_pending').textContent = pending;
+    document.getElementById('stat_rejected').textContent = rejected;
+    statsEl.style.display = 'flex';
+
+    if (total === 0) {
+        document.getElementById('templates_empty').style.display = 'block';
+        document.getElementById('templates_empty').innerHTML = '<p class="text-muted fs-5 py-10">Nenhum template encontrado nesta conta</p>';
+        tableEl.style.display = 'none';
+        return;
+    }
+
+    let html = '';
+    templates.forEach(t => {
+        const name = t.name || t.templateName || t.id || '-';
+        const category = t.category || t.type || '-';
+        const language = t.language || t.lang || '-';
+        const status = (t.status || 'unknown').toLowerCase();
+        const content = t.body || t.text || t.content || t.components?.find(c => c.type === 'BODY')?.text || '-';
+        const truncated = content.length > 120 ? content.substring(0, 120) + '...' : content;
+
+        const statusBadge = {
+            'approved': '<span class="badge badge-light-success">Aprovado</span>',
+            'pending': '<span class="badge badge-light-warning">Pendente</span>',
+            'rejected': '<span class="badge badge-light-danger">Rejeitado</span>',
+            'disabled': '<span class="badge badge-light-danger">Desabilitado</span>',
+            'draft': '<span class="badge badge-light-info">Rascunho</span>'
+        }[status] || `<span class="badge badge-light">${status}</span>`;
+
+        html += `<tr>
+            <td><span class="fw-bold">${escapeHtml(name)}</span></td>
+            <td>${escapeHtml(category)}</td>
+            <td>${escapeHtml(language)}</td>
+            <td>${statusBadge}</td>
+            <td><span class="text-muted fs-7">${escapeHtml(truncated)}</span></td>
+        </tr>`;
+    });
+
+    tbody.innerHTML = html;
+    tableEl.style.display = 'block';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
 
 <?php if (\App\Helpers\Permission::can('notificame.send')): ?>
 // Testar mensagem

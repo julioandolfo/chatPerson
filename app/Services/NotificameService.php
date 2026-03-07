@@ -435,54 +435,49 @@ class NotificameService
         $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
-        $channelId = $account['account_id'] ?? null; // usado como "from" para Instagram
-        
-        $endpoint = "{$channel}/send"; // default genérico
+        $channelId = $account['account_id'] ?? null;
+
+        if (empty($channelId)) {
+            throw new \Exception("Notificame: campo 'account_id' (sender identifier) é obrigatório para envio. Conta ID={$accountId}, Channel={$channel}");
+        }
+
+        // Endpoint padrão conforme SDK NotificameHub: channels/{channel}/messages
+        $endpoint = "channels/{$channel}/messages";
+
+        // Payload padrão: from + to + contents[]
         $payload = [
+            'from' => $channelId,
             'to' => $to,
-            'message' => $message
-        ];
-        
-        // 🔥 INSTAGRAM: Para responder comentários (canal instagram_comment), 
-        // a conta de integração continua sendo 'instagram' e a resposta vai via DM automaticamente
-        // O Notificame detecta que o destinatário ($to) é o usuário que comentou e envia DM
-        if ($channel === 'instagram') {
-            if (empty($channelId)) {
-                throw new \Exception("Para Instagram, é obrigatório preencher o ID do canal (account_id) que vai em 'from'.");
-            }
-            // Endpoint e payload conforme docs: https://api.notificame.com.br/v1/channels/instagram/messages
-            $endpoint = 'channels/instagram/messages';
-            $payload = [
-                'from' => $channelId,
-                'to' => $to,
-                'contents' => [
-                    [
-                        'type' => 'text',
-                        'text' => $message
-                    ]
+            'contents' => [
+                [
+                    'type' => 'text',
+                    'text' => $message
                 ]
+            ]
+        ];
+
+        // Mídia/arquivo (áudio, imagem, documento, vídeo)
+        if (!empty($options['media_url'])) {
+            $mediaContent = [
+                'type' => 'file',
+                'fileUrl' => $options['media_url'],
+                'fileMimeType' => $options['media_mime'] ?? $options['media_type'] ?? 'application/octet-stream'
             ];
-            // Suporte simples a mídia se fornecido
-            if (!empty($options['media_url'])) {
-                $payload['contents'] = [
-                    [
-                        'type' => 'file',
-                        'fileMimeType' => $options['media_type'] ?? 'image',
-                        'fileUrl' => $options['media_url'],
-                        'fileCaption' => $options['caption'] ?? ''
-                    ]
-                ];
-            }
-        } else {
-            // Genérico: mantém compatibilidade
-            if (!empty($options['media_url'])) {
-                $payload['media'] = [
-                    'url' => $options['media_url'],
-                    'type' => $options['media_type'] ?? 'image'
-                ];
+            if (!empty($options['media_name'])) {
+                $mediaContent['fileName'] = $options['media_name'];
             }
             if (!empty($options['caption'])) {
-                $payload['caption'] = $options['caption'];
+                $mediaContent['fileCaption'] = $options['caption'];
+            }
+
+            if (!empty($message) && empty($options['caption'])) {
+                // Se há texto E mídia sem caption, enviar ambos como conteúdos separados
+                $payload['contents'] = [
+                    $mediaContent,
+                    ['type' => 'text', 'text' => $message]
+                ];
+            } else {
+                $payload['contents'] = [$mediaContent];
             }
         }
         
@@ -554,23 +549,35 @@ class NotificameService
         if (!$account || $account['provider'] !== 'notificame') {
             throw new \Exception("Conta Notificame não encontrada: {$accountId}");
         }
-        
+
         $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
-        
+        $channelId = $account['account_id'] ?? null;
+
+        if (empty($channelId)) {
+            throw new \Exception("Notificame: campo 'account_id' é obrigatório para envio de template. Conta ID={$accountId}");
+        }
+
+        // Formato conforme SDK NotificameHub: TemplateContent
+        $endpoint = "channels/{$channel}/messages";
         $payload = [
+            'from' => $channelId,
             'to' => $to,
-            'template' => $templateName,
-            'params' => $params
+            'contents' => [
+                [
+                    'type' => 'template',
+                    'templateName' => $templateName,
+                    'params' => $params
+                ]
+            ]
         ];
-        
-        $endpoint = "{$channel}/template";
-        
+
         try {
             self::logInfo("Notificame sendTemplate endpoint={$endpoint} channel={$channel} to={$to} template={$templateName}");
+            self::logInfo("Notificame sendTemplate payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
-            
+
             return [
                 'success' => true,
                 'message_id' => $result['id'] ?? $result['message_id'] ?? null,
@@ -595,16 +602,25 @@ class NotificameService
         $channel = $account['channel'];
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
+        $channelId = $account['account_id'] ?? null;
+
+        if (empty($channelId)) {
+            throw new \Exception("Notificame: campo 'account_id' é obrigatório para envio interativo. Conta ID={$accountId}");
+        }
         
+        // ReplyableTextContent conforme SDK NotificameHub
+        $endpoint = "channels/{$channel}/messages";
         $payload = [
+            'from' => $channelId,
             'to' => $to,
-            'interactive' => $interactiveData
+            'contents' => [
+                array_merge(['type' => 'text'], $interactiveData)
+            ]
         ];
-        
-        $endpoint = "{$channel}/interactive";
         
         try {
             self::logInfo("Notificame sendInteractive endpoint={$endpoint} channel={$channel} to={$to}");
+            self::logInfo("Notificame sendInteractive payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
             return [
@@ -1279,7 +1295,7 @@ class NotificameService
         $endpoint = "{$channel}/templates";
         
         try {
-            $result = self::makeRequest($endpoint, 'POST', $templateData, $token);
+            $result = self::makeRequest($endpoint, $token, 'POST', $templateData);
             return $result;
         } catch (\Exception $e) {
             self::logError("Erro ao criar template Notificame: " . $e->getMessage());

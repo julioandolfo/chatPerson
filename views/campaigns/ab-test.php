@@ -47,12 +47,28 @@ $pageTitle = 'A/B Testing';
                         
                         <div class="mb-10">
                             <label class="form-label required">Contas WhatsApp</label>
-                            <?php foreach ($whatsappAccounts as $account): ?>
+                            <?php foreach ($whatsappAccounts as $account): 
+                                $providerLabel = match($account['provider'] ?? 'quepasa') {
+                                    'notificame' => 'Notificame',
+                                    'whatsapp_official' => 'API Oficial',
+                                    'meta_cloud', 'meta_coex' => 'Cloud API',
+                                    'evolution' => 'Evolution',
+                                    default => 'QuePasa'
+                                };
+                                $providerColor = match($account['provider'] ?? 'quepasa') {
+                                    'notificame' => 'badge-light-primary',
+                                    'whatsapp_official', 'meta_cloud', 'meta_coex' => 'badge-light-success',
+                                    default => 'badge-light-info'
+                                };
+                            ?>
                             <div class="form-check form-check-custom form-check-solid mb-3">
                                 <input class="form-check-input" type="checkbox" name="integration_account_ids[]" value="<?php echo $account['id']; ?>" id="acc_<?php echo $account['id']; ?>">
                                 <label class="form-check-label" for="acc_<?php echo $account['id']; ?>">
-                                    <div class="fw-bold"><?php echo htmlspecialchars($account['name']); ?></div>
-                                    <div class="text-muted fs-7"><?php echo htmlspecialchars($account['phone_number']); ?></div>
+                                    <div class="fw-bold">
+                                        <?php echo htmlspecialchars($account['name']); ?>
+                                        <span class="badge <?php echo $providerColor; ?> ms-2 fs-8"><?php echo $providerLabel; ?></span>
+                                    </div>
+                                    <div class="text-muted fs-7"><?php echo htmlspecialchars($account['phone_number'] ?? $account['account_id'] ?? ''); ?></div>
                                 </label>
                             </div>
                             <?php endforeach; ?>

@@ -1169,9 +1169,8 @@ class NotificameService
     {
         $eventType = $payload['type'] ?? 'CONNECTION_STATUS';
         self::logInfo("Processando evento {$eventType} para channel={$channel}");
-        self::logInfo("Payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        self::logInfo("Payload completo: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-        // Extrair status: pode vir em vários formatos do Notificame
         $connectionStatus = $payload['status']
             ?? $payload['connectionStatus']['status']
             ?? $payload['connection']['status']
@@ -1184,17 +1183,37 @@ class NotificameService
             ?? null;
 
         if (!$connectionStatus) {
-            self::logWarning("{$eventType}: Status não encontrado no payload");
+            self::logWarning("{$eventType}: Status não encontrado no payload — IGNORANDO (não alterar status da conta)");
             return;
         }
 
-        $normalizedStatus = strtolower($connectionStatus);
-        $isConnected = in_array($normalizedStatus, ['connected', 'active', 'online', 'open', 'ready']);
+        $normalizedStatus = strtolower(trim($connectionStatus));
+
+        // Listas explícitas: só alterar status se o valor for RECONHECIDO
+        // Isso evita que valores intermediários/desconhecidos marquem como disconnected
+        $connectedStatuses = [
+            'connected', 'active', 'online', 'open', 'ready',
+            'authenticated', 'available', 'running', 'operational',
+            'reconnected', 'session_active', 'sync', 'synced',
+            'logged_in', 'initialized', 'healthy',
+        ];
+        $disconnectedStatuses = [
+            'disconnected', 'offline', 'closed', 'error', 'failed',
+            'expired', 'banned', 'blocked', 'suspended', 'timeout',
+            'logged_out', 'session_expired', 'connection_lost',
+        ];
+
+        $isConnected = in_array($normalizedStatus, $connectedStatuses);
+        $isDisconnected = in_array($normalizedStatus, $disconnectedStatuses);
+
+        if (!$isConnected && !$isDisconnected) {
+            self::logInfo("{$eventType}: Status '{$connectionStatus}' NÃO RECONHECIDO — ignorando para não alterar status indevidamente");
+            return;
+        }
+
         $newStatus = $isConnected ? 'active' : 'disconnected';
+        self::logInfo("{$eventType}: connectionStatus='{$connectionStatus}' -> {$newStatus}");
 
-        self::logInfo("{$eventType}: connectionStatus={$connectionStatus} -> {$newStatus}");
-
-        // Encontrar a conta correspondente
         $account = self::findAccountByWebhook($payload, $channel);
 
         if (!$account) {
@@ -1204,14 +1223,20 @@ class NotificameService
 
         $currentStatus = $account['status'] ?? '';
         if ($currentStatus !== $newStatus) {
-            IntegrationAccount::update($account['id'], [
+            $updateData = [
                 'status' => $newStatus,
-                'error_message' => $isConnected ? null : "Desconectado: {$connectionStatus}",
-                'last_sync_at' => date('Y-m-d H:i:s')
-            ]);
-            self::logInfo("{$eventType}: Conta ID={$account['id']} atualizada: {$currentStatus} -> {$newStatus}");
+                'last_sync_at' => date('Y-m-d H:i:s'),
+            ];
+            if ($isConnected) {
+                $updateData['error_message'] = null;
+            } else {
+                $updateData['error_message'] = "Desconectado via webhook: {$connectionStatus}";
+            }
+
+            IntegrationAccount::update($account['id'], $updateData);
+            self::logInfo("{$eventType}: Conta ID={$account['id']} '{$account['name']}' atualizada: {$currentStatus} -> {$newStatus}");
         } else {
-            self::logInfo("{$eventType}: Status já é {$newStatus}, sem mudança");
+            self::logInfo("{$eventType}: Status já é '{$newStatus}', sem mudança necessária");
         }
     }
 
@@ -1354,11 +1379,12 @@ class NotificameService
             }
         }
 
-        // 4) fallback: primeira ativa do canal/provider notificame
+        // 4) fallback: primeira conta do canal/provider notificame (qualquer status)
+        // Não filtrar por status='active' — isso impede que webhooks de reconexão
+        // encontrem contas que já estão 'disconnected', criando um loop circular
         $acc = $filtered(function($a) use ($channel) {
             return ($a['provider'] ?? '') === 'notificame'
-                && ($a['channel'] ?? '') === $channel
-                && ($a['status'] ?? '') === 'active';
+                && ($a['channel'] ?? '') === $channel;
         });
 
         return $acc;

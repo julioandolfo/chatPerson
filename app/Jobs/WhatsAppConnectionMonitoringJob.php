@@ -43,6 +43,13 @@ class WhatsAppConnectionMonitoringJob
             $accounts = IntegrationAccount::getAllWhatsApp();
             
             foreach ($accounts as $account) {
+                // Pular contas Notificame — elas usam API própria, não Evolution/WhatsApp Web
+                $provider = $account['provider'] ?? '';
+                if ($provider === 'notificame') {
+                    Logger::info("WhatsAppConnectionMonitoringJob - Pulando conta Notificame: {$account['name']} (ID={$account['id']})");
+                    continue;
+                }
+
                 $results['checked']++;
                 
                 try {

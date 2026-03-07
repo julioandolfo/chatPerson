@@ -45,15 +45,25 @@ if ($secret) {
 }
 
 // Identificar canal do payload (tentar múltiplas localizações)
+// IMPORTANTE: NÃO usar $payload['type'] como fallback — ele contém o tipo de evento
+// (ex: CONNECTION_STATUS, MESSAGE_STATUS), não o canal de comunicação
 $channel = $payload['channel']
-    ?? $payload['message']['channel']
-    ?? $payload['type']
-    ?? null;
+    ?? $payload['message']['channel'] ?? null;
 
 if (!$channel) {
-    Logger::notificame("AVISO: Campo 'channel' não encontrado no payload. Usando 'whatsapp' como fallback.");
-    Logger::notificame("Payload completo para análise: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    $channel = 'whatsapp';
+    // Para eventos de status (CONNECTION_STATUS, ACCOUNT_STATUS, MESSAGE_STATUS),
+    // tentar extrair canal de outros campos do payload
+    $eventType = $payload['type'] ?? null;
+    $channelFromSubscription = $payload['subscription']['channel'] ?? null;
+    $channelFromConnection = $payload['connection']['channel'] ?? null;
+
+    $channel = $channelFromSubscription ?? $channelFromConnection ?? null;
+
+    if (!$channel) {
+        Logger::notificame("AVISO: Campo 'channel' não encontrado no payload (type={$eventType}). Usando 'whatsapp' como fallback.");
+        Logger::notificame("Payload completo para análise: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $channel = 'whatsapp';
+    }
 }
 
 Logger::notificame("Canal identificado: {$channel}");

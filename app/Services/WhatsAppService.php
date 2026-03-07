@@ -1207,7 +1207,17 @@ class WhatsAppService
 
         Logger::quepasa("verifyRealConnection - Verificando conta ID={$accountId}, nome={$account['name']}");
 
-        // Verificar se tem token configurado
+        $provider = $account['provider'] ?? '';
+        if ($provider === 'notificame') {
+            Logger::quepasa("verifyRealConnection - Conta Notificame ignorada (usa API própria): {$account['name']}");
+            return [
+                'connected' => false,
+                'status' => 'skipped',
+                'message' => 'Conta Notificame — use NotificameService::checkConnection',
+                'details' => ['reason' => 'notificame_provider']
+            ];
+        }
+
         if (empty($account['quepasa_token'])) {
             Logger::quepasa("verifyRealConnection - Conta sem token configurado");
             
@@ -1422,6 +1432,11 @@ class WhatsAppService
         $accounts = IntegrationAccount::getAllWhatsApp();
         
         foreach ($accounts as $account) {
+            $provider = $account['provider'] ?? '';
+            if ($provider === 'notificame') {
+                continue;
+            }
+
             $result = self::verifyRealConnection($account['id'], true);
             $results[] = [
                 'account_id' => $account['id'],

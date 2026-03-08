@@ -679,6 +679,49 @@ class NotificameService
             }
         }
 
+        // 4. Tentar GET /v1/resale/ (lista subcontas com acccount_id)
+        try {
+            $result = self::makeRequest('resale', $token, 'GET', [], $apiUrl);
+            self::logInfo("Resale response: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            $accounts = is_array($result) ? ($result['data'] ?? $result) : [];
+            foreach ($accounts as $acc) {
+                if (!is_array($acc)) continue;
+                $accToken = $acc['acccount_id'] ?? $acc['account_id'] ?? $acc['id'] ?? null;
+                if ($accToken && strlen((string)$accToken) > 10) {
+                    $discovered[] = [
+                        'token' => $accToken,
+                        'source' => 'resale',
+                        'name' => $acc['name'] ?? $acc['email'] ?? '-',
+                    ];
+                }
+            }
+        } catch (\Exception $e) {
+            self::logInfo("Resale endpoint falhou: " . $e->getMessage());
+        }
+
+        // 5. Consultar a última mensagem recebida desta conta para extrair o from/subscription.channel
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            $stmt = $db->prepare(
+                "SELECT external_id, metadata FROM messages 
+                 WHERE conversation_id IN (SELECT id FROM conversations WHERE integration_account_id = ?) 
+                 AND sender_type = 'contact' AND external_id IS NOT NULL 
+                 ORDER BY id DESC LIMIT 1"
+            );
+            $stmt->execute([$accountId]);
+            $lastMsg = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($lastMsg && !empty($lastMsg['metadata'])) {
+                $meta = json_decode($lastMsg['metadata'], true);
+                $subChannel = $meta['subscription']['channel'] ?? $meta['channel_token'] ?? null;
+                if ($subChannel && strlen($subChannel) > 10) {
+                    $discovered[] = ['token' => $subChannel, 'source' => 'last_message_metadata'];
+                    self::logInfo("Token descoberto via metadata da última mensagem: {$subChannel}");
+                }
+            }
+        } catch (\Exception $e) {
+            self::logInfo("Busca de token via mensagens falhou: " . $e->getMessage());
+        }
+
         // Deduplicate
         $seen = [];
         $unique = [];
@@ -920,7 +963,20 @@ class NotificameService
         }
         
         self::logInfo("Notificame conta identificada: ID={$account['id']}, Name={$account['name']}, Channel={$account['channel']}");
-        
+
+        // Auto-preencher account_id (token do canal) se estiver vazio
+        if (empty($account['account_id'])) {
+            $channelToken = $payload['subscription']['channel']
+                ?? $payload['connection']['channel']
+                ?? $payload['message']['subscription']['channel']
+                ?? null;
+            if ($channelToken && strlen($channelToken) > 10) {
+                self::logInfo("Auto-preenchendo account_id com token do webhook: {$channelToken}");
+                IntegrationAccount::update($account['id'], ['account_id' => $channelToken]);
+                $account['account_id'] = $channelToken;
+            }
+        }
+
         // Extrair dados da mensagem
         $messageData = self::extractMessageData($payload, $channel);
         
@@ -1407,6 +1463,18 @@ class NotificameService
         if (!$account) {
             self::logWarning("{$eventType}: Conta não encontrada para channel={$channel}, accountId={$accountIdentifier}");
             return;
+        }
+
+        // Auto-preencher account_id (token do canal) se estiver vazio
+        if (empty($account['account_id'])) {
+            $channelToken = $payload['subscription']['channel']
+                ?? $payload['connection']['channel']
+                ?? $accountIdentifier;
+            if ($channelToken && strlen($channelToken) > 10) {
+                self::logInfo("{$eventType}: Auto-preenchendo account_id com token: {$channelToken}");
+                IntegrationAccount::update($account['id'], ['account_id' => $channelToken]);
+                $account['account_id'] = $channelToken;
+            }
         }
 
         $currentStatus = $account['status'] ?? '';
@@ -1901,14 +1969,38 @@ class NotificameService
         
         $token = $account['api_token'];
         $apiUrl = $account['api_url'] ?? null;
-        $channelId = self::getChannelToken($account);
+
+        $channelId = $account['account_id'] ?? '';
+        if (empty($channelId)) {
+            self::logInfo("listTemplates: account_id vazio para conta #{$accountId}, tentando auto-descobrir...");
+            try {
+                $discovered = self::discoverChannels($accountId);
+                if (!empty($discovered)) {
+                    $channelId = $discovered[0]['token'];
+                    self::logInfo("listTemplates: canal auto-descoberto: {$channelId}");
+                    IntegrationAccount::update($accountId, ['account_id' => $channelId]);
+                }
+            } catch (\Exception $discoverEx) {
+                self::logError("listTemplates: falha ao auto-descobrir canal: " . $discoverEx->getMessage());
+            }
+        }
+
+        if (empty($channelId)) {
+            self::logError("listTemplates: account_id (token do canal) não configurado para conta #{$accountId}. Configure em Integrações > Notificame > Editar conta.");
+            return [];
+        }
         
         $endpoint = "templates/{$channelId}";
         
         try {
-            self::logInfo("Listando templates Notificame - Account: {$accountId}, Endpoint: {$endpoint}");
+            self::logInfo("Listando templates Notificame - Account: {$accountId}, Channel: {$channelId}");
             $result = self::makeRequest($endpoint, $token, 'GET', [], $apiUrl);
-            return $result['templates'] ?? $result['data'] ?? [];
+            $templates = $result['templates'] ?? $result['data'] ?? [];
+            if (!is_array($templates)) {
+                $templates = [];
+            }
+            self::logInfo("listTemplates: " . count($templates) . " templates retornados");
+            return $templates;
         } catch (\Exception $e) {
             self::logError("Erro ao listar templates Notificame: " . $e->getMessage());
             return [];

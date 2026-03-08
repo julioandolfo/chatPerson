@@ -372,16 +372,38 @@ class PCW_Personizi_Integration {
 			return $result;
 		}
 
+		$this->log( 'Resposta completa templates: ' . wp_json_encode( array_keys( $result ?? [] ) ), 'DEBUG' );
+		if ( isset( $result['data'] ) ) {
+			$this->log( 'result[data] keys: ' . wp_json_encode( array_keys( $result['data'] ) ), 'DEBUG' );
+			if ( isset( $result['data']['data'] ) && is_array( $result['data']['data'] ) ) {
+				$this->log( 'result[data][data] keys: ' . wp_json_encode( array_keys( $result['data']['data'] ) ), 'DEBUG' );
+			}
+		}
+
 		$templates = array();
-		if ( isset( $result['data']['templates'] ) ) {
+		if ( isset( $result['data']['templates'] ) && is_array( $result['data']['templates'] ) ) {
 			$templates = $result['data']['templates'];
-		} elseif ( isset( $result['data']['data']['templates'] ) ) {
+			$this->log( 'Templates encontrados em data.templates', 'DEBUG' );
+		} elseif ( isset( $result['data']['data']['templates'] ) && is_array( $result['data']['data']['templates'] ) ) {
 			$templates = $result['data']['data']['templates'];
-		} elseif ( isset( $result['templates'] ) ) {
+			$this->log( 'Templates encontrados em data.data.templates', 'DEBUG' );
+		} elseif ( isset( $result['templates'] ) && is_array( $result['templates'] ) ) {
 			$templates = $result['templates'];
+			$this->log( 'Templates encontrados em templates', 'DEBUG' );
 		}
 
 		$this->log( 'Templates encontrados: ' . count( $templates ), 'INFO' );
+
+		$debug = $result['data']['debug'] ?? $result['data']['data']['debug'] ?? '';
+		if ( count( $templates ) === 0 ) {
+			$provider = $result['data']['provider'] ?? $result['data']['data']['provider'] ?? 'desconhecido';
+			$accId = $result['data']['account_id'] ?? $result['data']['data']['account_id'] ?? 'N/A';
+			$this->log( "AVISO: 0 templates. Provider: {$provider}, Account ID: {$accId}, Debug: {$debug}", 'WARNING' );
+
+			if ( ! empty( $debug ) ) {
+				return new WP_Error( 'no_templates', $debug );
+			}
+		}
 
 		if ( ! empty( $templates ) ) {
 			set_transient( $cache_key, $templates, 5 * MINUTE_IN_SECONDS );

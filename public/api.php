@@ -1117,6 +1117,7 @@ try {
             $provider = $account['provider'] ?? '';
             $templates = [];
 
+            $debugInfo = '';
             if ($provider === 'notificame') {
                 try {
                     $raw = \App\Services\NotificameService::listTemplates($account['id']);
@@ -1131,18 +1132,30 @@ try {
                             'body_text' => $body ?: ($tpl['body'] ?? $tpl['text'] ?? ''), 'source' => 'notificame',
                         ];
                     }
+                    if (empty($templates)) {
+                        $channelToken = $account['account_id'] ?? '';
+                        $debugInfo = empty($channelToken)
+                            ? 'account_id (token do canal) não configurado. Configure em Integrações > Notificame > Editar conta.'
+                            : 'Nenhum template retornado pela API Notificame para o canal: ' . substr($channelToken, 0, 10) . '...';
+                    }
                 } catch (\Exception $e) {
                     \App\Helpers\Logger::notificame("API templatesList erro: " . $e->getMessage());
-                    errorResponse('Erro ao buscar templates: ' . $e->getMessage(), 'TEMPLATE_ERROR', 500);
+                    $debugInfo = $e->getMessage();
                 }
+            } else {
+                $debugInfo = "Provider '{$provider}' não suporta templates via esta rota.";
             }
 
-            successResponse([
+            $response = [
                 'account_id' => (string) $account['id'],
                 'account_name' => $account['name'] ?? '',
                 'provider' => $provider,
                 'templates' => $templates,
-            ]);
+            ];
+            if (!empty($debugInfo) && empty($templates)) {
+                $response['debug'] = $debugInfo;
+            }
+            successResponse($response);
             break;
 
         case 'messagesListByConversation':

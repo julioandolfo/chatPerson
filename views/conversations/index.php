@@ -5514,9 +5514,10 @@ function getChannelInfo(channel) {
                                 <option value="" disabled>Nenhuma integração WhatsApp ativa encontrada</option>
                             <?php else: ?>
                                 <?php foreach ($whatsappAccounts as $account): ?>
-                                    <option value="<?= $account['id'] ?>">
+                                    <option value="<?= $account['id'] ?>" data-provider="<?= htmlspecialchars($account['provider'] ?? '') ?>">
                                         <?= htmlspecialchars($account['name']) ?> 
                                         (<?= htmlspecialchars($account['phone_number']) ?>)
+                                        <?php if (($account['provider'] ?? '') === 'notificame'): ?> [API Oficial]<?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php endif; ?>
@@ -5563,9 +5564,37 @@ function getChannelInfo(channel) {
                         <div class="form-text">Digite apenas DDD e número (ex: 11987654321)</div>
                     </div>
                     
-                    <div class="mb-5">
+                    <div class="mb-5" id="new_conversation_message_container">
                         <label class="form-label fw-semibold mb-2">Mensagem:</label>
                         <textarea class="form-control form-control-solid" id="new_conversation_message" name="message" rows="4" placeholder="Digite sua mensagem aqui..." required></textarea>
+                    </div>
+
+                    <!-- Template obrigatório para contas API Oficial (Notificame/Cloud) -->
+                    <div class="mb-5 d-none" id="new_conversation_template_container">
+                        <div class="notice d-flex bg-light-info rounded border-info border border-dashed p-3 mb-4">
+                            <i class="ki-duotone ki-information-5 fs-2tx text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            <div class="fs-7 text-gray-700">
+                                Esta conta usa <strong>API Oficial do WhatsApp</strong>. Para iniciar uma conversa, é necessário enviar um <strong>template aprovado pela Meta</strong>.
+                            </div>
+                        </div>
+
+                        <label class="form-label fw-semibold mb-2">Template:</label>
+                        <div class="mb-3">
+                            <input type="text" class="form-control form-control-solid form-control-sm" id="new_conv_template_search" placeholder="Buscar template...">
+                        </div>
+                        <div id="new_conv_template_list" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 0.475rem;">
+                            <div class="text-center text-muted py-6 fs-7">Selecione uma integração para carregar templates</div>
+                        </div>
+
+                        <div id="new_conv_template_params" class="d-none mt-4">
+                            <div class="separator my-3"></div>
+                            <h6 class="fw-bold mb-3">Preencher variáveis</h6>
+                            <div id="new_conv_template_param_fields"></div>
+                            <div class="bg-light rounded p-3 mt-3">
+                                <label class="form-label fw-semibold text-gray-600 fs-8">Pré-visualização:</label>
+                                <div id="new_conv_template_preview" class="fs-7 text-gray-800" style="white-space: pre-wrap;"></div>
+                            </div>
+                        </div>
                     </div>
                     
                     <div class="d-flex justify-content-end">
@@ -21546,19 +21575,188 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Atualizar ao mudar canal
-        channelSelect.addEventListener('change', updateWhatsAppAccountVisibility);
+        channelSelect.addEventListener('change', function() {
+            updateWhatsAppAccountVisibility();
+            checkNewConvTemplateRequired();
+        });
         
         // Atualizar ao abrir modal
         const modal = document.getElementById('kt_modal_new_conversation');
         if (modal) {
             modal.addEventListener('show.bs.modal', function() {
-                setTimeout(updateWhatsAppAccountVisibility, 100);
+                setTimeout(() => {
+                    updateWhatsAppAccountVisibility();
+                    checkNewConvTemplateRequired();
+                }, 100);
             });
         }
         
         // Atualizar inicialmente
         updateWhatsAppAccountVisibility();
+
+        // Quando muda a conta WhatsApp, verificar se precisa de template
+        if (whatsappAccountSelect) {
+            whatsappAccountSelect.addEventListener('change', checkNewConvTemplateRequired);
+        }
     }
+
+    // --- Lógica de template obrigatório para nova conversa ---
+    let _newConvTemplates = [];
+    let _newConvSelectedTemplate = null;
+
+    function checkNewConvTemplateRequired() {
+        const accountSelect = document.getElementById('new_conversation_whatsapp_account');
+        const msgContainer = document.getElementById('new_conversation_message_container');
+        const tplContainer = document.getElementById('new_conversation_template_container');
+        const msgTextarea = document.getElementById('new_conversation_message');
+        if (!accountSelect || !msgContainer || !tplContainer) return;
+
+        const selectedOption = accountSelect.options[accountSelect.selectedIndex];
+        const provider = selectedOption ? (selectedOption.dataset.provider || '') : '';
+        const accountId = accountSelect.value;
+        const channel = document.getElementById('new_conversation_channel')?.value || '';
+
+        const needsTemplate = (provider === 'notificame' || provider === 'meta_cloud' || provider === 'meta_coex')
+                              && channel === 'whatsapp' && accountId;
+
+        if (needsTemplate) {
+            msgContainer.classList.add('d-none');
+            tplContainer.classList.remove('d-none');
+            if (msgTextarea) msgTextarea.removeAttribute('required');
+            _newConvSelectedTemplate = null;
+            loadNewConvTemplates(accountId, provider);
+        } else {
+            msgContainer.classList.remove('d-none');
+            tplContainer.classList.add('d-none');
+            if (msgTextarea) msgTextarea.setAttribute('required', 'required');
+            _newConvTemplates = [];
+            _newConvSelectedTemplate = null;
+        }
+    }
+
+    function loadNewConvTemplates(accountId, provider) {
+        const list = document.getElementById('new_conv_template_list');
+        const params = document.getElementById('new_conv_template_params');
+        if (params) params.classList.add('d-none');
+        list.innerHTML = '<div class="text-center text-muted py-6"><span class="spinner-border spinner-border-sm text-primary"></span> Carregando templates...</div>';
+
+        let url;
+        if (provider === 'notificame') {
+            url = `<?= \App\Helpers\Url::to("/integrations/notificame/accounts") ?>/${accountId}/templates`;
+        } else {
+            list.innerHTML = '<div class="text-center text-muted py-6 fs-7">Selecione uma conta Notificame para ver templates disponíveis</div>';
+            return;
+        }
+
+        fetch(url, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            const templates = data.templates || data.data || data || [];
+            _newConvTemplates = Array.isArray(templates) ? templates : [];
+            renderNewConvTemplates(_newConvTemplates);
+        })
+        .catch(err => {
+            list.innerHTML = '<div class="text-center text-danger py-4 fs-7">Erro ao carregar: ' + err.message + '</div>';
+        });
+    }
+
+    function renderNewConvTemplates(templates) {
+        const list = document.getElementById('new_conv_template_list');
+        if (!templates.length) {
+            list.innerHTML = '<div class="text-center text-muted py-6 fs-7">Nenhum template encontrado</div>';
+            return;
+        }
+
+        let html = '';
+        templates.forEach((t, idx) => {
+            const name = t.name || t.display_name || '';
+            const body = extractNewConvTemplateBody(t);
+            const preview = body.substring(0, 70) + (body.length > 70 ? '...' : '');
+            const lang = t.language || 'pt_BR';
+            const cat = t.category || '';
+            const varCount = countTemplateVars(body);
+            html += `<div class="new-conv-tpl-item px-3 py-2 border-bottom cursor-pointer" data-idx="${idx}" onclick="selectNewConvTemplate(${idx})">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold text-gray-800 fs-7">${escapeHtml(name)}</span>
+                    <div>
+                        ${cat ? '<span class="badge badge-light fs-9 me-1">' + escapeHtml(cat) + '</span>' : ''}
+                        <span class="badge badge-light-primary fs-9">${lang}</span>
+                    </div>
+                </div>
+                <div class="text-gray-500 fs-8 mt-1">${escapeHtml(preview)}</div>
+                ${varCount > 0 ? '<span class="badge badge-light-warning fs-9 mt-1">' + varCount + ' variável(is)</span>' : ''}
+            </div>`;
+        });
+        list.innerHTML = html;
+    }
+
+    function extractNewConvTemplateBody(tpl) {
+        if (tpl.body_text) return tpl.body_text;
+        const comps = tpl.components || [];
+        for (const c of comps) {
+            if ((c.type || '').toUpperCase() === 'BODY') return c.text || '';
+        }
+        return tpl.body || tpl.text || tpl.name || '';
+    }
+
+    window.selectNewConvTemplate = function(idx) {
+        const tpl = _newConvTemplates[idx];
+        if (!tpl) return;
+
+        _newConvSelectedTemplate = tpl;
+
+        document.querySelectorAll('.new-conv-tpl-item').forEach(el => el.classList.remove('bg-light-primary'));
+        const sel = document.querySelector(`.new-conv-tpl-item[data-idx="${idx}"]`);
+        if (sel) sel.classList.add('bg-light-primary');
+
+        const body = extractNewConvTemplateBody(tpl);
+        const varCount = countTemplateVars(body);
+        const paramsDiv = document.getElementById('new_conv_template_params');
+        const fieldsDiv = document.getElementById('new_conv_template_param_fields');
+
+        if (varCount > 0) {
+            paramsDiv.classList.remove('d-none');
+            let fieldsHtml = '';
+            for (let i = 1; i <= varCount; i++) {
+                fieldsHtml += `<div class="mb-2">
+                    <label class="form-label fs-8">Variável {{${i}}}</label>
+                    <input type="text" class="form-control form-control-solid form-control-sm new-conv-tpl-param" 
+                           data-index="${i}" placeholder="Valor para {{${i}}}" oninput="updateNewConvTemplatePreview()">
+                </div>`;
+            }
+            fieldsDiv.innerHTML = fieldsHtml;
+            updateNewConvTemplatePreview();
+        } else {
+            paramsDiv.classList.remove('d-none');
+            fieldsDiv.innerHTML = '';
+            updateNewConvTemplatePreview();
+        }
+    };
+
+    window.updateNewConvTemplatePreview = function() {
+        if (!_newConvSelectedTemplate) return;
+        let body = extractNewConvTemplateBody(_newConvSelectedTemplate);
+        document.querySelectorAll('.new-conv-tpl-param').forEach(input => {
+            const idx = input.dataset.index;
+            body = body.replace(`{{${idx}}}`, input.value || `{{${idx}}}`);
+        });
+        const preview = document.getElementById('new_conv_template_preview');
+        if (preview) preview.textContent = body;
+    };
+
+    // Busca de templates na nova conversa
+    document.getElementById('new_conv_template_search')?.addEventListener('input', function(e) {
+        const q = e.target.value.toLowerCase().trim();
+        if (!q) { renderNewConvTemplates(_newConvTemplates); return; }
+        const filtered = _newConvTemplates.filter(t => {
+            const name = (t.name || '').toLowerCase();
+            const body = extractNewConvTemplateBody(t).toLowerCase();
+            return name.includes(q) || body.includes(q);
+        });
+        renderNewConvTemplates(filtered);
+    });
 
     // Funil / Etapa - carregar etapas conforme o funil e permissões do agente
     if (funnelSelect && stageSelect) {
@@ -21636,11 +21834,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const message = document.getElementById('new_conversation_message').value.trim();
             const funnelId = document.getElementById('new_conversation_funnel')?.value.trim() || '';
             const stageId = document.getElementById('new_conversation_stage')?.value.trim() || '';
+
+            // Verificar se está no modo template
+            const tplContainer = document.getElementById('new_conversation_template_container');
+            const isTemplateMode = tplContainer && !tplContainer.classList.contains('d-none');
             
-            console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message, funnelId, stageId });
+            console.log('👔 Dados do formulírio:', { channel, whatsappAccountId, name, phone, message, funnelId, stageId, isTemplateMode });
             
-            if (!channel || !name || !phone || !message) {
+            if (!channel || !name || !phone) {
                 alert('Preencha todos os campos obrigatórios');
+                return;
+            }
+
+            if (isTemplateMode) {
+                if (!_newConvSelectedTemplate) {
+                    alert('Selecione um template para enviar');
+                    return;
+                }
+            } else if (!message) {
+                alert('Preencha a mensagem');
                 return;
             }
             
@@ -21811,7 +22023,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     channel: channel,
                     name: name,
                     phone: fullPhone,
-                    message: message
+                    message: isTemplateMode ? '' : message
                 };
                 
                 if (funnelId) {
@@ -21824,6 +22036,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Adicionar whatsapp_account_id apenas se canal for WhatsApp
                 if (channel === 'whatsapp' && whatsappAccountId) {
                     requestData.whatsapp_account_id = parseInt(whatsappAccountId);
+                }
+
+                // Dados de template (para contas API Oficial)
+                if (isTemplateMode && _newConvSelectedTemplate) {
+                    requestData.use_template = true;
+                    requestData.template_name = _newConvSelectedTemplate.name;
+                    requestData.template_language = _newConvSelectedTemplate.language || 'pt_BR';
+                    requestData.template_body_text = extractNewConvTemplateBody(_newConvSelectedTemplate);
+                    const params = [];
+                    document.querySelectorAll('.new-conv-tpl-param').forEach(input => {
+                        params.push(input.value || '');
+                    });
+                    requestData.template_params = params;
+                    requestData.message = requestData.template_body_text || _newConvSelectedTemplate.name;
                 }
                 
                 const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
@@ -24411,7 +24637,7 @@ function showWaCloudTemplateModal(conversationId) {
 function renderWaCloudTemplates(templates) {
     const list = document.getElementById('waCloudTemplateList');
     if (!templates.length) {
-        list.innerHTML = '<div class="text-center text-muted py-10"><i class="ki-duotone ki-information-5 fs-3x mb-3 text-warning"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><div>Nenhum template aprovado encontrado.<br><small class="text-gray-500">Crie e aprove templates em <strong>WhatsApp CoEx &gt; Templates</strong></small></div></div>';
+        list.innerHTML = '<div class="text-center text-muted py-10"><i class="ki-duotone ki-information-5 fs-3x mb-3 text-warning"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i><div>Nenhum template aprovado encontrado.<br><small class="text-gray-500">Crie e aprove templates nas <strong>Integrações</strong></small></div></div>';
         return;
     }
 
@@ -24428,39 +24654,49 @@ function renderWaCloudTemplates(templates) {
         html += `<div class="fw-bold text-gray-500 fs-7 px-4 py-2 bg-light border-bottom">${catLabels[cat] || cat}</div>`;
         tpls.forEach(t => {
             const preview = (t.body_text || '').substring(0, 80) + ((t.body_text || '').length > 80 ? '...' : '');
+            const tplIdSafe = String(t.id).replace(/'/g, "\\'");
+            const sourceBadge = t.source === 'notificame' ? '<span class="badge badge-light-info fs-9 ms-1">Notificame</span>' : '';
+            const varCount = t.variables_count || countTemplateVars(t.body_text || '');
             html += `
                 <div class="wa-cloud-tpl-item px-4 py-3 border-bottom cursor-pointer" 
-                     data-tpl-id="${t.id}" onclick="selectWaCloudTemplate(${t.id})">
+                     data-tpl-id="${escapeHtml(String(t.id))}" onclick="selectWaCloudTemplate('${tplIdSafe}')">
                     <div class="d-flex justify-content-between align-items-start">
-                        <div class="fw-semibold text-gray-800">${escapeHtml(t.display_name || t.name)}</div>
+                        <div class="fw-semibold text-gray-800">${escapeHtml(t.display_name || t.name)}${sourceBadge}</div>
                         <span class="badge badge-light-primary fs-8">${t.language || 'pt_BR'}</span>
                     </div>
                     <div class="text-gray-500 fs-7 mt-1">${escapeHtml(preview)}</div>
-                    ${t.variables_count > 0 ? `<span class="badge badge-light-warning fs-9 mt-1">${t.variables_count} variável(is)</span>` : ''}
+                    ${varCount > 0 ? `<span class="badge badge-light-warning fs-9 mt-1">${varCount} variável(is)</span>` : ''}
                 </div>`;
         });
     }
     list.innerHTML = html;
 }
 
+function countTemplateVars(bodyText) {
+    const matches = bodyText.match(/\{\{\d+\}\}/g);
+    return matches ? matches.length : 0;
+}
+
 function selectWaCloudTemplate(templateId) {
-    const tpl = _waCloudTemplates.find(t => t.id === templateId);
+    const tpl = _waCloudTemplates.find(t => String(t.id) === String(templateId));
     if (!tpl) return;
 
     _waCloudSelectedTemplate = tpl;
 
     document.querySelectorAll('.wa-cloud-tpl-item').forEach(el => el.classList.remove('bg-light-primary'));
-    const selected = document.querySelector(`.wa-cloud-tpl-item[data-tpl-id="${templateId}"]`);
+    const selected = document.querySelector(`.wa-cloud-tpl-item[data-tpl-id="${CSS.escape(String(templateId))}"]`);
     if (selected) selected.classList.add('bg-light-primary');
 
     const paramsDiv = document.getElementById('waCloudTemplateParams');
     const fieldsDiv = document.getElementById('waCloudTemplateParamFields');
     const btn = document.getElementById('btnSendWaCloudTemplate');
 
-    if (tpl.variables_count > 0) {
+    const varCount = tpl.variables_count || countTemplateVars(tpl.body_text || '');
+
+    if (varCount > 0) {
         paramsDiv.classList.remove('d-none');
         let fieldsHtml = '';
-        for (let i = 1; i <= tpl.variables_count; i++) {
+        for (let i = 1; i <= varCount; i++) {
             fieldsHtml += `
                 <div class="mb-3">
                     <label class="form-label fs-7">Variável {{${i}}}</label>
@@ -24513,6 +24749,20 @@ function submitWaCloudTemplate() {
         parameters.push(input.value || '');
     });
 
+    const isNotificame = _waCloudSelectedTemplate.source === 'notificame';
+    const payload = {
+        parameters: parameters,
+        source: _waCloudSelectedTemplate.source || 'meta',
+        body_text: _waCloudSelectedTemplate.body_text || '',
+        language: _waCloudSelectedTemplate.language || 'pt_BR',
+    };
+
+    if (isNotificame) {
+        payload.template_name = _waCloudSelectedTemplate.name;
+    } else {
+        payload.template_id = _waCloudSelectedTemplate.id;
+    }
+
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${_waCloudConversationId}/send-cloud-template`, {
         method: 'POST',
         headers: {
@@ -24520,10 +24770,7 @@ function submitWaCloudTemplate() {
             'X-Requested-With': 'XMLHttpRequest',
             'Accept': 'application/json'
         },
-        body: JSON.stringify({
-            template_id: _waCloudSelectedTemplate.id,
-            parameters: parameters
-        })
+        body: JSON.stringify(payload)
     })
     .then(r => r.json())
     .then(data => {
@@ -24534,7 +24781,9 @@ function submitWaCloudTemplate() {
             if (data.message) {
                 addMessageToChat(data.message);
             }
-            updateConversationInList(_waCloudConversationId, 'Template: ' + _waCloudSelectedTemplate.display_name);
+            updateConversationInList(_waCloudConversationId, 'Template: ' + (_waCloudSelectedTemplate.display_name || _waCloudSelectedTemplate.name));
+
+            checkAndShowCloudWindowBanner(_waCloudConversationId);
 
             if (typeof Swal !== 'undefined') {
                 Swal.fire({

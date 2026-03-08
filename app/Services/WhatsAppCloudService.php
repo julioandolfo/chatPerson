@@ -361,41 +361,37 @@ class WhatsAppCloudService extends MetaIntegrationService
      */
     public static function isWithin24hWindow(int $conversationId, ?int $viaAccountId = null): bool
     {
-        // Para conversas mescladas: verificar janela por número específico
         if ($viaAccountId) {
             $lastContactMessage = \App\Helpers\Database::fetch(
-                "SELECT sent_at FROM messages 
+                "SELECT created_at FROM messages
                  WHERE conversation_id = ? AND sender_type = 'contact' AND via_account_id = ?
-                 ORDER BY sent_at DESC LIMIT 1",
+                 ORDER BY created_at DESC LIMIT 1",
                 [$conversationId, $viaAccountId]
             );
-            
-            // Se tem mensagem nesse número, verificar janela
-            if ($lastContactMessage && !empty($lastContactMessage['sent_at'])) {
-                $lastMessageTime = strtotime($lastContactMessage['sent_at']);
+
+            if ($lastContactMessage && !empty($lastContactMessage['created_at'])) {
+                $lastMessageTime = strtotime($lastContactMessage['created_at']);
                 $windowEnd = $lastMessageTime + (24 * 60 * 60);
                 return time() < $windowEnd;
             }
-            
-            // Se não tem mensagem desse número, a janela NÃO está aberta para esse número
+
             return false;
         }
-        
-        // Fallback: verificar qualquer mensagem do contato
+
         $lastContactMessage = \App\Helpers\Database::fetch(
-            "SELECT sent_at FROM messages 
-             WHERE conversation_id = ? AND sender_type = 'contact' 
-             ORDER BY sent_at DESC LIMIT 1",
+            "SELECT created_at FROM messages
+             WHERE conversation_id = ? AND sender_type = 'contact'
+             ORDER BY created_at DESC LIMIT 1",
             [$conversationId]
         );
-        
-        if (!$lastContactMessage || empty($lastContactMessage['sent_at'])) {
+
+        if (!$lastContactMessage || empty($lastContactMessage['created_at'])) {
             return false;
         }
-        
-        $lastMessageTime = strtotime($lastContactMessage['sent_at']);
-        $windowEnd = $lastMessageTime + (24 * 60 * 60); // +24 horas
-        
+
+        $lastMessageTime = strtotime($lastContactMessage['created_at']);
+        $windowEnd = $lastMessageTime + (24 * 60 * 60);
+
         return time() < $windowEnd;
     }
     

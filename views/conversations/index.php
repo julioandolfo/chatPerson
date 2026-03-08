@@ -3473,6 +3473,7 @@ function getChannelInfo(channel) {
                         <span class="chat-header-status" id="chat-header-status">
                             <span class="badge badge-sm badge-light-<?= $statusClass ?>"><?= $statusText ?></span>
                         </span>
+                        <span id="chat-header-window-timer" class="d-none" style="margin-left: 6px;"></span>
                     </div>
                 </div>
             </div>
@@ -8472,6 +8473,10 @@ function resetConversationState(conversationId) {
     lastMessageId = getLastMessageIdForConversation(conversationId);
     oldestMessageId = null;
     hasMoreMessages = true;
+    if (typeof _windowTimerInterval !== 'undefined' && _windowTimerInterval) {
+        clearInterval(_windowTimerInterval);
+        _windowTimerInterval = null;
+    }
 }
 
 function startPolling(conversationId) {
@@ -19605,6 +19610,12 @@ if (typeof window.wsClient !== 'undefined') {
             
             console.groupEnd();
             addMessageToChat(data.message);
+
+            // Renovar timer da janela 24h quando chega mensagem do contato
+            if (data.message.sender_type === 'contact' && typeof _windowIsCloudApi !== 'undefined' && _windowIsCloudApi) {
+                _windowExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                updateWindowTimerUI();
+            }
             
             // Remover badge se existir (mensagem já foi marcada como lida no backend)
             if (badge) badge.remove();
@@ -24554,50 +24565,123 @@ function submitWaCloudTemplate() {
     });
 }
 
-// Verificar janela 24h e mostrar/ocultar banner
+// Timer da janela 24h
+let _windowTimerInterval = null;
+let _windowExpiresAt = null;
+let _windowTemplates = [];
+let _windowIsCloudApi = false;
+
 function checkAndShowCloudWindowBanner(conversationId) {
     const banner = document.getElementById('cloudWindowBanner');
-    if (!banner) return;
-
-    banner.classList.add('d-none');
+    const headerTimer = document.getElementById('chat-header-window-timer');
+    if (banner) banner.classList.add('d-none');
+    if (headerTimer) headerTimer.classList.add('d-none');
+    if (_windowTimerInterval) { clearInterval(_windowTimerInterval); _windowTimerInterval = null; }
 
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/cloud-window`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
     })
     .then(r => r.json())
     .then(data => {
-        if (!data.success || !data.is_cloud_api) {
-            banner.classList.add('d-none');
-            return;
+        _windowIsCloudApi = data.success && data.is_cloud_api;
+        if (!_windowIsCloudApi) return;
+
+        _windowTemplates = data.templates || [];
+
+        if (data.window_info && data.window_info.expires_at_iso) {
+            _windowExpiresAt = new Date(data.window_info.expires_at_iso);
+        } else if (data.window_info && data.window_info.remaining_seconds > 0) {
+            _windowExpiresAt = new Date(Date.now() + data.window_info.remaining_seconds * 1000);
+        } else {
+            _windowExpiresAt = null;
         }
 
-        if (data.within_24h) {
-            banner.classList.add('d-none');
-            if (data.window_info) {
-                const remaining = data.window_info.remaining_minutes;
-                if (remaining <= 60) {
-                    banner.classList.remove('d-none');
-                    banner.style.background = 'linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%)';
-                    banner.style.borderTopColor = '#17a2b8';
-                    const text = document.getElementById('cloudWindowBannerText');
-                    if (text) text.innerHTML = `<span class="text-info">Janela de 24h expira em <strong>${remaining} min</strong>. Após isso, será necessário usar template.</span>`;
-                    const btn = banner.querySelector('button');
-                    if (btn) btn.classList.add('d-none');
-                }
-            }
-        } else {
-            banner.classList.remove('d-none');
-            banner.style.background = 'linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%)';
-            banner.style.borderTopColor = '#ffc107';
-            const text = document.getElementById('cloudWindowBannerText');
-            if (text) text.innerHTML = 'Janela de 24h expirada. Use um <strong>template aprovado</strong> para reabrir a conversa.';
-            const btn = banner.querySelector('button');
-            if (btn) btn.classList.remove('d-none');
-        }
+        updateWindowTimerUI();
+        _windowTimerInterval = setInterval(updateWindowTimerUI, 1000);
     })
     .catch(() => {
-        banner.classList.add('d-none');
+        if (banner) banner.classList.add('d-none');
+        if (headerTimer) headerTimer.classList.add('d-none');
     });
+}
+
+function updateWindowTimerUI() {
+    const banner = document.getElementById('cloudWindowBanner');
+    const headerTimer = document.getElementById('chat-header-window-timer');
+    const bannerText = document.getElementById('cloudWindowBannerText');
+    if (!banner || !headerTimer) return;
+
+    if (!_windowIsCloudApi) {
+        banner.classList.add('d-none');
+        headerTimer.classList.add('d-none');
+        return;
+    }
+
+    const now = new Date();
+    const remaining = _windowExpiresAt ? Math.max(0, Math.floor((_windowExpiresAt - now) / 1000)) : 0;
+    const isExpired = !_windowExpiresAt || remaining <= 0;
+
+    if (isExpired) {
+        // Janela expirada
+        if (_windowTimerInterval) { clearInterval(_windowTimerInterval); _windowTimerInterval = null; }
+
+        headerTimer.classList.remove('d-none');
+        headerTimer.innerHTML = '<span class="badge badge-sm badge-light-danger" style="font-size: 10px; gap: 3px; display: inline-flex; align-items: center;">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+            ' Janela 24h fechada</span>';
+
+        banner.classList.remove('d-none');
+        banner.style.background = 'linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%)';
+        banner.style.borderTopColor = '#ffc107';
+        if (bannerText) bannerText.innerHTML = '<strong>Janela de 24h expirada.</strong> Use um <strong>template aprovado</strong> para reabrir a conversa.';
+        const btn = banner.querySelector('button');
+        if (btn) btn.classList.remove('d-none');
+    } else {
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+        const seconds = remaining % 60;
+        const timeStr = hours > 0
+            ? `${hours}h ${String(minutes).padStart(2, '0')}m`
+            : `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+
+        // Definir cor com base no tempo restante
+        let badgeClass, bgGradient, borderColor;
+        if (remaining <= 3600) { // < 1h
+            badgeClass = 'badge-light-danger';
+            bgGradient = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
+            borderColor = '#dc3545';
+        } else if (remaining <= 7200) { // < 2h
+            badgeClass = 'badge-light-warning';
+            bgGradient = 'linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%)';
+            borderColor = '#ffc107';
+        } else {
+            badgeClass = 'badge-light-success';
+            bgGradient = '';
+            borderColor = '';
+        }
+
+        headerTimer.classList.remove('d-none');
+        headerTimer.innerHTML = '<span class="badge badge-sm ' + badgeClass + '" style="font-size: 10px; gap: 3px; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums;">' +
+            '<svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
+            ' ' + timeStr + '</span>';
+
+        if (remaining <= 7200) {
+            banner.classList.remove('d-none');
+            banner.style.background = bgGradient;
+            banner.style.borderTopColor = borderColor;
+            if (bannerText) {
+                if (remaining <= 3600) {
+                    bannerText.innerHTML = '<span class="text-danger fw-bold">Janela expira em <strong>' + timeStr + '</strong>!</span> Após isso, será necessário usar template.';
+                } else {
+                    bannerText.innerHTML = '<span class="text-warning">Janela de 24h expira em <strong>' + timeStr + '</strong>.</span> Após isso, será necessário usar template.';
+                }
+            }
+            const btn = banner.querySelector('button');
+            if (btn) btn.classList.add('d-none');
+        } else {
+            banner.classList.add('d-none');
+        }
+    }
 }
 
 // Busca dentro do modal

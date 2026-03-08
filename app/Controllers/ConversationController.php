@@ -4328,7 +4328,13 @@ class ConversationController
             }
 
             $account = \App\Models\IntegrationAccount::find($integrationAccountId);
-            if (!$account || !in_array($account['provider'] ?? '', ['meta_cloud', 'meta_coex'])) {
+            $provider = $account['provider'] ?? '';
+            $channel = $conversation['channel'] ?? '';
+
+            $isCloudApi = in_array($provider, ['meta_cloud', 'meta_coex']);
+            $isNotificameWhatsApp = ($provider === 'notificame' && in_array($channel, ['whatsapp', 'whatsapp_official']));
+
+            if (!$account || (!$isCloudApi && !$isNotificameWhatsApp)) {
                 Response::json([
                     'success' => true,
                     'is_cloud_api' => false,
@@ -4343,41 +4349,73 @@ class ConversationController
 
             $templates = [];
             if (!$within24h) {
-                $phone = \App\Models\WhatsAppPhone::findByIntegrationAccount($integrationAccountId);
-                $wabaId = $phone['waba_id'] ?? ($account['account_id'] ?? null);
-                if ($wabaId) {
-                    $approved = \App\Models\WhatsAppTemplate::getApproved($wabaId);
-                    foreach ($approved as $tpl) {
-                        $templates[] = [
-                            'id' => $tpl['id'],
-                            'name' => $tpl['name'],
-                            'display_name' => $tpl['display_name'] ?: $tpl['name'],
-                            'language' => $tpl['language'],
-                            'category' => $tpl['category'],
-                            'body_text' => $tpl['body_text'],
-                            'header_type' => $tpl['header_type'],
-                            'header_text' => $tpl['header_text'],
-                            'footer_text' => $tpl['footer_text'],
-                            'buttons' => \App\Models\WhatsAppTemplate::getButtons($tpl),
-                            'variables_count' => \App\Models\WhatsAppTemplate::countVariables($tpl),
-                        ];
+                if ($isNotificameWhatsApp) {
+                    try {
+                        $notificameTemplates = \App\Services\NotificameService::listTemplates($integrationAccountId);
+                        foreach ($notificameTemplates as $tpl) {
+                            $status = $tpl['status'] ?? $tpl['qualityScore'] ?? '';
+                            if (strtolower($status) !== 'approved' && strtolower($status) !== 'approved_') {
+                                if (!in_array(strtolower($status), ['approved', 'approved_', ''])) {
+                                    continue;
+                                }
+                            }
+                            $templates[] = [
+                                'id' => $tpl['id'] ?? $tpl['name'] ?? '',
+                                'name' => $tpl['name'] ?? '',
+                                'display_name' => $tpl['name'] ?? '',
+                                'language' => $tpl['language'] ?? 'pt_BR',
+                                'category' => $tpl['category'] ?? '',
+                                'body_text' => self::extractNotificameTemplateBody($tpl),
+                                'header_type' => '',
+                                'header_text' => '',
+                                'footer_text' => '',
+                                'buttons' => [],
+                                'variables_count' => 0,
+                                'source' => 'notificame',
+                            ];
+                        }
+                    } catch (\Exception $e) {
+                        \App\Helpers\Logger::error("Erro ao listar templates Notificame: " . $e->getMessage());
+                    }
+                } else {
+                    $phone = \App\Models\WhatsAppPhone::findByIntegrationAccount($integrationAccountId);
+                    $wabaId = $phone['waba_id'] ?? ($account['account_id'] ?? null);
+                    if ($wabaId) {
+                        $approved = \App\Models\WhatsAppTemplate::getApproved($wabaId);
+                        foreach ($approved as $tpl) {
+                            $templates[] = [
+                                'id' => $tpl['id'],
+                                'name' => $tpl['name'],
+                                'display_name' => $tpl['display_name'] ?: $tpl['name'],
+                                'language' => $tpl['language'],
+                                'category' => $tpl['category'],
+                                'body_text' => $tpl['body_text'],
+                                'header_type' => $tpl['header_type'],
+                                'header_text' => $tpl['header_text'],
+                                'footer_text' => $tpl['footer_text'],
+                                'buttons' => \App\Models\WhatsAppTemplate::getButtons($tpl),
+                                'variables_count' => \App\Models\WhatsAppTemplate::countVariables($tpl),
+                                'source' => 'meta',
+                            ];
+                        }
                     }
                 }
             }
 
             $windowInfo = null;
-            if ($within24h) {
-                $lastMsg = \App\Helpers\Database::fetch(
-                    "SELECT sent_at FROM messages WHERE conversation_id = ? AND sender_type = 'contact' ORDER BY sent_at DESC LIMIT 1",
-                    [$id]
-                );
-                if ($lastMsg && !empty($lastMsg['sent_at'])) {
-                    $expiresAt = strtotime($lastMsg['sent_at']) + (24 * 60 * 60);
-                    $windowInfo = [
-                        'expires_at' => date('Y-m-d H:i:s', $expiresAt),
-                        'remaining_minutes' => max(0, round(($expiresAt - time()) / 60)),
-                    ];
-                }
+            $lastMsg = \App\Helpers\Database::fetch(
+                "SELECT created_at FROM messages WHERE conversation_id = ? AND sender_type = 'contact' ORDER BY created_at DESC LIMIT 1",
+                [$id]
+            );
+            if ($lastMsg && !empty($lastMsg['created_at'])) {
+                $expiresAt = strtotime($lastMsg['created_at']) + (24 * 60 * 60);
+                $remainingSeconds = max(0, $expiresAt - time());
+                $windowInfo = [
+                    'expires_at' => date('Y-m-d H:i:s', $expiresAt),
+                    'expires_at_iso' => date('c', $expiresAt),
+                    'remaining_minutes' => max(0, round($remainingSeconds / 60)),
+                    'remaining_seconds' => $remainingSeconds,
+                ];
             }
 
             Response::json([
@@ -4387,10 +4425,22 @@ class ConversationController
                 'window_info' => $windowInfo,
                 'templates' => $templates,
                 'account_name' => $account['name'] ?? '',
+                'provider' => $provider,
             ]);
         } catch (\Exception $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private static function extractNotificameTemplateBody(array $tpl): string
+    {
+        $components = $tpl['components'] ?? [];
+        foreach ($components as $comp) {
+            if (($comp['type'] ?? '') === 'BODY') {
+                return $comp['text'] ?? '';
+            }
+        }
+        return $tpl['body'] ?? $tpl['text'] ?? $tpl['name'] ?? '';
     }
 
     /**

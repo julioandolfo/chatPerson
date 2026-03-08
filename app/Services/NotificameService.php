@@ -1154,14 +1154,20 @@ class NotificameService
                     $simpleMime = 'video';
                 }
 
-                $downloadedContent = self::downloadEncryptedMedia($account, $fileUrl, $simpleMime);
+                try {
+                    $downloadedContent = self::downloadEncryptedMedia($account, $fileUrl, $simpleMime);
+                } catch (\Exception $downloadEx) {
+                    self::logError("Notificame webhook: Exceção ao baixar mídia: " . $downloadEx->getMessage());
+                    $downloadedContent = null;
+                }
 
-                if ($downloadedContent) {
+                if ($downloadedContent && is_string($downloadedContent) && strlen($downloadedContent) > 100) {
                     self::logInfo("Notificame webhook: ✅ Arquivo descriptografado (" . strlen($downloadedContent) . " bytes)");
 
-                    // Salvar localmente
                     try {
-                        $uploadDir = realpath(__DIR__ . '/../../public/assets/media/attachments') . '/' . $conversation['id'] . '/';
+                        // Construir caminho sem realpath (que retorna false se não existir)
+                        $baseDir = __DIR__ . '/../../public/assets/media/attachments';
+                        $uploadDir = $baseDir . '/' . $conversation['id'] . '/';
                         if (!is_dir($uploadDir)) {
                             @mkdir($uploadDir, 0775, true);
                         }
@@ -1181,14 +1187,14 @@ class NotificameService
                                 'filename' => $fileName ?: $savedName,
                                 'original_name' => $fileName ?: $savedName,
                                 'path' => $relativePath,
-                                'url' => \App\Helpers\Url::to($relativePath),
+                                'url' => '/' . $relativePath,
                                 'type' => $mediaType,
                                 'mime_type' => $fileMime ?: $simpleMime,
                                 'mimetype' => $fileMime ?: $simpleMime,
                                 'size' => strlen($downloadedContent),
                                 'extension' => $ext,
                             ];
-                            self::logInfo("Notificame webhook: ✅ Mídia salva: {$relativePath} ({$mediaType}, " . strlen($downloadedContent) . " bytes)");
+                            self::logInfo("Notificame webhook: ✅ Mídia salva: {$savedPath} ({$mediaType}, " . strlen($downloadedContent) . " bytes)");
                         } else {
                             self::logError("Notificame webhook: Falha ao salvar arquivo em {$savedPath}");
                         }
@@ -1196,10 +1202,23 @@ class NotificameService
                         self::logError("Notificame webhook: Erro ao salvar mídia descriptografada: " . $e->getMessage());
                     }
                 } else {
-                    self::logWarning("Notificame webhook: Não foi possível descriptografar o arquivo — armazenando URL como texto");
+                    $responseLen = $downloadedContent ? strlen($downloadedContent) : 0;
+                    self::logWarning("Notificame webhook: Download falhou ou resposta inválida ({$responseLen} bytes) — armazenando URL como texto");
                     if (empty($messageData['content'])) {
                         $messageData['content'] = $fileUrl;
                     }
+                    // Mesmo sem download, criar attachment com URL remota para o frontend renderizar
+                    $attachments[] = [
+                        'filename' => $fileName ?: 'audio.' . ($simpleMime === 'audio' ? 'ogg' : 'bin'),
+                        'original_name' => $fileName ?: 'media',
+                        'path' => '',
+                        'url' => $fileUrl,
+                        'type' => $mediaType,
+                        'mime_type' => $fileMime ?: $simpleMime,
+                        'mimetype' => $fileMime ?: $simpleMime,
+                        'size' => 0,
+                        'extension' => $simpleMime === 'audio' ? 'ogg' : 'bin',
+                    ];
                 }
             } else {
                 // URL pública — download direto
@@ -1242,7 +1261,8 @@ class NotificameService
         ];
 
         if (!empty($attachments)) {
-            $messageCreateData['attachments'] = $attachments;
+            $messageCreateData['attachments'] = json_encode($attachments);
+            $messageCreateData['message_type'] = $attachments[0]['type'] ?? $mediaType;
         }
 
         self::logInfo("Notificame webhook: Dados da mensagem: " . json_encode([
@@ -1250,6 +1270,7 @@ class NotificameService
             'contact_id' => $contact['id'],
             'content_length' => strlen($messageData['content'] ?? ''),
             'type' => $messageData['type'],
+            'message_type' => $messageCreateData['message_type'],
             'has_attachments' => !empty($attachments),
             'attachment_count' => count($attachments)
         ], JSON_UNESCAPED_UNICODE));
@@ -1732,106 +1753,139 @@ class NotificameService
         $apiUrl = $account['api_url'] ?? null;
         $channelId = $account['account_id'] ?? '';
 
-        if (empty($token) || empty($channelId)) {
-            self::logWarning("downloadEncryptedMedia: Token ou channelId ausente, não é possível baixar mídia");
-            return null;
-        }
-
-        $channel = $account['channel'] ?? 'whatsapp';
-        $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
-        $url = $baseUrl . "channels/{$channel}/media";
-
-        $payload = [
-            'from' => $channelId,
-            'to' => $channel,
-            'contents' => [
-                [
-                    'type' => 'file',
-                    'fileUrl' => $fileUrl,
-                    'fileMimeType' => $fileMimeType,
-                ]
-            ]
-        ];
-
-        self::logInfo("downloadEncryptedMedia: POST {$url}");
         self::logInfo("downloadEncryptedMedia: fileUrl=" . substr($fileUrl, 0, 120));
 
-        $ch = curl_init();
+        // Estratégia 1: Download direto da URL com token de autenticação
+        $directResult = self::downloadFileDirectly($fileUrl, $token);
+        if ($directResult && strlen($directResult) > 100) {
+            self::logInfo("downloadEncryptedMedia: ✅ Download direto OK (" . strlen($directResult) . " bytes)");
+            return $directResult;
+        }
+        self::logInfo("downloadEncryptedMedia: Download direto falhou, tentando endpoint /media...");
+
+        // Estratégia 2: Usar endpoint /channels/whatsapp/media do Notificame
+        if (!empty($token) && !empty($channelId)) {
+            $channel = $account['channel'] ?? 'whatsapp';
+            $baseUrl = $apiUrl ? rtrim($apiUrl, '/') . '/' : self::BASE_URL;
+            $url = $baseUrl . "channels/{$channel}/media";
+
+            $payload = [
+                'from' => $channelId,
+                'to' => $channel,
+                'contents' => [
+                    [
+                        'type' => 'file',
+                        'fileUrl' => $fileUrl,
+                        'fileMimeType' => $fileMimeType,
+                    ]
+                ]
+            ];
+
+            self::logInfo("downloadEncryptedMedia: POST {$url}");
+
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => [
+                    'Content-Type: application/json',
+                    'X-Api-Token: ' . $token,
+                ],
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_FOLLOWLOCATION => true,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '';
+            $curlError = curl_error($ch);
+            curl_close($ch);
+
+            if ($curlError) {
+                self::logError("downloadEncryptedMedia: cURL error (media endpoint): {$curlError}");
+            } elseif ($httpCode >= 200 && $httpCode < 300 && !empty($response)) {
+                self::logInfo("downloadEncryptedMedia: Media endpoint HTTP {$httpCode}, Content-Type: {$contentType}, size=" . strlen($response));
+
+                if (str_contains($contentType, 'json')) {
+                    $jsonData = json_decode($response, true);
+                    if ($jsonData) {
+                        $decryptedUrl = $jsonData['url'] ?? $jsonData['fileUrl'] ?? $jsonData['media_url'] ?? null;
+                        if ($decryptedUrl) {
+                            self::logInfo("downloadEncryptedMedia: URL descriptografada obtida, baixando...");
+                            $fileContent = self::downloadFileDirectly($decryptedUrl, $token);
+                            if ($fileContent && strlen($fileContent) > 100) {
+                                return $fileContent;
+                            }
+                        }
+
+                        $base64 = $jsonData['base64'] ?? $jsonData['data'] ?? $jsonData['file'] ?? null;
+                        if ($base64 && is_string($base64)) {
+                            $decoded = base64_decode($base64);
+                            if ($decoded !== false && strlen($decoded) > 100) {
+                                self::logInfo("downloadEncryptedMedia: Base64 decodificado (" . strlen($decoded) . " bytes)");
+                                return $decoded;
+                            }
+                        }
+
+                        self::logWarning("downloadEncryptedMedia: JSON sem URL/base64: " . substr($response, 0, 300));
+                    }
+                } elseif (strlen($response) > 100) {
+                    self::logInfo("downloadEncryptedMedia: Binário recebido do /media (" . strlen($response) . " bytes)");
+                    return $response;
+                }
+            } else {
+                self::logWarning("downloadEncryptedMedia: Media endpoint HTTP {$httpCode}, response=" . substr($response ?: '', 0, 300));
+            }
+        } else {
+            self::logWarning("downloadEncryptedMedia: Token ou channelId ausente, pulando endpoint /media");
+        }
+
+        self::logWarning("downloadEncryptedMedia: Todas as estratégias de download falharam");
+        return null;
+    }
+
+    /**
+     * Download direto de uma URL de mídia
+     */
+    private static function downloadFileDirectly(string $url, string $apiToken = ''): ?string
+    {
+        $headers = [
+            'User-Agent: Mozilla/5.0',
+            'Accept: */*',
+        ];
+        if ($apiToken) {
+            $headers[] = 'Authorization: Bearer ' . $apiToken;
+            $headers[] = 'X-Api-Token: ' . $apiToken;
+        }
+
+        $ch = curl_init($url);
         curl_setopt_array($ch, [
-            CURLOPT_URL => $url,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/json',
-                'X-Api-Token: ' . $token,
-            ],
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_HTTPHEADER => $headers,
         ]);
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE) ?: '';
         $curlError = curl_error($ch);
         curl_close($ch);
 
         if ($curlError) {
-            self::logError("downloadEncryptedMedia: cURL error: {$curlError}");
+            self::logWarning("downloadFileDirectly: cURL error: {$curlError}");
             return null;
         }
 
-        self::logInfo("downloadEncryptedMedia: HTTP {$httpCode}, Content-Type: {$contentType}, size=" . strlen($response));
-
-        if ($httpCode < 200 || $httpCode >= 300 || empty($response)) {
-            self::logError("downloadEncryptedMedia: Falha HTTP {$httpCode}, response=" . substr($response, 0, 500));
-            return null;
+        if ($httpCode === 200 && $response && strlen($response) > 100) {
+            return $response;
         }
 
-        // Se retornou JSON, pode conter a URL descriptografada ou base64
-        if (str_contains($contentType, 'json')) {
-            $jsonData = json_decode($response, true);
-            if ($jsonData) {
-                // Pode retornar URL descriptografada ou base64
-                $decryptedUrl = $jsonData['url'] ?? $jsonData['fileUrl'] ?? $jsonData['media_url'] ?? null;
-                if ($decryptedUrl) {
-                    self::logInfo("downloadEncryptedMedia: URL descriptografada obtida, baixando...");
-                    $ch2 = curl_init($decryptedUrl);
-                    curl_setopt_array($ch2, [
-                        CURLOPT_RETURNTRANSFER => true,
-                        CURLOPT_FOLLOWLOCATION => true,
-                        CURLOPT_SSL_VERIFYPEER => false,
-                        CURLOPT_TIMEOUT => 30,
-                    ]);
-                    $fileContent = curl_exec($ch2);
-                    $httpCode2 = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
-                    curl_close($ch2);
-
-                    if ($httpCode2 === 200 && !empty($fileContent)) {
-                        self::logInfo("downloadEncryptedMedia: Arquivo baixado com sucesso (" . strlen($fileContent) . " bytes)");
-                        return $fileContent;
-                    }
-                    self::logError("downloadEncryptedMedia: Falha ao baixar URL descriptografada (HTTP {$httpCode2})");
-                }
-
-                $base64 = $jsonData['base64'] ?? $jsonData['data'] ?? $jsonData['file'] ?? null;
-                if ($base64 && is_string($base64)) {
-                    $decoded = base64_decode($base64);
-                    if ($decoded !== false) {
-                        self::logInfo("downloadEncryptedMedia: Arquivo base64 decodificado (" . strlen($decoded) . " bytes)");
-                        return $decoded;
-                    }
-                }
-
-                self::logWarning("downloadEncryptedMedia: Resposta JSON não contém URL ou base64: " . substr($response, 0, 300));
-                return null;
-            }
-        }
-
-        // Se retornou binário direto, é o conteúdo do arquivo
-        self::logInfo("downloadEncryptedMedia: Arquivo binário recebido diretamente (" . strlen($response) . " bytes)");
-        return $response;
+        self::logWarning("downloadFileDirectly: HTTP {$httpCode}, size=" . strlen($response ?: ''));
+        return null;
     }
 
     /**

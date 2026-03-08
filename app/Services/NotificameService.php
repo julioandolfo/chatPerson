@@ -1586,28 +1586,46 @@ class NotificameService
             $data['metadata'] = $msg['metadata'] ?? $msg;
 
             // Conteúdo: se houver contents[], usar o primeiro item
-            if (!empty($msg['contents']) && is_array($msg['contents'])) {
-                $contentItem = $msg['contents'][0];
+            // contents pode ser array ou string JSON (docs NotificaMe mostram ambos formatos)
+            $msgContents = $msg['contents'] ?? null;
+            if (is_string($msgContents)) {
+                $msgContents = json_decode($msgContents, true);
+                if ($msgContents && !isset($msgContents[0])) {
+                    $msgContents = [$msgContents];
+                }
+            }
+
+            if (!empty($msgContents) && is_array($msgContents)) {
+                $contentItem = $msgContents[0];
                 $contentType = $contentItem['type'] ?? 'text';
 
-                if ($contentType === 'text') {
-                    $data['type'] = 'text';
-                    $data['content'] = $contentItem['text'] ?? '';
-                } elseif ($contentType === 'file') {
+                // Detecção de mídia: priorizar presença de fileUrl sobre o campo type
+                // O webhook pode enviar type="text" mas incluir fileUrl (inconsistência da API)
+                $hasFileUrl = !empty($contentItem['fileUrl']);
+                $hasFileMime = !empty($contentItem['fileMimeType']);
+
+                self::logInfo("extractMessageData: contentType={$contentType}, hasFileUrl=" . ($hasFileUrl ? 'YES' : 'NO') . ", hasFileMime=" . ($hasFileMime ? 'YES' : 'NO'));
+
+                if ($hasFileUrl || $contentType === 'file' || in_array($contentType, ['audio', 'image', 'video', 'document', 'sticker'])) {
+                    // Conteúdo de mídia/arquivo
                     $fileUrl = $contentItem['fileUrl'] ?? '';
                     $fileMime = $contentItem['fileMimeType'] ?? '';
                     $fileName = $contentItem['fileName'] ?? '';
                     $fileCaption = $contentItem['fileCaption'] ?? '';
 
-                    // Detectar tipo real baseado no MIME type
+                    // Detectar tipo real: prioridade é contentType se for específico, senão MIME, senão URL
                     $detectedType = 'document';
-                    $mimeLower = strtolower($fileMime);
-                    if (str_contains($mimeLower, 'audio') || str_contains($mimeLower, 'ogg')) {
-                        $detectedType = 'audio';
-                    } elseif (str_contains($mimeLower, 'image')) {
-                        $detectedType = 'image';
-                    } elseif (str_contains($mimeLower, 'video')) {
-                        $detectedType = 'video';
+                    if (in_array($contentType, ['audio', 'image', 'video', 'document', 'sticker'])) {
+                        $detectedType = $contentType;
+                    } else {
+                        $mimeLower = strtolower($fileMime);
+                        if (str_contains($mimeLower, 'audio') || str_contains($mimeLower, 'ogg')) {
+                            $detectedType = 'audio';
+                        } elseif (str_contains($mimeLower, 'image') || str_contains($mimeLower, 'webp')) {
+                            $detectedType = 'image';
+                        } elseif (str_contains($mimeLower, 'video')) {
+                            $detectedType = 'video';
+                        }
                     }
 
                     $data['type'] = $detectedType;
@@ -1617,6 +1635,23 @@ class NotificameService
                     $data['metadata']['file_mime'] = $fileMime;
                     $data['metadata']['file_name'] = $fileName;
                     $data['metadata']['detected_type'] = $detectedType;
+
+                    self::logInfo("extractMessageData: 📎 Mídia detectada - tipo={$detectedType}, mime={$fileMime}, url=" . substr($fileUrl, 0, 80));
+                } elseif ($contentType === 'text') {
+                    $textContent = $contentItem['text'] ?? '';
+
+                    // Fallback: detectar URLs de mídia que vêm como "text"
+                    if ($textContent && (str_contains($textContent, 'lookaside.fbsbx.com') || str_contains($textContent, 'whatsapp_business/attachments'))) {
+                        self::logInfo("extractMessageData: URL de mídia WhatsApp detectada dentro de type=text — tratando como arquivo");
+                        $data['type'] = 'document';
+                        $data['content'] = '';
+                        $data['metadata']['file_url'] = $textContent;
+                        $data['metadata']['file_mime'] = '';
+                        $data['metadata']['detected_type'] = 'document';
+                    } else {
+                        $data['type'] = 'text';
+                        $data['content'] = $textContent;
+                    }
                 } elseif ($contentType === 'comment') {
                     $data['content'] = $contentItem['text'] ?? '';
                     $data['type'] = 'comment';

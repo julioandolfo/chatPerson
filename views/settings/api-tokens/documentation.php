@@ -60,6 +60,9 @@ ob_start();
                             <a class="nav-link" href="#envio-direto">Envio Direto (WhatsApp)</a>
                         </li>
                         <li class="nav-item mb-2">
+                            <a class="nav-link" href="#templates">Templates WhatsApp</a>
+                        </li>
+                        <li class="nav-item mb-2">
                             <a class="nav-link" href="#conversas">Conversas</a>
                         </li>
                         <li class="nav-item mb-2">
@@ -443,6 +446,223 @@ ob_start();
                             <strong>Importante:</strong><br>
                             O numero <code>from</code> deve corresponder a uma integracao WhatsApp ativa no sistema.
                             Use o endpoint <code>/whatsapp-accounts</code> para listar os numeros disponiveis.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Templates WhatsApp -->
+            <div class="card mb-5" id="templates">
+                <div class="card-header bg-info">
+                    <h3 class="card-title text-white">Templates WhatsApp (API Oficial / Notificame)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info d-flex align-items-center mb-5">
+                        <i class="ki-duotone ki-message-text-2 fs-2x text-info me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div>
+                            <strong>Envio de Templates Aprovados!</strong><br>
+                            Envie templates aprovados pela Meta para iniciar conversas ou reabrir a janela de 24h.
+                            Funciona com contas Notificame e Meta Cloud API.
+                        </div>
+                    </div>
+                    
+                    <h4 class="fw-bold mb-3">Endpoints Disponiveis</h4>
+                    <table class="table table-row-bordered">
+                        <thead>
+                            <tr>
+                                <th>Metodo</th>
+                                <th>Endpoint</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="badge badge-light-primary">GET</span></td>
+                                <td><code>/templates?from=NUMERO</code></td>
+                                <td>Listar templates aprovados de uma conta</td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge badge-light-success">POST</span></td>
+                                <td><code>/messages/send-template</code></td>
+                                <td>Enviar template para um numero</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <div class="separator my-5"></div>
+                    
+                    <h4 class="fw-bold mb-3">1. Listar Templates Aprovados</h4>
+                    <p class="text-gray-600 mb-3">Retorna todos os templates disponiveis para uma conta WhatsApp. Use o numero da conta no parametro <code>from</code>.</p>
+                    
+                    <div class="bg-light rounded p-4 mb-4">
+                        <code class="text-dark">
+                            curl -X GET "<?= $standaloneUrl ?>/templates?from=5519958714328" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN"
+                        </code>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3">Resposta</h5>
+                    <div class="bg-light rounded p-4 mb-5">
+                        <pre class="mb-0"><code>{
+  "success": true,
+  "data": {
+    "account_id": "10",
+    "account_name": "Whats 19 95871-4328",
+    "provider": "notificame",
+    "templates": [
+      {
+        "name": "hello_world",
+        "language": "pt_BR",
+        "category": "UTILITY",
+        "status": "APPROVED",
+        "body_text": "Ola {{1}}, seu pedido {{2}} esta pronto!",
+        "source": "notificame"
+      }
+    ]
+  }
+}</code></pre>
+                    </div>
+                    
+                    <div class="separator my-5"></div>
+                    
+                    <h4 class="fw-bold mb-3">2. Enviar Template</h4>
+                    <h5 class="fw-bold mb-3">Parametros</h5>
+                    <table class="table table-row-bordered mb-5">
+                        <thead>
+                            <tr>
+                                <th>Campo</th>
+                                <th>Tipo</th>
+                                <th>Obrigatorio</th>
+                                <th>Descricao</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>to</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Numero do destinatario (ex: <code>5511999998888</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>from</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Numero da conta WhatsApp (ex: <code>5519958714328</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>template_name</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-danger">Sim</span></td>
+                                <td>Nome do template (conforme retornado pelo <code>/templates</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>template_language</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-secondary">Nao</span></td>
+                                <td>Codigo do idioma (padrao: <code>pt_BR</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>template_params</code></td>
+                                <td>array</td>
+                                <td><span class="badge badge-light-secondary">Nao</span></td>
+                                <td>Valores das variaveis do template (<code>["valor1", "valor2"]</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>template_body_text</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-secondary">Nao</span></td>
+                                <td>Texto do body para preview (com variaveis <code>{{1}}</code>). Se nao informado, usa o <code>template_name</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>contact_name</code></td>
+                                <td>string</td>
+                                <td><span class="badge badge-light-secondary">Nao</span></td>
+                                <td>Nome do contato (usado se for um novo contato)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <h5 class="fw-bold mb-3">Exemplo: Enviar Template</h5>
+                    <div class="bg-light rounded p-4 mb-4">
+                        <code class="text-dark">
+                            curl -X POST "<?= $standaloneUrl ?>/messages/send-template" \<br>
+                            &nbsp;&nbsp;-H "Authorization: Bearer SEU_TOKEN" \<br>
+                            &nbsp;&nbsp;-H "Content-Type: application/json" \<br>
+                            &nbsp;&nbsp;-d '{<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"to": "5511999998888",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"from": "5519958714328",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"template_name": "hello_world",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"template_language": "pt_BR",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"template_params": ["Joao", "12345"],<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"template_body_text": "Ola {{1}}, seu pedido {{2}} esta pronto!",<br>
+                            &nbsp;&nbsp;&nbsp;&nbsp;"contact_name": "Joao Silva"<br>
+                            &nbsp;&nbsp;}'
+                        </code>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3">Resposta de Sucesso</h5>
+                    <div class="bg-light rounded p-4 mb-4">
+                        <pre class="mb-0"><code>{
+  "success": true,
+  "message": "Template enviado com sucesso",
+  "data": {
+    "message_id": "123",
+    "external_id": "wamid.xxx",
+    "conversation_id": "456",
+    "contact_id": "789",
+    "template_name": "hello_world",
+    "status": "sent",
+    "is_new_contact": false,
+    "is_new_conversation": true
+  }
+}</code></pre>
+                    </div>
+                    
+                    <h5 class="fw-bold mb-3">Exemplo: Enviar para Multiplos Numeros</h5>
+                    <p class="text-gray-600 mb-3">Para enviar o mesmo template para varios numeros, faca uma chamada por numero. Exemplo em PHP:</p>
+                    <div class="bg-light rounded p-4 mb-4">
+                        <pre class="mb-0"><code class="language-php">$numeros = ['5511999998888', '5511888887777', '5511777776666'];
+$token = 'SEU_TOKEN';
+$baseUrl = '<?= $standaloneUrl ?>';
+
+foreach ($numeros as $numero) {
+    $payload = [
+        'to' => $numero,
+        'from' => '5519958714328',
+        'template_name' => 'hello_world',
+        'template_language' => 'pt_BR',
+        'template_params' => ['Joao', '12345'],
+    ];
+
+    $ch = curl_init("{$baseUrl}/messages/send-template");
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER => [
+            "Authorization: Bearer {$token}",
+            'Content-Type: application/json',
+        ],
+        CURLOPT_POSTFIELDS => json_encode($payload),
+    ]);
+    $response = curl_exec($ch);
+    $result = json_decode($response, true);
+    curl_close($ch);
+
+    echo "{$numero}: " . ($result['success'] ? 'OK' : $result['message']) . "\n";
+    usleep(500000); // 0.5s entre envios (respeitar rate limit)
+}</code></pre>
+                    </div>
+                    
+                    <div class="alert alert-warning d-flex align-items-center mt-5">
+                        <i class="ki-duotone ki-information-5 fs-2x text-warning me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                        <div>
+                            <strong>Importante:</strong><br>
+                            <ul class="mb-0 mt-2">
+                                <li>O template deve estar <strong>aprovado pela Meta</strong> antes de ser utilizado.</li>
+                                <li>O numero <code>from</code> deve corresponder a uma conta WhatsApp ativa (Notificame ou Meta Cloud).</li>
+                                <li>Use <code>GET /templates?from=NUMERO</code> para listar templates disponiveis.</li>
+                                <li>Respeite o rate limit da API (100 req/min) e da Meta (varia conforme a conta).</li>
+                            </ul>
                         </div>
                     </div>
                 </div>

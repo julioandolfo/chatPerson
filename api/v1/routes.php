@@ -86,6 +86,8 @@ $routes = [
     
     // Messages (Enviar mensagem via WhatsApp)
     'POST /messages/send' => ['Api\V1\Controllers\MessagesController', 'send', true],
+    'POST /messages/send-template' => ['Api\V1\Controllers\MessagesController', 'sendTemplate', true],
+    'GET /templates' => ['Api\V1\Controllers\MessagesController', 'listTemplates', true],
 
     // Estatísticas / Dashboard
     'GET /stats/overview'          => ['Api\V1\Controllers\StatsController', 'overview',    true],

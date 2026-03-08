@@ -1,0 +1,141 @@
+/**
+ * Estilos do formulário de inscrição
+ * @since 1.4.0
+ */
+
+.pcw-subscribe-form {
+	max-width: 500px;
+	margin: 20px auto;
+	padding: 30px;
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.pcw-subscribe-form__title {
+	margin: 0 0 10px;
+	font-size: 24px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.pcw-subscribe-form__subtitle {
+	margin: 0 0 20px;
+	font-size: 14px;
+	color: #6b7280;
+}
+
+.pcw-subscribe-form__form {
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+}
+
+.pcw-subscribe-form__field {
+	display: flex;
+	flex-direction: column;
+}
+
+.pcw-subscribe-form__field label {
+	margin-bottom: 5px;
+	font-size: 14px;
+	font-weight: 500;
+	color: #374151;
+}
+
+.pcw-subscribe-form__field input {
+	padding: 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	font-size: 14px;
+	transition: border-color 0.2s;
+}
+
+.pcw-subscribe-form__field input:focus {
+	outline: none;
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.pcw-subscribe-form__submit {
+	padding: 12px 24px;
+	background: #3b82f6;
+	color: #fff;
+	border: none;
+	border-radius: 6px;
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: background-color 0.2s;
+}
+
+.pcw-subscribe-form__submit:hover {
+	background: #2563eb;
+}
+
+.pcw-subscribe-form__submit:disabled {
+	background: #9ca3af;
+	cursor: not-allowed;
+}
+
+.pcw-subscribe-form__message {
+	padding: 12px;
+	border-radius: 6px;
+	font-size: 14px;
+	text-align: center;
+}
+
+.pcw-subscribe-form__message--success {
+	background: #d1fae5;
+	color: #065f46;
+	border: 1px solid #6ee7b7;
+}
+
+.pcw-subscribe-form__message--error {
+	background: #fee2e2;
+	color: #991b1b;
+	border: 1px solid #fca5a5;
+}
+
+/* Estilo Minimal */
+.pcw-subscribe-form--minimal {
+	box-shadow: none;
+	border: 1px solid #e5e7eb;
+	padding: 20px;
+}
+
+.pcw-subscribe-form--minimal .pcw-subscribe-form__title {
+	font-size: 20px;
+}
+
+/* Estilo Inline */
+.pcw-subscribe-form--inline .pcw-subscribe-form__form {
+	flex-direction: row;
+	align-items: flex-end;
+}
+
+.pcw-subscribe-form--inline .pcw-subscribe-form__field {
+	flex: 1;
+}
+
+.pcw-subscribe-form--inline .pcw-subscribe-form__submit {
+	flex-shrink: 0;
+	margin-left: 10px;
+}
+
+/* Responsivo */
+@media (max-width: 640px) {
+	.pcw-subscribe-form {
+		padding: 20px;
+	}
+
+	.pcw-subscribe-form--inline .pcw-subscribe-form__form {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.pcw-subscribe-form--inline .pcw-subscribe-form__submit {
+		margin-left: 0;
+		margin-top: 10px;
+	}
+}

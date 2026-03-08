@@ -61,10 +61,35 @@ class IntegrationAccount extends Model
      */
     public static function findByPhone(string $phoneNumber, string $channel = 'whatsapp'): ?array
     {
-        $sql = "SELECT * FROM integration_accounts 
-                WHERE phone_number = ? AND channel = ? 
+        $phone = preg_replace('/[^0-9]/', '', $phoneNumber);
+
+        $sql = "SELECT * FROM integration_accounts
+                WHERE phone_number = ? AND channel = ?
                 LIMIT 1";
-        return \App\Helpers\Database::fetch($sql, [$phoneNumber, $channel]);
+        $result = \App\Helpers\Database::fetch($sql, [$phone, $channel]);
+        if ($result) return $result;
+
+        // Tentar com/sem 9o dígito
+        if (strlen($phone) === 13 && substr($phone, 0, 2) === '55') {
+            $alt = '55' . substr($phone, 2, 2) . substr($phone, 5);
+            $result = \App\Helpers\Database::fetch($sql, [$alt, $channel]);
+            if ($result) return $result;
+        } elseif (strlen($phone) === 12 && substr($phone, 0, 2) === '55') {
+            $alt = '55' . substr($phone, 2, 2) . '9' . substr($phone, 4);
+            $result = \App\Helpers\Database::fetch($sql, [$alt, $channel]);
+            if ($result) return $result;
+        }
+
+        // Último fallback: busca pelos últimos 8 dígitos
+        if (strlen($phone) >= 10) {
+            $suffix = substr($phone, -8);
+            $sqlLike = "SELECT * FROM integration_accounts
+                        WHERE phone_number LIKE ? AND channel = ?
+                        LIMIT 1";
+            return \App\Helpers\Database::fetch($sqlLike, ['%' . $suffix, $channel]);
+        }
+
+        return null;
     }
 
     /**

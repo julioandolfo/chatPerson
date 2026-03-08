@@ -1,0 +1,181 @@
+# Growly Digital - Regras de Desenvolvimento
+
+## 📋 Contexto do Projeto
+
+Plugin WordPress/WooCommerce que integra três sistemas:
+1. Sistema de Cashback com expiração e notificações
+2. Sistema de Níveis/Tiers com descontos exclusivos
+3. Sistema de Wallet como forma de pagamento
+
+## 🎯 Regras Principais
+
+### Padrões de Código
+- Seguir WordPress Coding Standards
+- Seguir WooCommerce Coding Standards
+- Usar prefixo `pcw_` para todas as funções, classes e constantes
+- Text domain: `person-cash-wallet`
+- PHP 7.4+ (recomendado 8.0+)
+- WordPress 5.8+
+- WooCommerce 5.0+
+
+### Estrutura de Arquivos
+- Classes em `includes/core/`
+- Admin em `includes/admin/`
+- Public em `includes/public/`
+- Templates em `templates/`
+- Assets em `assets/`
+
+### Banco de Dados
+- Prefixo de tabelas: `wp_pcw_`
+- Usar `$wpdb->prepare()` sempre
+- Criar índices nas colunas mais consultadas
+- Versionamento de schema com migrations
+
+### Segurança
+- Validar e sanitizar TODOS os inputs
+- Escapar TODOS os outputs
+- Usar nonces em formulários
+- Verificar capabilities antes de ações
+- Proteção contra SQL injection e XSS
+- HMAC SHA256 para webhooks
+
+### Formatação de Valores
+- Valores monetários sempre em R$ (BRL)
+- Formatar com 2 casas decimais (mostrar centavos)
+- Usar `wc_price()` do WooCommerce para formatação
+- Exemplo: R$ 1.234,56
+
+### Internacionalização
+- Todas as strings traduzíveis com `__()` ou `_e()`
+- Text domain: `person-cash-wallet`
+- Preparar para tradução desde o início
+
+### Performance
+- Queries otimizadas
+- Cache quando apropriado
+- Processamento em lotes para cron jobs
+- Assets minificados em produção
+
+### Nomenclatura
+- Classes: `PCW_Class_Name` (PascalCase)
+- Funções: `pcw_function_name()` (snake_case)
+- Constantes: `PCW_CONSTANT_NAME` (UPPER_SNAKE_CASE)
+- Variáveis: `$variable_name` (snake_case)
+- Tabelas: `wp_pcw_table_name` (snake_case)
+
+### Hooks e Filtros
+- Actions: `pcw_action_name`
+- Filters: `pcw_filter_name`
+- Prioridade padrão: 10
+
+### Comentários
+- PHPDoc para todas as classes e métodos públicos
+- Comentários inline para lógica complexa
+- Documentar parâmetros e retornos
+
+### Testes
+- Testar em ambiente limpo
+- Verificar compatibilidade com diferentes versões
+- Testar todos os fluxos principais
+
+## 🔧 Configurações Importantes
+
+### Cashback
+- Valores sempre em decimal(10,2)
+- Status: pending, available, used, expired
+- Expiração configurável em dias
+
+### Níveis
+- Níveis numerados sequencialmente
+- Requisitos podem ser combinados (AND/OR)
+- Expiração pode ser nunca, dias ou data específica
+
+### Wallet
+- Saldo em decimal(10,2)
+- Transações: credit, debit
+- Source: cashback, manual, refund, purchase, adjustment
+
+### Webhooks
+- Eventos: cashback.*, level.*, wallet.*
+- Assinatura HMAC SHA256 obrigatória
+- Retry automático configurável
+- Logs de todas as tentativas
+
+## 📝 Convenções Específicas
+
+### Validação de Dados
+```php
+// IDs sempre usar absint()
+$user_id = absint( $_POST['user_id'] );
+
+// Valores monetários sempre floatval()
+$amount = floatval( $_POST['amount'] );
+
+// Strings sempre sanitize_text_field()
+$name = sanitize_text_field( $_POST['name'] );
+```
+
+### Escaping de Outputs
+```php
+// HTML
+echo esc_html( $text );
+
+// Atributos
+echo esc_attr( $value );
+
+// URLs
+echo esc_url( $url );
+
+// JavaScript
+echo esc_js( $js_string );
+```
+
+### Queries SQL
+```php
+// SEMPRE usar prepare()
+$wpdb->prepare( "SELECT * FROM {$table} WHERE user_id = %d", $user_id );
+
+// IDs sempre %d
+// Strings sempre %s
+// Floats sempre %f
+```
+
+### Nonces
+```php
+// Criar
+wp_nonce_field( 'pcw_action_name', 'pcw_nonce' );
+
+// Verificar
+if ( ! isset( $_POST['pcw_nonce'] ) || 
+     ! wp_verify_nonce( $_POST['pcw_nonce'], 'pcw_action_name' ) ) {
+    wp_die( 'Ação não autorizada' );
+}
+```
+
+## 🚫 O que NÃO fazer
+
+- NUNCA concatenar strings diretamente em SQL
+- NUNCA confiar em dados do usuário sem validar
+- NUNCA outputar dados sem escapar
+- NUNCA esquecer de verificar capabilities
+- NUNCA hardcodar valores que devem ser configuráveis
+- NUNCA esquecer de limpar dados na desinstalação (opcional)
+
+## ✅ Checklist Antes de Commitar
+
+- [ ] Código segue padrões WordPress/WooCommerce
+- [ ] Inputs validados e sanitizados
+- [ ] Outputs escapados
+- [ ] Nonces em formulários
+- [ ] Capabilities verificadas
+- [ ] Queries usam prepare()
+- [ ] Strings traduzíveis
+- [ ] Valores monetários formatados corretamente (R$)
+- [ ] Comentários adequados
+- [ ] Testado em ambiente limpo
+
+## 📚 Referências
+
+- WordPress Codex: https://codex.wordpress.org/
+- WooCommerce Docs: https://woocommerce.com/documentation/
+- WordPress Coding Standards: https://developer.wordpress.org/coding-standards/

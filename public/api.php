@@ -419,6 +419,8 @@ $routes = [
     
     // ============== MENSAGENS ==============
     'POST /messages/send' => 'messagesSend',
+    'POST /messages/send-template' => 'messagesSendTemplate',
+    'GET /templates' => 'templatesList',
     'GET /conversations/:id/messages' => 'messagesListByConversation',
     
     // ============== CONVERSAS ==============
@@ -503,6 +505,8 @@ if (!$handler) {
                 'POST /auth/login' => 'Autenticação',
                 'GET /whatsapp-accounts' => 'Listar contas WhatsApp',
                 'POST /messages/send' => 'Enviar mensagem WhatsApp',
+                'POST /messages/send-template' => 'Enviar template WhatsApp',
+                'GET /templates?from=NUMERO' => 'Listar templates da conta',
                 'GET /conversations' => 'Listar conversas',
                 'GET /contacts' => 'Listar contatos',
                 'GET /agents' => 'Listar agentes',
@@ -944,6 +948,203 @@ try {
             ], 'Mensagem enviada', 201);
             break;
             
+        case 'messagesSendTemplate':
+            apiLog('INFO', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            apiLog('INFO', '📤 ENVIANDO TEMPLATE WHATSAPP');
+
+            $input = getJsonBody();
+            apiLog('DEBUG', 'Body recebido: ' . json_encode($input));
+
+            $errors = [];
+            if (empty($input['to'])) $errors['to'] = ['Campo obrigatório'];
+            if (empty($input['from'])) $errors['from'] = ['Campo obrigatório'];
+            if (empty($input['template_name'])) $errors['template_name'] = ['Campo obrigatório'];
+            if (!empty($errors)) errorResponse('Dados inválidos', 'VALIDATION_ERROR', 422, $errors);
+
+            $to = normalizePhoneBR($input['to']);
+            $from = normalizePhoneBR($input['from']);
+            $templateName = trim($input['template_name']);
+            $templateLanguage = trim($input['template_language'] ?? 'pt_BR');
+            $templateParams = $input['template_params'] ?? [];
+            $contactName = $input['contact_name'] ?? '';
+
+            if (!is_array($templateParams)) $templateParams = [];
+
+            apiLog('INFO', "Para: {$to}, De: {$from}, Template: {$templateName}, Params: " . json_encode($templateParams));
+
+            $stmt = $db->prepare("SELECT * FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active' LIMIT 1");
+            $stmt->execute([$from]);
+            $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$account) {
+                $fromAlt = getAlternativePhone($from);
+                if ($fromAlt) {
+                    $stmt->execute([$fromAlt]);
+                    $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+                }
+            }
+
+            if (!$account) {
+                apiLog('ERROR', "Conta WhatsApp não encontrada para: {$from}");
+                errorResponse('Conta WhatsApp não encontrada', 'NOT_FOUND', 404, ['from' => ["Número não encontrado: {$from}"]]);
+            }
+
+            apiLog('INFO', "Conta encontrada: {$account['name']} (ID: {$account['id']}, Provider: {$account['provider']})");
+
+            $contact = null;
+            $stmt2 = $db->prepare("SELECT id, name, phone FROM contacts WHERE phone = ? LIMIT 1");
+            $stmt2->execute([$to]);
+            $contact = $stmt2->fetch(\PDO::FETCH_ASSOC);
+            $isNewContact = false;
+
+            if (!$contact) {
+                $altPhone = getAlternativePhone($to);
+                if ($altPhone) {
+                    $stmt2->execute([$altPhone]);
+                    $contact = $stmt2->fetch(\PDO::FETCH_ASSOC);
+                }
+            }
+
+            if (!$contact) {
+                $cName = !empty($contactName) ? $contactName : $to;
+                $stmt3 = $db->prepare("INSERT INTO contacts (name, phone, created_at, updated_at) VALUES (?, ?, NOW(), NOW())");
+                $stmt3->execute([$cName, $to]);
+                $contactId = $db->lastInsertId();
+                $contact = ['id' => $contactId, 'name' => $cName, 'phone' => $to];
+                $isNewContact = true;
+                apiLog('INFO', "Novo contato criado: ID={$contactId}");
+            }
+
+            $stmt4 = $db->prepare("SELECT id, status FROM conversations WHERE contact_id = ? AND channel = 'whatsapp' AND integration_account_id = ? ORDER BY updated_at DESC LIMIT 1");
+            $stmt4->execute([$contact['id'], $account['id']]);
+            $conv = $stmt4->fetch(\PDO::FETCH_ASSOC);
+            $isNewConversation = false;
+
+            if (!$conv) {
+                $stmt5 = $db->prepare("INSERT INTO conversations (contact_id, channel, integration_account_id, status, created_at, updated_at) VALUES (?, 'whatsapp', ?, 'open', NOW(), NOW())");
+                $stmt5->execute([$contact['id'], $account['id']]);
+                $convId = $db->lastInsertId();
+                $isNewConversation = true;
+                apiLog('INFO', "Nova conversa criada: ID={$convId}");
+            } else {
+                $convId = $conv['id'];
+                if (in_array($conv['status'], ['closed', 'resolved'])) {
+                    $db->prepare("UPDATE conversations SET status = 'open', updated_at = NOW() WHERE id = ?")->execute([$convId]);
+                }
+            }
+
+            $bodyPreview = $templateName;
+            if (!empty($input['template_body_text'])) {
+                $bodyPreview = $input['template_body_text'];
+                foreach ($templateParams as $i => $val) {
+                    $bodyPreview = str_replace('{{' . ($i + 1) . '}}', $val, $bodyPreview);
+                }
+            }
+
+            $stmtMsg = $db->prepare("INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, status, created_at) VALUES (?, 'agent', ?, ?, 'text', 'pending', NOW())");
+            $stmtMsg->execute([$convId, $tokenData['user_id'] ?? 0, $bodyPreview]);
+            $messageId = $db->lastInsertId();
+
+            $sendResult = ['success' => false, 'error' => 'Provider não suportado'];
+            $provider = $account['provider'] ?? '';
+
+            if ($provider === 'notificame') {
+                $sendResult = \App\Services\NotificameService::sendTemplate(
+                    $account['id'], $to, $templateName, $templateParams, $templateLanguage
+                );
+            } elseif (in_array($provider, ['meta_cloud', 'meta_coex'])) {
+                $service = new \App\Services\WhatsAppCloudApiService();
+                $sendResult = $service->sendMessage($account['id'], $to, '', [
+                    'template_name' => $templateName,
+                    'template_language' => $templateLanguage,
+                    'template_parameters' => $templateParams,
+                ]);
+            }
+
+            $success = $sendResult['success'] ?? false;
+            if ($success) {
+                $db->prepare("UPDATE messages SET external_id = ?, status = 'sent' WHERE id = ?")->execute([$sendResult['message_id'] ?? null, $messageId]);
+            } else {
+                $db->prepare("UPDATE messages SET status = 'failed', error_message = ? WHERE id = ?")->execute([$sendResult['error'] ?? 'Falha', $messageId]);
+            }
+
+            $db->prepare("UPDATE conversations SET last_message_at = NOW() WHERE id = ?")->execute([$convId]);
+
+            if (!$success) {
+                apiLog('ERROR', "Falha ao enviar template: " . ($sendResult['error'] ?? 'Desconhecido'));
+                errorResponse('Falha ao enviar template: ' . ($sendResult['error'] ?? 'Erro desconhecido'), 'TEMPLATE_SEND_FAILED', 502, [
+                    'message_id' => (string) $messageId,
+                    'conversation_id' => (string) $convId,
+                ]);
+            }
+
+            apiLog('INFO', "✅ Template enviado com sucesso!");
+            successResponse([
+                'data' => [
+                    'message_id' => (string) $messageId,
+                    'external_id' => $sendResult['message_id'] ?? null,
+                    'conversation_id' => (string) $convId,
+                    'contact_id' => (string) $contact['id'],
+                    'template_name' => $templateName,
+                    'status' => 'sent',
+                    'is_new_contact' => $isNewContact,
+                    'is_new_conversation' => $isNewConversation,
+                ]
+            ], 'Template enviado com sucesso', 201);
+            break;
+
+        case 'templatesList':
+            $from = normalizePhoneBR($_GET['from'] ?? '');
+            if (strlen($from) < 10) {
+                errorResponse('Parâmetro "from" obrigatório', 'VALIDATION_ERROR', 422, ['from' => ['Informe ?from=NUMERO']]);
+            }
+
+            $stmt = $db->prepare("SELECT * FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' LIMIT 1");
+            $stmt->execute([$from]);
+            $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$account) {
+                $fromAlt = getAlternativePhone($from);
+                if ($fromAlt) { $stmt->execute([$fromAlt]); $account = $stmt->fetch(\PDO::FETCH_ASSOC); }
+            }
+            if (!$account) {
+                $phoneSuffix = substr($from, -8);
+                $stmtLike = $db->prepare("SELECT * FROM integration_accounts WHERE phone_number LIKE ? AND channel = 'whatsapp' LIMIT 1");
+                $stmtLike->execute(['%' . $phoneSuffix]);
+                $account = $stmtLike->fetch(\PDO::FETCH_ASSOC);
+            }
+            if (!$account) errorResponse('Conta não encontrada para o número: ' . $from, 'NOT_FOUND', 404);
+
+            $provider = $account['provider'] ?? '';
+            $templates = [];
+
+            if ($provider === 'notificame') {
+                try {
+                    $raw = \App\Services\NotificameService::listTemplates($account['id']);
+                    foreach ($raw as $tpl) {
+                        $body = '';
+                        foreach (($tpl['components'] ?? []) as $c) {
+                            if (strtoupper($c['type'] ?? '') === 'BODY') { $body = $c['text'] ?? ''; break; }
+                        }
+                        $templates[] = [
+                            'name' => $tpl['name'] ?? '', 'language' => $tpl['language'] ?? 'pt_BR',
+                            'category' => $tpl['category'] ?? '', 'status' => $tpl['status'] ?? '',
+                            'body_text' => $body ?: ($tpl['body'] ?? $tpl['text'] ?? ''), 'source' => 'notificame',
+                        ];
+                    }
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::notificame("API templatesList erro: " . $e->getMessage());
+                    errorResponse('Erro ao buscar templates: ' . $e->getMessage(), 'TEMPLATE_ERROR', 500);
+                }
+            }
+
+            successResponse([
+                'account_id' => (string) $account['id'],
+                'account_name' => $account['name'] ?? '',
+                'provider' => $provider,
+                'templates' => $templates,
+            ]);
+            break;
+
         case 'messagesListByConversation':
             $page = max(1, intval($_GET['page'] ?? 1));
             $perPage = min(100, max(1, intval($_GET['per_page'] ?? 50)));

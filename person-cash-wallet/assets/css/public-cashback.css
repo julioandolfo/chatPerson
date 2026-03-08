@@ -1,0 +1,249 @@
+/**
+ * Estilos para exibição de cashback no frontend
+ * Growly Digital
+ */
+
+/* Container principal */
+.pcw-cashback-display {
+	margin: 15px 0;
+	clear: both;
+	animation: pcw-fade-in 0.3s ease-in;
+}
+
+/* Layouts */
+.pcw-cashback-display.badge {
+	display: inline-block;
+}
+
+.pcw-cashback-display.banner,
+.pcw-cashback-display.box {
+	display: block;
+	width: 100%;
+}
+
+.pcw-cashback-display.table_row {
+	display: table-row;
+}
+
+/* Ícone */
+.pcw-cashback-display .pcw-cashback-icon {
+	margin-right: 8px;
+	font-size: 1.2em;
+	vertical-align: middle;
+}
+
+/* Badge */
+.pcw-cashback-display.badge .pcw-cashback-content {
+	padding: 8px 16px;
+	border-radius: 20px;
+	font-size: 14px;
+	font-weight: 600;
+	display: inline-block;
+	transition: transform 0.2s ease;
+}
+
+.pcw-cashback-display.badge .pcw-cashback-content:hover {
+	transform: scale(1.05);
+}
+
+/* Banner */
+.pcw-cashback-display.banner .pcw-cashback-content {
+	padding: 20px;
+	text-align: center;
+	font-size: 18px;
+	font-weight: 700;
+	border-radius: 8px;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+	transition: box-shadow 0.3s ease;
+}
+
+.pcw-cashback-display.banner .pcw-cashback-content:hover {
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Box */
+.pcw-cashback-display.box .pcw-cashback-content {
+	padding: 16px;
+	border-width: 2px;
+	border-style: solid;
+	border-radius: 8px;
+	font-weight: 600;
+	position: relative;
+	overflow: hidden;
+}
+
+.pcw-cashback-display.box .pcw-cashback-content::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: -100%;
+	width: 100%;
+	height: 100%;
+	background: rgba(255, 255, 255, 0.1);
+	transition: left 0.5s ease;
+}
+
+.pcw-cashback-display.box .pcw-cashback-content:hover::before {
+	left: 100%;
+}
+
+/* Inline */
+.pcw-cashback-display.inline .pcw-cashback-content {
+	font-weight: 600;
+	display: inline-block;
+	margin: 10px 0;
+}
+
+/* Table Row */
+.pcw-cashback-display.table_row td {
+	padding: 10px;
+	border-top: 1px solid #e5e5e5;
+}
+
+/* Animação */
+@keyframes pcw-fade-in {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+	.pcw-cashback-display.banner .pcw-cashback-content {
+		font-size: 16px;
+		padding: 15px;
+	}
+	
+	.pcw-cashback-display.badge .pcw-cashback-content {
+		font-size: 13px;
+		padding: 6px 12px;
+	}
+	
+	.pcw-cashback-display .pcw-cashback-icon {
+		font-size: 1em;
+	}
+}
+
+@media (max-width: 480px) {
+	.pcw-cashback-display.banner .pcw-cashback-content {
+		font-size: 14px;
+		padding: 12px;
+	}
+}
+
+/* Integração com WooCommerce */
+.woocommerce .pcw-cashback-display {
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
+
+.woocommerce-cart .pcw-cashback-display {
+	margin: 15px 0;
+}
+
+.woocommerce-checkout .pcw-cashback-display {
+	margin: 10px 0;
+}
+
+/* Compatibilidade com temas */
+.pcw-cashback-display * {
+	box-sizing: border-box;
+}
+
+/* Print styles */
+@media print {
+	.pcw-cashback-display {
+		page-break-inside: avoid;
+	}
+}
+
+/* ========================================
+   Wallet Summary on Order Details
+   ======================================== */
+
+.pcw-order-details {
+	margin-top: 30px;
+}
+
+.pcw-order-wallet-summary {
+	margin-bottom: 25px;
+	padding: 20px;
+	background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+	border-radius: 10px;
+	border-left: 4px solid #667eea;
+}
+
+.pcw-order-wallet-summary h3 {
+	margin: 0 0 15px 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #333;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pcw-order-wallet-summary h3::before {
+	content: "\1F4B3";
+	font-size: 20px;
+}
+
+.pcw-wallet-summary-table {
+	margin: 0 !important;
+	background: #fff !important;
+	border-radius: 8px !important;
+	overflow: hidden;
+}
+
+.pcw-wallet-summary-table th {
+	text-align: left !important;
+	font-weight: 500 !important;
+	color: #555 !important;
+	padding: 12px 15px !important;
+	width: 60%;
+	background: transparent !important;
+}
+
+.pcw-wallet-summary-table td {
+	text-align: right !important;
+	font-weight: 600 !important;
+	padding: 12px 15px !important;
+}
+
+.pcw-wallet-summary-table tr {
+	border-bottom: 1px solid #f0f0f0;
+}
+
+.pcw-wallet-summary-table tr:last-child {
+	border-bottom: none;
+}
+
+.pcw-wallet-used-row {
+	background: #fff5f5 !important;
+}
+
+.pcw-wallet-after-row,
+.pcw-wallet-current-row {
+	background: #f0fff4 !important;
+}
+
+/* Order Wallet/Cashback Sections */
+.pcw-order-cashback,
+.pcw-order-wallet {
+	margin-bottom: 20px;
+}
+
+.pcw-order-cashback h3,
+.pcw-order-wallet h3 {
+	font-size: 15px;
+	font-weight: 600;
+	color: #333;
+	margin: 0 0 10px 0;
+	padding-bottom: 8px;
+	border-bottom: 1px solid #eee;
+}

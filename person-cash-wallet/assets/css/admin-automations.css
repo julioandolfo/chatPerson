@@ -1,0 +1,1640 @@
+/**
+ * Growly Digital - Admin Automations Styles
+ */
+
+/* Grid de Automações */
+.pcw-automations-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+	gap: 28px;
+	margin-top: 28px;
+}
+
+@media (max-width: 1400px) {
+	.pcw-automations-grid {
+		grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+		gap: 24px;
+	}
+}
+
+@media (max-width: 768px) {
+	.pcw-automations-grid {
+		grid-template-columns: 1fr;
+		gap: 20px;
+	}
+}
+
+.pcw-automation-card {
+	background: #fff;
+	border-radius: 12px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	overflow: hidden;
+	position: relative;
+	transition: transform 0.2s, box-shadow 0.2s;
+	border: 1px solid #e5e7eb;
+}
+
+.pcw-automation-card:hover {
+	transform: translateY(-4px);
+	box-shadow: 0 12px 32px rgba(0,0,0,0.12);
+	border-color: #667eea;
+}
+
+.pcw-automation-card-preview {
+	height: 140px !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	background: #f8fafc !important;
+	border-bottom: 3px solid !important;
+	position: relative !important;
+}
+
+.pcw-automation-card-preview::before {
+	content: '' !important;
+	position: absolute !important;
+	top: 0 !important;
+	left: 0 !important;
+	right: 0 !important;
+	bottom: 0 !important;
+	background: radial-gradient(circle at top right, rgba(102, 126, 234, 0.08), transparent 60%) !important;
+	pointer-events: none !important;
+}
+
+.pcw-automation-card-preview .dashicons {
+	font-size: 64px !important;
+	width: 64px !important;
+	height: 64px !important;
+	opacity: 0.9 !important;
+	position: relative !important;
+	z-index: 1 !important;
+}
+
+.pcw-automation-status {
+	position: absolute;
+	top: 16px;
+	right: 16px;
+	background: #fff;
+	padding: 6px 14px;
+	border-radius: 20px;
+	font-size: 11px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+	z-index: 2;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.pcw-automation-status.active {
+	background: #d1fae5;
+	color: #065f46;
+	border: 1px solid #10b981;
+}
+
+.pcw-automation-status.inactive {
+	background: #f1f5f9;
+	color: #475569;
+	border: 1px solid #cbd5e1;
+}
+
+.pcw-automation-status .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+.pcw-automation-card h3 {
+	margin: 20px 24px 10px;
+	font-size: 18px;
+	font-weight: 700;
+	color: #1e293b;
+	letter-spacing: -0.2px;
+}
+
+.pcw-automation-card > p {
+	margin: 0 24px 20px;
+	font-size: 14px;
+	color: #64748b;
+	line-height: 1.6;
+}
+
+.pcw-automation-actions {
+	padding: 20px 24px;
+	border-top: 2px solid #e5e7eb;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	background: #f9fafb;
+}
+
+.pcw-analytics-btn {
+	background: #667eea !important;
+	border-color: #667eea !important;
+	color: #fff !important;
+	font-weight: 700 !important;
+	box-shadow: 0 3px 12px rgba(102, 126, 234, 0.3) !important;
+	transition: all 0.2s ease !important;
+	justify-content: center !important;
+}
+
+.pcw-analytics-btn:hover,
+.pcw-analytics-btn:focus {
+	background: #5568d3 !important;
+	border-color: #5568d3 !important;
+	transform: translateY(-2px) !important;
+	box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+	color: #fff !important;
+}
+
+.pcw-analytics-btn .dashicons {
+	color: #fff !important;
+}
+
+.pcw-automation-actions .button {
+	justify-content: center;
+	width: 100%;
+}
+
+/* Quick Stats */
+.pcw-automation-quick-stats {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 10px;
+	padding: 20px 24px;
+	background: #f9fafb;
+	border-top: 2px solid #e5e7eb;
+}
+
+.pcw-quick-stat {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 16px 12px;
+	background: #fff;
+	border-radius: 10px;
+	border: 2px solid #e5e7eb;
+	transition: all 0.2s;
+	text-align: center;
+}
+
+.pcw-quick-stat:hover {
+	border-color: #667eea;
+	background: #f0f4ff;
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.pcw-stat-icon {
+	font-size: 24px;
+	line-height: 1;
+	margin-bottom: 4px;
+}
+
+.pcw-stat-value {
+	font-size: 24px;
+	font-weight: 800;
+	color: #1e293b;
+	line-height: 1;
+}
+
+.pcw-stat-label {
+	font-size: 11px;
+	color: #64748b;
+	text-transform: uppercase;
+	letter-spacing: 0.8px;
+	font-weight: 600;
+}
+
+@media (max-width: 768px) {
+	.pcw-automation-quick-stats {
+		grid-template-columns: repeat(2, 1fr);
+	}
+}
+
+/* Stats antigas - ocultadas (usando quick stats agora) */
+.pcw-automation-stats {
+	display: none;
+}
+
+/* Workflow Builder */
+.pcw-workflow-builder {
+	padding: 20px;
+	background: #f8fafc;
+	border-radius: 8px;
+}
+
+.pcw-workflow-step.pcw-step-trigger {
+	border-left: 4px solid #667eea;
+	display: flex;
+	align-items: flex-start;
+	gap: 16px;
+	background: #fff;
+	padding: 16px;
+	border-radius: 8px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+	position: relative;
+}
+
+.pcw-workflow-step.pcw-step-delay {
+	border-left: 4px solid #f59e0b;
+}
+
+.pcw-workflow-step.pcw-step-send_email,
+.pcw-workflow-step.pcw-step-email {
+	border-left: 4px solid #3b82f6;
+}
+
+.pcw-workflow-step.pcw-step-send_sms {
+	border-left: 4px solid #f59e0b;
+}
+
+.pcw-workflow-step.pcw-step-send_whatsapp,
+.pcw-workflow-step.pcw-step-whatsapp {
+	border-left: 4px solid #22c55e;
+}
+
+.pcw-workflow-step.pcw-step-add_tag,
+.pcw-workflow-step.pcw-step-tag {
+	border-left: 4px solid #f59e0b;
+}
+
+.pcw-workflow-step.pcw-step-condition {
+	border-left: 4px solid #8b5cf6;
+}
+
+.pcw-workflow-step.pcw-step-webhook {
+	border-left: 4px solid #ec4899;
+}
+
+.pcw-step-icon {
+	width: 40px;
+	height: 40px;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: #f1f5f9;
+	flex-shrink: 0;
+}
+
+.pcw-step-trigger .pcw-step-icon { background: #dbeafe; color: #1d4ed8; }
+.pcw-step-delay .pcw-step-icon { background: #fef3c7; color: #d97706; }
+.pcw-step-email .pcw-step-icon,
+.pcw-step-send_email .pcw-step-icon { background: #dbeafe; color: #3b82f6; }
+.pcw-step-whatsapp .pcw-step-icon { background: #d1fae5; color: #22c55e; }
+.pcw-step-tag .pcw-step-icon { background: #fef3c7; color: #f59e0b; }
+.pcw-step-condition .pcw-step-icon { background: #ede9fe; color: #8b5cf6; }
+.pcw-step-webhook .pcw-step-icon { background: #fce7f3; color: #ec4899; }
+
+.pcw-step-content {
+	flex: 1;
+}
+
+.pcw-step-content h4 {
+	margin: 0 0 4px 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.pcw-step-content p {
+	margin: 0;
+	font-size: 12px;
+	color: #64748b;
+}
+
+.pcw-inline-form {
+	display: flex;
+	gap: 10px;
+	margin-top: 12px;
+	align-items: center;
+}
+
+.pcw-inline-form input,
+.pcw-inline-form select {
+	padding: 10px 14px;
+	border: 2px solid #e0e0e0;
+	border-radius: 8px;
+	font-size: 14px;
+	min-height: 42px;
+}
+
+.pcw-inline-form input:focus,
+.pcw-inline-form select:focus {
+	border-color: #667eea;
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.pcw-step-content input[type="text"],
+.pcw-step-content input[type="url"],
+.pcw-step-content textarea {
+	width: 100%;
+	padding: 10px 14px;
+	border: 2px solid #e0e0e0;
+	border-radius: 8px;
+	font-size: 14px;
+	min-height: 42px;
+}
+
+.pcw-step-content textarea {
+	min-height: 80px;
+	resize: vertical;
+	font-family: inherit;
+}
+
+.pcw-step-content input:focus,
+.pcw-step-content textarea:focus {
+	border-color: #667eea;
+	outline: none;
+	box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.pcw-workflow-connector {
+	width: 2px;
+	height: 24px;
+	background: #d1d5db;
+	margin-left: 35px;
+}
+
+/* AI Button */
+.pcw-ai-btn {
+	margin-left: 8px;
+	vertical-align: middle;
+}
+
+.pcw-ai-btn .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+}
+
+/* Form Columns */
+.pcw-form-columns {
+	display: grid;
+	grid-template-columns: 1fr 350px;
+	gap: 24px;
+}
+
+.pcw-form-main,
+.pcw-form-sidebar {
+	display: flex;
+	flex-direction: column;
+	gap: 24px;
+}
+
+/* Checkbox Styles */
+.pcw-checkbox-inline {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 8px;
+	font-size: 13px;
+	color: #64748b;
+}
+
+.pcw-checkbox-block {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 10px;
+	background: #f8fafc;
+	border-radius: 6px;
+	margin-bottom: 8px;
+	cursor: pointer;
+}
+
+.pcw-checkbox-block:hover {
+	background: #f1f5f9;
+}
+
+/* Dashicons no header do card */
+.pcw-card-header .dashicons {
+	font-size: 24px;
+	width: 24px;
+	height: 24px;
+}
+
+/* Modal Seletor de Etapas */
+.pcw-step-types-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 16px;
+	margin-top: 8px;
+}
+
+.pcw-step-type-card {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	padding: 20px;
+	background: #fff;
+	border: 2px solid #e5e7eb;
+	border-radius: 12px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.pcw-step-type-card:hover {
+	border-color: #667eea;
+	background: #f9fafb;
+	transform: translateY(-2px);
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+}
+
+.pcw-step-type-card h3 {
+	margin: 0 0 4px 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #1e293b;
+}
+
+.pcw-step-type-card p {
+	margin: 0;
+	font-size: 13px;
+	color: #64748b;
+	line-height: 1.4;
+}
+
+.pcw-step-type-card .dashicons {
+	flex-shrink: 0;
+}
+
+/* Email Editor Actions */
+.pcw-email-editor-actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 15px;
+}
+
+.pcw-email-editor-actions .button {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pcw-email-editor-actions .button .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+}
+
+/* Email Preview */
+.pcw-email-preview {
+	margin-top: 15px;
+	padding: 15px;
+	background: #f8f9fa;
+	border: 1px solid #e5e7eb;
+	border-radius: 8px;
+	max-height: 250px;
+	overflow: hidden;
+	position: relative;
+}
+
+.pcw-email-preview::after {
+	content: '';
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 60px;
+	background: linear-gradient(to bottom, transparent, #f8f9fa);
+	pointer-events: none;
+}
+
+.pcw-email-preview-frame {
+	width: 100%;
+	height: 220px;
+	border: none;
+	pointer-events: none;
+	background: #fff;
+	border-radius: 4px;
+}
+
+/* Workflow Step - Novo Layout Expandível */
+.pcw-workflow-step {
+	display: flex;
+	flex-direction: column;
+	background: #fff;
+	padding: 0;
+	border-radius: 8px;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+	position: relative;
+	overflow: hidden;
+	border-left: 4px solid #cbd5e1;
+	transition: all 0.2s ease;
+}
+
+.pcw-workflow-step:hover {
+	box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
+.pcw-step-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 16px;
+	cursor: pointer;
+	transition: background 0.2s;
+	user-select: none;
+}
+
+.pcw-step-header:hover {
+	background: #f8fafc;
+}
+
+.pcw-step-summary {
+	flex: 1;
+	min-width: 0;
+}
+
+.pcw-step-summary h4 {
+	margin: 0 0 4px;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1e293b;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pcw-step-summary h4::before {
+	content: '';
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	border-radius: 6px;
+	background: #f1f5f9;
+	flex-shrink: 0;
+	font-size: 14px;
+}
+
+.pcw-step-delay .pcw-step-summary h4::before {
+	content: '⏱️';
+}
+
+.pcw-step-send_email .pcw-step-summary h4::before {
+	content: '✉️';
+	background: #dbeafe;
+}
+
+.pcw-step-send_sms .pcw-step-summary h4::before {
+	content: '📱';
+	background: #fef3c7;
+}
+
+.pcw-step-send_whatsapp .pcw-step-summary h4::before {
+	content: '💬';
+	background: #d1fae5;
+}
+
+.pcw-step-condition .pcw-step-summary h4::before {
+	content: '⚡';
+	background: #fce7f3;
+}
+
+.pcw-step-webhook .pcw-step-summary h4::before {
+	content: '🔗';
+	background: #e0e7ff;
+}
+
+.pcw-step-summary .description {
+	margin: 0;
+	font-size: 12px;
+	color: #64748b;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.pcw-step-actions {
+	display: flex;
+	gap: 6px;
+	flex-shrink: 0;
+}
+
+.pcw-step-actions .button {
+	min-height: 30px;
+	height: 30px;
+	width: 30px;
+	padding: 0;
+	line-height: 1;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 6px;
+	border: 1px solid #cbd5e1;
+	background: #ffffff;
+	color: #64748b;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.pcw-step-actions .button:hover {
+	background: #f8fafc;
+	border-color: #94a3b8;
+	color: #1e293b;
+	transform: translateY(-1px);
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.pcw-step-actions .button .dashicons {
+	width: 18px;
+	height: 18px;
+	font-size: 18px;
+}
+
+.pcw-step-actions .pcw-toggle-step {
+	background: #f1f5f9;
+	border-color: #e2e8f0;
+}
+
+.pcw-step-actions .pcw-toggle-step:hover {
+	background: #e2e8f0;
+	color: #667eea;
+}
+
+.pcw-step-actions .pcw-remove-step:hover {
+	background: #fee;
+	border-color: #fca5a5;
+	color: #ef4444;
+}
+
+.pcw-step-config {
+	padding: 0 16px 16px;
+	border-top: 1px solid #e2e8f0;
+	margin-top: -1px;
+}
+
+.pcw-step-config .pcw-form-group {
+	margin-bottom: 16px;
+}
+
+.pcw-step-config .pcw-form-group:last-child {
+	margin-bottom: 0;
+}
+
+.pcw-step-variables {
+	margin-top: 16px;
+	padding-top: 16px;
+	border-top: 1px solid #e2e8f0;
+}
+
+.pcw-step-variables .description {
+	font-size: 11px;
+	color: #64748b;
+	line-height: 1.6;
+}
+
+.pcw-step-variables code {
+	font-size: 10px;
+	padding: 2px 4px;
+	background: #f1f5f9;
+	border-radius: 3px;
+	color: #0f172a;
+}
+
+/* Email Preview Mini */
+.pcw-email-preview-mini {
+	margin-top: 12px;
+	padding: 12px;
+	background: #f8fafc;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+}
+
+.pcw-email-preview-mini p {
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: #475569;
+}
+
+/* Char Counter */
+.pcw-char-count {
+	font-weight: 600;
+	color: #3b82f6;
+}
+
+/* Media Uploader */
+.pcw-media-uploader {
+	display: flex;
+	gap: 8px;
+}
+
+.pcw-media-uploader .pcw-media-input {
+	flex: 1;
+}
+
+.pcw-media-uploader .button {
+	flex-shrink: 0;
+}
+
+/* Toggle Step Animation */
+.pcw-toggle-step .dashicons {
+	transition: transform 0.3s ease;
+}
+
+.pcw-workflow-step.expanded .pcw-toggle-step .dashicons {
+	transform: rotate(180deg);
+}
+
+.pcw-workflow-step.expanded {
+	box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.pcw-workflow-step.expanded .pcw-step-header {
+	background: #f8fafc;
+	border-bottom: 1px solid #e2e8f0;
+}
+
+/* Cores das bordas por tipo de etapa */
+.pcw-step-delay {
+	border-left-color: #94a3b8;
+}
+
+.pcw-step-send_email {
+	border-left-color: #3b82f6;
+}
+
+.pcw-step-send_sms {
+	border-left-color: #f59e0b;
+}
+
+.pcw-step-send_whatsapp {
+	border-left-color: #22c55e;
+}
+
+.pcw-step-condition {
+	border-left-color: #ec4899;
+}
+
+.pcw-step-webhook {
+	border-left-color: #8b5cf6;
+}
+
+/* Webhook Configuration */
+.pcw-webhook-headers {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.pcw-webhook-header-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.pcw-webhook-header-row input {
+	margin: 0;
+}
+
+.pcw-webhook-header-row .button {
+	flex-shrink: 0;
+	min-height: 0;
+	padding: 6px;
+	line-height: 1;
+}
+
+.pcw-webhook-auth-fields {
+	margin-top: 12px;
+	padding: 16px;
+	background: #f8fafc;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+}
+
+.pcw-webhook-body {
+	font-family: 'Courier New', monospace;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.pcw-webhook-test-section {
+	margin-top: 20px;
+	padding: 15px;
+	background: #f8fafc;
+	border-left: 4px solid #667eea;
+	border-radius: 4px;
+}
+
+.pcw-webhook-test-section h4 {
+	margin-top: 0;
+	margin-bottom: 15px;
+	color: #667eea;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 14px;
+}
+
+.pcw-webhook-test-section .dashicons {
+	width: 18px;
+	height: 18px;
+	font-size: 18px;
+}
+
+.pcw-webhook-test-personizi .pcw-form-group,
+.pcw-webhook-test-generic .pcw-form-group {
+	margin-bottom: 12px;
+}
+
+.pcw-webhook-test-personizi label,
+.pcw-webhook-test-generic label {
+	font-weight: 600;
+	font-size: 13px;
+	color: #1e293b;
+	margin-bottom: 6px;
+	display: block;
+}
+
+.pcw-test-phone,
+.pcw-test-message {
+	max-width: 100%;
+}
+
+.pcw-webhook-test-result {
+	margin-top: 12px;
+}
+
+.pcw-webhook-test-result .notice {
+	margin: 0;
+	padding: 12px 15px;
+	border-radius: 4px;
+}
+
+.pcw-webhook-test-result .notice p {
+	margin: 0;
+}
+
+.pcw-webhook-test-result code {
+	display: block;
+	padding: 8px;
+	background: #f1f5f9;
+	border-radius: 4px;
+	margin-top: 8px;
+	font-size: 11px;
+	max-height: 100px;
+	overflow-y: auto;
+}
+
+.pcw-test-webhook {
+	margin-top: 10px;
+}
+
+.pcw-test-webhook .dashicons.spin {
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+/* Condition Configuration */
+.pcw-condition-config {
+	margin-top: 12px;
+	padding: 16px;
+	background: #f8fafc;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+}
+
+.pcw-condition-config .pcw-form-group {
+	margin-bottom: 12px;
+}
+
+.pcw-condition-config .pcw-form-group:last-child {
+	margin-bottom: 0;
+}
+
+.pcw-inline-form {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.pcw-inline-form span {
+	color: #475569;
+	font-size: 13px;
+}
+
+.pcw-inline-form input,
+.pcw-inline-form select {
+	margin: 0;
+}
+
+.pcw-notice {
+	padding: 12px 16px;
+	border-radius: 6px;
+	border-left: 4px solid;
+}
+
+.pcw-notice-info {
+	background: #dbeafe;
+	border-color: #3b82f6;
+	color: #1e40af;
+}
+
+.pcw-notice-info p {
+	margin: 4px 0;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.pcw-notice-info p:first-child {
+	margin-top: 0;
+}
+
+.pcw-notice-info p:last-child {
+	margin-bottom: 0;
+}
+
+/* Inputs de Número - Tamanho Adequado */
+.pcw-automations-page input[type="number"] {
+	min-width: 100px;
+	width: auto;
+	padding: 8px 12px;
+	font-size: 15px;
+	font-weight: 600;
+	text-align: center;
+	border: 2px solid #cbd5e1;
+	border-radius: 6px;
+	transition: all 0.2s;
+}
+
+.pcw-automations-page input[type="number"]:focus {
+	border-color: #667eea;
+	box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+	outline: none;
+}
+
+/* Trigger Configuration */
+.pcw-trigger-config {
+	margin-top: 15px;
+	padding: 16px;
+	background: #f8fafc;
+	border-radius: 6px;
+	border: 1px solid #e2e8f0;
+}
+
+.pcw-trigger-config .pcw-form-group {
+	margin-bottom: 0;
+}
+
+.pcw-trigger-config .pcw-form-group label {
+	display: block;
+	font-weight: 600;
+	color: #334155;
+	margin-bottom: 8px;
+	font-size: 13px;
+}
+
+.pcw-trigger-config .pcw-inline-form {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.pcw-trigger-config .pcw-inline-form > span {
+	font-size: 14px;
+	color: #475569;
+	font-weight: 500;
+	white-space: nowrap;
+	line-height: 38px;
+}
+
+/* Destaque especial para o label/título do período */
+.pcw-trigger-config .pcw-inline-form strong {
+	font-size: 14px;
+	color: #1e293b;
+	font-weight: 600;
+}
+
+.pcw-trigger-config .pcw-inline-form input[type="number"] {
+	margin: 0;
+	min-width: 100px;
+	width: 120px;
+	max-width: 150px;
+	padding: 10px 16px;
+	font-size: 16px;
+	font-weight: 600;
+	text-align: center;
+	background: #fff;
+	border: 2px solid #cbd5e1;
+	border-radius: 8px;
+	transition: all 0.2s;
+}
+
+.pcw-trigger-config .pcw-inline-form input[type="number"]:hover {
+	border-color: #94a3b8;
+}
+
+.pcw-trigger-config .pcw-inline-form input[type="number"]:focus {
+	border-color: #667eea;
+	box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.15);
+	outline: none;
+	background: #fefefe;
+}
+
+.pcw-trigger-config .pcw-inline-form select {
+	margin: 0;
+	min-width: 150px;
+}
+
+.pcw-trigger-config .description {
+	margin-top: 12px;
+	padding: 8px 12px;
+	font-size: 12px;
+	color: #64748b;
+	font-style: italic;
+	background: #fff;
+	border-left: 3px solid #cbd5e1;
+	border-radius: 4px;
+}
+
+/* Título do período de visualização */
+.pcw-trigger-config h4,
+.pcw-trigger-config h5 {
+	margin: 0 0 12px 0;
+	font-size: 13px;
+	font-weight: 600;
+	color: #334155;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.pcw-step-trigger .pcw-trigger-config {
+	background: #eff6ff;
+	border-color: #bfdbfe;
+}
+
+@media (max-width: 1200px) {
+	.pcw-form-columns {
+		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 768px) {
+	.pcw-trigger-config .pcw-inline-form {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 12px;
+	}
+	
+	.pcw-trigger-config .pcw-inline-form input[type="number"] {
+		width: 100%;
+		max-width: 200px;
+		font-size: 18px;
+		padding: 12px 16px;
+	}
+	
+	.pcw-trigger-config .pcw-inline-form > span {
+		line-height: 1.5;
+	}
+	
+	.pcw-automations-page input[type="number"] {
+		font-size: 16px;
+		padding: 10px 14px;
+		min-width: 120px;
+	}
+}
+
+/* Modal de Preview de Email com IA */
+.pcw-modal {
+	display: none;
+}
+
+.pcw-modal-overlay {
+	display: none;
+}
+
+.pcw-modal-container {
+	display: none;
+}
+
+/* Novo sistema de modais (jQuery UI Dialog) */
+.pcw-ui-dialog {
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+	border: none;
+}
+
+.pcw-ui-dialog .ui-dialog-titlebar {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	border: none;
+	padding: 14px 18px;
+}
+
+.pcw-ui-dialog .ui-dialog-title {
+	color: #fff;
+	font-size: 16px;
+	font-weight: 600;
+}
+
+.pcw-ui-dialog .ui-dialog-titlebar-close {
+	background: rgba(255, 255, 255, 0.2);
+	border: none;
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+}
+
+.pcw-ui-dialog .ui-dialog-content {
+	padding: 28px 32px;
+	overflow: auto;
+	max-height: 70vh;
+}
+
+.pcw-ui-overlay {
+	background: rgba(0, 0, 0, 0.75) !important;
+}
+
+.pcw-modal-header {
+	padding: 20px 30px;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: #fff;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.pcw-modal-header h2 {
+	margin: 0;
+	font-size: 20px;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	color: #fff;
+}
+
+.pcw-modal-header h2 .dashicons {
+	font-size: 24px;
+	width: 24px;
+	height: 24px;
+}
+
+.pcw-modal-close {
+	background: rgba(255, 255, 255, 0.2);
+	border: none;
+	color: #fff;
+	font-size: 28px;
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.2s;
+	line-height: 1;
+	padding: 0;
+}
+
+.pcw-modal-close:hover {
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.pcw-modal-body {
+	padding: 0;
+}
+
+.pcw-ai-modal-loading {
+	text-align: center;
+	padding: 50px 30px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+}
+
+.pcw-ai-modal-loading .spinner {
+	float: none !important;
+	margin: 0 auto !important;
+}
+
+.pcw-ai-modal-loading p {
+	font-size: 16px;
+	color: #64748b;
+	margin-top: 20px;
+}
+
+.pcw-ai-preview-container {
+	background: #f8fafc;
+	padding: 15px;
+	border-radius: 8px;
+	border: 1px solid #e5e7eb;
+}
+
+.pcw-ai-preview-container iframe {
+	display: block;
+	width: 100%;
+	height: 350px;
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	background: #fff;
+}
+
+/* Garantir que iframes nos modais de IA tenham interação */
+#pcw-ai-email-modal iframe,
+#pcw-ai-complete-modal iframe {
+	height: 400px;
+}
+
+.pcw-modal-footer {
+	padding: 20px 30px;
+	background: #f8fafc;
+	border-top: 1px solid #e5e7eb;
+	display: flex;
+	justify-content: center;
+	gap: 15px;
+}
+
+.pcw-modal-footer .button-large {
+	padding: 12px 30px;
+	font-size: 15px;
+	height: auto;
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pcw-ai-use-content {
+	background: #10b981;
+	border-color: #10b981;
+	color: #fff;
+}
+
+.pcw-ai-use-content:hover {
+	background: #059669;
+	border-color: #059669;
+	color: #fff;
+}
+
+.pcw-ai-regenerate {
+	background: #f59e0b;
+	border-color: #f59e0b;
+	color: #fff;
+}
+
+.pcw-ai-regenerate:hover {
+	background: #d97706;
+	border-color: #d97706;
+	color: #fff;
+}
+
+.pcw-ai-modal-cancel:hover {
+	background: #f3f4f6;
+}
+
+/* Botão de IA nos campos */
+.pcw-ai-btn {
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: #fff;
+	border: none;
+	padding: 4px 12px;
+	border-radius: 4px;
+	cursor: pointer;
+	transition: all 0.2s;
+	font-size: 12px;
+	vertical-align: middle;
+	margin-left: 8px;
+}
+
+.pcw-ai-btn:hover {
+	transform: scale(1.05);
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+	color: #fff;
+	border: none;
+}
+
+.pcw-ai-btn .dashicons {
+	font-size: 14px;
+	width: 14px;
+	height: 14px;
+	vertical-align: middle;
+}
+
+/* Botão Hero de IA (Gerar Completo) */
+.pcw-ai-btn-hero {
+	background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+	color: #fff;
+	border: none;
+	padding: 12px 24px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.3s;
+	font-size: 14px;
+	font-weight: 600;
+	box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.pcw-ai-btn-hero:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+	color: #fff;
+	border: none;
+}
+
+.pcw-ai-btn-hero:active {
+	transform: translateY(0);
+}
+
+.pcw-ai-btn-hero .dashicons {
+	font-size: 18px;
+	width: 18px;
+	height: 18px;
+	animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
+.pcw-ai-btn-hero:not(:hover) .dashicons {
+	animation: none;
+}
+
+/* Ajustar layout dos botões */
+.pcw-email-editor-actions {
+	display: flex;
+	gap: 10px;
+	flex-wrap: wrap;
+	margin-bottom: 15px;
+}
+
+/* Preview do assunto */
+.pcw-subject-preview-box {
+	position: relative;
+	transition: all 0.2s;
+}
+
+.pcw-subject-preview-box:hover {
+	border-color: #667eea;
+	box-shadow: 0 2px 8px rgba(102, 126, 234, 0.15);
+}
+
+/* Seção de input da IA */
+.pcw-ai-input-section {
+	padding: 0;
+}
+
+.pcw-ai-input-section textarea {
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	resize: vertical;
+	min-height: 100px;
+	font-size: 14px;
+	line-height: 1.5;
+	width: 100%;
+	padding: 12px;
+	border: 1px solid #d1d5db;
+	border-radius: 6px;
+	box-sizing: border-box;
+}
+
+.pcw-ai-input-section textarea:focus {
+	outline: none;
+	border-color: #667eea;
+	box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
+}
+
+.pcw-start-generation {
+	background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+	color: #fff;
+	border: none;
+	box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+	transition: all 0.3s;
+}
+
+.pcw-start-generation:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+	color: #fff;
+}
+
+.pcw-start-generation .dashicons {
+	font-size: 20px;
+	width: 20px;
+	height: 20px;
+	vertical-align: middle;
+	margin-right: 5px;
+}
+
+/* Badge de sucesso */
+.pcw-ai-success-badge {
+	animation: slideInDown 0.5s ease-out;
+}
+
+@keyframes slideInDown {
+	from {
+		opacity: 0;
+		transform: translateY(-20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Personizi Config */
+.pcw-personizi-config {
+	background: #f0fdf4;
+	padding: 20px;
+	border-radius: 8px;
+	border: 1px solid #bbf7d0;
+	margin-top: 15px;
+}
+
+.pcw-personizi-specific-number {
+	margin-top: 15px;
+	padding: 15px;
+	background: #fff;
+	border: 1px solid #e5e7eb;
+	border-radius: 6px;
+}
+
+/* AI Success Animation */
+.pcw-ai-success {
+	animation: aiPulse 0.5s ease-in-out;
+	border-color: #22c55e !important;
+	box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1) !important;
+}
+
+@keyframes aiPulse {
+	0%, 100% {
+		box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
+	}
+	50% {
+		box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+	}
+}
+
+/* AI Notification */
+.pcw-ai-notification {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	margin-top: 8px;
+	padding: 8px 16px;
+	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+	color: #fff;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+	animation: slideIn 0.3s ease-out;
+	z-index: 10;
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateY(-10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* Ajustes específicos para cada modal */
+/* Modal de seleção de etapas (conteúdo) */
+#pcw-step-selector-modal {
+	padding: 0;
+}
+
+/* Grid de tipos de etapas */
+.pcw-step-types-grid {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 15px;
+}
+
+@media (max-width: 600px) {
+	.pcw-step-types-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.pcw-step-type-card {
+	display: flex;
+	align-items: flex-start;
+	gap: 15px;
+	padding: 18px;
+	background: #fff;
+	border: 2px solid #e5e7eb;
+	border-radius: 10px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+}
+
+.pcw-step-type-card:hover {
+	border-color: currentColor;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+	transform: translateY(-3px);
+}
+
+.pcw-step-type-card .dashicons {
+	flex-shrink: 0;
+	margin-top: 2px;
+}
+
+.pcw-step-type-card h3 {
+	margin: 0 0 4px 0;
+	font-size: 15px;
+	font-weight: 600;
+	color: #1f2937;
+}
+
+.pcw-step-type-card p {
+	margin: 0;
+	font-size: 12px;
+	color: #6b7280;
+	line-height: 1.4;
+}
+
+/* Responsivo para Modais (jQuery UI) */
+@media (max-width: 768px) {
+	.pcw-ui-dialog .ui-dialog-content {
+		max-height: 65vh;
+	}
+
+	.pcw-ai-preview-container iframe {
+		height: 260px;
+	}
+}
+
+/* Modal de Sugestões de Assunto */
+.pcw-suggestions-list {
+	display: flex;
+	flex-direction: column;
+	gap: 15px;
+}
+
+.pcw-suggestion-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 20px;
+	background: #fff;
+	border: 2px solid #e5e7eb;
+	border-radius: 8px;
+	transition: all 0.2s;
+	cursor: pointer;
+}
+
+.pcw-suggestion-item:hover {
+	border-color: #667eea;
+	box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+	transform: translateX(4px);
+}
+
+.pcw-suggestion-text {
+	flex: 1;
+	font-size: 15px;
+	font-weight: 500;
+	color: #1f2937;
+	line-height: 1.5;
+}
+
+.pcw-use-suggestion {
+	flex-shrink: 0;
+	margin-left: 15px;
+	background: #667eea;
+	color: #fff;
+	border: none;
+	padding: 8px 20px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s;
+}
+
+.pcw-use-suggestion:hover {
+	background: #5568d3;
+	color: #fff;
+	transform: scale(1.05);
+}
+
+.pcw-generate-more-subjects {
+	padding: 10px 20px;
+}
+
+.pcw-generate-more-subjects .dashicons {
+	vertical-align: middle;
+}

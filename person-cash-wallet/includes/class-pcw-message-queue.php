@@ -279,7 +279,8 @@ class PCW_Message_Queue_Manager {
 		// Verificar se há número disponível
 		if ( empty( $args['from_number'] ) ) {
 			delete_transient( $lock_key );
-			$this->log_cron( 'error', 'Nenhum número disponível para envio à fila' );
+			$this->log_cron( 'error', 'Nenhum número disponível para envio à fila. to=' . $args['to_number'] . ' type=' . $args['type'] );
+			error_log( '[PCW Queue] ERRO: Nenhum número WhatsApp disponível para envio. Verifique se há números ativos com distribution_enabled=1 em Fila > Números WhatsApp.' );
 			return false;
 		}
 
@@ -369,6 +370,7 @@ class PCW_Message_Queue_Manager {
 			'template_language' => 'pt_BR',
 			'template_body_text'=> '',
 			'contact_name'      => '',
+			'automation_id'     => null,
 			'metadata'          => array(),
 		);
 
@@ -394,6 +396,7 @@ class PCW_Message_Queue_Manager {
 			'from_number'        => $args['from'],
 			'message'            => ! empty( $body_preview ) ? $body_preview : '[Template: ' . $args['template_name'] . ']',
 			'contact_name'       => $args['contact_name'],
+			'automation_id'      => $args['automation_id'],
 			'template_name'      => $args['template_name'],
 			'template_language'  => $args['template_language'],
 			'template_params'    => is_array( $args['template_params'] ) ? wp_json_encode( $args['template_params'] ) : $args['template_params'],
@@ -1485,6 +1488,20 @@ class PCW_Message_Queue_Manager {
 		
 		$is_template = ( $message->type === 'whatsapp_template' || ! empty( $message->template_name ) );
 
+		// Detectar provider do número para logging
+		$number_provider = 'evolution';
+		if ( ! empty( $from ) ) {
+			$number_data = $wpdb->get_row( $wpdb->prepare(
+				"SELECT provider FROM {$this->numbers_table} WHERE phone_number = %s LIMIT 1",
+				$from
+			) );
+			if ( $number_data && ! empty( $number_data->provider ) ) {
+				$number_provider = $number_data->provider;
+			}
+		}
+
+		$this->log_cron( 'info', "Mensagem #{$message->id}: provider={$number_provider}, is_template=" . ( $is_template ? 'sim' : 'não' ) . ", from={$from}, to={$to}" );
+
 		if ( $is_template ) {
 			$template_params = array();
 			if ( ! empty( $message->template_params ) ) {
@@ -1494,7 +1511,7 @@ class PCW_Message_Queue_Manager {
 				}
 			}
 
-			$this->log_cron( 'info', "Mensagem #{$message->id}: Enviando template '{$message->template_name}' para {$to}" );
+			$this->log_cron( 'info', "Mensagem #{$message->id}: Enviando template '{$message->template_name}' via {$number_provider}" );
 
 			$result = $personizi->send_template_message(
 				$to,
@@ -1506,6 +1523,8 @@ class PCW_Message_Queue_Manager {
 				! empty( $message->template_body_text ) ? $message->template_body_text : ''
 			);
 		} else {
+			$this->log_cron( 'info', "Mensagem #{$message->id}: Enviando mensagem normal via {$number_provider}" );
+
 			$result = $personizi->send_whatsapp_message(
 				$to,
 				$msg_text,

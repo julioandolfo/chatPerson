@@ -102,6 +102,8 @@ class PCW_Automation_Executor {
 
 		@set_time_limit( 300 );
 
+		error_log( "[PCW EXECUTAR AGORA] Iniciando automação #{$automation_id}, trigger={$trigger}" );
+
 		try {
 			if ( in_array( $trigger, array( 'inactive_customer', 'customer_recovery' ), true ) ) {
 				$this->check_inactive_customers();
@@ -128,12 +130,37 @@ class PCW_Automation_Executor {
 			$started
 		) ) );
 
+		// Contar mensagens na fila criadas neste período
+		$queue_table = $wpdb->prefix . 'pcw_message_queue';
+		$new_queue = absint( $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$queue_table} WHERE created_at >= %s",
+			$started
+		) ) );
+
+		$details = '';
+		if ( $new_execs === 0 ) {
+			$config = $automation->trigger_config ?? array();
+			$inactive_days = isset( $config['inactive_days'] ) ? absint( $config['inactive_days'] ) : 30;
+			$include_historical = ! empty( $config['include_historical'] ) && $config['include_historical'] === '1';
+			$details = sprintf(
+				' (trigger=%s, inactive_days=%d, include_historical=%s). Verifique se existem clientes elegíveis e se os steps estão configurados corretamente.',
+				$trigger,
+				$inactive_days,
+				$include_historical ? 'sim' : 'não'
+			);
+		}
+
+		error_log( "[PCW EXECUTAR AGORA] Finalizado automação #{$automation_id}: {$new_execs} execuções, {$new_queue} mensagens na fila" );
+
 		wp_send_json_success( array(
 			'message'       => sprintf(
-				__( 'Cron executado com sucesso. %d nova(s) execução(ões) criada(s).', 'person-cash-wallet' ),
-				$new_execs
+				__( 'Cron executado com sucesso. %d execução(ões) criada(s), %d mensagem(ns) na fila.%s', 'person-cash-wallet' ),
+				$new_execs,
+				$new_queue,
+				$details
 			),
 			'new_executions' => $new_execs,
+			'new_queue'      => $new_queue,
 		) );
 	}
 
@@ -320,15 +347,20 @@ class PCW_Automation_Executor {
 
 			error_log( sprintf( '[PCW Automations] Automação #%d: HPOS=%s, novos_inativos=%d, since=%s, created_at=%s', $automation->id, $use_hpos ? 'sim' : 'não', count( $new_users ), $since, $automation_created_at ) );
 
+			$skipped_already_notified = 0;
+			$executed_new = 0;
 			foreach ( $new_users as $user_id ) {
 				if ( $this->was_notified_while_still_inactive( $automation->id, $user_id ) ) {
+					$skipped_already_notified++;
 					continue;
 				}
 				$this->execute_automation( $automation, $user_id, array(
 					'inactive_days' => $inactive_days,
 					'source'        => 'new',
 				) );
+				$executed_new++;
 			}
+			error_log( sprintf( '[PCW Automations] Automação #%d: novos_inativos executados=%d, ignorados_já_notificados=%d', $automation->id, $executed_new, $skipped_already_notified ) );
 
 			// ─── CLIENTES HISTÓRICOS (PACING) ────────────────────────────────────
 			$include_historical = ! empty( $config['include_historical'] ) && $config['include_historical'] === '1';
@@ -653,6 +685,7 @@ class PCW_Automation_Executor {
 	private function send_whatsapp( $automation, $execution_id, $user_id, $extra_data ) {
 		$user = get_user_by( 'id', $user_id );
 		if ( ! $user ) {
+			error_log( "[PCW send_whatsapp] user_id={$user_id} não encontrado" );
 			return new WP_Error( 'user_not_found', __( 'Usuário não encontrado', 'person-cash-wallet' ) );
 		}
 
@@ -662,7 +695,10 @@ class PCW_Automation_Executor {
 			$current_step = $automation->workflow_steps[ $extra_data['current_step_index'] ];
 		}
 
-		if ( ! $current_step || $current_step['type'] !== 'send_whatsapp' ) {
+		$step_type = $current_step['type'] ?? $current_step['action'] ?? '';
+		if ( ! $current_step || $step_type !== 'send_whatsapp' ) {
+			error_log( "[PCW send_whatsapp] Step inválido. step_type={$step_type}, automation={$automation->id}, step_index=" . ( $extra_data['current_step_index'] ?? 'N/A' ) );
+			error_log( "[PCW send_whatsapp] current_step=" . wp_json_encode( $current_step ) );
 			return new WP_Error( 'invalid_step', __( 'Configuração de WhatsApp não encontrada', 'person-cash-wallet' ) );
 		}
 
@@ -722,13 +758,15 @@ class PCW_Automation_Executor {
 
 		$queue_manager = PCW_Message_Queue_Manager::instance();
 
-		$strategy = isset( $config['personizi_strategy'] ) ? $config['personizi_strategy'] : 'queue';
 		$from_number = '';
-		if ( $strategy === 'specific' && ! empty( $config['personizi_from'] ) ) {
+		if ( ! empty( $config['personizi_from'] ) ) {
 			$from_number = $config['personizi_from'];
+			error_log( "[PCW send_whatsapp] Usando número específico configurado: {$from_number}" );
 		}
 
 		$use_template = ! empty( $config['use_template'] ) && $config['use_template'] == '1';
+
+		error_log( "[PCW send_whatsapp] automation={$automation->id}, user={$user_id}, phone={$phone}, from={$from_number}, use_template=" . ( $use_template ? 'sim' : 'não' ) . ", template_name=" . ( $config['template_name'] ?? 'N/A' ) . ", message_len=" . strlen( $message ) );
 
 		if ( $use_template && ! empty( $config['template_name'] ) ) {
 			$template_params = array();
@@ -745,6 +783,8 @@ class PCW_Automation_Executor {
 
 			$template_body = isset( $config['template_body_text'] ) ? $config['template_body_text'] : '';
 
+			error_log( "[PCW send_whatsapp] Adicionando template à fila: template={$config['template_name']}, params=" . wp_json_encode( $template_params ) );
+
 			$queue_id = $queue_manager->add_template_to_queue( array(
 				'to'                 => $phone,
 				'from'               => $from_number,
@@ -753,8 +793,13 @@ class PCW_Automation_Executor {
 				'template_language'  => ! empty( $config['template_language'] ) ? $config['template_language'] : 'pt_BR',
 				'template_body_text' => $template_body,
 				'contact_name'       => $user->display_name,
+				'automation_id'      => $automation->id,
 			) );
 		} else {
+			if ( empty( $message ) && ! $use_template ) {
+				error_log( "[PCW send_whatsapp] AVISO: Mensagem vazia e sem template! config=" . wp_json_encode( array_keys( $config ) ) );
+			}
+
 			$queue_args = array(
 				'type'          => 'whatsapp',
 				'to_number'     => $phone,
@@ -768,10 +813,15 @@ class PCW_Automation_Executor {
 				$queue_args['from_number'] = $from_number;
 			}
 
+			error_log( "[PCW send_whatsapp] Adicionando mensagem à fila: to={$phone}, from={$from_number}, msg_len=" . strlen( $message ) );
+
 			$queue_id = $queue_manager->add_to_queue( $queue_args );
 		}
 
+		error_log( "[PCW send_whatsapp] Resultado queue_id=" . var_export( $queue_id, true ) );
+
 		if ( false === $queue_id ) {
+			error_log( "[PCW send_whatsapp] ERRO: Falha ao adicionar à fila. automation={$automation->id}, user={$user_id}" );
 			return new WP_Error( 'queue_error', __( 'Erro ao adicionar mensagem à fila', 'person-cash-wallet' ) );
 		}
 

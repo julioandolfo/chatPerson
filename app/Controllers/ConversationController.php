@@ -68,7 +68,9 @@ class ConversationController
         
         // Obter filtros da requisição
         // Se status for vazio ou 'all', significa "Todas" - não filtrar por status
-        $statusFilter = $_GET['status'] ?? 'open';
+        // Quando vem de contact_id (histórico do contato), mostrar todas por padrão
+        $hasContactFilter = !empty($_GET['contact_id']);
+        $statusFilter = $_GET['status'] ?? ($hasContactFilter ? null : 'open');
         if ($statusFilter === '' || $statusFilter === 'all') {
             $statusFilter = null; // Não filtrar por status = mostrar todas
         }

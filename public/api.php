@@ -749,14 +749,40 @@ try {
                 apiLog('INFO', "✅ Usando conta da conversa existente: {$account['name']} (ID: {$account['id']})");
             } else {
                 // Buscar conta pelo número (integration_accounts unificado)
+                // Priorizar contas ativas, mas aceitar qualquer status como fallback
                 $stmt = $db->prepare("
                     SELECT id, name, api_url, provider, api_token as quepasa_token, username as quepasa_user
                     FROM integration_accounts 
-                    WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active'
+                    WHERE phone_number = ? AND channel = 'whatsapp'
+                    ORDER BY FIELD(status, 'active', 'disconnected', 'error') ASC
                     LIMIT 1
                 ");
                 $stmt->execute([$from]);
                 $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+                
+                // Fallback: buscar por número alternativo (com/sem 9o dígito)
+                if (!$account) {
+                    $fromAlt = getAlternativePhone($from);
+                    if ($fromAlt) {
+                        $stmt->execute([$fromAlt]);
+                        $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($account) apiLog('INFO', "Conta encontrada via número alternativo: {$fromAlt}");
+                    }
+                }
+                // Fallback: buscar por sufixo (últimos 8 dígitos)
+                if (!$account && strlen($from) >= 10) {
+                    $suffix = substr($from, -8);
+                    $stmtLike = $db->prepare("
+                        SELECT id, name, api_url, provider, api_token as quepasa_token, username as quepasa_user
+                        FROM integration_accounts 
+                        WHERE phone_number LIKE ? AND channel = 'whatsapp'
+                        ORDER BY FIELD(status, 'active', 'disconnected', 'error') ASC
+                        LIMIT 1
+                    ");
+                    $stmtLike->execute(['%' . $suffix]);
+                    $account = $stmtLike->fetch(\PDO::FETCH_ASSOC);
+                    if ($account) apiLog('INFO', "Conta encontrada via sufixo: %{$suffix}");
+                }
                 
                 if (!$account) {
                     apiLog('ERROR', "❌ Conta WhatsApp não encontrada para: {$from}");
@@ -764,7 +790,7 @@ try {
                         ['from' => ["Nenhuma conta ativa para: {$from}"]]);
                 }
                 
-                apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']})");
+                apiLog('INFO', "✅ Conta encontrada: {$account['name']} (ID: {$account['id']}, Provider: " . ($account['provider'] ?? 'N/A') . ")");
             }
             
             // Buscar configurações da Integration Account (funil e etapa padrão da integração)
@@ -875,23 +901,40 @@ try {
                 }
             }
             
-            // Enviar mensagem via WhatsAppService (com retry, error handling, etc.)
-            apiLog('INFO', '📡 Enviando via WhatsAppService...');
-            
-            $sendResult = \App\Services\WhatsAppService::sendMessage(
-                (int)$account['id'],
-                $to,
-                $message,
-                []
-            );
+            // Enviar mensagem baseado no provider da conta
+            $provider = $account['provider'] ?? 'evolution';
+            apiLog('INFO', "📡 Enviando via provider: {$provider}...");
+
+            $sendResult = ['success' => false, 'error' => 'Provider não suportado: ' . $provider];
+
+            if ($provider === 'notificame') {
+                try {
+                    $sendResult = \App\Services\NotificameService::sendMessage(
+                        (int)$account['id'],
+                        $to,
+                        $message,
+                        []
+                    );
+                } catch (\Exception $e) {
+                    apiLog('ERROR', "❌ NotificameService::sendMessage falhou: " . $e->getMessage());
+                    $sendResult = ['success' => false, 'error' => $e->getMessage()];
+                }
+            } else {
+                $sendResult = \App\Services\WhatsAppService::sendMessage(
+                    (int)$account['id'],
+                    $to,
+                    $message,
+                    []
+                );
+            }
             
             $messageSent = $sendResult['success'] ?? false;
             $externalId = $sendResult['message_id'] ?? null;
             
-            apiLog('INFO', "📡 WhatsAppService respondeu: success=" . ($messageSent ? 'true' : 'false') . ", external_id=" . ($externalId ?? 'NULL'));
+            apiLog('INFO', "📡 Resultado ({$provider}): success=" . ($messageSent ? 'true' : 'false') . ", external_id=" . ($externalId ?? 'NULL'));
             
             if (!$messageSent) {
-                apiLog('ERROR', "❌ WhatsApp falhou: " . ($sendResult['error'] ?? 'Erro desconhecido'));
+                apiLog('ERROR', "❌ Envio falhou ({$provider}): " . ($sendResult['error'] ?? 'Erro desconhecido'));
             }
             
             // Inserir mensagem no banco APÓS envio (com status real)

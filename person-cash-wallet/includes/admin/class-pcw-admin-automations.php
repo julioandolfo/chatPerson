@@ -159,7 +159,7 @@ class PCW_Admin_Automations {
 
 			// WhatsApp enviados via fila
 			$queue_sent = absint( $wpdb->get_var( $wpdb->prepare(
-				"SELECT COUNT(*) FROM {$queue_table} WHERE automation_id = %d AND type = 'whatsapp' AND status = 'sent'",
+				"SELECT COUNT(*) FROM {$queue_table} WHERE automation_id = %d AND type IN ('whatsapp', 'whatsapp_template') AND status = 'sent'",
 				$auto->id
 			) ) );
 

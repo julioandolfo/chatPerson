@@ -119,7 +119,7 @@ class PCW_Automation_Analytics {
 		$whatsapp_failed = 0;
 
 		if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $queue_table ) ) ) {
-			$q_where = array( "q.automation_id = %d", "q.type = 'whatsapp'" );
+			$q_where = array( "q.automation_id = %d", "q.type IN ('whatsapp', 'whatsapp_template')" );
 			$q_params = array( $automation_id );
 
 			if ( $start_date ) {

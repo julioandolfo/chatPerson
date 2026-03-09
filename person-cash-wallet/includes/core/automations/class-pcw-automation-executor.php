@@ -762,6 +762,9 @@ class PCW_Automation_Executor {
 		if ( ! empty( $config['personizi_from'] ) ) {
 			$from_number = $config['personizi_from'];
 			error_log( "[PCW send_whatsapp] Usando número específico configurado: {$from_number}" );
+		} else {
+			error_log( "[PCW send_whatsapp] AVISO: personizi_from vazio. Config keys: " . wp_json_encode( array_keys( $config ) ) );
+			error_log( "[PCW send_whatsapp] Config completo (parcial): personizi_from=" . ( $config['personizi_from'] ?? 'NULL' ) . ", use_personizi=" . ( $config['use_personizi'] ?? 'NULL' ) . ", use_specific_number=" . ( $config['use_specific_number'] ?? 'NULL' ) );
 		}
 
 		$use_template = ! empty( $config['use_template'] ) && $config['use_template'] == '1';

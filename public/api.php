@@ -1015,7 +1015,12 @@ try {
 
             apiLog('INFO', "Para: {$to}, De: {$from}, Template: {$templateName}, Params: " . json_encode($templateParams));
 
-            $stmt = $db->prepare("SELECT * FROM integration_accounts WHERE phone_number = ? AND channel = 'whatsapp' AND status = 'active' LIMIT 1");
+            $stmt = $db->prepare("
+                SELECT * FROM integration_accounts 
+                WHERE phone_number = ? AND channel = 'whatsapp'
+                ORDER BY FIELD(status, 'active', 'disconnected', 'error') ASC
+                LIMIT 1
+            ");
             $stmt->execute([$from]);
             $account = $stmt->fetch(\PDO::FETCH_ASSOC);
 
@@ -1024,7 +1029,20 @@ try {
                 if ($fromAlt) {
                     $stmt->execute([$fromAlt]);
                     $account = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($account) apiLog('INFO', "Conta template encontrada via número alternativo: {$fromAlt}");
                 }
+            }
+            if (!$account && strlen($from) >= 10) {
+                $suffix = substr($from, -8);
+                $stmtLike = $db->prepare("
+                    SELECT * FROM integration_accounts 
+                    WHERE phone_number LIKE ? AND channel = 'whatsapp'
+                    ORDER BY FIELD(status, 'active', 'disconnected', 'error') ASC
+                    LIMIT 1
+                ");
+                $stmtLike->execute(['%' . $suffix]);
+                $account = $stmtLike->fetch(\PDO::FETCH_ASSOC);
+                if ($account) apiLog('INFO', "Conta template encontrada via sufixo: %{$suffix}");
             }
 
             if (!$account) {
@@ -1111,7 +1129,7 @@ try {
                 $db->prepare("UPDATE messages SET status = 'failed', error_message = ? WHERE id = ?")->execute([$sendResult['error'] ?? 'Falha', $messageId]);
             }
 
-            $db->prepare("UPDATE conversations SET last_message_at = NOW() WHERE id = ?")->execute([$convId]);
+            $db->prepare("UPDATE conversations SET updated_at = NOW() WHERE id = ?")->execute([$convId]);
 
             if (!$success) {
                 apiLog('ERROR', "Falha ao enviar template: " . ($sendResult['error'] ?? 'Desconhecido'));

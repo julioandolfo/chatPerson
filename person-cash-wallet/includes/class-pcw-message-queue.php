@@ -644,7 +644,7 @@ class PCW_Message_Queue_Manager {
 		$last_from = $wpdb->get_var( $wpdb->prepare(
 			"SELECT from_number FROM {$this->table_name} 
 			WHERE to_number = %s 
-			AND type = 'whatsapp' 
+			AND type IN ('whatsapp', 'whatsapp_template') 
 			AND status = 'sent' 
 			AND from_number IS NOT NULL 
 			AND from_number != ''
@@ -661,7 +661,7 @@ class PCW_Message_Queue_Manager {
 		$pending_from = $wpdb->get_var( $wpdb->prepare(
 			"SELECT from_number FROM {$this->table_name} 
 			WHERE to_number = %s 
-			AND type = 'whatsapp' 
+			AND type IN ('whatsapp', 'whatsapp_template') 
 			AND status = 'pending' 
 			AND from_number IS NOT NULL 
 			AND from_number != ''
@@ -716,7 +716,7 @@ class PCW_Message_Queue_Manager {
 		$real_sent = (int) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COUNT(*) FROM {$this->table_name} 
 			WHERE from_number = %s 
-			AND type = 'whatsapp'
+			AND type IN ('whatsapp', 'whatsapp_template')
 			AND status = 'sent' 
 			AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
 			$phone,
@@ -728,7 +728,7 @@ class PCW_Message_Queue_Manager {
 			$pending_this_hour = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'pending'
 				AND scheduled_at >= DATE_SUB(%s, INTERVAL 1 HOUR)
 				AND scheduled_at <= DATE_ADD(%s, INTERVAL 1 HOUR)",
@@ -819,7 +819,7 @@ class PCW_Message_Queue_Manager {
 		$real_sent_hour = (int) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COUNT(*) FROM {$this->table_name} 
 			WHERE from_number = %s 
-			AND type = 'whatsapp'
+			AND type IN ('whatsapp', 'whatsapp_template')
 			AND status = 'sent' 
 			AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
 			$from_number,
@@ -832,7 +832,7 @@ class PCW_Message_Queue_Manager {
 			"SELECT COUNT(*) FROM {$this->table_name} 
 			WHERE from_number = %s 
 			AND status = 'pending'
-			AND type = 'whatsapp'",
+			AND type IN ('whatsapp', 'whatsapp_template')",
 			$from_number
 		) );
 
@@ -844,7 +844,7 @@ class PCW_Message_Queue_Manager {
 			"SELECT MAX(scheduled_at) FROM {$this->table_name} 
 			WHERE from_number = %s 
 			AND status = 'pending'
-			AND type = 'whatsapp'",
+			AND type IN ('whatsapp', 'whatsapp_template')",
 			$from_number
 		) );
 
@@ -958,7 +958,7 @@ class PCW_Message_Queue_Manager {
 			$real_sent_hour = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'sent' 
 				AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
 				$phone,
@@ -969,7 +969,7 @@ class PCW_Message_Queue_Manager {
 			$real_sent_today = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'sent' 
 				AND DATE(processed_at) = CURDATE()",
 				$phone
@@ -979,7 +979,7 @@ class PCW_Message_Queue_Manager {
 			$real_total_sent = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'sent'",
 				$phone
 			) );
@@ -988,7 +988,7 @@ class PCW_Message_Queue_Manager {
 			$real_total_failed = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'failed'",
 				$phone
 			) );
@@ -1138,7 +1138,7 @@ class PCW_Message_Queue_Manager {
 			"SELECT from_number, COUNT(*) as sent_count 
 			FROM {$this->table_name} 
 			WHERE status = 'sent' 
-			AND type = 'whatsapp' 
+			AND type IN ('whatsapp', 'whatsapp_template') 
 			AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR) 
 			AND from_number IS NOT NULL 
 			AND from_number != '' 
@@ -1370,7 +1370,7 @@ class PCW_Message_Queue_Manager {
 			$sent = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'sent' 
 				AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
 				$phone,
@@ -1381,7 +1381,7 @@ class PCW_Message_Queue_Manager {
 			$pending = (int) $wpdb->get_var( $wpdb->prepare(
 				"SELECT COUNT(*) FROM {$this->table_name} 
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'pending'
 				AND scheduled_at >= DATE_SUB(%s, INTERVAL 1 HOUR)
 				AND scheduled_at <= DATE_ADD(%s, INTERVAL 1 HOUR)",
@@ -1464,9 +1464,26 @@ class PCW_Message_Queue_Manager {
 		$contact_name = $message->contact_name ? $message->contact_name : '';
 		$from = $message->from_number ? $message->from_number : '';
 		
-		// Se from estiver vazio, selecionar via distribuição da fila
+		$is_template = ( $message->type === 'whatsapp_template' || ! empty( $message->template_name ) );
+		
+		// Se from estiver vazio, selecionar número adequado
 		if ( empty( $from ) ) {
-			$from = $this->select_number_for_sending( $to );
+			if ( $is_template ) {
+				// Templates só podem ser enviados por contas Notificame/oficial
+				$notificame_number = $wpdb->get_var(
+					"SELECT phone_number FROM {$this->numbers_table} 
+					WHERE provider = 'notificame' AND status = 'active' AND distribution_enabled = 1 
+					ORDER BY sent_last_hour ASC LIMIT 1"
+				);
+				if ( $notificame_number ) {
+					$from = $notificame_number;
+					$this->log_cron( 'info', "Mensagem #{$message->id}: Template sem from, selecionando número Notificame: {$from}" );
+				} else {
+					$this->log_cron( 'error', "Mensagem #{$message->id}: Template sem from e nenhum número Notificame disponível!" );
+				}
+			} else {
+				$from = $this->select_number_for_sending( $to );
+			}
 			
 			// Se ainda vazio, usar padrão como último fallback
 			if ( empty( $from ) ) {
@@ -1485,8 +1502,6 @@ class PCW_Message_Queue_Manager {
 				$message->from_number = $from;
 			}
 		}
-		
-		$is_template = ( $message->type === 'whatsapp_template' || ! empty( $message->template_name ) );
 
 		// Detectar provider do número para logging
 		$number_provider = 'evolution';
@@ -1501,6 +1516,42 @@ class PCW_Message_Queue_Manager {
 		}
 
 		$this->log_cron( 'info', "Mensagem #{$message->id}: provider={$number_provider}, is_template=" . ( $is_template ? 'sim' : 'não' ) . ", from={$from}, to={$to}" );
+
+		// Validação: templates requerem provider notificame — corrigir se necessário
+		if ( $is_template && $number_provider !== 'notificame' ) {
+			$this->log_cron( 'warning', "Mensagem #{$message->id}: Template com provider '{$number_provider}' (from={$from}). Buscando número Notificame..." );
+			$notificame_from = $wpdb->get_var(
+				"SELECT phone_number FROM {$this->numbers_table} 
+				WHERE provider = 'notificame' AND status = 'active' 
+				ORDER BY sent_last_hour ASC LIMIT 1"
+			);
+			if ( $notificame_from ) {
+				$from = $notificame_from;
+				$number_provider = 'notificame';
+				$wpdb->update(
+					$this->table_name,
+					array( 'from_number' => $from ),
+					array( 'id' => $message->id ),
+					array( '%s' ),
+					array( '%d' )
+				);
+				$message->from_number = $from;
+				$this->log_cron( 'info', "Mensagem #{$message->id}: Corrigido para número Notificame: {$from}" );
+			} else {
+				$this->log_cron( 'error', "Mensagem #{$message->id}: Nenhum número Notificame disponível para enviar template!" );
+				$wpdb->update(
+					$this->table_name,
+					array(
+						'status'        => 'failed',
+						'error_message' => 'Nenhum número Notificame disponível para enviar template',
+					),
+					array( 'id' => $message->id ),
+					array( '%s', '%s' ),
+					array( '%d' )
+				);
+				return;
+			}
+		}
 
 		if ( $is_template ) {
 			$template_params = array();

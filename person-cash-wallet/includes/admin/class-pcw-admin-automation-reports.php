@@ -762,7 +762,7 @@ class PCW_Admin_Automation_Reports {
 		}
 
 		$results = $wpdb->get_results( $wpdb->prepare(
-			"SELECT status, COUNT(*) as cnt FROM {$table} WHERE automation_id = %d AND type = 'whatsapp' GROUP BY status",
+			"SELECT status, COUNT(*) as cnt FROM {$table} WHERE automation_id = %d AND type IN ('whatsapp', 'whatsapp_template') GROUP BY status",
 			$automation_id
 		) );
 
@@ -785,12 +785,12 @@ class PCW_Admin_Automation_Reports {
 		}
 
 		$stats['next_scheduled'] = $wpdb->get_var( $wpdb->prepare(
-			"SELECT MIN(scheduled_at) FROM {$table} WHERE automation_id = %d AND type = 'whatsapp' AND status IN ('pending', 'scheduled') AND scheduled_at > NOW()",
+			"SELECT MIN(scheduled_at) FROM {$table} WHERE automation_id = %d AND type IN ('whatsapp', 'whatsapp_template') AND status IN ('pending', 'scheduled') AND scheduled_at > NOW()",
 			$automation_id
 		) );
 
 		$stats['sent_today'] = absint( $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(*) FROM {$table} WHERE automation_id = %d AND type = 'whatsapp' AND status = 'sent' AND processed_at >= %s",
+			"SELECT COUNT(*) FROM {$table} WHERE automation_id = %d AND type IN ('whatsapp', 'whatsapp_template') AND status = 'sent' AND processed_at >= %s",
 			$automation_id,
 			date( 'Y-m-d 00:00:00' )
 		) ) );
@@ -1075,7 +1075,7 @@ class PCW_Admin_Automation_Reports {
 
 		$table = $wpdb->prefix . 'pcw_message_queue';
 
-		$where = $wpdb->prepare( "automation_id = %d AND type = 'whatsapp'", $automation_id );
+		$where = $wpdb->prepare( "automation_id = %d AND type IN ('whatsapp', 'whatsapp_template')", $automation_id );
 		if ( ! empty( $status_filter ) ) {
 			$where .= $wpdb->prepare( " AND status = %s", $status_filter );
 		}

@@ -3198,7 +3198,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'sent'
 					AND processed_at >= DATE_SUB(%s, INTERVAL 1 HOUR)",
 					$phone,
@@ -3211,7 +3211,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'sent'
 					AND DATE(processed_at) = CURDATE()",
 					$phone
@@ -3223,7 +3223,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'sent'
 					AND processed_at >= DATE_SUB(%s, INTERVAL 7 DAY)",
 					$phone,
@@ -3236,7 +3236,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'failed'",
 					$phone
 				)
@@ -3247,7 +3247,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT COUNT(*) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'sent'",
 					$phone
 				)
@@ -3263,7 +3263,7 @@ class PCW_Admin_Queue {
 				$wpdb->prepare(
 					"SELECT MIN(processed_at) FROM {$queue_table} 
 					WHERE from_number = %s 
-					AND type = 'whatsapp'
+					AND type IN ('whatsapp', 'whatsapp_template')
 					AND status = 'sent'",
 					$phone
 				)
@@ -3322,7 +3322,7 @@ class PCW_Admin_Queue {
 		$total_sent = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$queue_table} 
-				WHERE from_number = %s AND type = 'whatsapp' AND status = 'sent'",
+				WHERE from_number = %s AND type IN ('whatsapp', 'whatsapp_template') AND status = 'sent'",
 				$phone
 			)
 		);
@@ -3330,7 +3330,7 @@ class PCW_Admin_Queue {
 		$total_failed = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$queue_table} 
-				WHERE from_number = %s AND type = 'whatsapp' AND status = 'failed'",
+				WHERE from_number = %s AND type IN ('whatsapp', 'whatsapp_template') AND status = 'failed'",
 				$phone
 			)
 		);
@@ -3338,7 +3338,7 @@ class PCW_Admin_Queue {
 		$total_pending = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$queue_table} 
-				WHERE from_number = %s AND type = 'whatsapp' AND status = 'pending'",
+				WHERE from_number = %s AND type IN ('whatsapp', 'whatsapp_template') AND status = 'pending'",
 				$phone
 			)
 		);
@@ -3351,7 +3351,7 @@ class PCW_Admin_Queue {
 					COUNT(*) as count
 				FROM {$queue_table}
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND status = 'sent'
 				AND processed_at >= DATE_SUB(%s, INTERVAL 24 HOUR)
 				GROUP BY HOUR(processed_at)
@@ -3377,7 +3377,7 @@ class PCW_Admin_Queue {
 					SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_count
 				FROM {$queue_table}
 				WHERE from_number = %s 
-				AND type = 'whatsapp'
+				AND type IN ('whatsapp', 'whatsapp_template')
 				AND processed_at >= DATE_SUB(%s, INTERVAL 30 DAY)
 				GROUP BY DATE(processed_at)
 				ORDER BY date ASC",
@@ -3407,7 +3407,7 @@ class PCW_Admin_Queue {
 			$wpdb->prepare(
 				"SELECT id, to_number, message, status, processed_at, scheduled_at, error_message
 				FROM {$queue_table}
-				WHERE from_number = %s AND type = 'whatsapp'
+				WHERE from_number = %s AND type IN ('whatsapp', 'whatsapp_template')
 				ORDER BY COALESCE(processed_at, scheduled_at) DESC
 				LIMIT 20",
 				$phone
@@ -3422,7 +3422,7 @@ class PCW_Admin_Queue {
 		$sent_7d = $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$queue_table}
-				WHERE from_number = %s AND type = 'whatsapp' AND status = 'sent'
+				WHERE from_number = %s AND type IN ('whatsapp', 'whatsapp_template') AND status = 'sent'
 				AND processed_at >= DATE_SUB(%s, INTERVAL 7 DAY)",
 				$phone,
 				$now

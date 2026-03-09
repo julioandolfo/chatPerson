@@ -1076,17 +1076,31 @@ try {
                 apiLog('INFO', "Novo contato criado: ID={$contactId}");
             }
 
+            // Buscar configurações de funil/etapa/departamento da conta
+            $departmentId = $account['default_department_id'] ?? $account['department_id'] ?? null;
+            $funnelId = $account['default_funnel_id'] ?? $account['funnel_id'] ?? null;
+            $stageId = $account['default_stage_id'] ?? $account['funnel_stage_id'] ?? $account['stage_id'] ?? null;
+            $inboxId = $account['inbox_id'] ?? null;
+
+            apiLog('INFO', "Configurações da conta: Funil={$funnelId}, Etapa={$stageId}, Depto={$departmentId}, Inbox={$inboxId}");
+
             $stmt4 = $db->prepare("SELECT id, status FROM conversations WHERE contact_id = ? AND channel = 'whatsapp' AND integration_account_id = ? ORDER BY updated_at DESC LIMIT 1");
             $stmt4->execute([$contact['id'], $account['id']]);
             $conv = $stmt4->fetch(\PDO::FETCH_ASSOC);
             $isNewConversation = false;
 
             if (!$conv) {
-                $stmt5 = $db->prepare("INSERT INTO conversations (contact_id, channel, integration_account_id, status, created_at, updated_at) VALUES (?, 'whatsapp', ?, 'open', NOW(), NOW())");
-                $stmt5->execute([$contact['id'], $account['id']]);
+                $stmt5 = $db->prepare("
+                    INSERT INTO conversations (
+                        contact_id, channel, integration_account_id, status,
+                        inbox_id, department_id, funnel_id, funnel_stage_id,
+                        created_at, updated_at
+                    ) VALUES (?, 'whatsapp', ?, 'open', ?, ?, ?, ?, NOW(), NOW())
+                ");
+                $stmt5->execute([$contact['id'], $account['id'], $inboxId, $departmentId, $funnelId, $stageId]);
                 $convId = $db->lastInsertId();
                 $isNewConversation = true;
-                apiLog('INFO', "Nova conversa criada: ID={$convId}");
+                apiLog('INFO', "Nova conversa criada: ID={$convId} (Funil={$funnelId}, Etapa={$stageId})");
             } else {
                 $convId = $conv['id'];
                 if (in_array($conv['status'], ['closed', 'resolved'])) {

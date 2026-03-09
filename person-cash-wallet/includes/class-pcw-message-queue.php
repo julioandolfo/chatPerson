@@ -629,6 +629,56 @@ class PCW_Message_Queue_Manager {
 	}
 
 	/**
+	 * Encontrar um número Notificame disponível para envio de templates.
+	 *
+	 * @return string|null Número do telefone ou null
+	 */
+	private function find_notificame_number() {
+		global $wpdb;
+
+		// 1. Buscar por provider explícito
+		$number = $wpdb->get_var(
+			"SELECT phone_number FROM {$this->numbers_table} 
+			WHERE provider = 'notificame' AND status = 'active' 
+			ORDER BY sent_last_hour ASC LIMIT 1"
+		);
+		if ( $number ) {
+			return $number;
+		}
+
+		// 2. Fallback: buscar por account_id preenchido (indicador de conta oficial)
+		$number = $wpdb->get_var(
+			"SELECT phone_number FROM {$this->numbers_table} 
+			WHERE account_id IS NOT NULL AND account_id > 0 AND status = 'active' 
+			ORDER BY sent_last_hour ASC LIMIT 1"
+		);
+		if ( $number ) {
+			$this->log_cron( 'info', "Notificame encontrado via account_id: {$number}. Atualizando provider." );
+			$wpdb->update(
+				$this->numbers_table,
+				array( 'provider' => 'notificame' ),
+				array( 'phone_number' => $number ),
+				array( '%s' ),
+				array( '%s' )
+			);
+			return $number;
+		}
+
+		// 3. Último fallback: buscar qualquer número com provider diferente de 'evolution'
+		// que possa ter sido configurado incorretamente
+		$number = $wpdb->get_var(
+			"SELECT phone_number FROM {$this->numbers_table} 
+			WHERE provider NOT IN ('evolution', '') AND status = 'active' 
+			ORDER BY sent_last_hour ASC LIMIT 1"
+		);
+		if ( $number ) {
+			return $number;
+		}
+
+		return null;
+	}
+
+	/**
 	 * Buscar número "sticky" para um destinatário
 	 * 
 	 * Verifica o histórico de mensagens enviadas com sucesso para o destinatário
@@ -1469,14 +1519,8 @@ class PCW_Message_Queue_Manager {
 		// Se from estiver vazio, selecionar número adequado
 		if ( empty( $from ) ) {
 			if ( $is_template ) {
-				// Templates só podem ser enviados por contas Notificame/oficial
-				$notificame_number = $wpdb->get_var(
-					"SELECT phone_number FROM {$this->numbers_table} 
-					WHERE provider = 'notificame' AND status = 'active' AND distribution_enabled = 1 
-					ORDER BY sent_last_hour ASC LIMIT 1"
-				);
-				if ( $notificame_number ) {
-					$from = $notificame_number;
+				$from = $this->find_notificame_number();
+				if ( $from ) {
 					$this->log_cron( 'info', "Mensagem #{$message->id}: Template sem from, selecionando número Notificame: {$from}" );
 				} else {
 					$this->log_cron( 'error', "Mensagem #{$message->id}: Template sem from e nenhum número Notificame disponível!" );
@@ -1503,28 +1547,39 @@ class PCW_Message_Queue_Manager {
 			}
 		}
 
-		// Detectar provider do número para logging
+		// Detectar provider do número
 		$number_provider = 'evolution';
 		if ( ! empty( $from ) ) {
 			$number_data = $wpdb->get_row( $wpdb->prepare(
-				"SELECT provider FROM {$this->numbers_table} WHERE phone_number = %s LIMIT 1",
+				"SELECT provider, account_id FROM {$this->numbers_table} WHERE phone_number = %s LIMIT 1",
 				$from
 			) );
-			if ( $number_data && ! empty( $number_data->provider ) ) {
-				$number_provider = $number_data->provider;
+			if ( $number_data ) {
+				if ( ! empty( $number_data->provider ) && $number_data->provider !== 'evolution' ) {
+					$number_provider = $number_data->provider;
+				} elseif ( ! empty( $number_data->account_id ) ) {
+					// account_id preenchido indica conta oficial (Notificame)
+					$number_provider = 'notificame';
+					$wpdb->update(
+						$this->numbers_table,
+						array( 'provider' => 'notificame' ),
+						array( 'phone_number' => $from ),
+						array( '%s' ),
+						array( '%s' )
+					);
+					$this->log_cron( 'info', "Mensagem #{$message->id}: Provider atualizado para 'notificame' baseado em account_id" );
+				}
 			}
 		}
 
 		$this->log_cron( 'info', "Mensagem #{$message->id}: provider={$number_provider}, is_template=" . ( $is_template ? 'sim' : 'não' ) . ", from={$from}, to={$to}" );
 
-		// Validação: templates requerem provider notificame — corrigir se necessário
+		// Para templates: se o provider local não é 'notificame', tentar encontrar 
+		// um número Notificame. Se não encontrar, manter o from original e deixar
+		// a API do chat validar (o provider pode estar correto no integration_accounts).
 		if ( $is_template && $number_provider !== 'notificame' ) {
-			$this->log_cron( 'warning', "Mensagem #{$message->id}: Template com provider '{$number_provider}' (from={$from}). Buscando número Notificame..." );
-			$notificame_from = $wpdb->get_var(
-				"SELECT phone_number FROM {$this->numbers_table} 
-				WHERE provider = 'notificame' AND status = 'active' 
-				ORDER BY sent_last_hour ASC LIMIT 1"
-			);
+			$this->log_cron( 'info', "Mensagem #{$message->id}: Template com provider local '{$number_provider}' (from={$from}). Verificando..." );
+			$notificame_from = $this->find_notificame_number();
 			if ( $notificame_from ) {
 				$from = $notificame_from;
 				$number_provider = 'notificame';
@@ -1538,18 +1593,7 @@ class PCW_Message_Queue_Manager {
 				$message->from_number = $from;
 				$this->log_cron( 'info', "Mensagem #{$message->id}: Corrigido para número Notificame: {$from}" );
 			} else {
-				$this->log_cron( 'error', "Mensagem #{$message->id}: Nenhum número Notificame disponível para enviar template!" );
-				$wpdb->update(
-					$this->table_name,
-					array(
-						'status'        => 'failed',
-						'error_message' => 'Nenhum número Notificame disponível para enviar template',
-					),
-					array( 'id' => $message->id ),
-					array( '%s', '%s' ),
-					array( '%d' )
-				);
-				return;
+				$this->log_cron( 'info', "Mensagem #{$message->id}: Provider local não é notificame, mas usando from={$from} (API validará)" );
 			}
 		}
 

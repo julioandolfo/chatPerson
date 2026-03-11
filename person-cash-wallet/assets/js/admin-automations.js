@@ -1630,6 +1630,9 @@
                         html += ' data-body="' + $('<span>').text(t.body_text || t.body || '').html() + '"';
                         html += ' data-language="' + $('<span>').text(t.language || 'pt_BR').html() + '"';
                         html += ' data-category="' + $('<span>').text(t.category || '').html() + '"';
+                        html += ' data-header="' + $('<span>').text(t.header_text || '').html() + '"';
+                        html += ' data-footer="' + $('<span>').text(t.footer_text || '').html() + '"';
+                        html += ' data-buttons="' + $('<span>').text(JSON.stringify(t.buttons || [])).html() + '"';
                         html += '>' + $('<span>').text(t.name + status).html() + '</option>';
                     });
                     $tplSelect.html(html);
@@ -1657,10 +1660,19 @@
             var $option = $select.find('option:selected');
             var body = $option.data('body') || '';
             var language = $option.data('language') || 'pt_BR';
+            var headerText = $option.data('header') || '';
+            var footerText = $option.data('footer') || '';
+            var buttonsRaw = $option.data('buttons') || '[]';
+            var buttons = [];
+            try { buttons = typeof buttonsRaw === 'string' ? JSON.parse(buttonsRaw) : buttonsRaw; } catch(ex) {}
+            if (!Array.isArray(buttons)) buttons = [];
             var $config = $select.closest('.pcw-template-config');
 
             $config.find('.pcw-template-language').val(language);
             $config.find('.pcw-template-body-text').val(body);
+            $config.find('.pcw-template-header-text').val(headerText);
+            $config.find('.pcw-template-footer-text').val(footerText);
+            $config.find('.pcw-template-buttons').val(JSON.stringify(buttons));
 
             var $paramsContainer = $('.pcw-template-params-' + stepIndex);
             var $preview = $('.pcw-template-preview-' + stepIndex);
@@ -1675,14 +1687,19 @@
             var varCount = varMatches.length;
 
             if (varCount > 0) {
+                var existingParams = [];
+                $paramsContainer.find('.pcw-tpl-param').each(function() {
+                    existingParams.push($(this).val());
+                });
+
                 var fieldsHtml = '';
                 for (var i = 1; i <= varCount; i++) {
-                    var savedVal = '';
+                    var savedVal = (existingParams.length >= i) ? existingParams[i - 1] : '';
                     fieldsHtml += '<div style="margin-bottom: 8px;">';
                     fieldsHtml += '<label style="font-size: 12px; font-weight: 500;">Variável {{' + i + '}}</label>';
                     fieldsHtml += '<input type="text" name="steps[' + stepIndex + '][config][template_params][]" ';
                     fieldsHtml += 'class="widefat pcw-tpl-param" data-step="' + stepIndex + '" ';
-                    fieldsHtml += 'placeholder="Ex: {{customer_first_name}}" value="' + savedVal + '">';
+                    fieldsHtml += 'placeholder="Ex: {{customer_first_name}}" value="' + $('<span>').text(savedVal).html() + '">';
                     fieldsHtml += '</div>';
                 }
                 $paramsContainer.find('.pcw-template-params-fields').html(fieldsHtml);
@@ -1691,7 +1708,19 @@
                 $paramsContainer.hide();
             }
 
-            $preview.find('div').text(body);
+            // Preview completo com header/footer/buttons
+            var previewHtml = '';
+            if (headerText) previewHtml += '📋 <strong>' + $('<span>').text(headerText).html() + '</strong>\n\n';
+            previewHtml += $('<span>').text(body).html();
+            if (footerText) previewHtml += '\n\n<em style="color: #94a3b8;">' + $('<span>').text(footerText).html() + '</em>';
+            if (buttons.length > 0) {
+                previewHtml += '\n';
+                buttons.forEach(function(btn) {
+                    var txt = btn.text || btn.label || '';
+                    if (txt) previewHtml += '\n🔘 ' + $('<span>').text(txt).html();
+                });
+            }
+            $preview.find('div').html(previewHtml.replace(/\n/g, '<br>'));
             $preview.show();
         },
 
@@ -2215,12 +2244,47 @@
 
     $(document).ready(function() {
         PCWAdminAutomations.init();
-        
+
         // Inicializar contadores de caracteres
         $('textarea[maxlength="160"]').each(function() {
             var current = $(this).val().length;
             var max = $(this).attr('maxlength');
             $(this).siblings('.description').find('.pcw-char-count').text(current + '/' + max);
+        });
+
+        // Auto-carregar templates para contas já selecionadas (edição de automação)
+        $('.pcw-template-account').each(function() {
+            var $select = $(this);
+            var phone = $select.val();
+            var stepIndex = $select.data('step');
+            if (!phone) return;
+
+            var savedTemplateName = $select.closest('.pcw-template-config').find('.pcw-template-select').val();
+            var $tplSelect = $select.closest('.pcw-template-config').find('.pcw-template-select');
+
+            $.post(pcwAutomations.ajaxUrl || ajaxurl, {
+                action: 'pcw_get_templates',
+                nonce: pcwAutomations.queueNonce || '',
+                phone: phone
+            }, function(response) {
+                if (response.success && response.data.templates && response.data.templates.length > 0) {
+                    var html = '<option value="">Selecione o template</option>';
+                    response.data.templates.forEach(function(t) {
+                        var status = t.status === 'APPROVED' ? ' [Aprovado]' : ' [' + (t.status || '?') + ']';
+                        var isSelected = (savedTemplateName && t.name === savedTemplateName) ? ' selected' : '';
+                        html += '<option value="' + $('<span>').text(t.name).html() + '"';
+                        html += ' data-body="' + $('<span>').text(t.body_text || t.body || '').html() + '"';
+                        html += ' data-language="' + $('<span>').text(t.language || 'pt_BR').html() + '"';
+                        html += ' data-category="' + $('<span>').text(t.category || '').html() + '"';
+                        html += ' data-header="' + $('<span>').text(t.header_text || '').html() + '"';
+                        html += ' data-footer="' + $('<span>').text(t.footer_text || '').html() + '"';
+                        html += ' data-buttons="' + $('<span>').text(JSON.stringify(t.buttons || [])).html() + '"';
+                        html += isSelected;
+                        html += '>' + $('<span>').text(t.name + status).html() + '</option>';
+                    });
+                    $tplSelect.html(html);
+                }
+            });
         });
     });
 

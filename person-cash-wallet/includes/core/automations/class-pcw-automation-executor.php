@@ -785,6 +785,9 @@ class PCW_Automation_Executor {
 			}
 
 			$template_body = isset( $config['template_body_text'] ) ? $config['template_body_text'] : '';
+			$template_header = isset( $config['template_header_text'] ) ? $config['template_header_text'] : '';
+			$template_footer = isset( $config['template_footer_text'] ) ? $config['template_footer_text'] : '';
+			$template_buttons = isset( $config['template_buttons'] ) ? $config['template_buttons'] : '[]';
 
 			error_log( "[PCW send_whatsapp] Adicionando template à fila: template={$config['template_name']}, params=" . wp_json_encode( $template_params ) );
 
@@ -795,6 +798,9 @@ class PCW_Automation_Executor {
 				'template_params'    => $template_params,
 				'template_language'  => ! empty( $config['template_language'] ) ? $config['template_language'] : 'pt_BR',
 				'template_body_text' => $template_body,
+				'template_header_text' => $template_header,
+				'template_footer_text' => $template_footer,
+				'template_buttons'   => $template_buttons,
 				'contact_name'       => $user->display_name,
 				'automation_id'      => $automation->id,
 			) );

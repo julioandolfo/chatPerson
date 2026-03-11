@@ -424,7 +424,7 @@ class PCW_Personizi_Integration {
 	 * @param string $body_text      Texto do body para preview (opcional)
 	 * @return array|WP_Error
 	 */
-	public function send_template_message( $to, $from, $template_name, $params = array(), $language = 'pt_BR', $contact_name = '', $body_text = '' ) {
+	public function send_template_message( $to, $from, $template_name, $params = array(), $language = 'pt_BR', $contact_name = '', $body_text = '', $header_text = '', $footer_text = '', $buttons = '' ) {
 		$to   = $this->normalize_phone( $to );
 		$from = $this->normalize_phone( $from );
 
@@ -457,6 +457,15 @@ class PCW_Personizi_Integration {
 		}
 		if ( ! empty( $body_text ) ) {
 			$data['template_body_text'] = $body_text;
+		}
+		if ( ! empty( $header_text ) ) {
+			$data['template_header_text'] = $header_text;
+		}
+		if ( ! empty( $footer_text ) ) {
+			$data['template_footer_text'] = $footer_text;
+		}
+		if ( ! empty( $buttons ) ) {
+			$data['template_buttons'] = is_string( $buttons ) ? json_decode( $buttons, true ) : $buttons;
 		}
 
 		$result = $this->request( '/messages/send-template', 'POST', $data );

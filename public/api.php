@@ -1116,8 +1116,56 @@ try {
                 }
             }
 
+            // Montar preview completo com header/footer/buttons
+            $headerText = trim($input['template_header_text'] ?? '');
+            $footerText = trim($input['template_footer_text'] ?? '');
+            $buttonsData = $input['template_buttons'] ?? [];
+
+            // Se não vieram do payload, buscar do template na API
+            if (empty($headerText) && empty($footerText) && empty($buttonsData) && $account['provider'] === 'notificame') {
+                try {
+                    $tplList = \App\Services\NotificameService::listTemplates($account['id']);
+                    foreach ($tplList as $tpl) {
+                        if (($tpl['name'] ?? '') === $templateName) {
+                            foreach (($tpl['components'] ?? []) as $c) {
+                                $cType = strtoupper($c['type'] ?? '');
+                                if ($cType === 'HEADER' && empty($headerText)) $headerText = $c['text'] ?? '';
+                                if ($cType === 'FOOTER' && empty($footerText)) $footerText = $c['text'] ?? '';
+                                if ($cType === 'BUTTONS' && empty($buttonsData)) $buttonsData = $c['buttons'] ?? [];
+                            }
+                            break;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    apiLog('WARNING', "Não foi possível buscar componentes do template: " . $e->getMessage());
+                }
+            }
+
+            $fullPreview = '';
+            if (!empty($headerText)) {
+                $fullPreview .= "📋 *" . $headerText . "*\n\n";
+            }
+            $fullPreview .= $bodyPreview;
+            if (!empty($footerText)) {
+                $fullPreview .= "\n\n_" . $footerText . "_";
+            }
+            if (!empty($buttonsData) && is_array($buttonsData)) {
+                $fullPreview .= "\n";
+                foreach ($buttonsData as $btn) {
+                    $btnText = $btn['text'] ?? $btn['label'] ?? '';
+                    $btnType = $btn['type'] ?? '';
+                    if (!empty($btnText)) {
+                        $icon = '🔘';
+                        if (stripos($btnType, 'url') !== false || stripos($btnType, 'URL') !== false) $icon = '🔗';
+                        elseif (stripos($btnType, 'phone') !== false || stripos($btnType, 'PHONE') !== false) $icon = '📞';
+                        elseif (stripos($btnType, 'copy') !== false || stripos($btnType, 'COPY') !== false) $icon = '📋';
+                        $fullPreview .= "\n{$icon} " . $btnText;
+                    }
+                }
+            }
+
             $stmtMsg = $db->prepare("INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type, status, created_at) VALUES (?, 'agent', ?, ?, 'text', 'pending', NOW())");
-            $stmtMsg->execute([$convId, $tokenData['user_id'] ?? 0, $bodyPreview]);
+            $stmtMsg->execute([$convId, $tokenData['user_id'] ?? 0, $fullPreview]);
             $messageId = $db->lastInsertId();
 
             $sendResult = ['success' => false, 'error' => 'Provider não suportado'];
@@ -1198,13 +1246,22 @@ try {
                     $raw = \App\Services\NotificameService::listTemplates($account['id']);
                     foreach ($raw as $tpl) {
                         $body = '';
+                        $header = '';
+                        $footer = '';
+                        $buttons = [];
                         foreach (($tpl['components'] ?? []) as $c) {
-                            if (strtoupper($c['type'] ?? '') === 'BODY') { $body = $c['text'] ?? ''; break; }
+                            $cType = strtoupper($c['type'] ?? '');
+                            if ($cType === 'BODY') { $body = $c['text'] ?? ''; }
+                            elseif ($cType === 'HEADER') { $header = $c['text'] ?? $c['format'] ?? ''; }
+                            elseif ($cType === 'FOOTER') { $footer = $c['text'] ?? ''; }
+                            elseif ($cType === 'BUTTONS') { $buttons = $c['buttons'] ?? []; }
                         }
                         $templates[] = [
                             'name' => $tpl['name'] ?? '', 'language' => $tpl['language'] ?? 'pt_BR',
                             'category' => $tpl['category'] ?? '', 'status' => $tpl['status'] ?? '',
-                            'body_text' => $body ?: ($tpl['body'] ?? $tpl['text'] ?? ''), 'source' => 'notificame',
+                            'body_text' => $body ?: ($tpl['body'] ?? $tpl['text'] ?? ''),
+                            'header_text' => $header, 'footer_text' => $footer, 'buttons' => $buttons,
+                            'source' => 'notificame',
                         ];
                     }
                     if (empty($templates)) {

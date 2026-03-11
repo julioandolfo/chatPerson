@@ -795,18 +795,67 @@ class PCW_Admin_Automations {
 				<input type="hidden" name="steps[<?php echo esc_attr( $index ); ?>][config][template_body_text]" 
 					class="pcw-template-body-text" data-step="<?php echo esc_attr( $index ); ?>"
 					value="<?php echo esc_attr( isset( $config['template_body_text'] ) ? $config['template_body_text'] : '' ); ?>">
+				<input type="hidden" name="steps[<?php echo esc_attr( $index ); ?>][config][template_header_text]" 
+					class="pcw-template-header-text" data-step="<?php echo esc_attr( $index ); ?>"
+					value="<?php echo esc_attr( isset( $config['template_header_text'] ) ? $config['template_header_text'] : '' ); ?>">
+				<input type="hidden" name="steps[<?php echo esc_attr( $index ); ?>][config][template_footer_text]" 
+					class="pcw-template-footer-text" data-step="<?php echo esc_attr( $index ); ?>"
+					value="<?php echo esc_attr( isset( $config['template_footer_text'] ) ? $config['template_footer_text'] : '' ); ?>">
+				<input type="hidden" name="steps[<?php echo esc_attr( $index ); ?>][config][template_buttons]" 
+					class="pcw-template-buttons" data-step="<?php echo esc_attr( $index ); ?>"
+					value="<?php echo esc_attr( isset( $config['template_buttons'] ) ? (is_array($config['template_buttons']) ? wp_json_encode($config['template_buttons']) : $config['template_buttons']) : '[]' ); ?>">
 
-				<div class="pcw-template-params-container pcw-template-params-<?php echo esc_attr( $index ); ?>" style="display: none;">
+				<?php
+				$saved_params = isset( $config['template_params'] ) ? $config['template_params'] : array();
+				if ( is_string( $saved_params ) ) {
+					$saved_params = json_decode( $saved_params, true );
+				}
+				if ( ! is_array( $saved_params ) ) {
+					$saved_params = array();
+				}
+				$has_saved_params = ! empty( $saved_params );
+				$body_text = isset( $config['template_body_text'] ) ? $config['template_body_text'] : '';
+				$param_count = $has_saved_params ? count( $saved_params ) : 0;
+				if ( ! $param_count && ! empty( $body_text ) ) {
+					preg_match_all( '/\{\{(\d+)\}\}/', $body_text, $matches );
+					$param_count = ! empty( $matches[1] ) ? max( array_map( 'intval', $matches[1] ) ) : 0;
+				}
+			?>
+				<div class="pcw-template-params-container pcw-template-params-<?php echo esc_attr( $index ); ?>" style="<?php echo $param_count > 0 ? '' : 'display: none;'; ?>">
 					<label><?php esc_html_e( 'Variáveis do Template', 'person-cash-wallet' ); ?></label>
-					<div class="pcw-template-params-fields"></div>
+					<div class="pcw-template-params-fields">
+						<?php for ( $pi = 0; $pi < $param_count; $pi++ ) :
+							$param_val = isset( $saved_params[ $pi ] ) ? $saved_params[ $pi ] : '';
+						?>
+						<div style="margin-bottom: 8px;">
+							<label style="font-size: 12px; font-weight: 500;">
+								<?php printf( esc_html__( 'Variável {{%d}}', 'person-cash-wallet' ), $pi + 1 ); ?>
+							</label>
+							<input type="text"
+								name="steps[<?php echo esc_attr( $index ); ?>][config][template_params][]"
+								class="widefat pcw-tpl-param"
+								data-step="<?php echo esc_attr( $index ); ?>"
+								placeholder="Ex: {{customer_first_name}}"
+								value="<?php echo esc_attr( $param_val ); ?>">
+						</div>
+						<?php endfor; ?>
+					</div>
 					<p class="description" style="font-size: 11px;">
 						<?php esc_html_e( 'Variáveis de automação disponíveis: {{customer_first_name}}, {{customer_name}}, {{order_number}}, {{order_total}}', 'person-cash-wallet' ); ?>
 					</p>
 				</div>
 
-				<div class="pcw-template-preview pcw-template-preview-<?php echo esc_attr( $index ); ?>" style="display: none; margin-top: 10px;">
+				<?php
+				$preview_text = $body_text;
+				if ( $has_saved_params && ! empty( $body_text ) ) {
+					foreach ( $saved_params as $pi => $pv ) {
+						$preview_text = str_replace( '{{' . ( $pi + 1 ) . '}}', $pv, $preview_text );
+					}
+				}
+				?>
+				<div class="pcw-template-preview pcw-template-preview-<?php echo esc_attr( $index ); ?>" style="<?php echo ! empty( $body_text ) ? '' : 'display: none;'; ?> margin-top: 10px;">
 					<label><?php esc_html_e( 'Preview', 'person-cash-wallet' ); ?></label>
-					<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 13px; color: #475569; white-space: pre-wrap;"></div>
+					<div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; font-size: 13px; color: #475569; white-space: pre-wrap;"><?php echo esc_html( $preview_text ); ?></div>
 				</div>
 			</div>
 			<?php endif; ?>

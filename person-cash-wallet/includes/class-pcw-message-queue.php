@@ -108,6 +108,9 @@ class PCW_Message_Queue_Manager {
 			template_language varchar(10) DEFAULT NULL,
 			template_params text DEFAULT NULL,
 			template_body_text text DEFAULT NULL,
+			template_header_text varchar(255) DEFAULT NULL,
+			template_footer_text varchar(255) DEFAULT NULL,
+			template_buttons text DEFAULT NULL,
 			priority int(11) NOT NULL DEFAULT 5,
 			status varchar(20) NOT NULL DEFAULT 'pending',
 			attempts int(11) NOT NULL DEFAULT 0,
@@ -201,6 +204,15 @@ class PCW_Message_Queue_Manager {
 		if ( ! in_array( 'template_body_text', $queue_columns, true ) ) {
 			$wpdb->query( "ALTER TABLE {$this->table_name} ADD COLUMN template_body_text text DEFAULT NULL AFTER template_params" );
 		}
+		if ( ! in_array( 'template_header_text', $queue_columns, true ) ) {
+			$wpdb->query( "ALTER TABLE {$this->table_name} ADD COLUMN template_header_text varchar(255) DEFAULT NULL AFTER template_body_text" );
+		}
+		if ( ! in_array( 'template_footer_text', $queue_columns, true ) ) {
+			$wpdb->query( "ALTER TABLE {$this->table_name} ADD COLUMN template_footer_text varchar(255) DEFAULT NULL AFTER template_header_text" );
+		}
+		if ( ! in_array( 'template_buttons', $queue_columns, true ) ) {
+			$wpdb->query( "ALTER TABLE {$this->table_name} ADD COLUMN template_buttons text DEFAULT NULL AFTER template_footer_text" );
+		}
 	}
 
 	/**
@@ -230,19 +242,22 @@ class PCW_Message_Queue_Manager {
 		global $wpdb;
 
 		$defaults = array(
-			'type'               => 'whatsapp',
-			'to_number'          => '',
-			'from_number'        => null,
-			'message'            => '',
-			'contact_name'       => null,
-			'webhook_id'         => null,
-			'automation_id'      => null,
-			'template_name'      => null,
-			'template_language'  => null,
-			'template_params'    => null,
-			'template_body_text' => null,
-			'priority'           => 5,
-			'scheduled_at'       => null,
+			'type'                 => 'whatsapp',
+			'to_number'            => '',
+			'from_number'          => null,
+			'message'              => '',
+			'contact_name'         => null,
+			'webhook_id'           => null,
+			'automation_id'        => null,
+			'template_name'        => null,
+			'template_language'    => null,
+			'template_params'      => null,
+			'template_body_text'   => null,
+			'template_header_text' => null,
+			'template_footer_text' => null,
+			'template_buttons'     => null,
+			'priority'             => 5,
+			'scheduled_at'         => null,
 		);
 
 		$args = wp_parse_args( $args, $defaults );
@@ -303,14 +318,26 @@ class PCW_Message_Queue_Manager {
 		$insert_format = array( '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s' );
 
 		if ( ! empty( $args['template_name'] ) ) {
-			$insert_data['template_name']      = $args['template_name'];
-			$insert_data['template_language']   = $args['template_language'];
-			$insert_data['template_params']     = $args['template_params'];
-			$insert_data['template_body_text']  = $args['template_body_text'];
+			$insert_data['template_name']        = $args['template_name'];
+			$insert_data['template_language']     = $args['template_language'];
+			$insert_data['template_params']       = $args['template_params'];
+			$insert_data['template_body_text']    = $args['template_body_text'];
 			$insert_format[] = '%s';
 			$insert_format[] = '%s';
 			$insert_format[] = '%s';
 			$insert_format[] = '%s';
+			if ( ! empty( $args['template_header_text'] ) ) {
+				$insert_data['template_header_text'] = $args['template_header_text'];
+				$insert_format[] = '%s';
+			}
+			if ( ! empty( $args['template_footer_text'] ) ) {
+				$insert_data['template_footer_text'] = $args['template_footer_text'];
+				$insert_format[] = '%s';
+			}
+			if ( ! empty( $args['template_buttons'] ) && $args['template_buttons'] !== '[]' ) {
+				$insert_data['template_buttons'] = $args['template_buttons'];
+				$insert_format[] = '%s';
+			}
 		}
 
 		$result = $wpdb->insert( $this->table_name, $insert_data, $insert_format );
@@ -363,15 +390,18 @@ class PCW_Message_Queue_Manager {
 	 */
 	public function add_template_to_queue( $args ) {
 		$defaults = array(
-			'to'                => '',
-			'from'              => '',
-			'template_name'     => '',
-			'template_params'   => array(),
-			'template_language' => 'pt_BR',
-			'template_body_text'=> '',
-			'contact_name'      => '',
-			'automation_id'     => null,
-			'metadata'          => array(),
+			'to'                  => '',
+			'from'                => '',
+			'template_name'       => '',
+			'template_params'     => array(),
+			'template_language'   => 'pt_BR',
+			'template_body_text'  => '',
+			'template_header_text'=> '',
+			'template_footer_text'=> '',
+			'template_buttons'    => '[]',
+			'contact_name'        => '',
+			'automation_id'       => null,
+			'metadata'            => array(),
 		);
 
 		$args = wp_parse_args( $args, $defaults );
@@ -390,18 +420,46 @@ class PCW_Message_Queue_Manager {
 			}
 		}
 
+		// Montar preview completo com header/footer/buttons
+		$full_preview = '';
+		$header = $args['template_header_text'];
+		$footer = $args['template_footer_text'];
+		$buttons_raw = $args['template_buttons'];
+		$buttons = is_string( $buttons_raw ) ? json_decode( $buttons_raw, true ) : $buttons_raw;
+		if ( ! is_array( $buttons ) ) $buttons = array();
+
+		if ( ! empty( $header ) ) {
+			$full_preview .= "📋 *{$header}*\n\n";
+		}
+		$full_preview .= ! empty( $body_preview ) ? $body_preview : '[Template: ' . $args['template_name'] . ']';
+		if ( ! empty( $footer ) ) {
+			$full_preview .= "\n\n_{$footer}_";
+		}
+		if ( ! empty( $buttons ) ) {
+			$full_preview .= "\n";
+			foreach ( $buttons as $btn ) {
+				$btn_text = $btn['text'] ?? $btn['label'] ?? '';
+				if ( ! empty( $btn_text ) ) {
+					$full_preview .= "\n🔘 {$btn_text}";
+				}
+			}
+		}
+
 		return $this->add_to_queue( array(
-			'type'               => 'whatsapp_template',
-			'to_number'          => $args['to'],
-			'from_number'        => $args['from'],
-			'message'            => ! empty( $body_preview ) ? $body_preview : '[Template: ' . $args['template_name'] . ']',
-			'contact_name'       => $args['contact_name'],
-			'automation_id'      => $args['automation_id'],
-			'template_name'      => $args['template_name'],
-			'template_language'  => $args['template_language'],
-			'template_params'    => is_array( $args['template_params'] ) ? wp_json_encode( $args['template_params'] ) : $args['template_params'],
-			'template_body_text' => $args['template_body_text'],
-			'metadata'           => $args['metadata'],
+			'type'                 => 'whatsapp_template',
+			'to_number'            => $args['to'],
+			'from_number'          => $args['from'],
+			'message'              => $full_preview,
+			'contact_name'         => $args['contact_name'],
+			'automation_id'        => $args['automation_id'],
+			'template_name'        => $args['template_name'],
+			'template_language'    => $args['template_language'],
+			'template_params'      => is_array( $args['template_params'] ) ? wp_json_encode( $args['template_params'] ) : $args['template_params'],
+			'template_body_text'   => $args['template_body_text'],
+			'template_header_text' => $args['template_header_text'],
+			'template_footer_text' => $args['template_footer_text'],
+			'template_buttons'     => is_array( $buttons_raw ) ? wp_json_encode( $buttons_raw ) : $buttons_raw,
+			'metadata'             => $args['metadata'],
 		) );
 	}
 
@@ -1615,7 +1673,10 @@ class PCW_Message_Queue_Manager {
 				$template_params,
 				! empty( $message->template_language ) ? $message->template_language : 'pt_BR',
 				$contact_name,
-				! empty( $message->template_body_text ) ? $message->template_body_text : ''
+				! empty( $message->template_body_text ) ? $message->template_body_text : '',
+				isset( $message->template_header_text ) ? $message->template_header_text : '',
+				isset( $message->template_footer_text ) ? $message->template_footer_text : '',
+				isset( $message->template_buttons ) ? $message->template_buttons : ''
 			);
 		} else {
 			$this->log_cron( 'info', "Mensagem #{$message->id}: Enviando mensagem normal via {$number_provider}" );

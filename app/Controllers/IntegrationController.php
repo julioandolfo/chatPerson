@@ -679,16 +679,20 @@ class IntegrationController
             // Buscar funis disponíveis
             $funnels = \App\Models\Funnel::whereActive();
             
+            $users = \App\Services\UserService::list(['status' => 'active']);
+
             Response::view('integrations/notificame/index', [
                 'accounts' => $accounts,
                 'funnels' => $funnels,
-                'channels' => NotificameService::CHANNELS
+                'channels' => NotificameService::CHANNELS,
+                'users' => $users
             ]);
         } catch (\Exception $e) {
             Response::view('integrations/notificame/index', [
                 'accounts' => [],
                 'funnels' => [],
                 'channels' => NotificameService::CHANNELS,
+                'users' => [],
                 'error' => $e->getMessage()
             ]);
         }
@@ -1066,6 +1070,77 @@ class IntegrationController
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Obter permissões de templates Notificame para uma conta
+     */
+    public function getTemplatePermissions(int $id): void
+    {
+        Permission::abortIfCannot('notificame.view');
+
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            $stmt = $db->prepare("SELECT template_name, allowed_users FROM notificame_template_permissions WHERE integration_account_id = ?");
+            $stmt->execute([$id]);
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $permissions = [];
+            foreach ($rows as $row) {
+                $permissions[$row['template_name']] = json_decode($row['allowed_users'], true) ?: [];
+            }
+
+            Response::json([
+                'success' => true,
+                'permissions' => $permissions
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Salvar permissões de templates Notificame
+     */
+    public function saveTemplatePermissions(int $id): void
+    {
+        Permission::abortIfCannot('notificame.edit');
+
+        try {
+            $data = Request::all();
+            $templateName = trim($data['template_name'] ?? '');
+            $allowedUsers = $data['allowed_users'] ?? [];
+
+            if (empty($templateName)) {
+                throw new \Exception('Nome do template é obrigatório');
+            }
+
+            if (!is_array($allowedUsers)) {
+                $allowedUsers = [];
+            }
+            $allowedUsers = array_map('intval', array_filter($allowedUsers));
+
+            $db = \App\Helpers\Database::getInstance();
+            $allowedUsersJson = empty($allowedUsers) ? null : json_encode(array_values($allowedUsers));
+
+            $stmt = $db->prepare("INSERT INTO notificame_template_permissions (integration_account_id, template_name, allowed_users)
+                VALUES (?, ?, ?)
+                ON DUPLICATE KEY UPDATE allowed_users = VALUES(allowed_users), updated_at = NOW()");
+            $stmt->execute([$id, $templateName, $allowedUsersJson]);
+
+            Response::json([
+                'success' => true,
+                'message' => 'Permissões salvas com sucesso!'
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 

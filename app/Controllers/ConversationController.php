@@ -679,6 +679,54 @@ class ConversationController
     }
     
     /**
+     * Templates disponíveis para o usuário logado (filtrados por permissão)
+     */
+    public function availableTemplates(int $accountId): void
+    {
+        Permission::abortIfCannot('messages.send.own');
+
+        try {
+            $userId = Auth::id();
+            $templates = \App\Services\NotificameService::listTemplates($accountId);
+
+            $db = \App\Helpers\Database::getInstance();
+            $stmt = $db->prepare("SELECT template_name, allowed_users FROM notificame_template_permissions WHERE integration_account_id = ?");
+            $stmt->execute([$accountId]);
+            $permRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            $permMap = [];
+            foreach ($permRows as $row) {
+                $allowed = json_decode($row['allowed_users'], true);
+                if (!empty($allowed) && is_array($allowed)) {
+                    $permMap[$row['template_name']] = $allowed;
+                }
+            }
+
+            $isSuperAdmin = PermissionService::isSuperAdmin($userId);
+
+            if (!$isSuperAdmin && !empty($permMap)) {
+                $templates = array_values(array_filter($templates, function ($tpl) use ($permMap, $userId) {
+                    $name = $tpl['name'] ?? '';
+                    if (!isset($permMap[$name])) {
+                        return true;
+                    }
+                    return in_array((int)$userId, $permMap[$name], true);
+                }));
+            }
+
+            Response::json([
+                'success' => true,
+                'templates' => $templates
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
      * Criar nova conversa com contato e mensagem
      * Qualquer agente autenticado pode criar conversas
      */
@@ -4456,6 +4504,34 @@ class ConversationController
                                 'source' => 'meta',
                             ];
                         }
+                    }
+                }
+            }
+
+            if ($isNotificameWhatsApp && !empty($templates)) {
+                $userId = Auth::id();
+                $isSuperAdmin = PermissionService::isSuperAdmin($userId);
+                if (!$isSuperAdmin) {
+                    $permStmt = \App\Helpers\Database::getInstance()->prepare(
+                        "SELECT template_name, allowed_users FROM notificame_template_permissions WHERE integration_account_id = ?"
+                    );
+                    $permStmt->execute([$integrationAccountId]);
+                    $permRows = $permStmt->fetchAll(\PDO::FETCH_ASSOC);
+                    $permMap = [];
+                    foreach ($permRows as $row) {
+                        $allowed = json_decode($row['allowed_users'], true);
+                        if (!empty($allowed) && is_array($allowed)) {
+                            $permMap[$row['template_name']] = $allowed;
+                        }
+                    }
+                    if (!empty($permMap)) {
+                        $templates = array_values(array_filter($templates, function ($tpl) use ($permMap, $userId) {
+                            $name = $tpl['name'] ?? '';
+                            if (!isset($permMap[$name])) {
+                                return true;
+                            }
+                            return in_array((int)$userId, $permMap[$name], true);
+                        }));
                     }
                 }
             }

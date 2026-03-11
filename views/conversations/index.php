@@ -21642,7 +21642,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let url;
         if (provider === 'notificame') {
-            url = `<?= \App\Helpers\Url::to("/integrations/notificame/accounts") ?>/${accountId}/templates`;
+            url = `<?= \App\Helpers\Url::to("/conversations/available-templates") ?>/${accountId}`;
         } else {
             list.innerHTML = '<div class="text-center text-muted py-6 fs-7">Selecione uma conta Notificame para ver templates disponíveis</div>';
             return;

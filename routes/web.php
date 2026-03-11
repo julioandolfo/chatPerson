@@ -80,6 +80,7 @@ Router::post('/conversations', [ConversationController::class, 'store'], ['Authe
 // Rotas específicas DEVEM vir ANTES das rotas com parâmetros dinâmicos
 Router::post('/conversations/check-existing', [ConversationController::class, 'checkExistingConversationsBeforeCreate'], ['Authentication']);
 Router::post('/conversations/new', [ConversationController::class, 'newConversation'], ['Authentication']);
+Router::get('/conversations/available-templates/{id}', [ConversationController::class, 'availableTemplates'], ['Authentication']);
 Router::get('/conversations/for-forwarding', [ConversationController::class, 'listForForwarding'], ['Authentication']);
 // Rotas com parâmetros dinâmicos {id}
 // Rotas específicas devem vir antes das rotas dinâmicas
@@ -327,6 +328,8 @@ Router::post('/integrations/notificame/accounts/{id}/templates', [IntegrationCon
 Router::put('/integrations/notificame/accounts/{id}/templates', [IntegrationController::class, 'updateNotificameTemplate'], ['Authentication', 'Permission:notificame.edit']);
 Router::post('/integrations/notificame/accounts/{id}/templates/update', [IntegrationController::class, 'updateNotificameTemplate'], ['Authentication', 'Permission:notificame.edit']);
 Router::post('/integrations/notificame/accounts/{id}/templates/delete', [IntegrationController::class, 'deleteNotificameTemplate'], ['Authentication', 'Permission:notificame.edit']);
+Router::get('/integrations/notificame/accounts/{id}/templates/permissions', [IntegrationController::class, 'getTemplatePermissions'], ['Authentication']);
+Router::post('/integrations/notificame/accounts/{id}/templates/permissions', [IntegrationController::class, 'saveTemplatePermissions'], ['Authentication', 'Permission:notificame.edit']);
 Router::get('/integrations/notificame/logs', [IntegrationController::class, 'notificameLogs'], ['Authentication']);
 
 // Webhook Notificame (executa script diretamente)

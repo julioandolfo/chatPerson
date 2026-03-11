@@ -810,6 +810,61 @@ ob_start();
 </div>
 <!--end::Modal-->
 
+<!--begin::Modal - Permissões do Template-->
+<div class="modal fade" id="kt_modal_template_permissions" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-550px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title fw-bold">
+                    <i class="ki-duotone ki-shield-tick fs-2 me-2"><span class="path1"></span><span class="path2"></span></i>
+                    Permissões do Template
+                </h3>
+                <div class="btn btn-icon btn-sm btn-active-light-primary ms-2" data-bs-dismiss="modal">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="kt_perm_template_name" value="">
+                <div class="mb-5">
+                    <h5 class="fw-semibold mb-1" id="kt_perm_template_label"></h5>
+                    <p class="text-muted fs-7">Selecione quais usuários/agentes podem usar este template ao iniciar conversas. Se nenhum for selecionado, todos terão acesso.</p>
+                </div>
+                <div class="mb-5">
+                    <div class="form-check form-switch mb-4">
+                        <input class="form-check-input" type="checkbox" id="kt_perm_all_users" checked>
+                        <label class="form-check-label fw-semibold" for="kt_perm_all_users">Todos os usuários</label>
+                    </div>
+                    <div id="kt_perm_users_container" class="d-none">
+                        <label class="form-label fw-semibold mb-2">Usuários permitidos:</label>
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm form-control-solid" id="kt_perm_user_search" placeholder="Buscar usuário...">
+                        </div>
+                        <div id="kt_perm_users_list" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--bs-border-color); border-radius: 0.475rem; padding: 0.5rem;">
+                            <?php foreach ($users ?? [] as $user): ?>
+                            <label class="d-flex align-items-center py-2 px-2 rounded cursor-pointer user-perm-item" style="transition: background 0.15s;" data-name="<?= htmlspecialchars(strtolower($user['name'] ?? '')) ?>">
+                                <input type="checkbox" class="form-check-input me-3 perm-user-cb" value="<?= (int)$user['id'] ?>">
+                                <div>
+                                    <span class="fw-semibold d-block"><?= htmlspecialchars($user['name'] ?? '') ?></span>
+                                    <span class="text-muted fs-8"><?= htmlspecialchars($user['email'] ?? '') ?> <?= !empty($user['roles_names']) ? '(' . htmlspecialchars($user['roles_names']) . ')' : '' ?></span>
+                                </div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="kt_save_permissions" onclick="saveTemplatePermissions()">
+                    <span class="indicator-label">Salvar Permissões</span>
+                    <span class="indicator-progress">Salvando... <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Modal-->
+
 <script>
 // Filtrar por canal
 function filterByChannel(channel) {
@@ -1393,6 +1448,8 @@ document.getElementById('kt_form_webhook_notificame').addEventListener('submit',
 
 // ========== Templates ==========
 let _cachedTemplates = [];
+const _canEditNotificame = <?= \App\Helpers\Permission::can('notificame.edit') ? 'true' : 'false' ?>;
+let _templatePermissionsCache = {};
 
 function loadTemplates(accountId) {
     if (!accountId) return;
@@ -1488,6 +1545,10 @@ function renderTemplates(templates) {
                     ${canEdit ? `<button type="button" class="btn btn-icon btn-bg-light btn-active-color-warning btn-sm"
                             onclick="editTemplate(${idx})" title="Editar">
                         <i class="ki-duotone ki-pencil fs-2"><span class="path1"></span><span class="path2"></span></i>
+                    </button>` : ''}
+                    ${_canEditNotificame ? `<button type="button" class="btn btn-icon btn-bg-light btn-active-color-info btn-sm"
+                            onclick="openTemplatePermissions(${idx})" title="Permissões">
+                        <i class="ki-duotone ki-shield-tick fs-2"><span class="path1"></span><span class="path2"></span></i>
                     </button>` : ''}
                     <button type="button" class="btn btn-icon btn-bg-light btn-active-color-danger btn-sm"
                             onclick="deleteTemplate('${escapeAttr(tplId)}', '${escapeAttr(name)}')" title="Excluir">
@@ -2005,6 +2066,116 @@ document.getElementById('kt_form_test_message').addEventListener('submit', funct
     });
 });
 <?php endif; ?>
+
+// ========== Template Permissions ==========
+
+function openTemplatePermissions(idx) {
+    const t = _cachedTemplates[idx];
+    if (!t) return;
+
+    const accountId = getSelectedTemplateAccountId();
+    if (!accountId) {
+        Swal.fire('Erro', 'Selecione uma conta primeiro', 'warning');
+        return;
+    }
+
+    const templateName = t.name || t.templateName || '';
+    document.getElementById('kt_perm_template_name').value = templateName;
+    document.getElementById('kt_perm_template_label').textContent = templateName;
+
+    document.querySelectorAll('.perm-user-cb').forEach(cb => cb.checked = false);
+    document.getElementById('kt_perm_all_users').checked = true;
+    document.getElementById('kt_perm_users_container').classList.add('d-none');
+    document.getElementById('kt_perm_user_search').value = '';
+    filterPermUsers('');
+
+    fetch(`<?= \App\Helpers\Url::to('/integrations/notificame/accounts') ?>/${accountId}/templates/permissions`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && data.permissions) {
+            _templatePermissionsCache = data.permissions;
+            const allowed = data.permissions[templateName] || [];
+            if (allowed.length > 0) {
+                document.getElementById('kt_perm_all_users').checked = false;
+                document.getElementById('kt_perm_users_container').classList.remove('d-none');
+                document.querySelectorAll('.perm-user-cb').forEach(cb => {
+                    cb.checked = allowed.includes(parseInt(cb.value));
+                });
+            }
+        }
+    })
+    .catch(() => {});
+
+    new bootstrap.Modal(document.getElementById('kt_modal_template_permissions')).show();
+}
+
+document.getElementById('kt_perm_all_users').addEventListener('change', function() {
+    const container = document.getElementById('kt_perm_users_container');
+    if (this.checked) {
+        container.classList.add('d-none');
+        document.querySelectorAll('.perm-user-cb').forEach(cb => cb.checked = false);
+    } else {
+        container.classList.remove('d-none');
+    }
+});
+
+document.getElementById('kt_perm_user_search').addEventListener('input', function() {
+    filterPermUsers(this.value.toLowerCase());
+});
+
+function filterPermUsers(search) {
+    document.querySelectorAll('.user-perm-item').forEach(item => {
+        const name = item.dataset.name || '';
+        item.style.display = (!search || name.includes(search)) ? '' : 'none';
+    });
+}
+
+function saveTemplatePermissions() {
+    const accountId = getSelectedTemplateAccountId();
+    const templateName = document.getElementById('kt_perm_template_name').value;
+    const allUsers = document.getElementById('kt_perm_all_users').checked;
+    const btn = document.getElementById('kt_save_permissions');
+
+    let allowedUsers = [];
+    if (!allUsers) {
+        document.querySelectorAll('.perm-user-cb:checked').forEach(cb => {
+            allowedUsers.push(parseInt(cb.value));
+        });
+    }
+
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+
+    fetch(`<?= \App\Helpers\Url::to('/integrations/notificame/accounts') ?>/${accountId}/templates/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ template_name: templateName, allowed_users: allowedUsers })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        if (data.success) {
+            Swal.fire({
+                text: data.message || 'Permissões salvas!',
+                icon: 'success',
+                buttonsStyling: false,
+                confirmButtonText: 'OK',
+                customClass: { confirmButton: 'btn btn-primary' }
+            });
+            bootstrap.Modal.getInstance(document.getElementById('kt_modal_template_permissions'))?.hide();
+        } else {
+            Swal.fire({ text: data.message || 'Erro ao salvar', icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+        }
+    })
+    .catch(err => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        Swal.fire({ text: 'Erro: ' + err.message, icon: 'error', buttonsStyling: false, confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-primary' } });
+    });
+}
 </script>
 
 <?php

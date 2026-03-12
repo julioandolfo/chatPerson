@@ -40,6 +40,41 @@ ob_start();
             </div>
             
             <div class="separator my-10"></div>
+
+            <div class="mb-10">
+                <h4 class="mb-5">Fonte Externa</h4>
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <label class="form-label">Fonte de Dados</label>
+                        <select class="form-select" name="external_source_id" id="external_source_id">
+                            <option value="">Nenhuma (lista manual)</option>
+                            <?php foreach ($externalSources ?? [] as $src): ?>
+                            <option value="<?= $src['id'] ?>" <?= ((int)($list['external_source_id'] ?? 0)) === (int)$src['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($src['name']) ?> (<?= ucfirst($src['type']) ?>)
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text">Vincule esta lista a uma fonte externa para sincronização automática</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Sincronização Automática</label>
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" name="sync_enabled" id="sync_enabled" value="1"
+                                   <?= !empty($list['sync_enabled']) ? 'checked' : '' ?>
+                                   <?= empty($list['external_source_id']) ? 'disabled' : '' ?>>
+                            <label class="form-check-label" for="sync_enabled">Ativar sync automático</label>
+                        </div>
+                        <div class="form-text">Quando ativado, novos contatos da fonte serão adicionados automaticamente conforme a frequência configurada na fonte</div>
+                    </div>
+                </div>
+                <?php if (!empty($list['last_sync_at'])): ?>
+                <div class="mt-3">
+                    <span class="badge badge-light-info">Última sincronização: <?= date('d/m/Y H:i', strtotime($list['last_sync_at'])) ?></span>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="separator my-10"></div>
             
             <div class="mb-10">
                 <h4 class="mb-5">Informações da Lista</h4>
@@ -88,6 +123,16 @@ ob_start();
 <!--end::Card-->
 
 <script>
+document.getElementById('external_source_id').addEventListener('change', function() {
+    const syncCb = document.getElementById('sync_enabled');
+    if (!this.value) {
+        syncCb.checked = false;
+        syncCb.disabled = true;
+    } else {
+        syncCb.disabled = false;
+    }
+});
+
 document.getElementById('list_form').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -97,6 +142,8 @@ document.getElementById('list_form').addEventListener('submit', function(e) {
     
     const formData = new FormData(this);
     const data = Object.fromEntries(formData);
+    data.external_source_id = document.getElementById('external_source_id').value || null;
+    data.sync_enabled = document.getElementById('sync_enabled').checked ? 1 : 0;
     
     fetch('<?= \App\Helpers\Url::to('/contact-lists/' . $list['id']) ?>', {
         method: 'PUT',

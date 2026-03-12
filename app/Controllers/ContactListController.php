@@ -136,9 +136,14 @@ class ContactListController
             return;
         }
 
+        $externalSources = \App\Helpers\Database::fetchAll(
+            "SELECT id, name, type FROM external_data_sources WHERE status = 'active' ORDER BY name"
+        );
+
         Response::view('contact-lists/edit', [
             'list' => $list,
-            'title' => 'Editar Lista'
+            'title' => 'Editar Lista',
+            'externalSources' => $externalSources
         ]);
     }
 

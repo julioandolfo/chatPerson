@@ -517,29 +517,44 @@ class ExternalDataSourceService
     {
         $sources = ExternalDataSource::getNeedingSync();
         
-        Logger::info("ExternalDataSource::processPending - " . count($sources) . " fonte(s) pendente(s)");
+        $count = count($sources);
+        Logger::info("ExternalDataSource::processPending - {$count} fonte(s) pendente(s)");
+        echo "{$count} fonte(s) pendente(s) de sincronização\n";
         
         foreach ($sources as $source) {
+            $sourceId = $source['id'];
+            $sourceType = $source['type'] ?? 'unknown';
+            $sourceName = $source['name'] ?? "#{$sourceId}";
+            echo "  → Processando: {$sourceName} (tipo: {$sourceType})\n";
+
             try {
-                // Buscar listas vinculadas a esta fonte
                 $sql = "SELECT id FROM contact_lists WHERE external_source_id = ? AND sync_enabled = TRUE";
-                $lists = \App\Helpers\Database::fetchAll($sql, [$source['id']]);
+                $lists = \App\Helpers\Database::fetchAll($sql, [$sourceId]);
                 
+                if (empty($lists)) {
+                    echo "    ⚠ Nenhuma lista vinculada com sync ativo. Atualizando last_sync_at.\n";
+                    Logger::info("Fonte #{$sourceId}: nenhuma lista com sync_enabled, atualizando last_sync_at");
+                    ExternalDataSource::updateSyncStatus($sourceId, 'success', 'Nenhuma lista vinculada para sincronizar');
+                    continue;
+                }
+
                 foreach ($lists as $list) {
-                    Logger::info("Sincronizando fonte #{$source['id']} (tipo: {$source['type']}) para lista #{$list['id']}");
+                    echo "    Sincronizando para lista #{$list['id']}...\n";
+                    Logger::info("Sincronizando fonte #{$sourceId} (tipo: {$sourceType}) para lista #{$list['id']}");
                     
-                    // Delegar para o service apropriado baseado no tipo
-                    if ($source['type'] === 'google_maps') {
-                        GoogleMapsProspectService::sync($source['id'], $list['id']);
-                    } elseif ($source['type'] === 'woocommerce') {
-                        WooCommerceProspectService::sync($source['id'], $list['id']);
+                    if ($sourceType === 'google_maps') {
+                        GoogleMapsProspectService::sync($sourceId, $list['id']);
+                    } elseif ($sourceType === 'woocommerce') {
+                        WooCommerceProspectService::sync($sourceId, $list['id']);
                     } else {
-                        self::sync($source['id'], $list['id']);
+                        self::sync($sourceId, $list['id']);
                     }
                 }
                 
+                echo "    ✅ Concluído\n";
             } catch (\Exception $e) {
-                Logger::error("Erro ao processar fonte #{$source['id']}: " . $e->getMessage());
+                echo "    ❌ Erro: " . $e->getMessage() . "\n";
+                Logger::error("Erro ao processar fonte #{$sourceId}: " . $e->getMessage());
             }
         }
     }

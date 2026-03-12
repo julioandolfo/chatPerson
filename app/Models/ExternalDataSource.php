@@ -50,7 +50,7 @@ class ExternalDataSource extends Model
                     (sync_frequency = 'daily' AND last_sync_at <= DATE_SUB(NOW(), INTERVAL 1 DAY)) OR
                     (sync_frequency = 'weekly' AND last_sync_at <= DATE_SUB(NOW(), INTERVAL 1 WEEK))
                 )
-                ORDER BY last_sync_at ASC NULLS FIRST";
+                ORDER BY last_sync_at IS NULL DESC, last_sync_at ASC";
         
         return Database::fetchAll($sql, []);
     }

@@ -622,12 +622,16 @@ async function loadSystemData() {
                 'send_internal_message': { 
                     label: 'Mensagem Interna (Chat)', 
                     icon: 'ki-message-text-2' 
+                },
+                'send_whatsapp_template': {
+                    label: 'Enviar Template WhatsApp (Notificame)',
+                    icon: 'ki-whatsapp',
+                    requiresConfig: true
                 }
             };
         }
     } catch (error) {
         console.error('Erro ao carregar dados do sistema:', error);
-        // Usar valores padrão em caso de erro
         conditionTypes = {
             'conversation_status': { label: 'Status da Conversa', operators: ['equals', 'not_equals'], valueType: 'select', options: ['open', 'closed', 'resolved'] }
         };
@@ -924,6 +928,28 @@ function getActionConfigHTML(actionData, index) {
                 </div>
                 <textarea class="form-control action-config-template" rows="2" placeholder="Template da mensagem..." ${config.use_ai_generated ? 'disabled' : ''}>${config.template || ''}</textarea>
             `;
+        case 'send_whatsapp_template':
+            const ntfAccounts = (systemData.notificame_accounts || []).map(a =>
+                `<option value="${a.id}" ${config.notificame_account_id == a.id ? 'selected' : ''}>${a.name} (${a.phone_number || ''})</option>`
+            ).join('');
+            return `
+                <label class="form-label">Conta Notificame</label>
+                <select class="form-select mb-3 action-config-notificame_account_id" id="ka_ntf_account_${index}" onchange="loadKanbanTemplates(${index})">
+                    <option value="">Selecione uma conta...</option>
+                    ${ntfAccounts}
+                </select>
+                <label class="form-label">Template Aprovado</label>
+                <select class="form-select mb-3 action-config-template_name" id="ka_ntf_template_${index}" onchange="onKanbanTemplateSelect(${index})">
+                    <option value="">Selecione o template...</option>
+                </select>
+                <div id="ka_ntf_tpl_preview_${index}" class="d-none mb-3">
+                    <div class="bg-light rounded p-3 fs-7">
+                        <div id="ka_ntf_tpl_preview_text_${index}" style="white-space: pre-wrap;"></div>
+                    </div>
+                </div>
+                <div id="ka_ntf_tpl_params_${index}"></div>
+                <input type="hidden" class="action-config-template_language" id="ka_ntf_tpl_lang_${index}" value="${config.template_language || 'pt_BR'}">
+            `;
         case 'move_to_stage':
             const stagesOptions = getAllStagesLabels();
             const stagesSelect = Object.entries(stagesOptions).map(([id, label]) => 
@@ -1083,6 +1109,110 @@ function toggleTemplate(index, useAI) {
     }
 }
 
+let _kanbanTemplatesCache = {};
+
+function loadKanbanTemplates(index) {
+    const select = document.getElementById(`ka_ntf_account_${index}`);
+    const tplSelect = document.getElementById(`ka_ntf_template_${index}`);
+    const accountId = select ? select.value : '';
+
+    tplSelect.innerHTML = '<option value="">Carregando...</option>';
+    document.getElementById(`ka_ntf_tpl_preview_${index}`).classList.add('d-none');
+    document.getElementById(`ka_ntf_tpl_params_${index}`).innerHTML = '';
+
+    if (!accountId) {
+        tplSelect.innerHTML = '<option value="">Selecione uma conta...</option>';
+        return;
+    }
+
+    fetch(`<?= \App\Helpers\Url::to('/conversations/available-templates') ?>/${accountId}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        const templates = data.templates || [];
+        _kanbanTemplatesCache[index] = templates;
+        const approved = templates.filter(t => (t.status || '').toLowerCase() === 'approved');
+
+        if (!approved.length) {
+            tplSelect.innerHTML = '<option value="">Nenhum template aprovado</option>';
+            return;
+        }
+
+        let html = '<option value="">Selecione o template...</option>';
+        approved.forEach(t => {
+            const name = t.name || '';
+            const body = t.body || t.text || t.content || (t.components || []).find(c => c.type === 'BODY')?.text || '';
+            const lang = t.language || 'pt_BR';
+            html += `<option value="${name}" data-lang="${lang}" data-body="${encodeURIComponent(body)}">${name} (${lang})</option>`;
+        });
+        tplSelect.innerHTML = html;
+
+        const savedName = tplSelect.dataset.savedValue || '';
+        if (savedName) {
+            tplSelect.value = savedName;
+            if (tplSelect.value === savedName) onKanbanTemplateSelect(index);
+        }
+    })
+    .catch(() => {
+        tplSelect.innerHTML = '<option value="">Erro ao carregar</option>';
+    });
+}
+
+function onKanbanTemplateSelect(index) {
+    const tplSelect = document.getElementById(`ka_ntf_template_${index}`);
+    const selected = tplSelect.options[tplSelect.selectedIndex];
+    const previewDiv = document.getElementById(`ka_ntf_tpl_preview_${index}`);
+    const previewText = document.getElementById(`ka_ntf_tpl_preview_text_${index}`);
+    const paramsDiv = document.getElementById(`ka_ntf_tpl_params_${index}`);
+    const langInput = document.getElementById(`ka_ntf_tpl_lang_${index}`);
+
+    if (!selected || !selected.value) {
+        previewDiv.classList.add('d-none');
+        paramsDiv.innerHTML = '';
+        return;
+    }
+
+    const body = decodeURIComponent(selected.dataset.body || '');
+    const lang = selected.dataset.lang || 'pt_BR';
+    if (langInput) langInput.value = lang;
+
+    previewText.textContent = body;
+    previewDiv.classList.remove('d-none');
+
+    const matches = body.match(/\{\{(\d+)\}\}/g) || [];
+    if (matches.length > 0) {
+        let html = '<label class="form-label mt-2">Parâmetros do Template</label>';
+        const uniqueVars = [...new Set(matches)];
+        uniqueVars.forEach(v => {
+            const num = v.replace(/[{}]/g, '');
+            html += `<div class="mb-2">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text">${v}</span>
+                    <input type="text" class="form-control ka-tpl-param" data-param="${num}" placeholder="Valor ou variável ({contact_name})" value="">
+                </div>
+            </div>`;
+        });
+        html += '<div class="form-text">Use {contact_name} para o nome do contato</div>';
+        paramsDiv.innerHTML = html;
+
+        const actionItem = document.querySelector(`.action-item[data-index="${index}"]`);
+        const savedParams = actionItem?.dataset?.savedTemplateParams;
+        if (savedParams) {
+            try {
+                const parsed = JSON.parse(savedParams);
+                if (Array.isArray(parsed)) {
+                    paramsDiv.querySelectorAll('.ka-tpl-param').forEach((input, i) => {
+                        if (parsed[i] !== undefined) input.value = parsed[i];
+                    });
+                }
+            } catch(e) {}
+        }
+    } else {
+        paramsDiv.innerHTML = '';
+    }
+}
+
 // Adicionar ação
 function addAction() {
     actions.push({ type: '', enabled: true, config: {} });
@@ -1223,6 +1353,17 @@ function collectActions() {
                 config.use_ai_generated = useAI.checked;
             }
         }
+        if (type === 'send_whatsapp_template') {
+            const tplSelect = document.getElementById(`ka_ntf_template_${index}`);
+            const langInput = document.getElementById(`ka_ntf_tpl_lang_${index}`);
+            config.template_name = tplSelect ? tplSelect.value : '';
+            config.template_language = langInput ? langInput.value : 'pt_BR';
+            const paramInputs = item.querySelectorAll('.ka-tpl-param');
+            if (paramInputs.length > 0) {
+                config.template_params = [];
+                paramInputs.forEach(input => config.template_params.push(input.value));
+            }
+        }
         if (type === 'create_note') {
             const isInternal = item.querySelector(`#is_internal_${index}`);
             if (isInternal) {
@@ -1268,6 +1409,18 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     if (actions.length > 0) {
         loadActions();
+        // Auto-carregar templates para ações send_whatsapp_template existentes
+        actions.forEach((action, index) => {
+            if (action.type === 'send_whatsapp_template' && action.config?.notificame_account_id) {
+                const actionItem = document.querySelector(`.action-item[data-index="${index}"]`);
+                if (actionItem) {
+                    actionItem.dataset.savedTemplateParams = JSON.stringify(action.config.template_params || []);
+                    const tplSelect = document.getElementById(`ka_ntf_template_${index}`);
+                    if (tplSelect) tplSelect.dataset.savedValue = action.config.template_name || '';
+                }
+                loadKanbanTemplates(index);
+            }
+        });
     }
 });
 

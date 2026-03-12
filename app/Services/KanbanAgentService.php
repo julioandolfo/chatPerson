@@ -1630,6 +1630,10 @@ class KanbanAgentService
             case 'close_conversation':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'close_conversation': encerrando conversa {$conversation['id']}");
                 return self::actionCloseConversation($conversation);
+
+            case 'send_whatsapp_template':
+                Logger::info("KanbanAgentService::executeSingleAction - Ação 'send_whatsapp_template': enviando template para conversa {$conversation['id']}");
+                return self::actionSendWhatsAppTemplate($conversation, $analysis, $config);
             
             default:
                 Logger::error("KanbanAgentService::executeSingleAction - Tipo de ação desconhecido: $type");
@@ -1677,6 +1681,75 @@ class KanbanAgentService
 
         Logger::info("KanbanAgentService::actionSendFollowupMessage - Mensagem enviada com sucesso (ID: $messageId)");
         return ['message' => 'Mensagem de followup enviada', 'message_id' => $messageId, 'content' => $message];
+    }
+
+    /**
+     * Ação: Enviar template WhatsApp via Notificame
+     */
+    private static function actionSendWhatsAppTemplate(array $conversation, array $analysis, array $config): array
+    {
+        $accountId = $config['notificame_account_id'] ?? null;
+        $templateName = $config['template_name'] ?? '';
+        $templateLanguage = $config['template_language'] ?? 'pt_BR';
+        $templateParams = $config['template_params'] ?? [];
+
+        if (empty($accountId) || empty($templateName)) {
+            throw new \Exception('Conta Notificame e template são obrigatórios');
+        }
+
+        $contact = \App\Models\Contact::find($conversation['contact_id']);
+        $phone = $contact['phone'] ?? $conversation['contact_phone'] ?? '';
+
+        if (empty($phone)) {
+            throw new \Exception('Contato sem número de telefone');
+        }
+
+        $phone = preg_replace('/\D/', '', $phone);
+
+        // Substituir variáveis nos params do template
+        foreach ($templateParams as &$param) {
+            $param = str_replace(
+                ['{contact_name}', '{analysis_summary}', '{conversation_id}'],
+                [$contact['name'] ?? 'Cliente', $analysis['summary'] ?? '', $conversation['id']],
+                $param
+            );
+        }
+        unset($param);
+
+        Logger::info("KanbanAgent::actionSendWhatsAppTemplate - Enviando template '{$templateName}' para {$phone} via conta #{$accountId}");
+
+        $result = \App\Services\NotificameService::sendTemplate(
+            $accountId,
+            $phone,
+            $templateName,
+            $templateParams,
+            $templateLanguage
+        );
+
+        // Salvar mensagem na conversa para rastreabilidade
+        $bodyText = "📋 *Template:* {$templateName}";
+        if (!empty($templateParams)) {
+            $bodyText .= "\n*Params:* " . implode(', ', $templateParams);
+        }
+
+        \App\Helpers\Database::execute(
+            "INSERT INTO messages (conversation_id, content, sender_type, message_type, channel, created_at) VALUES (?, ?, 'agent', 'template', ?, NOW())",
+            [$conversation['id'], $bodyText, $conversation['channel'] ?? 'whatsapp']
+        );
+
+        \App\Helpers\Database::execute(
+            "UPDATE conversations SET updated_at = NOW() WHERE id = ?",
+            [$conversation['id']]
+        );
+
+        Logger::info("KanbanAgent::actionSendWhatsAppTemplate - Template enviado com sucesso para {$phone}");
+
+        return [
+            'message' => "Template '{$templateName}' enviado para {$phone}",
+            'template_name' => $templateName,
+            'phone' => $phone,
+            'result' => $result
+        ];
     }
 
     /**

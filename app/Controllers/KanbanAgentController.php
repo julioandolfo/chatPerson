@@ -487,6 +487,11 @@ class KanbanAgentController
             
             // Departamentos
             $departments = \App\Services\DepartmentService::list([]);
+
+            // Contas Notificame WhatsApp (para envio de templates)
+            $notificameAccounts = \App\Helpers\Database::fetchAll(
+                "SELECT id, name, phone_number, account_id FROM integration_accounts WHERE provider = 'notificame' AND channel = 'whatsapp' AND account_id IS NOT NULL AND account_id != '' ORDER BY name"
+            );
             
             Response::json([
                 'success' => true,
@@ -499,7 +504,8 @@ class KanbanAgentController
                     'agents' => $agents,
                     'ai_agents' => $aiAgents,
                     'tags' => $tags,
-                    'departments' => $departments
+                    'departments' => $departments,
+                    'notificame_accounts' => $notificameAccounts
                 ]
             ]);
         } catch (\Exception $e) {

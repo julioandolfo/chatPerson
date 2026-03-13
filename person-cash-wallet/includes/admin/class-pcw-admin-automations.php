@@ -1519,23 +1519,25 @@ class PCW_Admin_Automations {
 				<?php
 				break;
 
-				case 'cart_abandoned':
-					$hours = isset( $trigger_config['abandoned_hours'] ) ? $trigger_config['abandoned_hours'] : 24;
-					?>
-					<div class="pcw-form-group">
-						<label><?php esc_html_e( 'Tempo de Abandono', 'person-cash-wallet' ); ?></label>
-						<div class="pcw-inline-form" style="align-items: center; gap: 8px;">
-							<span><?php esc_html_e( 'Carrinho abandonado por', 'person-cash-wallet' ); ?></span>
-							<input type="number" name="trigger_config[abandoned_hours]" 
-								value="<?php echo esc_attr( $hours ); ?>" 
-								min="1" 
-								style="width: 80px;">
-							<span><?php esc_html_e( 'horas', 'person-cash-wallet' ); ?></span>
-						</div>
-						<p class="description"><?php esc_html_e( 'Tempo que o carrinho ficou abandonado antes de disparar a automação', 'person-cash-wallet' ); ?></p>
+			case 'cart_abandoned':
+				$hours = isset( $trigger_config['abandoned_hours'] ) ? $trigger_config['abandoned_hours'] : 24;
+				?>
+				<div class="pcw-form-group">
+					<label><?php esc_html_e( 'Tempo de Abandono', 'person-cash-wallet' ); ?></label>
+					<div class="pcw-inline-form" style="align-items: center; gap: 8px;">
+						<span><?php esc_html_e( 'Carrinho abandonado por', 'person-cash-wallet' ); ?></span>
+						<input type="number" name="trigger_config[abandoned_hours]" 
+							value="<?php echo esc_attr( $hours ); ?>" 
+							min="1" 
+							style="width: 80px;">
+						<span><?php esc_html_e( 'horas', 'person-cash-wallet' ); ?></span>
 					</div>
-					<?php
-					break;
+					<p class="description">
+						<?php esc_html_e( 'O cliente receberá no máximo 2 avisos por carrinho abandonado: o 1º quando o tempo acima for atingido, e o 2º após 7 dias caso o carrinho ainda esteja abandonado. Se o cliente comprar e abandonar um novo carrinho, o ciclo reinicia do zero.', 'person-cash-wallet' ); ?>
+					</p>
+				</div>
+				<?php
+				break;
 
 				case 'product_view':
 					$days = isset( $trigger_config['view_days'] ) ? $trigger_config['view_days'] : 7;
@@ -1733,6 +1735,9 @@ class PCW_Admin_Automations {
 		// Horas de carrinho abandonado
 		if ( isset( $config['abandoned_hours'] ) ) {
 			$sanitized['abandoned_hours'] = absint( $config['abandoned_hours'] );
+		}
+		if ( isset( $config['resend_days'] ) ) {
+			$sanitized['resend_days'] = max( 1, absint( $config['resend_days'] ) );
 		}
 
 		// Dias de visualização de produto

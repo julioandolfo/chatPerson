@@ -1143,7 +1143,7 @@ try {
 
             $fullPreview = '';
             if (!empty($headerText)) {
-                $fullPreview .= "📋 *" . $headerText . "*\n\n";
+                $fullPreview .= "*" . $headerText . "*\n\n";
             }
             $fullPreview .= $bodyPreview;
             if (!empty($footerText)) {

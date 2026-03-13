@@ -1312,8 +1312,7 @@ class NotificameService
             'type' => $messageData['type'],
             'external_id' => $messageData['external_id'],
             'direction' => 'inbound',
-            'status' => 'received',
-            'metadata' => json_encode($messageData['metadata'] ?? [])
+            'status' => 'received'
         ];
 
         if (!empty($attachments)) {
@@ -1757,6 +1756,22 @@ class NotificameService
                 } elseif ($contentType === 'contacts') {
                     $data['type'] = 'contacts';
                     $data['content'] = json_encode($contentItem['contacts'] ?? $contentItem);
+                } elseif ($contentType === 'button' || $contentType === 'interactive') {
+                    $buttonText = $contentItem['payload']
+                        ?? $contentItem['title']
+                        ?? $contentItem['text']
+                        ?? $contentItem['button']['text']
+                        ?? $contentItem['button']['payload']
+                        ?? $contentItem['interactive']['button_reply']['title']
+                        ?? $contentItem['interactive']['list_reply']['title']
+                        ?? '';
+
+                    $data['type'] = 'text';
+                    $data['content'] = $buttonText;
+                    $data['metadata']['original_type'] = $contentType;
+                    $data['metadata']['raw_content'] = $contentItem;
+
+                    self::logInfo("extractMessageData: 🔘 Resposta de botão/interativo - tipo={$contentType}, texto='{$buttonText}'");
                 } else {
                     $data['type'] = $contentType;
                     $data['content'] = $contentItem['text'] ?? $contentItem['fileUrl'] ?? '';

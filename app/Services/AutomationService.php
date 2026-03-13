@@ -684,8 +684,10 @@ class AutomationService
             // Verificar palavra-chave
             $config = json_decode($automation['trigger_config'], true);
             if (!empty($config['keyword'])) {
-                if (stripos($message['content'], $config['keyword']) === false) {
-                    \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): palavra-chave '{$config['keyword']}' não encontrada");
+                $searchContent = $message['content'] ?? '';
+
+                if (stripos($searchContent, $config['keyword']) === false) {
+                    \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): palavra-chave '{$config['keyword']}' não encontrada em '{$searchContent}'");
                     continue;
                 }
             }
@@ -3356,6 +3358,50 @@ class AutomationService
                     return false;
             }
         }
+
+        // Campo especial: última mensagem recebida do contato
+        if ($field === 'last_message') {
+            $conversationId = (int)($conversation['id'] ?? 0);
+            $lastMsg = null;
+            if ($conversationId) {
+                $sql = "SELECT content FROM messages
+                        WHERE conversation_id = ? AND sender_type = 'contact'
+                        ORDER BY created_at DESC LIMIT 1";
+                $lastMsg = \App\Helpers\Database::fetch($sql, [$conversationId]);
+            }
+            $messageContent = $lastMsg['content'] ?? '';
+
+            switch ($operator) {
+                case 'contains':
+                    return stripos($messageContent, $value) !== false;
+                case 'not_contains':
+                    return stripos($messageContent, $value) === false;
+                case 'contains_any':
+                    $keywords = array_map('trim', explode(',', $value));
+                    foreach ($keywords as $keyword) {
+                        if ($keyword !== '' && stripos($messageContent, $keyword) !== false) {
+                            return true;
+                        }
+                    }
+                    return false;
+                case 'starts_with':
+                    return stripos($messageContent, $value) === 0;
+                case 'ends_with':
+                    return stripos(strrev($messageContent), strrev($value)) === 0;
+                case 'equals':
+                case '==':
+                    return strcasecmp($messageContent, $value) === 0;
+                case 'not_equals':
+                case '!=':
+                    return strcasecmp($messageContent, $value) !== 0;
+                case 'is_empty':
+                    return empty(trim($messageContent));
+                case 'is_not_empty':
+                    return !empty(trim($messageContent));
+                default:
+                    return false;
+            }
+        }
         
         $conversationValue = $conversation[$field] ?? null;
 
@@ -3370,6 +3416,14 @@ class AutomationService
                 return stripos($conversationValue ?? '', $value) !== false;
             case 'not_contains':
                 return stripos($conversationValue ?? '', $value) === false;
+            case 'contains_any':
+                $keywords = array_map('trim', explode(',', $value));
+                foreach ($keywords as $keyword) {
+                    if ($keyword !== '' && stripos($conversationValue ?? '', $keyword) !== false) {
+                        return true;
+                    }
+                }
+                return false;
             case 'greater_than':
             case '>':
                 return ($conversationValue ?? 0) > $value;

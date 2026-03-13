@@ -1436,7 +1436,44 @@ function renderNode(node) {
         });
         innerHtml += '</div>';
     } else if (node.node_type === 'condition') {
-        // Nó de Condição: mostrar handles TRUE e FALSE
+        // Nó de Condição: mostrar prévia e handles TRUE e FALSE
+        const condField = node.node_data?.field || node.node_data?.conditions?.[0]?.field || '';
+        const condOperator = node.node_data?.operator || node.node_data?.conditions?.[0]?.operator || '';
+        const condValue = node.node_data?.value || node.node_data?.conditions?.[0]?.value || '';
+        const fieldLabels = {
+            'last_message': 'Última msg recebida',
+            'channel': 'Canal',
+            'status': 'Status',
+            'priority': 'Prioridade',
+            'unread_count': 'Msgs não lidas',
+            'created_days_ago': 'Dias desde criação',
+            'contact.name': 'Nome do Contato',
+            'contact.phone': 'Telefone',
+            'contact.email': 'Email',
+            'agent.id': 'Agente (ID)',
+            'agent.name': 'Agente (Nome)',
+            'has_tag': 'Possui Tag',
+            'business_hours': 'Horário Atendimento'
+        };
+        const operatorLabels = {
+            'contains': 'contém',
+            'not_contains': 'não contém',
+            'contains_any': 'contém qualquer',
+            'equals': '=',
+            'not_equals': '≠',
+            'starts_with': 'começa com',
+            'ends_with': 'termina com',
+            'is_empty': 'está vazio',
+            'is_not_empty': 'não está vazio',
+            'greater_than': '>',
+            'less_than': '<'
+        };
+        if (condField) {
+            const fLabel = fieldLabels[condField] || condField;
+            const oLabel = operatorLabels[condOperator] || condOperator;
+            const vLabel = condValue ? ` "${condValue.length > 20 ? condValue.substring(0, 20) + '…' : condValue}"` : '';
+            innerHtml += `<div class="text-muted fs-8 mb-1" style="text-align:center; padding: 0 4px; word-break:break-word;">${fLabel} ${oLabel}${vLabel}</div>`;
+        }
         innerHtml += '<div class="condition-outputs" style="margin-top: 10px;">';
         innerHtml += `
             <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; padding-right: 5px;">
@@ -2383,6 +2420,9 @@ function openNodeConfig(nodeId) {
                             <option value="agent.id">ID do Agente</option>
                             <option value="agent.name">Nome do Agente</option>
                         </optgroup>
+                        <optgroup label="Mensagem">
+                            <option value="last_message">Última mensagem recebida</option>
+                        </optgroup>
                         <optgroup label="Tags">
                             <option value="has_tag">Possui Tag</option>
                         </optgroup>
@@ -2391,12 +2431,13 @@ function openNodeConfig(nodeId) {
                 </div>
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Operador</label>
-                    <select name="operator" id="kt_condition_operator" class="form-select form-select-solid" required>
+                    <select name="operator" id="kt_condition_operator" class="form-select form-select-solid" required onchange="updateConditionValueHint(this.value)">
                         <option value="">Selecione um operador</option>
                         <option value="equals">Igual a (=)</option>
                         <option value="not_equals">Diferente de (≠)</option>
                         <option value="contains">Contém</option>
                         <option value="not_contains">Não contém</option>
+                        <option value="contains_any">Contém qualquer uma das palavras</option>
                         <option value="starts_with">Começa com</option>
                         <option value="ends_with">Termina com</option>
                         <option value="greater_than">Maior que (>)</option>
@@ -3028,6 +3069,7 @@ function openNodeConfig(nodeId) {
                     const operatorSelect = document.getElementById('kt_condition_operator');
                     if (operatorSelect) {
                         operatorSelect.value = node.node_data.operator;
+                        updateConditionValueHint(node.node_data.operator);
                     }
                 }
             }, 50);
@@ -4996,6 +5038,10 @@ function updateConditionOperators(field) {
     // Operadores numéricos para campos numéricos
     const numericFields = ['unread_count', 'created_days_ago'];
     const isNumeric = numericFields.includes(field);
+
+    // Campos de mensagem (texto com operadores de palavra-chave)
+    const messageFields = ['last_message'];
+    const isMessageField = messageFields.includes(field);
     
     let operatorOptions = '<option value="">Selecione um operador</option>';
     
@@ -5023,12 +5069,29 @@ function updateConditionOperators(field) {
         valueInput.placeholder = 'Digite um número...';
         valueContainer.style.display = 'block';
         valueInput.setAttribute('required', 'required');
+    } else if (isMessageField) {
+        operatorOptions += `
+            <option value="contains">Contém</option>
+            <option value="not_contains">Não contém</option>
+            <option value="contains_any">Contém qualquer uma das palavras</option>
+            <option value="starts_with">Começa com</option>
+            <option value="ends_with">Termina com</option>
+            <option value="equals">Igual a (=)</option>
+            <option value="not_equals">Diferente de (≠)</option>
+            <option value="is_empty">Está vazia</option>
+            <option value="is_not_empty">Não está vazia</option>
+        `;
+        valueInput.type = 'text';
+        valueInput.placeholder = 'Ex: sim, ok, quero (separado por vírgula para "contém qualquer")';
+        valueContainer.style.display = 'block';
+        valueInput.setAttribute('required', 'required');
     } else {
         operatorOptions += `
             <option value="equals">Igual a (=)</option>
             <option value="not_equals">Diferente de (≠)</option>
             <option value="contains">Contém</option>
             <option value="not_contains">Não contém</option>
+            <option value="contains_any">Contém qualquer uma das palavras</option>
             <option value="starts_with">Começa com</option>
             <option value="ends_with">Termina com</option>
             <option value="is_empty">Está vazio</option>
@@ -5045,8 +5108,29 @@ function updateConditionOperators(field) {
     operatorSelect.innerHTML = operatorOptions;
 }
 
+// Atualizar hint/placeholder do campo de valor baseado no operador
+function updateConditionValueHint(operator) {
+    const valueInput = document.getElementById('kt_condition_value');
+    const valueHint = document.querySelector('#kt_condition_value_container .form-text');
+    if (!valueInput) return;
+
+    if (operator === 'contains_any') {
+        valueInput.placeholder = 'Ex: sim, ok, quero, confirmar';
+        if (valueHint) valueHint.textContent = 'Separe as palavras por vírgula. Verdadeiro se a mensagem contiver QUALQUER UMA delas.';
+    } else if (operator === 'in' || operator === 'not_in') {
+        valueInput.placeholder = 'valor1, valor2, valor3';
+        if (valueHint) valueHint.textContent = 'Separe os valores por vírgula.';
+    } else if (operator === 'is_empty' || operator === 'is_not_empty') {
+        if (valueHint) valueHint.textContent = 'Nenhum valor necessário para este operador.';
+    } else {
+        valueInput.placeholder = 'Digite o valor...';
+        if (valueHint) valueHint.textContent = 'Valor para comparação. Para listas, separe por vírgula.';
+    }
+}
+
 window.loadStagesForFunnel = loadStagesForFunnel;
 window.updateConditionOperators = updateConditionOperators;
+window.updateConditionValueHint = updateConditionValueHint;
 
 // ============================================
 // FUNÇÕES PARA RAMIFICAÇÃO DE IA

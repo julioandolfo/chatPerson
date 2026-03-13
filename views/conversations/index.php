@@ -342,6 +342,114 @@ function isDifferentDay($date1, $date2) {
 }
 
 /**
+ * Formatar texto com markdown WhatsApp e detectar estrutura de template
+ */
+function formatWhatsAppText(string $text): string {
+    if (empty($text)) return '';
+
+    $escaped = htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    $lines = explode("\n", $escaped);
+
+    $buttonEmojis = ['🔘', '⚙', '📎', '📞', '🔗', '↗', '📋'];
+    $headerLine = null;
+    $footerLine = null;
+    $bodyLines = [];
+    $buttonLines = [];
+
+    $firstNonEmpty = -1;
+    $lastNonEmpty = -1;
+    for ($i = 0; $i < count($lines); $i++) {
+        if (trim($lines[$i]) !== '') {
+            if ($firstNonEmpty === -1) $firstNonEmpty = $i;
+            $lastNonEmpty = $i;
+        }
+    }
+
+    for ($i = 0; $i < count($lines); $i++) {
+        $trimmed = trim($lines[$i]);
+        if ($trimmed === '' && $i > $firstNonEmpty && $i < $lastNonEmpty) {
+            $bodyLines[] = $lines[$i];
+            continue;
+        }
+        $isButton = false;
+        foreach ($buttonEmojis as $e) {
+            if (mb_strpos($trimmed, $e) === 0) { $isButton = true; break; }
+        }
+        if ($isButton) {
+            $buttonLines[] = $trimmed;
+            continue;
+        }
+        if ($i === $firstNonEmpty && preg_match('/^\*[^*]+\*$/', $trimmed)) {
+            $headerLine = mb_substr($trimmed, 1, -1);
+            continue;
+        }
+        if ($i === $lastNonEmpty && empty($buttonLines) && preg_match('/^_[^_]+_$/', $trimmed)) {
+            $footerLine = mb_substr($trimmed, 1, -1);
+            continue;
+        }
+        if (empty($buttonLines)) {
+            $bodyLines[] = $lines[$i];
+        }
+    }
+
+    if (!$footerLine && !empty($bodyLines)) {
+        for ($j = count($bodyLines) - 1; $j >= 0; $j--) {
+            $t = trim($bodyLines[$j]);
+            if ($t === '') continue;
+            if (preg_match('/^_[^_]+_$/', $t)) {
+                $footerLine = mb_substr($t, 1, -1);
+                array_splice($bodyLines, $j);
+            }
+            break;
+        }
+    }
+
+    $hasStructure = $headerLine || $footerLine || !empty($buttonLines);
+
+    $applyInline = function(string $s): string {
+        $s = preg_replace('/\*([^*\n]+)\*/', '<span class="wa-bold">$1</span>', $s);
+        $s = preg_replace('/_([^_\n]+)_/', '<span class="wa-italic">$1</span>', $s);
+        $s = preg_replace('/~([^~\n]+)~/', '<span class="wa-strike">$1</span>', $s);
+        $s = preg_replace('/```([^`]+)```/', '<span class="wa-mono">$1</span>', $s);
+        $s = preg_replace('/`([^`\n]+)`/', '<span class="wa-mono">$1</span>', $s);
+        $s = preg_replace('/(https?:\/\/[^\s<]+)/', '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">$1</a>', $s);
+        return $s;
+    };
+
+    if (!$hasStructure) {
+        return str_replace("\n", "<br>", $applyInline($escaped));
+    }
+
+    $html = '';
+    if ($headerLine) {
+        $html .= '<div class="wa-tpl-header">' . $applyInline($headerLine) . '</div>';
+    }
+
+    $bodyText = trim(implode("\n", $bodyLines), "\n");
+    if ($bodyText !== '') {
+        $html .= '<div class="wa-tpl-body">' . str_replace("\n", "<br>", $applyInline($bodyText)) . '</div>';
+    }
+
+    if ($footerLine) {
+        $html .= '<div class="wa-tpl-footer">' . $applyInline($footerLine) . '</div>';
+    }
+
+    if (!empty($buttonLines)) {
+        $html .= '<div class="wa-tpl-buttons">';
+        foreach ($buttonLines as $btn) {
+            $icon = mb_substr($btn, 0, 1);
+            $label = ltrim(mb_substr($btn, 1), " \t\xC2\xA0");
+            $label = preg_replace('/^\x{FE0F}/u', '', $label);
+            $label = ltrim($label);
+            $html .= '<div class="wa-tpl-btn"><span class="wa-tpl-btn-icon">' . $icon . '</span> ' . $applyInline($label) . '</div>';
+        }
+        $html .= '</div>';
+    }
+
+    return $html;
+}
+
+/**
  * Renderizar separador de data
  */
 function renderDateSeparator($dateString) {
@@ -1525,6 +1633,67 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     line-height: 1.5;
     word-wrap: break-word;
 }
+
+/* WhatsApp template message styling */
+.wa-tpl-header {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+}
+.chat-message.incoming .wa-tpl-header {
+    border-bottom-color: var(--bs-border-color);
+}
+.wa-tpl-footer {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    font-style: italic;
+}
+.chat-message.incoming .wa-tpl-footer {
+    border-top-color: var(--bs-border-color);
+}
+.wa-tpl-buttons {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.chat-message.incoming .wa-tpl-buttons {
+    border-top-color: var(--bs-border-color);
+}
+.wa-tpl-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.12);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    justify-content: center;
+    transition: background 0.15s;
+}
+.chat-message.incoming .wa-tpl-btn {
+    background: rgba(0,0,0,0.04);
+}
+.wa-tpl-btn-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+/* WhatsApp inline formatting */
+.wa-bold { font-weight: 700; }
+.wa-italic { font-style: italic; }
+.wa-strike { text-decoration: line-through; }
+.wa-mono { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; }
+.chat-message.outgoing .wa-mono { background: rgba(255,255,255,0.15); }
+[data-theme="dark"] .wa-mono { background: rgba(255,255,255,0.1); }
 
 /* Reações de mensagem */
 .message-reactions {
@@ -3718,6 +3887,12 @@ function getChannelInfo(channel) {
                         $msgType = $msg['type'] ?? 'message';
                         $msgDirection = $msg['direction'] ?? 'outgoing';
                         $msgContent = $msg['content'] ?? '';
+                        $msgMessageType = $msg['message_type'] ?? 'text';
+
+                        if (empty($msgContent) && $msgMessageType === 'button') {
+                            $msgContent = '🔘 Resposta de botão';
+                        }
+
                         $msgSenderName = $msg['sender_name'] ?? 'Sistema';
                         $msgCreatedAt = $msg['created_at'] ?? date('Y-m-d H:i:s');
                         ?>
@@ -3944,7 +4119,7 @@ function getChannelInfo(channel) {
                         ?>
                                         <?php if ($shouldShowContent): ?>
                                             <div class="<?= (!empty($msg['attachments']) || $isQuoted) ? 'mt-2' : '' ?>">
-                                                <?= str_replace("\n", "<br>", htmlspecialchars($contentToShow)) ?>
+                                                <?= formatWhatsAppText($contentToShow) ?>
                                             </div>
                                         <?php endif; ?>
                                     </div>
@@ -14165,6 +14340,11 @@ function addMessageToChat(message) {
             });
         }
         
+        // Fallback para mensagens de botão sem conteúdo
+        if (!message.content && message.message_type === 'button') {
+            message.content = '🔘 Resposta de botão';
+        }
+
         // Verificar se é mensagem citada/reply
         const hasQuote = message.quoted_message_id || (message.content && message.content.startsWith('↩️'));
         let quotedHtml = '';
@@ -14297,7 +14477,7 @@ function addMessageToChat(message) {
                 <div class="${bubbleClass} ${isAIMessage ? 'ai-message' : ''}">
                     ${quotedHtml}
                     ${attachmentsHtml}
-                    ${shouldShowContent ? '<div class="' + ((attachmentsHtml || quotedHtml) ? 'mt-2' : '') + '">' + nl2br(escapeHtml(actualContent)) + '</div>' : ''}
+                    ${shouldShowContent ? '<div class="' + ((attachmentsHtml || quotedHtml) ? 'mt-2' : '') + '">' + formatWhatsAppText(actualContent) + '</div>' : ''}
                 </div>
                 ${reactionsHtml}
                 <div class="message-time">
@@ -14488,6 +14668,106 @@ function getInitials(name) {
 
 function nl2br(text) {
     return text.replace(/\n/g, '<br>');
+}
+
+function formatWhatsAppText(rawText) {
+    if (!rawText) return '';
+    const escaped = escapeHtml(rawText);
+    const lines = escaped.split('\n');
+
+    const buttonEmojis = ['🔘', '⚙', '📎', '📞', '🔗', '↗', '📋'];
+    let headerLine = null;
+    let footerLine = null;
+    const bodyLines = [];
+    const buttonLines = [];
+
+    let firstNonEmpty = -1;
+    let lastNonEmpty = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim()) {
+            if (firstNonEmpty === -1) firstNonEmpty = i;
+            lastNonEmpty = i;
+        }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
+        if (!trimmed && i > firstNonEmpty && i < lastNonEmpty) {
+            bodyLines.push(lines[i]);
+            continue;
+        }
+        const isButton = buttonEmojis.some(e => trimmed.startsWith(e));
+        if (isButton) {
+            buttonLines.push(trimmed);
+            continue;
+        }
+        if (i === firstNonEmpty && /^\*[^*]+\*$/.test(trimmed)) {
+            headerLine = trimmed.slice(1, -1);
+            continue;
+        }
+        if (i === lastNonEmpty && buttonLines.length === 0 && /^_[^_]+_$/.test(trimmed)) {
+            footerLine = trimmed.slice(1, -1);
+            continue;
+        }
+        if (buttonLines.length === 0) {
+            bodyLines.push(lines[i]);
+        }
+    }
+
+    // Check for footer in last body line if buttons exist
+    if (!footerLine && bodyLines.length > 0) {
+        for (let j = bodyLines.length - 1; j >= 0; j--) {
+            const t = bodyLines[j].trim();
+            if (!t) continue;
+            if (/^_[^_]+_$/.test(t)) {
+                footerLine = t.slice(1, -1);
+                bodyLines.splice(j);
+            }
+            break;
+        }
+    }
+
+    const hasStructure = headerLine || footerLine || buttonLines.length > 0;
+
+    function applyInlineFormat(text) {
+        return text
+            .replace(/\*([^*\n]+)\*/g, '<span class="wa-bold">$1</span>')
+            .replace(/_([^_\n]+)_/g, '<span class="wa-italic">$1</span>')
+            .replace(/~([^~\n]+)~/g, '<span class="wa-strike">$1</span>')
+            .replace(/```([^`]+)```/g, '<span class="wa-mono">$1</span>')
+            .replace(/`([^`\n]+)`/g, '<span class="wa-mono">$1</span>')
+            .replace(/(https?:\/\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">$1</a>');
+    }
+
+    if (!hasStructure) {
+        return applyInlineFormat(escaped).replace(/\n/g, '<br>');
+    }
+
+    let html = '';
+    if (headerLine) {
+        html += `<div class="wa-tpl-header">${applyInlineFormat(headerLine)}</div>`;
+    }
+
+    let bodyText = bodyLines.join('\n').replace(/^\n+|\n+$/g, '');
+    if (bodyText) {
+        html += `<div class="wa-tpl-body">${applyInlineFormat(bodyText).replace(/\n/g, '<br>')}</div>`;
+    }
+
+    if (footerLine) {
+        html += `<div class="wa-tpl-footer">${applyInlineFormat(footerLine)}</div>`;
+    }
+
+    if (buttonLines.length > 0) {
+        html += '<div class="wa-tpl-buttons">';
+        buttonLines.forEach(btn => {
+            const icon = [...btn][0];
+            const label = btn.replace(/^.[\s\uFE0F]*/, '');
+            html += `<div class="wa-tpl-btn"><span class="wa-tpl-btn-icon">${icon}</span> ${applyInlineFormat(label)}</div>`;
+        });
+        html += '</div>';
+    }
+
+    return html;
 }
 
 // Variível global para armazenar mensagem sendo respondida
@@ -22050,6 +22330,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     requestData.template_params = params;
                     requestData.message = requestData.template_body_text || _newConvSelectedTemplate.name;
+
+                    // Extrair header/footer/buttons dos componentes do template
+                    const tplComps = _newConvSelectedTemplate.components || [];
+                    let hdr = _newConvSelectedTemplate.header_text || '';
+                    let ftr = _newConvSelectedTemplate.footer_text || '';
+                    let btns = _newConvSelectedTemplate.buttons || [];
+                    if (!hdr || !ftr || btns.length === 0) {
+                        tplComps.forEach(c => {
+                            const t = (c.type || '').toUpperCase();
+                            if (t === 'HEADER' && !hdr) hdr = c.text || '';
+                            if (t === 'FOOTER' && !ftr) ftr = c.text || '';
+                            if (t === 'BUTTONS' && btns.length === 0) {
+                                (c.buttons || []).forEach(b => {
+                                    btns.push({type: b.type || 'QUICK_REPLY', text: b.text || '', url: b.url || null});
+                                });
+                            }
+                        });
+                    }
+                    requestData.header_text = hdr;
+                    requestData.footer_text = ftr;
+                    requestData.buttons = btns;
                 }
                 
                 const response = await fetch('<?= \App\Helpers\Url::to("/conversations/new") ?>', {
@@ -24755,6 +25056,9 @@ function submitWaCloudTemplate() {
         source: _waCloudSelectedTemplate.source || 'meta',
         body_text: _waCloudSelectedTemplate.body_text || '',
         language: _waCloudSelectedTemplate.language || 'pt_BR',
+        header_text: _waCloudSelectedTemplate.header_text || '',
+        footer_text: _waCloudSelectedTemplate.footer_text || '',
+        buttons: _waCloudSelectedTemplate.buttons || [],
     };
 
     if (isNotificame) {

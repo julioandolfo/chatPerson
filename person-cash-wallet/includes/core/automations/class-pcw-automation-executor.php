@@ -533,24 +533,98 @@ class PCW_Automation_Executor {
 		);
 
 		foreach ( $automations as $automation ) {
-			$config = $automation->trigger_config;
+			$config          = $automation->trigger_config;
 			$abandoned_hours = isset( $config['abandoned_hours'] ) ? absint( $config['abandoned_hours'] ) : 24;
 
-			// Buscar carrinhos abandonados
 			$carts = $this->get_abandoned_carts( $abandoned_hours );
 
 			foreach ( $carts as $cart ) {
-				// Verificar se já foi enviado
-				if ( $this->was_recently_sent( $automation->id, $cart['user_id'], 1 ) ) {
+				$user_id = $cart['user_id'];
+				$state   = $this->get_cart_notification_state( $automation->id, $user_id );
+
+				// Já enviou 2x para este carrinho abandonado → nunca mais
+				if ( $state['count'] >= 2 ) {
 					continue;
 				}
 
-				$this->execute_automation( $automation, $cart['user_id'], array(
+				// Já enviou 1x → só reenviar após 7 dias
+				if ( $state['count'] === 1 ) {
+					$days_since_last = ( time() - strtotime( $state['last_sent_at'] ) ) / DAY_IN_SECONDS;
+					if ( $days_since_last < 7 ) {
+						continue;
+					}
+				}
+
+				$this->execute_automation( $automation, $user_id, array(
 					'cart_total' => $cart['cart_total'],
 					'cart_items' => $cart['cart_items'],
 				) );
 			}
 		}
+	}
+
+	/**
+	 * Retorna quantas vezes o cliente foi notificado para este carrinho abandonado
+	 * (contando apenas envios APÓS a última compra do cliente — se comprou e abandonou de novo, reinicia)
+	 *
+	 * @param int $automation_id ID da automação.
+	 * @param int $user_id       ID do usuário.
+	 * @return array { count: int, last_sent_at: string|null }
+	 */
+	private function get_cart_notification_state( $automation_id, $user_id ) {
+		global $wpdb;
+
+		// Descobrir data da última compra do cliente
+		$use_hpos = get_option( 'woocommerce_feature_hpos_enabled' ) === 'yes'
+			|| ( function_exists( 'wc_get_container' ) && class_exists( '\Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' )
+				&& wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() );
+
+		if ( $use_hpos ) {
+			$orders_table    = $wpdb->prefix . 'wc_orders';
+			$last_purchase   = $wpdb->get_var( $wpdb->prepare(
+				"SELECT MAX(date_created_gmt) FROM {$orders_table}
+				 WHERE customer_id = %d AND type = 'shop_order'
+				 AND status IN ('wc-completed','wc-processing','wc-on-hold')",
+				$user_id
+			) );
+		} else {
+			$last_purchase = $wpdb->get_var( $wpdb->prepare(
+				"SELECT MAX(p.post_date_gmt)
+				 FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_customer_user'
+				 WHERE p.post_type = 'shop_order'
+				 AND p.post_status IN ('wc-completed','wc-processing','wc-on-hold')
+				 AND pm.meta_value = %d",
+				$user_id
+			) );
+		}
+
+		// Contar envios desta automação para este usuário APÓS a última compra
+		// (se não houve compra, conta todos os envios)
+		$exec_table = $wpdb->prefix . 'pcw_automation_executions';
+		$since_sql  = $last_purchase
+			? $wpdb->prepare( "AND created_at > %s", $last_purchase )
+			: '';
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT created_at FROM {$exec_table}
+			 WHERE automation_id = %d
+			 AND user_id = %d
+			 AND status != 'skipped'
+			 {$since_sql}
+			 ORDER BY created_at ASC",
+			$automation_id,
+			$user_id
+		) );
+
+		$count       = count( $rows );
+		$last_sent   = $count > 0 ? end( $rows )->created_at : null;
+
+		return array(
+			'count'        => $count,
+			'last_sent_at' => $last_sent,
+			'last_purchase' => $last_purchase,
+		);
 	}
 
 	/**

@@ -1007,11 +1007,32 @@ class ConversationController
                     }
                 }
 
+                $displayContent = $bodyPreview;
+                $headerText = trim($data['header_text'] ?? '');
+                $footerText = trim($data['footer_text'] ?? '');
+                $buttons = $data['buttons'] ?? [];
+
+                if (!empty($headerText)) {
+                    $displayContent = "*{$headerText}*\n\n" . $displayContent;
+                }
+                if (!empty($footerText)) {
+                    $displayContent .= "\n\n_{$footerText}_";
+                }
+                if (!empty($buttons) && is_array($buttons)) {
+                    $displayContent .= "\n";
+                    foreach ($buttons as $btn) {
+                        $btnType = strtoupper($btn['type'] ?? 'QUICK_REPLY');
+                        $btnText = $btn['text'] ?? '';
+                        $emoji = $btnType === 'URL' ? '🔗' : ($btnType === 'PHONE_NUMBER' ? '📞' : '🔘');
+                        $displayContent .= "\n{$emoji} {$btnText}";
+                    }
+                }
+
                 $messageData = [
                     'conversation_id' => $conversationId,
                     'sender_id' => $currentUserId ?? 0,
                     'sender_type' => 'agent',
-                    'content' => $bodyPreview,
+                    'content' => $displayContent,
                     'message_type' => 'text',
                     'status' => 'pending',
                 ];
@@ -4465,6 +4486,7 @@ class ConversationController
                                     continue;
                                 }
                             }
+                            $comps = self::extractNotificameTemplateComponents($tpl);
                             $templates[] = [
                                 'id' => $tpl['id'] ?? $tpl['name'] ?? '',
                                 'name' => $tpl['name'] ?? '',
@@ -4472,10 +4494,10 @@ class ConversationController
                                 'language' => $tpl['language'] ?? 'pt_BR',
                                 'category' => $tpl['category'] ?? '',
                                 'body_text' => self::extractNotificameTemplateBody($tpl),
-                                'header_type' => '',
-                                'header_text' => '',
-                                'footer_text' => '',
-                                'buttons' => [],
+                                'header_type' => !empty($comps['header_text']) ? 'TEXT' : '',
+                                'header_text' => $comps['header_text'],
+                                'footer_text' => $comps['footer_text'],
+                                'buttons' => $comps['buttons'],
                                 'variables_count' => 0,
                                 'source' => 'notificame',
                             ];
@@ -4577,6 +4599,34 @@ class ConversationController
         return $tpl['body'] ?? $tpl['text'] ?? $tpl['name'] ?? '';
     }
 
+    private static function extractNotificameTemplateComponents(array $tpl): array
+    {
+        $header = '';
+        $footer = '';
+        $buttons = [];
+        $components = $tpl['components'] ?? [];
+
+        foreach ($components as $comp) {
+            $type = strtoupper($comp['type'] ?? '');
+            if ($type === 'HEADER') {
+                $header = $comp['text'] ?? '';
+            } elseif ($type === 'FOOTER') {
+                $footer = $comp['text'] ?? '';
+            } elseif ($type === 'BUTTONS') {
+                foreach ($comp['buttons'] ?? [] as $btn) {
+                    $buttons[] = [
+                        'type' => $btn['type'] ?? 'QUICK_REPLY',
+                        'text' => $btn['text'] ?? '',
+                        'url' => $btn['url'] ?? null,
+                        'phone_number' => $btn['phone_number'] ?? null,
+                    ];
+                }
+            }
+        }
+
+        return ['header_text' => $header, 'footer_text' => $footer, 'buttons' => $buttons];
+    }
+
     /**
      * Enviar template WhatsApp Cloud API em uma conversa
      */
@@ -4652,11 +4702,32 @@ class ConversationController
                     }
                 }
 
+                $displayContent = $bodyText;
+                $headerText = $data['header_text'] ?? '';
+                $footerText = $data['footer_text'] ?? '';
+                $buttons = $data['buttons'] ?? [];
+
+                if (!empty($headerText)) {
+                    $displayContent = "*{$headerText}*\n\n" . $displayContent;
+                }
+                if (!empty($footerText)) {
+                    $displayContent .= "\n\n_{$footerText}_";
+                }
+                if (!empty($buttons) && is_array($buttons)) {
+                    $displayContent .= "\n";
+                    foreach ($buttons as $btn) {
+                        $btnType = strtoupper($btn['type'] ?? 'QUICK_REPLY');
+                        $btnText = $btn['text'] ?? '';
+                        $emoji = $btnType === 'URL' ? '🔗' : ($btnType === 'PHONE_NUMBER' ? '📞' : '🔘');
+                        $displayContent .= "\n{$emoji} {$btnText}";
+                    }
+                }
+
                 $messageData = [
                     'conversation_id' => $id,
                     'sender_id' => $userId ?? 0,
                     'sender_type' => 'agent',
-                    'content' => $bodyText,
+                    'content' => $displayContent,
                     'message_type' => 'text',
                     'status' => 'pending',
                 ];

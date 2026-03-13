@@ -1317,7 +1317,7 @@ function collectActions() {
         
         configInputs.forEach(input => {
             const className = input.className;
-            if (className.includes('action-config-template')) {
+            if (className.includes('action-config-template') && !className.includes('action-config-template_')) {
                 config.template = input.value;
             } else if (className.includes('action-config-use_ai')) {
                 config.use_ai_generated = input.checked;
@@ -1346,16 +1346,20 @@ function collectActions() {
             }
         });
         
+        const dataIdx = item.dataset.index;
+
         // Configurações específicas por tipo
         if (type === 'send_followup_message') {
-            const useAI = item.querySelector(`#use_ai_${index}`);
+            const useAI = item.querySelector(`#use_ai_${dataIdx}`);
             if (useAI) {
                 config.use_ai_generated = useAI.checked;
             }
         }
         if (type === 'send_whatsapp_template') {
-            const tplSelect = document.getElementById(`ka_ntf_template_${index}`);
-            const langInput = document.getElementById(`ka_ntf_tpl_lang_${index}`);
+            const accSelect = document.getElementById(`ka_ntf_account_${dataIdx}`);
+            const tplSelect = document.getElementById(`ka_ntf_template_${dataIdx}`);
+            const langInput = document.getElementById(`ka_ntf_tpl_lang_${dataIdx}`);
+            config.notificame_account_id = accSelect ? (parseInt(accSelect.value) || null) : null;
             config.template_name = tplSelect ? tplSelect.value : '';
             config.template_language = langInput ? langInput.value : 'pt_BR';
             const paramInputs = item.querySelectorAll('.ka-tpl-param');
@@ -1365,14 +1369,13 @@ function collectActions() {
             }
         }
         if (type === 'create_note') {
-            const isInternal = item.querySelector(`#is_internal_${index}`);
+            const isInternal = item.querySelector(`#is_internal_${dataIdx}`);
             if (isInternal) {
                 config.is_internal = isInternal.checked;
             }
         }
-        // Coletar process_immediately para assign_ai_agent
         if (type === 'assign_ai_agent') {
-            const processImmediately = item.querySelector(`#process_immediately_${index}`);
+            const processImmediately = item.querySelector(`#process_immediately_${dataIdx}`);
             if (processImmediately) {
                 config.process_immediately = processImmediately.checked;
             }

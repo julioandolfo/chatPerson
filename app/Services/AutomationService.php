@@ -659,17 +659,38 @@ class AutomationService
         \App\Helpers\Logger::automation("📱 triggerData completo: " . json_encode($triggerData));
         \App\Helpers\Logger::automation("📱 ==========================================");
 
+        $convFunnelId = $conversation['funnel_id'] ?? null;
+        $convStageId = $conversation['funnel_stage_id'] ?? null;
+        \App\Helpers\Logger::automation("📱 Conversa funnel_id={$convFunnelId}, funnel_stage_id={$convStageId}");
+
         $automations = Automation::getActiveByTrigger('message_received', $triggerData);
 
+        \App\Helpers\Logger::automation("📱 Automações message_received encontradas: " . count($automations));
+
         foreach ($automations as $automation) {
-            // Verificar se mensagem contém palavra-chave se configurado
+            // Verificar funil/etapa da automação vs conversa
+            $autoFunnelId = $automation['funnel_id'] ?? null;
+            $autoStageId = $automation['stage_id'] ?? null;
+
+            if ($autoFunnelId && (int)$autoFunnelId !== (int)$convFunnelId) {
+                \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): funil não corresponde (auto={$autoFunnelId}, conv={$convFunnelId})");
+                continue;
+            }
+            if ($autoStageId && (int)$autoStageId !== (int)$convStageId) {
+                \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): etapa não corresponde (auto={$autoStageId}, conv={$convStageId})");
+                continue;
+            }
+
+            // Verificar palavra-chave
             $config = json_decode($automation['trigger_config'], true);
             if (!empty($config['keyword'])) {
                 if (stripos($message['content'], $config['keyword']) === false) {
-                    continue; // Pular se não contém palavra-chave
+                    \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): palavra-chave '{$config['keyword']}' não encontrada");
+                    continue;
                 }
             }
-            
+
+            \App\Helpers\Logger::automation("✅ Executando automação {$automation['id']} ({$automation['name']}) para conversa {$conversation['id']}");
             self::executeAutomation($automation['id'], $conversation['id']);
         }
     }

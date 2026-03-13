@@ -40,7 +40,41 @@ class PCW_Automation_Executor {
 	 * Construtor
 	 */
 	private function __construct() {
+		$this->maybe_fix_trigger_types();
 		$this->init_hooks();
+	}
+
+	/**
+	 * Corrige registros antigos com trigger_type incorreto no banco
+	 */
+	private function maybe_fix_trigger_types() {
+		if ( get_option( 'pcw_trigger_type_fixed_v2' ) ) {
+			return;
+		}
+		global $wpdb;
+		$table = $wpdb->prefix . 'pcw_automations';
+
+		$mappings = array(
+			'abandoned_cart'       => 'cart_abandoned',
+			'post_purchase'        => 'order_completed',
+			'recommended_products' => 'order_completed',
+			'welcome'              => 'user_registered',
+			'new_products'         => 'new_product',
+			'cashback_earned'      => 'cashback_earned',
+			'level_achieved'       => 'level_achieved',
+		);
+
+		foreach ( $mappings as $type => $correct_trigger ) {
+			$wpdb->query( $wpdb->prepare(
+				"UPDATE {$table} SET trigger_type = %s WHERE type = %s AND trigger_type = %s",
+				$correct_trigger,
+				$type,
+				$type
+			) );
+		}
+
+		update_option( 'pcw_trigger_type_fixed_v1', 1 );
+		update_option( 'pcw_trigger_type_fixed_v2', 1 );
 	}
 
 	/**
@@ -107,10 +141,19 @@ class PCW_Automation_Executor {
 		try {
 			if ( in_array( $trigger, array( 'inactive_customer', 'customer_recovery' ), true ) ) {
 				$this->check_inactive_customers();
-			} elseif ( $trigger === 'cart_abandoned' ) {
+			} elseif ( in_array( $trigger, array( 'cart_abandoned', 'abandoned_cart' ), true ) ) {
 				$this->check_abandoned_carts();
 			} elseif ( $trigger === 'cashback_expiring' ) {
 				$this->check_cashback_expiring();
+			} elseif ( $trigger === 'order_completed' ) {
+				$this->check_recent_orders_for_automation( $automation );
+			} elseif ( in_array( $trigger, array( 'user_registered', 'new_product', 'cashback_earned', 'level_achieved' ), true ) ) {
+				wp_send_json_error( array(
+					'message' => sprintf(
+						__( 'A automação "%s" dispara automaticamente quando o evento ocorre (ex: nova compra, novo usuário). Não é possível executar manualmente — aguarde o próximo evento real.', 'person-cash-wallet' ),
+						esc_html( $automation->name )
+					),
+				) );
 			} else {
 				wp_send_json_error( array( 'message' => sprintf( __( 'Trigger "%s" não suporta disparo manual', 'person-cash-wallet' ), esc_html( $trigger ) ) ) );
 			}
@@ -140,14 +183,38 @@ class PCW_Automation_Executor {
 		$details = '';
 		if ( $new_execs === 0 ) {
 			$config = $automation->trigger_config ?? array();
-			$inactive_days = isset( $config['inactive_days'] ) ? absint( $config['inactive_days'] ) : 30;
-			$include_historical = ! empty( $config['include_historical'] ) && $config['include_historical'] === '1';
-			$details = sprintf(
-				' (trigger=%s, inactive_days=%d, include_historical=%s). Verifique se existem clientes elegíveis e se os steps estão configurados corretamente.',
-				$trigger,
-				$inactive_days,
-				$include_historical ? 'sim' : 'não'
-			);
+			if ( in_array( $trigger, array( 'cart_abandoned', 'abandoned_cart' ), true ) ) {
+				$abandoned_hours = isset( $config['abandoned_hours'] ) ? absint( $config['abandoned_hours'] ) : 24;
+				$details = sprintf(
+					' (trigger=%s, abandoned_hours=%d). Verifique se existem carrinhos abandonados de usuários logados e se os steps estão configurados corretamente.',
+					$trigger,
+					$abandoned_hours
+				);
+			} elseif ( $trigger === 'cashback_expiring' ) {
+				$expiring_days = isset( $config['expiring_days'] ) ? absint( $config['expiring_days'] ) : 7;
+				$details = sprintf(
+					' (trigger=%s, expiring_days=%d). Verifique se há cashback expirando no período e se os steps estão configurados corretamente.',
+					$trigger,
+					$expiring_days
+				);
+			} elseif ( $trigger === 'order_completed' ) {
+				$days_back = isset( $config['days_back'] ) ? absint( $config['days_back'] ) : 7;
+				$details   = sprintf(
+					' (trigger=%s, days_back=%d). Verifique se existem pedidos concluídos nos últimos %d dias com clientes elegíveis.',
+					$trigger,
+					$days_back,
+					$days_back
+				);
+			} else {
+				$inactive_days      = isset( $config['inactive_days'] ) ? absint( $config['inactive_days'] ) : 30;
+				$include_historical = ! empty( $config['include_historical'] ) && $config['include_historical'] === '1';
+				$details = sprintf(
+					' (trigger=%s, inactive_days=%d, include_historical=%s). Verifique se existem clientes elegíveis e se os steps estão configurados corretamente.',
+					$trigger,
+					$inactive_days,
+					$include_historical ? 'sim' : 'não'
+				);
+			}
 		}
 
 		error_log( "[PCW EXECUTAR AGORA] Finalizado automação #{$automation_id}: {$new_execs} execuções, {$new_queue} mensagens na fila" );
@@ -459,7 +526,11 @@ class PCW_Automation_Executor {
 	 * Verificar carrinhos abandonados (via cron)
 	 */
 	public function check_abandoned_carts() {
-		$automations = PCW_Automations::instance()->get_active_by_trigger( 'cart_abandoned' );
+		$instance    = PCW_Automations::instance();
+		$automations = array_merge(
+			$instance->get_active_by_trigger( 'cart_abandoned' ),
+			$instance->get_active_by_trigger( 'abandoned_cart' )
+		);
 
 		foreach ( $automations as $automation ) {
 			$config = $automation->trigger_config;
@@ -1203,15 +1274,190 @@ class PCW_Automation_Executor {
 	}
 
 	/**
-	 * Buscar carrinhos abandonados
+	 * Disparo manual para automações baseadas em pedido concluído (post_purchase, recommended_products)
+	 * Busca pedidos completados nos últimos dias_config dias e dispara para clientes não notificados
+	 *
+	 * @param object $automation Dados da automação.
+	 */
+	private function check_recent_orders_for_automation( $automation ) {
+		global $wpdb;
+
+		$config      = $automation->trigger_config ?? array();
+		$days_back   = isset( $config['days_back'] ) ? absint( $config['days_back'] ) : 7;
+		$since       = date( 'Y-m-d H:i:s', strtotime( "-{$days_back} days" ) );
+
+		$use_hpos = get_option( 'woocommerce_feature_hpos_enabled' ) === 'yes'
+			|| ( function_exists( 'wc_get_container' ) && class_exists( '\Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' )
+				&& wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() );
+
+		if ( $use_hpos ) {
+			$orders_table = $wpdb->prefix . 'wc_orders';
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT DISTINCT o.id as order_id, o.customer_id as user_id
+				 FROM {$orders_table} o
+				 WHERE o.type = 'shop_order'
+				 AND o.status IN ('wc-completed','wc-processing')
+				 AND o.customer_id > 0
+				 AND o.date_created_gmt >= %s
+				 ORDER BY o.date_created_gmt DESC",
+				$since
+			), ARRAY_A );
+		} else {
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT p.ID as order_id, pm.meta_value as user_id
+				 FROM {$wpdb->posts} p
+				 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_customer_user'
+				 WHERE p.post_type = 'shop_order'
+				 AND p.post_status IN ('wc-completed','wc-processing')
+				 AND pm.meta_value > 0
+				 AND p.post_date >= %s
+				 ORDER BY p.post_date DESC",
+				$since
+			), ARRAY_A );
+		}
+
+		if ( empty( $rows ) ) {
+			error_log( "[PCW Post Purchase] Nenhum pedido encontrado nos últimos {$days_back} dias para automação #{$automation->id}" );
+			return;
+		}
+
+		foreach ( $rows as $row ) {
+			$user_id  = (int) $row['user_id'];
+			$order_id = (int) $row['order_id'];
+
+			if ( $this->was_recently_sent( $automation->id, $user_id, 1 ) ) {
+				continue;
+			}
+
+			$order = wc_get_order( $order_id );
+			if ( ! $order ) {
+				continue;
+			}
+
+			if ( ! $this->check_trigger_conditions( $automation, $user_id, array( 'order' => $order ) ) ) {
+				continue;
+			}
+
+			$this->execute_automation( $automation, $user_id, array(
+				'order_id'    => $order_id,
+				'order_total' => $order->get_total(),
+			) );
+		}
+
+		error_log( "[PCW Post Purchase] Processados " . count( $rows ) . " pedidos para automação #{$automation->id} (últimos {$days_back} dias)" );
+	}
+
+	/**
+	 * Buscar carrinhos abandonados de usuários logados
+	 *
+	 * Estratégia:
+	 * - Lê o meta _woocommerce_persistent_cart_{blog_id} de usuários com carrinho salvo
+	 * - Filtra usuários cujo último pedido (completo ou processando) foi há mais de X horas,
+	 *   ou que nunca pediram
+	 * - Exclui usuários que não têm itens no carrinho
 	 *
 	 * @param int $hours Horas de abandono.
-	 * @return array
+	 * @return array  Cada item: ['user_id' => int, 'cart_total' => float, 'cart_items' => array]
 	 */
 	private function get_abandoned_carts( $hours ) {
-		// TODO: Implementar busca de carrinhos abandonados
-		// Por ora retorna array vazio
-		return array();
+		global $wpdb;
+
+		$blog_id      = get_current_blog_id();
+		$meta_key     = "_woocommerce_persistent_cart_{$blog_id}";
+		$cutoff_time  = date( 'Y-m-d H:i:s', strtotime( "-{$hours} hours" ) );
+
+		// Usuários com carrinho salvo
+		$users_with_cart = $wpdb->get_results( $wpdb->prepare(
+			"SELECT user_id, meta_value FROM {$wpdb->usermeta}
+			 WHERE meta_key = %s AND meta_value != '' AND meta_value != 'a:0:{}'",
+			$meta_key
+		) );
+
+		if ( empty( $users_with_cart ) ) {
+			return array();
+		}
+
+		$use_hpos = get_option( 'woocommerce_feature_hpos_enabled' ) === 'yes'
+			|| ( function_exists( 'wc_get_container' ) && class_exists( '\Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController' )
+				&& wc_get_container()->get( \Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() );
+
+		$results = array();
+
+		foreach ( $users_with_cart as $row ) {
+			$user_id    = (int) $row->user_id;
+			$cart_data  = maybe_unserialize( $row->meta_value );
+
+			// Verificar se o carrinho tem itens reais
+			if ( empty( $cart_data['cart'] ) || ! is_array( $cart_data['cart'] ) ) {
+				continue;
+			}
+
+			$cart_items = array();
+			$cart_total = 0.0;
+
+			foreach ( $cart_data['cart'] as $item ) {
+				if ( empty( $item['product_id'] ) ) {
+					continue;
+				}
+				$product = wc_get_product( $item['product_id'] );
+				if ( ! $product ) {
+					continue;
+				}
+				$qty    = isset( $item['quantity'] ) ? (int) $item['quantity'] : 1;
+				$price  = (float) $product->get_price();
+				$cart_total += $price * $qty;
+				$cart_items[] = array(
+					'product_id'   => $item['product_id'],
+					'product_name' => $product->get_name(),
+					'quantity'     => $qty,
+					'price'        => $price,
+				);
+			}
+
+			if ( empty( $cart_items ) ) {
+				continue;
+			}
+
+			// Verificar se o usuário fez pedido recente (dentro do período de abandono)
+			if ( $use_hpos ) {
+				$orders_table  = $wpdb->prefix . 'wc_orders';
+				$recent_order  = $wpdb->get_var( $wpdb->prepare(
+					"SELECT COUNT(*) FROM {$orders_table}
+					 WHERE customer_id = %d
+					 AND type = 'shop_order'
+					 AND status IN ('wc-completed','wc-processing','wc-on-hold')
+					 AND date_created_gmt >= %s",
+					$user_id,
+					$cutoff_time
+				) );
+			} else {
+				$recent_order = $wpdb->get_var( $wpdb->prepare(
+					"SELECT COUNT(*) FROM {$wpdb->posts} p
+					 INNER JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_customer_user'
+					 WHERE p.post_type = 'shop_order'
+					 AND p.post_status IN ('wc-completed','wc-processing','wc-on-hold')
+					 AND pm.meta_value = %d
+					 AND p.post_date >= %s",
+					$user_id,
+					$cutoff_time
+				) );
+			}
+
+			// Se fez pedido recente, o carrinho não é abandonado
+			if ( (int) $recent_order > 0 ) {
+				continue;
+			}
+
+			$results[] = array(
+				'user_id'    => $user_id,
+				'cart_total' => $cart_total,
+				'cart_items' => $cart_items,
+			);
+		}
+
+		error_log( "[PCW Abandoned Carts] Encontrados " . count( $results ) . " carrinhos abandonados (threshold: {$hours}h)" );
+
+		return $results;
 	}
 
 	/**

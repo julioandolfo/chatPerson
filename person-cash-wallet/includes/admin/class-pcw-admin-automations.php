@@ -1790,7 +1790,21 @@ class PCW_Admin_Automations {
 			'description'    => isset( $_POST['description'] ) ? sanitize_textarea_field( $_POST['description'] ) : '',
 			'type'           => isset( $_POST['type'] ) ? sanitize_text_field( $_POST['type'] ) : '',
 			'status'         => isset( $_POST['status'] ) ? sanitize_text_field( $_POST['status'] ) : 'inactive',
-			'trigger_type'   => isset( $_POST['type'] ) && sanitize_text_field( $_POST['type'] ) === 'customer_recovery' ? 'customer_recovery' : ( isset( $_POST['type'] ) ? sanitize_text_field( $_POST['type'] ) : '' ),
+		'trigger_type'   => ( function() {
+			$type = isset( $_POST['type'] ) ? sanitize_text_field( $_POST['type'] ) : '';
+			$type_to_trigger = array(
+				'customer_recovery'    => 'customer_recovery',
+				'abandoned_cart'       => 'cart_abandoned',
+				'cashback_expiring'    => 'cashback_expiring',
+				'post_purchase'        => 'order_completed',
+				'recommended_products' => 'order_completed',
+				'welcome'              => 'user_registered',
+				'new_products'         => 'new_product',
+				'cashback_earned'      => 'cashback_earned',
+				'level_achieved'       => 'level_achieved',
+			);
+			return isset( $type_to_trigger[ $type ] ) ? $type_to_trigger[ $type ] : $type;
+		} )(),
 			'trigger_config' => isset( $_POST['trigger_config'] ) ? $this->sanitize_trigger_config( $_POST['trigger_config'] ) : array(),
 			'workflow_steps' => isset( $_POST['steps'] ) ? $_POST['steps'] : array(),
 			'email_template' => isset( $_POST['email_template'] ) ? wp_kses_post( $_POST['email_template'] ) : '',

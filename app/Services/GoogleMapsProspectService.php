@@ -206,7 +206,7 @@ class GoogleMapsProspectService
             ]);
             ContactList::recalculateTotal($contactListId);
             
-            Logger::info("GoogleMapsProspectService::sync - Concluído", $stats);
+            Logger::info("GoogleMapsProspectService::sync - Concluído | " . json_encode($stats, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
             
             return [
                 'success' => true,

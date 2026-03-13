@@ -75,6 +75,11 @@ class AutomationNode extends Model
                 'icon' => 'ki-bookmark',
                 'color' => '#181c32'
             ],
+            'keyword_router' => [
+                'label' => 'Roteador de Palavras-chave',
+                'icon' => 'ki-message-question',
+                'color' => '#f59e0b'
+            ],
             'condition_business_hours' => [
                 'label' => 'Horário de Atendimento',
                 'icon' => 'ki-time',

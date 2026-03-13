@@ -1037,6 +1037,10 @@ class AutomationService
                 \App\Helpers\Logger::automation("  ⏸️ Chatbot executado - PAUSANDO execução. Aguardando resposta do usuário.");
                 \App\Helpers\Logger::automation("  Próximos nós serão executados após resposta do usuário via handleChatbotResponse()");
                 return; // ✅ CHATBOT PAUSA AQUI - não continuar para próximos nós!
+            case 'keyword_router':
+                \App\Helpers\Logger::automation("  Executando: roteador de palavras-chave");
+                self::executeKeywordRouter($nodeData, $conversationId, $allNodes, $executionId);
+                return; // Já processa os próximos nós internamente
             case 'condition':
                 \App\Helpers\Logger::automation("  Executando: condição");
                 self::executeCondition($nodeData, $conversationId, $allNodes, $executionId);
@@ -2984,6 +2988,54 @@ class AutomationService
     /**
      * Executar condição
      */
+    /**
+     * Executar roteador de palavras-chave (múltiplas saídas baseadas em keywords da última mensagem)
+     */
+    private static function executeKeywordRouter(array $nodeData, int $conversationId, array $allNodes, ?int $executionId = null): void
+    {
+        $routes = $nodeData['routes'] ?? [];
+
+        // Buscar última mensagem do contato
+        $sql = "SELECT content FROM messages
+                WHERE conversation_id = ? AND sender_type = 'contact'
+                ORDER BY created_at DESC LIMIT 1";
+        $lastMsg = \App\Helpers\Database::fetch($sql, [$conversationId]);
+        $messageContent = strtolower(trim($lastMsg['content'] ?? ''));
+
+        \App\Helpers\Logger::automation("  🔀 keyword_router - Mensagem: '{$messageContent}', Rotas: " . count($routes));
+
+        $matchedConnectionType = 'fallback';
+
+        foreach ($routes as $idx => $route) {
+            $keywords = array_map('trim', explode(',', strtolower($route['keywords'] ?? '')));
+            foreach ($keywords as $keyword) {
+                if ($keyword !== '' && stripos($messageContent, $keyword) !== false) {
+                    $matchedConnectionType = 'route_' . $idx;
+                    \App\Helpers\Logger::automation("  🔀 keyword_router - Match na rota {$idx} (keyword: '{$keyword}')");
+                    break 2;
+                }
+            }
+        }
+
+        if ($matchedConnectionType === 'fallback') {
+            \App\Helpers\Logger::automation("  🔀 keyword_router - Nenhuma rota correspondeu, usando fallback");
+        }
+
+        // Seguir para o nó da rota correspondente
+        if (!empty($nodeData['connections'])) {
+            foreach ($nodeData['connections'] as $connection) {
+                $connType = $connection['connection_type'] ?? null;
+                if ($connType === $matchedConnectionType) {
+                    $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
+                    if ($nextNode) {
+                        self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
     private static function executeCondition(array $nodeData, int $conversationId, array $allNodes, ?int $executionId = null): void
     {
         $conditions = $nodeData['conditions'] ?? [];
@@ -3939,6 +3991,18 @@ class AutomationService
                     ];
                     break;
                     
+                case 'keyword_router':
+                    $routes = $nodeData['routes'] ?? [];
+                    $routeLabels = array_map(function($r, $i) {
+                        return ($r['label'] ?? ('Rota ' . ($i + 1))) . ': ' . ($r['keywords'] ?? '');
+                    }, $routes, array_keys($routes));
+                    $step['action_preview'] = [
+                        'type' => 'keyword_router',
+                        'routes_count' => count($routes),
+                        'routes' => $routeLabels
+                    ];
+                    break;
+
                 case 'condition':
                     $conditionResult = self::testCondition($nodeData, $conversationId);
                     $step['condition_result'] = $conditionResult;

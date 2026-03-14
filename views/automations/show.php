@@ -1314,14 +1314,22 @@ function renderNode(node) {
 
     switch (node.node_type) {
         case 'trigger':
+            const tType = nd.trigger_type || automationTriggerType || '';
             previewHtml = `<div class="node-preview-detail">
                 <span class="node-preview-icon">⚡</span>
-                <span>${triggerLabels[nd.trigger_type] || nd.trigger_type || 'Não configurado'}</span>
+                <span>${triggerLabels[tType] || tType || 'Não configurado'}</span>
             </div>`;
-            if (nd.trigger_type === 'inactivity' && nd.wait_time_value) {
+            if (nd.channel) {
+                const chanLabels = { whatsapp: 'WhatsApp', instagram: 'Instagram', instagram_comment: 'Comentário IG', facebook: 'Facebook', telegram: 'Telegram', email: 'Email', webchat: 'Webchat' };
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">📡</span><span>${chanLabels[nd.channel] || nd.channel}</span></div>`;
+            }
+            if (nd.keyword) {
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">🔑</span><span>"${nd.keyword}"</span></div>`;
+            }
+            if (tType === 'inactivity' && nd.wait_time_value) {
                 previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">⏱</span><span>Após ${nd.wait_time_value} ${unitLabels[nd.wait_time_unit] || nd.wait_time_unit}</span></div>`;
             }
-            if (nd.trigger_type === 'scheduled') {
+            if (tType === 'scheduled') {
                 previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">📅</span><span>${(nd.schedule_type || 'daily') === 'daily' ? 'Diário' : 'Semanal'} às ${String(nd.schedule_hour || 9).padStart(2,'0')}:${String(nd.schedule_minute || 0).padStart(2,'0')}</span></div>`;
             }
             break;
@@ -5757,16 +5765,9 @@ window.advancedTestAutomation = window.advancedTestAutomation || function() {
     console.warn('advancedTestAutomation ainda não carregou. Aguarde o script principal.');
 };
 
-// ===== FUNÇÕES GLOBAIS (EXPORT NO TOPO) =====
-// Declarar funções como globais imediatamente
-window.testAutomation = null;
-window.advancedTestAutomation = null;
-window.validateAutomationForm = null;
-window.validateAutomationConnections = null;
-window.validateRequiredField = null;
-window.previewVariables = null;
-window.showVariablesModal = null;
-window.previewMessageVariables = null;
+// ===== FUNÇÕES GLOBAIS =====
+// As funções abaixo são declaradas via function declaration e hoisted automaticamente.
+// NÃO usar window.X = null aqui, pois sobrescreveria as declarations hoisted.
 
 // Constante auxiliar para string vazia (evita problemas com aspas em strings PHP)
 const _EMPTY_STR = "";

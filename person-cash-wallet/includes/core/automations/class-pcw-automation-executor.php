@@ -81,9 +81,8 @@ class PCW_Automation_Executor {
 	 * Inicializar hooks
 	 */
 	private function init_hooks() {
-		// Gatilhos de pedidos
+		// Gatilho de pedido concluído (apenas status_completed para evitar disparo duplo)
 		add_action( 'woocommerce_order_status_completed', array( $this, 'trigger_order_completed' ), 10, 1 );
-		add_action( 'woocommerce_thankyou', array( $this, 'trigger_order_completed' ), 10, 1 );
 
 		// Gatilho de cashback ganho
 		add_action( 'pcw_cashback_earned', array( $this, 'trigger_cashback_earned' ), 10, 3 );
@@ -247,16 +246,23 @@ class PCW_Automation_Executor {
 			return;
 		}
 
-		// Buscar automações ativas para este trigger
 		$automations = PCW_Automations::instance()->get_active_by_trigger( 'order_completed' );
 
 		foreach ( $automations as $automation ) {
-			// Verificar condições específicas
 			if ( ! $this->check_trigger_conditions( $automation, $user_id, array( 'order' => $order ) ) ) {
 				continue;
 			}
 
-			// Executar automação
+			// Bloquear reenvio para o mesmo pedido (evita disparo duplo por hooks)
+			if ( $this->was_sent_for_order( $automation->id, $user_id, $order_id ) ) {
+				continue;
+			}
+
+			// Bloquear reenvio dentro de 24h (cliente que fez 2 pedidos no mesmo dia recebe só 1 mensagem)
+			if ( $this->was_recently_sent( $automation->id, $user_id, 1 ) ) {
+				continue;
+			}
+
 			$this->execute_automation( $automation, $user_id, array(
 				'order_id'    => $order_id,
 				'order_total' => $order->get_total(),
@@ -279,6 +285,16 @@ class PCW_Automation_Executor {
 				continue;
 			}
 
+			// Bloquear reenvio para o mesmo pedido
+			if ( $this->was_sent_for_order( $automation->id, $user_id, $order_id ) ) {
+				continue;
+			}
+
+			// Máximo 1 notificação de cashback por dia por cliente
+			if ( $this->was_recently_sent( $automation->id, $user_id, 1 ) ) {
+				continue;
+			}
+
 			$this->execute_automation( $automation, $user_id, array(
 				'cashback_amount' => $amount,
 				'order_id'        => $order_id,
@@ -297,9 +313,13 @@ class PCW_Automation_Executor {
 		$automations = PCW_Automations::instance()->get_active_by_trigger( 'level_achieved' );
 
 		foreach ( $automations as $automation ) {
-			// Verificar se é o nível específico configurado
 			$config = $automation->trigger_config;
 			if ( ! empty( $config['level_id'] ) && $config['level_id'] != $new_level_id ) {
+				continue;
+			}
+
+			// Bloquear reenvio para o mesmo nível dentro de 30 dias
+			if ( $this->was_recently_sent( $automation->id, $user_id, 30 ) ) {
 				continue;
 			}
 
@@ -319,6 +339,11 @@ class PCW_Automation_Executor {
 		$automations = PCW_Automations::instance()->get_active_by_trigger( 'user_registered' );
 
 		foreach ( $automations as $automation ) {
+			// Boas-vindas deve ser enviado apenas 1x na vida do usuário
+			if ( $this->was_recently_sent( $automation->id, $user_id, 3650 ) ) {
+				continue;
+			}
+
 			$this->execute_automation( $automation, $user_id, array(
 				'is_new_user' => true,
 			) );
@@ -1176,10 +1201,37 @@ class PCW_Automation_Executor {
 		$since = date( 'Y-m-d H:i:s', strtotime( "-{$days} days" ) );
 
 		$count = $wpdb->get_var( $wpdb->prepare(
-			"SELECT COUNT(*) FROM {$table} WHERE automation_id = %d AND user_id = %d AND created_at > %s",
+			"SELECT COUNT(*) FROM {$table}
+			 WHERE automation_id = %d AND user_id = %d AND status != 'skipped' AND created_at > %s",
 			$automation_id,
 			$user_id,
 			$since
+		) );
+
+		return $count > 0;
+	}
+
+	/**
+	 * Verifica se esta automação já foi disparada para este pedido específico
+	 * (evita disparo duplo quando múltiplos hooks apontam para o mesmo método)
+	 *
+	 * @param int $automation_id ID da automação.
+	 * @param int $user_id       ID do usuário.
+	 * @param int $order_id      ID do pedido.
+	 * @return bool
+	 */
+	private function was_sent_for_order( $automation_id, $user_id, $order_id ) {
+		global $wpdb;
+
+		$table = $wpdb->prefix . 'pcw_automation_executions';
+
+		$count = $wpdb->get_var( $wpdb->prepare(
+			"SELECT COUNT(*) FROM {$table}
+			 WHERE automation_id = %d AND user_id = %d AND status != 'skipped'
+			 AND step_results LIKE %s",
+			$automation_id,
+			$user_id,
+			'%"order_id":' . intval( $order_id ) . '%'
 		) );
 
 		return $count > 0;

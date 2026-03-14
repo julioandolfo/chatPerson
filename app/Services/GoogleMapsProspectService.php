@@ -235,7 +235,7 @@ class GoogleMapsProspectService
     }
     
     /**
-     * Buscar empresas via Google Places API
+     * Buscar empresas via Google Places API (Text Search + paginação automática)
      */
     private static function fetchFromGooglePlaces(array $config, ?string $pageToken = null): array
     {
@@ -243,88 +243,115 @@ class GoogleMapsProspectService
         if (empty($apiKey)) {
             throw new \Exception("API Key do Google Places não configurada");
         }
-        
+
         $client = self::getClient();
         $results = [];
-        $nextPageToken = null;
-        
-        // Se temos um page token, usar para continuar paginação
-        if ($pageToken) {
-            $url = self::GOOGLE_PLACES_BASE_URL . '/nearbysearch/json';
-            $params = [
-                'pagetoken' => $pageToken,
-                'key' => $apiKey
-            ];
-            
-            // Google exige delay de 2s antes de usar page token
-            sleep(2);
-            
-        } else {
-            // Primeira requisição - converter localização em coordenadas
-            $location = $config['location'] ?? 'São Paulo, SP';
-            $coordinates = self::geocodeLocation($location, $apiKey);
-            
-            if (!$coordinates) {
-                throw new \Exception("Não foi possível geocodificar a localização: {$location}");
-            }
-            
-            $url = self::GOOGLE_PLACES_BASE_URL . '/nearbysearch/json';
-            $params = [
-                'location' => "{$coordinates['lat']},{$coordinates['lng']}",
-                'radius' => $config['radius'] ?? self::DEFAULT_RADIUS,
-                'keyword' => $config['keyword'] ?? '',
-                'language' => $config['language'] ?? self::DEFAULT_LANGUAGE,
-                'key' => $apiKey
-            ];
-        }
-        
-        try {
-            $response = $client->get($url, ['query' => $params]);
-            $data = json_decode($response->getBody()->getContents(), true);
-            
-            if ($data['status'] !== 'OK' && $data['status'] !== 'ZERO_RESULTS') {
-                throw new \Exception("Google Places API erro: " . ($data['error_message'] ?? $data['status']));
-            }
-            
-            $nextPageToken = $data['next_page_token'] ?? null;
-            
-            // Processar resultados
-            foreach ($data['results'] ?? [] as $place) {
-                // Buscar detalhes para obter telefone
-                $details = self::getPlaceDetails($place['place_id'], $apiKey);
-                
-                if ($details && !empty($details['formatted_phone_number'])) {
-                    $results[] = [
-                        'place_id' => $place['place_id'],
-                        'name' => $place['name'] ?? '',
-                        'phone' => $details['formatted_phone_number'] ?? '',
-                        'international_phone' => $details['international_phone_number'] ?? '',
-                        'address' => $place['vicinity'] ?? $details['formatted_address'] ?? '',
-                        'rating' => $place['rating'] ?? null,
-                        'category' => $place['types'][0] ?? '',
-                        'website' => $details['website'] ?? '',
-                        'lat' => $place['geometry']['location']['lat'] ?? null,
-                        'lng' => $place['geometry']['location']['lng'] ?? null
-                    ];
+        $maxResults = $config['max_results'] ?? self::DEFAULT_MAX_RESULTS;
+        $includeNoPhone = !empty($config['include_no_phone']);
+        $keyword = $config['keyword'] ?? '';
+        $location = $config['location'] ?? 'São Paulo, SP';
+        $radius = $config['radius'] ?? self::DEFAULT_RADIUS;
+        $language = $config['language'] ?? self::DEFAULT_LANGUAGE;
+        $currentToken = $pageToken;
+        $page = 0;
+        $maxPages = 3; // Google Places retorna no máximo 3 páginas (60 resultados)
+
+        // Para Text Search, montar query combinando keyword + location
+        $textQuery = trim("{$keyword} em {$location}");
+
+        Logger::info("GoogleMaps::fetchFromGooglePlaces - query='{$textQuery}', radius={$radius}, maxResults={$maxResults}, includeNoPhone=" . ($includeNoPhone ? 'sim' : 'não'));
+
+        while ($page < $maxPages && count($results) < $maxResults) {
+            $page++;
+
+            if ($currentToken) {
+                // Paginação: Google exige delay de 2s antes de usar page token
+                sleep(2);
+                $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
+                $params = [
+                    'pagetoken' => $currentToken,
+                    'key' => $apiKey
+                ];
+                Logger::info("GoogleMaps - Página {$page} via page_token");
+            } else {
+                $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
+                $params = [
+                    'query' => $textQuery,
+                    'radius' => $radius,
+                    'language' => $language,
+                    'key' => $apiKey
+                ];
+
+                // Usar location bias (coordenadas) se possível para melhorar relevância
+                $coordinates = self::geocodeLocation($location, $apiKey);
+                if ($coordinates) {
+                    $params['location'] = "{$coordinates['lat']},{$coordinates['lng']}";
+                    Logger::info("GoogleMaps - Geocoded: {$coordinates['lat']},{$coordinates['lng']}");
                 }
-                
-                // Delay entre requisições de detalhes
-                usleep(self::REQUEST_DELAY_MS * 1000);
-                
-                // Respeitar limite de resultados
-                $maxResults = $config['max_results'] ?? self::DEFAULT_MAX_RESULTS;
-                if (count($results) >= $maxResults) {
+
+                Logger::info("GoogleMaps - Página 1, query='{$textQuery}'");
+            }
+
+            try {
+                $response = $client->get($url, ['query' => $params]);
+                $data = json_decode($response->getBody()->getContents(), true);
+
+                $status = $data['status'] ?? 'UNKNOWN';
+                if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
+                    Logger::error("GoogleMaps - API erro: " . ($data['error_message'] ?? $status));
+                    throw new \Exception("Google Places API erro: " . ($data['error_message'] ?? $status));
+                }
+
+                $pageResults = $data['results'] ?? [];
+                Logger::info("GoogleMaps - Página {$page}: " . count($pageResults) . " resultados brutos");
+
+                if (empty($pageResults)) {
                     break;
                 }
+
+                foreach ($pageResults as $place) {
+                    if (count($results) >= $maxResults) {
+                        break 2;
+                    }
+
+                    $details = self::getPlaceDetails($place['place_id'], $apiKey);
+                    $hasPhone = $details && !empty($details['formatted_phone_number']);
+
+                    if ($hasPhone || $includeNoPhone) {
+                        $results[] = [
+                            'place_id' => $place['place_id'],
+                            'name' => $place['name'] ?? '',
+                            'phone' => $details['formatted_phone_number'] ?? '',
+                            'international_phone' => $details['international_phone_number'] ?? '',
+                            'address' => $place['formatted_address'] ?? $place['vicinity'] ?? $details['formatted_address'] ?? '',
+                            'rating' => $place['rating'] ?? null,
+                            'category' => $place['types'][0] ?? '',
+                            'website' => $details['website'] ?? '',
+                            'lat' => $place['geometry']['location']['lat'] ?? null,
+                            'lng' => $place['geometry']['location']['lng'] ?? null,
+                            'has_phone' => $hasPhone,
+                        ];
+                    }
+
+                    usleep(self::REQUEST_DELAY_MS * 1000);
+                }
+
+                $currentToken = $data['next_page_token'] ?? null;
+                if (empty($currentToken)) {
+                    Logger::info("GoogleMaps - Sem next_page_token, encerrando paginação");
+                    break;
+                }
+
+            } catch (RequestException $e) {
+                throw new \Exception("Erro na requisição Google Places: " . $e->getMessage());
             }
-            
-        } catch (RequestException $e) {
-            throw new \Exception("Erro na requisição Google Places: " . $e->getMessage());
         }
-        
+
+        Logger::info("GoogleMaps - Total final: " . count($results) . " resultados (em {$page} página(s))");
+
         return [
             'results' => $results,
-            'next_page_token' => $nextPageToken
+            'next_page_token' => $currentToken
         ];
     }
     
@@ -534,9 +561,12 @@ class GoogleMapsProspectService
     {
         $placeId = $lead['place_id'] ?? '';
         $phone = self::normalizePhone($lead['phone'] ?? $lead['international_phone'] ?? '');
-        
-        if (empty($phone)) {
-            return ['action' => 'skipped', 'reason' => 'Sem telefone'];
+
+        if (empty($phone) && empty($lead['has_phone'])) {
+            // Só pular se não tiver telefone E não estiver marcado como include_no_phone
+            if (empty($lead['name'])) {
+                return ['action' => 'skipped', 'reason' => 'Sem telefone e sem nome'];
+            }
         }
         
         // Verificar duplicata por place_id

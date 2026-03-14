@@ -70,20 +70,29 @@ ob_start();
                 </div>
                 
                 <div class="row g-5 mt-3">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Raio (metros)</label>
-                        <input type="number" class="form-control" name="radius" value="<?= (int)($searchConfig['radius'] ?? 5000) ?>" min="100" max="50000" />
+                        <input type="number" class="form-control" name="radius" value="<?= (int)($searchConfig['radius'] ?? 50000) ?>" min="100" max="50000" />
+                        <div class="form-text text-muted">Máx: 50.000m (50km)</div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Limite de Resultados</label>
                         <input type="number" class="form-control" name="max_results" value="<?= (int)($searchConfig['max_results'] ?? 60) ?>" min="10" max="500" />
+                        <div class="form-text text-muted">Google Places: máx 60</div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <label class="form-label">Provider</label>
                         <select class="form-select" name="provider">
                             <option value="google_places" <?= ($source['provider'] ?? 'google_places') === 'google_places' ? 'selected' : '' ?>>Google Places API</option>
                             <option value="outscraper" <?= ($source['provider'] ?? '') === 'outscraper' ? 'selected' : '' ?>>Outscraper</option>
                         </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label d-block">Empresas sem telefone</label>
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" name="include_no_phone" value="1" <?= !empty($searchConfig['include_no_phone']) ? 'checked' : '' ?>>
+                            <label class="form-check-label">Incluir</label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -240,8 +249,9 @@ document.getElementById('edit_source_form').addEventListener('submit', function(
         data.search_config = {
             keyword: formData.get('keyword'),
             location: formData.get('location'),
-            radius: parseInt(formData.get('radius')) || 5000,
+            radius: parseInt(formData.get('radius')) || 50000,
             max_results: parseInt(formData.get('max_results')) || 60,
+            include_no_phone: formData.get('include_no_phone') === '1',
             language: 'pt-BR'
         };
     } else if (type === 'woocommerce') {

@@ -73,17 +73,24 @@ ob_start();
                     </div>
                     
                     <div class="row g-3 mb-5">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Limite de Resultados por Sync</label>
                             <input type="number" class="form-control" id="gm_max_results" value="60" min="10" max="500" />
-                            <div class="form-text">Máximo 60 por busca (Google Places API)</div>
+                            <div class="form-text">Google Places: máx 60</div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Provider</label>
                             <select class="form-select" id="gm_provider">
                                 <option value="google_places">Google Places API (Oficial)</option>
                                 <option value="outscraper">Outscraper (Terceiros - Mais Barato)</option>
                             </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label d-block">Empresas sem telefone</label>
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" id="gm_include_no_phone" value="1">
+                                <label class="form-check-label" for="gm_include_no_phone">Incluir na lista</label>
+                            </div>
                         </div>
                     </div>
                     
@@ -557,8 +564,9 @@ function saveGoogleMapsSource() {
         search_config: {
             keyword: keyword,
             location: location,
-            radius: parseInt(document.getElementById('gm_radius').value) || 5000,
+            radius: parseInt(document.getElementById('gm_radius').value) || 50000,
             max_results: parseInt(document.getElementById('gm_max_results').value) || 60,
+            include_no_phone: document.getElementById('gm_include_no_phone')?.checked || false,
             language: 'pt-BR'
         },
         sync_frequency: document.getElementById('gm_sync_frequency').value,

@@ -85,6 +85,30 @@ $styles = <<<HTML
 /* =============================================
    SECTION 2: LAYOUT (topbar, sidebar, canvas)
    ============================================= */
+/* Override Metronic layout when ae-wrapper is present */
+body:has(.ae-wrapper) {
+    padding-left: 0 !important;
+    overflow: hidden !important;
+}
+body:has(.ae-wrapper) #kt_aside {
+    display: none !important;
+}
+body:has(.ae-wrapper) > .d-flex > .page > .wrapper > *:not(.content) {
+    display: none !important;
+}
+body:has(.ae-wrapper) > .d-flex > .page > .wrapper > .content {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+body:has(.ae-wrapper) > .d-flex > .page > .wrapper > .content > .container-fluid {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+body:has(.ae-wrapper) .wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
 .ae-wrapper {
     position: fixed;
     inset: 0;
@@ -232,6 +256,26 @@ $styles = <<<HTML
     padding: 2px 14px 8px; font-size: 11px; color: var(--ae-text-muted);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.automation-node .node-preview-body {
+    padding: 4px 14px 10px; font-size: 11px; color: var(--ae-text-muted);
+    border-top: 1px solid var(--ae-border); margin-top: 2px;
+}
+.automation-node .node-preview-detail {
+    display: flex; align-items: center; gap: 5px; padding: 2px 0;
+    font-size: 11px; color: var(--ae-text); line-height: 1.4;
+}
+.automation-node .node-preview-detail.muted {
+    color: var(--ae-text-muted); font-style: italic;
+}
+.automation-node .node-preview-detail .node-preview-icon {
+    flex-shrink: 0; width: 16px; text-align: center; font-size: 11px; font-style: normal;
+}
+.automation-node .node-preview-msg {
+    font-size: 11px; color: var(--ae-text-muted); line-height: 1.4;
+    padding: 3px 0; word-break: break-word;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 .automation-node .node-actions {
     display: none; position: absolute; top: 8px; right: 8px;
     gap: 4px; z-index: 100;
@@ -300,16 +344,15 @@ $styles = <<<HTML
 }
 .connections-overlay path, .connections-overlay line { pointer-events: stroke; cursor: pointer; }
 .connections-overlay path.connection-line {
-    stroke: var(--ae-primary); stroke-width: 2; fill: none;
-    stroke-linecap: round; stroke-linejoin: round;
-    transition: stroke-width var(--ae-transition);
+    fill: none; stroke-linecap: round; stroke-linejoin: round;
+    transition: stroke-width .15s ease, filter .15s ease;
 }
-.connections-overlay path.connection-line:hover { stroke-width: 3; opacity: .8; }
-.connection-arrow { filter: drop-shadow(0 1px 2px rgba(0,0,0,.1)); }
-.connection-delete-btn { opacity: 0; transition: opacity var(--ae-transition); cursor: pointer; }
+.connection-arrow { transition: opacity .15s ease; }
+.connection-delete-btn { opacity: 0; transition: opacity .2s ease; cursor: pointer; pointer-events: all; }
 .connection-group:hover .connection-delete-btn { opacity: 1; }
-.connecting-line { stroke-dasharray: 6,4; opacity: .7; fill: none; stroke-linecap: round; animation: dash .5s linear infinite; }
-@keyframes dash { to { stroke-dashoffset: -10; } }
+.flow-dot { pointer-events: none; }
+.connecting-line { stroke-dasharray: 8,5; opacity: .6; fill: none; stroke-linecap: round; animation: dash .6s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -13; } }
 
 /* Config side panel */
 .ae-config-panel {
@@ -1255,20 +1298,136 @@ function renderNode(node) {
                           node.node_data?.chatbot_type === 'menu' &&
                           Array.isArray(node.node_data?.chatbot_options);
     
-    // Build preview text
-    let previewText = '';
-    if (node.node_type === 'action_send_message' && node.node_data.message) {
-        previewText = node.node_data.message.substring(0, 50) + (node.node_data.message.length > 50 ? '...' : '');
-    } else if (node.node_type === 'action_assign_agent' && node.node_data.agent_id) {
-        previewText = 'Agente ID: ' + node.node_data.agent_id;
-    } else if (node.node_type === 'action_chatbot') {
-        previewText = (node.node_data.chatbot_type === 'menu' ? 'Menu' : 'Simples');
-    } else if (node.node_type === 'delay') {
-        previewText = (node.node_data.delay_value || '5') + ' ' + (node.node_data.delay_unit || 'minutes');
-    } else if (node.node_data.label && node.node_data.label !== config.label) {
-        previewText = node.node_data.label;
+    // Build rich preview HTML
+    let previewHtml = '';
+    const nd = node.node_data || {};
+    const unitLabels = { seconds: 'segundos', minutes: 'minutos', hours: 'horas', days: 'dias' };
+    const triggerLabels = {
+        new_conversation: 'Nova conversa iniciada',
+        message_received: 'Mensagem recebida',
+        conversation_closed: 'Conversa encerrada',
+        tag_added: 'Tag adicionada',
+        stage_changed: 'Estágio alterado',
+        inactivity: 'Inatividade do contato',
+        scheduled: 'Agendamento programado'
+    };
+
+    switch (node.node_type) {
+        case 'trigger':
+            previewHtml = `<div class="node-preview-detail">
+                <span class="node-preview-icon">⚡</span>
+                <span>${triggerLabels[nd.trigger_type] || nd.trigger_type || 'Não configurado'}</span>
+            </div>`;
+            if (nd.trigger_type === 'inactivity' && nd.wait_time_value) {
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">⏱</span><span>Após ${nd.wait_time_value} ${unitLabels[nd.wait_time_unit] || nd.wait_time_unit}</span></div>`;
+            }
+            if (nd.trigger_type === 'scheduled') {
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">📅</span><span>${(nd.schedule_type || 'daily') === 'daily' ? 'Diário' : 'Semanal'} às ${String(nd.schedule_hour || 9).padStart(2,'0')}:${String(nd.schedule_minute || 0).padStart(2,'0')}</span></div>`;
+            }
+            break;
+        case 'action_send_message':
+            if (nd.message) {
+                const msgClean = nd.message.replace(/<[^>]*>/g, '').replace(/\n/g, ' ').trim();
+                previewHtml = `<div class="node-preview-msg">${msgClean.substring(0, 80)}${msgClean.length > 80 ? '…' : ''}</div>`;
+            }
+            if (nd.send_image_url || nd.attachment_url) {
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">📎</span><span>Com anexo</span></div>`;
+            }
+            if (!nd.message && !nd.send_image_url && !nd.attachment_url) {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_assign_agent':
+            if (nd.agent_name) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">👤</span><span>${nd.agent_name}</span></div>`;
+            } else if (nd.agent_id) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">👤</span><span>Agente #${nd.agent_id}</span></div>`;
+            } else {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_assign_advanced':
+            if (nd.distribution_method) {
+                const distLabels = { round_robin: 'Rodízio', least_active: 'Menor carga', random: 'Aleatório', all_at_once: 'Todos de uma vez' };
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🔄</span><span>${distLabels[nd.distribution_method] || nd.distribution_method}</span></div>`;
+                if (nd.agent_ids && Array.isArray(nd.agent_ids)) {
+                    previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">👥</span><span>${nd.agent_ids.length} agente(s)</span></div>`;
+                }
+            } else {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_assign_ai_agent':
+            if (nd.ai_model) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🤖</span><span>${nd.ai_model}</span></div>`;
+            }
+            if (nd.ai_prompt) {
+                const promptShort = nd.ai_prompt.substring(0, 60) + (nd.ai_prompt.length > 60 ? '…' : '');
+                previewHtml += `<div class="node-preview-msg">${promptShort}</div>`;
+            }
+            if (nd.ai_intents && Array.isArray(nd.ai_intents) && nd.ai_intents.length > 0) {
+                previewHtml += `<div class="node-preview-detail muted"><span class="node-preview-icon">🎯</span><span>${nd.ai_intents.length} intent(s)</span></div>`;
+            }
+            if (!nd.ai_model && !nd.ai_prompt) {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_move_stage':
+            if (nd.stage_name) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">📋</span><span>${nd.stage_name}</span></div>`;
+            } else if (nd.stage_id) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">📋</span><span>Estágio #${nd.stage_id}</span></div>`;
+            } else {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_set_tag':
+            if (nd.tag_name) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🏷️</span><span>${nd.tag_name}</span></div>`;
+            } else if (nd.tag_id) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🏷️</span><span>Tag #${nd.tag_id}</span></div>`;
+            } else {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'action_chatbot':
+            if (nd.chatbot_type === 'menu') {
+                const optCount = (nd.chatbot_options && Array.isArray(nd.chatbot_options)) ? nd.chatbot_options.length : 0;
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">📋</span><span>Menu com ${optCount} opções</span></div>`;
+                if (nd.chatbot_message) {
+                    const cbMsg = nd.chatbot_message.replace(/<[^>]*>/g, '').substring(0, 50);
+                    previewHtml += `<div class="node-preview-msg">${cbMsg}${nd.chatbot_message.length > 50 ? '…' : ''}</div>`;
+                }
+            } else {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">💬</span><span>Simples</span></div>`;
+                if (nd.chatbot_message) {
+                    const cbMsg2 = nd.chatbot_message.replace(/<[^>]*>/g, '').substring(0, 50);
+                    previewHtml += `<div class="node-preview-msg">${cbMsg2}${nd.chatbot_message.length > 50 ? '…' : ''}</div>`;
+                }
+            }
+            break;
+        case 'action_create_conversation':
+            if (nd.template_name || nd.template_id) {
+                previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">💬</span><span>${nd.template_name || 'Template #' + nd.template_id}</span></div>`;
+            } else {
+                previewHtml = `<div class="node-preview-detail muted"><span class="node-preview-icon">✏️</span><span>Não configurado</span></div>`;
+            }
+            break;
+        case 'delay':
+            const delayVal = nd.delay_value || '5';
+            const delayUnit = unitLabels[nd.delay_unit] || nd.delay_unit || 'minutos';
+            previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">⏳</span><span>Aguardar ${delayVal} ${delayUnit}</span></div>`;
+            break;
+        case 'end':
+            previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🏁</span><span>Fim do fluxo</span></div>`;
+            break;
+        default:
+            if (nd.label && nd.label !== config.label) {
+                previewHtml = `<div class="node-preview-detail muted"><span>${nd.label}</span></div>`;
+            }
+            break;
     }
-    
+
     let innerHtml = `
         <div class="node-color-bar" style="background:${color};"></div>
         <div class="node-actions">
@@ -1286,7 +1445,7 @@ function renderNode(node) {
             <span class="node-title">${config.label || node.node_type}</span>
             <span class="node-id-badge">${String(node.id || '')}</span>
         </div>
-        ${previewText ? `<div class="node-preview">${previewText}</div>` : ''}
+        ${previewHtml ? `<div class="node-preview-body">${previewHtml}</div>` : ''}
         <div class="node-connection-handle input" data-node-id="${String(node.id || '')}" data-handle-type="input"></div>
     `;
     
@@ -3379,17 +3538,18 @@ function startConnection(nodeId, handleType, e, optionIndex, connectionType) {
     document.body.style.cursor = 'crosshair';
     document.body.style.userSelect = 'none';
     
-    // Criar path temporário para curva Bézier
+    const isRightOutput = (optionIndex !== undefined && optionIndex !== null) || (connectionType !== null && connectionType !== undefined);
+
     connectingLine = document.createElementNS('http://www.w3.org/2000/svg', 'path');
     connectingLine.setAttribute('d', `M ${pos.x} ${pos.y} L ${pos.x} ${pos.y}`);
     connectingLine.setAttribute('class', 'connecting-line');
-    connectingLine.setAttribute('stroke', '#009ef7');
-    connectingLine.setAttribute('stroke-width', '2');
+    connectingLine.setAttribute('stroke', '#3b82f6');
+    connectingLine.setAttribute('stroke-width', '2.5');
     connectingLine.setAttribute('fill', 'none');
     connectionsSvg.appendChild(connectingLine);
-    
-    // Armazenar posição inicial
+
     connectingLine._startX = pos.x;
+    connectingLine._isRightOutput = isRightOutput;
     connectingLine._startY = pos.y;
     
     // Atualizar linha ao mover mouse (com curva Bézier)
@@ -3401,26 +3561,11 @@ function startConnection(nodeId, handleType, e, optionIndex, connectionType) {
         if (connectingLine) {
             const startX = connectingLine._startX;
             const startY = connectingLine._startY;
-            
-            // Calcular pontos de controle (mesmos parâmetros da linha permanente)
-            const dx = x - startX;
-            const dy = y - startY;
-            
-            // Offset horizontal: maior para distâncias maiores
-            const offsetX = Math.max(80, Math.min(Math.abs(dx) * 0.6, 150));
-            
-            // Offset vertical adicional para curvas mais "orgânicas"
-            const offsetY = Math.abs(dy) * 0.2;
-            
-            // Pontos de controle para curva suave (saindo horizontalmente)
-            const cp1x = startX + offsetX;
-            const cp1y = startY + offsetY;
-            const cp2x = x - offsetX;
-            const cp2y = y - offsetY;
-            
-            // Atualizar path com curva Bézier
-            const pathData = `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x} ${y}`;
-            connectingLine.setAttribute('d', pathData);
+            const isRight = connectingLine._isRightOutput || false;
+            const { cp1x, cp1y, cp2x, cp2y } = computeSmartControlPoints(
+                { x: startX, y: startY }, { x, y }, isRight
+            );
+            connectingLine.setAttribute('d', `M ${startX} ${startY} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x} ${y}`);
         }
     };
     
@@ -3510,177 +3655,227 @@ function endConnection(nodeId, handleType, e) {
     cancelConnection();
 }
 
+function bezierPoint(t, p0, p1, p2, p3) {
+    const u = 1 - t;
+    return u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3;
+}
+function bezierTangent(t, p0, p1, p2, p3) {
+    const u = 1 - t;
+    return 3*u*u*(p1-p0) + 6*u*t*(p2-p1) + 3*t*t*(p3-p2);
+}
+
+function computeSmartControlPoints(fromPos, toPos, isRightOutput) {
+    const dx = toPos.x - fromPos.x;
+    const dy = toPos.y - fromPos.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    const curvature = Math.max(40, Math.min(dist * 0.45, 180));
+
+    let cp1x, cp1y, cp2x, cp2y;
+
+    if (isRightOutput) {
+        // Handle exits to the RIGHT, target enters from TOP
+        cp1x = fromPos.x + curvature;
+        cp1y = fromPos.y;
+        cp2x = toPos.x;
+        cp2y = toPos.y - curvature;
+
+        // If target is to the left or nearly same X, add extra curvature to avoid overlap
+        if (dx < 50) {
+            const extra = Math.max(60, Math.abs(dx) + 80);
+            cp1x = fromPos.x + extra;
+            cp2y = toPos.y - Math.max(curvature, Math.abs(dy) * 0.35);
+        }
+    } else {
+        // Handle exits DOWNWARD, target enters from TOP
+        cp1x = fromPos.x;
+        cp1y = fromPos.y + curvature;
+        cp2x = toPos.x;
+        cp2y = toPos.y - curvature;
+
+        // If target is above or at same level, curve wider
+        if (dy < 30) {
+            const swing = Math.max(80, Math.abs(dx) * 0.6);
+            cp1x = fromPos.x + (dx > 0 ? swing : -swing);
+            cp1y = fromPos.y + Math.max(60, Math.abs(dy) * 0.5 + 40);
+            cp2x = toPos.x + (dx > 0 ? -swing * 0.3 : swing * 0.3);
+            cp2y = toPos.y - Math.max(60, Math.abs(dy) * 0.5 + 40);
+        }
+    }
+
+    return { cp1x, cp1y, cp2x, cp2y };
+}
+
 function renderConnections() {
     if (!connectionsSvg) return;
-    
-    // Limpar conexões existentes
     connectionsSvg.innerHTML = '';
-    
+
+    // SVG defs for reusable markers and filters
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+
+    // Glow filter
+    const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+    filter.setAttribute('id', 'conn-glow');
+    filter.setAttribute('x', '-20%'); filter.setAttribute('y', '-20%');
+    filter.setAttribute('width', '140%'); filter.setAttribute('height', '140%');
+    const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+    blur.setAttribute('stdDeviation', '3'); blur.setAttribute('result', 'glow');
+    const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+    const mn1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    mn1.setAttribute('in', 'glow');
+    const mn2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+    mn2.setAttribute('in', 'SourceGraphic');
+    merge.appendChild(mn1); merge.appendChild(mn2);
+    filter.appendChild(blur); filter.appendChild(merge);
+    defs.appendChild(filter);
+
+    // Animated flow dot pattern
+    const flowDot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    flowDot.setAttribute('id', 'flow-dot-template');
+    flowDot.setAttribute('r', '3');
+    defs.appendChild(flowDot);
+
+    connectionsSvg.appendChild(defs);
+
+    let connIdx = 0;
     nodes.forEach(function(node) {
         if (!node.node_data.connections || !Array.isArray(node.node_data.connections)) return;
-        
+
         node.node_data.connections.forEach(function(connection) {
             const optionIndex = connection.option_index !== undefined ? connection.option_index : null;
-            const connectionType = connection.connection_type || null; // 'true' ou 'false' para condições
+            const connectionType = connection.connection_type || null;
+            const isRightOutput = (optionIndex !== null) || (connectionType !== null);
+
             const fromPos = getNodeHandlePosition(node.id, 'output', optionIndex, connectionType);
             const toPos = getNodeHandlePosition(connection.target_node_id, 'input');
-            
-            if (fromPos && toPos) {
-                // Criar grupo para linha + botão de delete
-                const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                group.setAttribute('class', 'connection-group');
-                
-                // Calcular pontos de controle para curva Bézier SUAVE
-                const dx = toPos.x - fromPos.x;
-                const dy = toPos.y - fromPos.y;
-                
-                // Distância entre os pontos
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                // Offset horizontal: maior para distâncias maiores
-                // Mínimo de 80px, máximo de 150px, ou 60% da distância horizontal
-                const offsetX = Math.max(80, Math.min(Math.abs(dx) * 0.6, 150));
-                
-                // Offset vertical adicional para curvas mais "orgânicas"
-                const offsetY = Math.abs(dy) * 0.2;
-                
-                // Pontos de controle para curva suave (saindo horizontalmente)
-                const cp1x = fromPos.x + offsetX;
-                const cp1y = fromPos.y + offsetY;
-                const cp2x = toPos.x - offsetX;
-                const cp2y = toPos.y - offsetY;
-                
-                // Criar path com curva Bézier cúbica
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const pathData = `M ${fromPos.x} ${fromPos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toPos.x} ${toPos.y}`;
-                path.setAttribute('d', pathData);
-                path.setAttribute('data-from', String(node.id || ''));
-                path.setAttribute('data-to', String(connection.target_node_id || ''));
-                path.setAttribute('class', 'connection-line');
-                path.setAttribute('fill', 'none');
-                
-                // Cor da linha baseada no tipo de conexão
-                let lineColor = '#009ef7'; // Cor padrão (azul)
-                if (connectionType === 'true' || connectionType === 'within') {
-                    lineColor = '#50cd89'; // Verde para TRUE / Dentro do Horário
-                } else if (connectionType === 'false' || connectionType === 'outside') {
-                    lineColor = '#f1416c'; // Vermelho para FALSE / Fora do Horário
+            if (!fromPos || !toPos) return;
+
+            const { cp1x, cp1y, cp2x, cp2y } = computeSmartControlPoints(fromPos, toPos, isRightOutput);
+
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('class', 'connection-group');
+
+            // Determine line color
+            let lineColor = '#3b82f6';
+            if (connectionType === 'true' || connectionType === 'within') lineColor = '#50cd89';
+            else if (connectionType === 'false' || connectionType === 'outside') lineColor = '#f1416c';
+            else if (connectionType && connectionType.startsWith('route_')) lineColor = '#8b5cf6';
+
+            // Background stroke for depth
+            const pathData = `M ${fromPos.x} ${fromPos.y} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${toPos.x} ${toPos.y}`;
+
+            const pathBg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            pathBg.setAttribute('d', pathData);
+            pathBg.setAttribute('fill', 'none');
+            pathBg.setAttribute('stroke', lineColor);
+            pathBg.setAttribute('stroke-width', '6');
+            pathBg.setAttribute('stroke-linecap', 'round');
+            pathBg.setAttribute('opacity', '0.08');
+
+            // Main path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathData);
+            path.setAttribute('data-from', String(node.id || ''));
+            path.setAttribute('data-to', String(connection.target_node_id || ''));
+            path.setAttribute('class', 'connection-line');
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', lineColor);
+            path.setAttribute('stroke-width', '2.5');
+            path.setAttribute('stroke-linecap', 'round');
+
+            // Arrow at ~80% of the path
+            const tArrow = 0.8;
+            const arrowX = bezierPoint(tArrow, fromPos.x, cp1x, cp2x, toPos.x);
+            const arrowY = bezierPoint(tArrow, fromPos.y, cp1y, cp2y, toPos.y);
+            const tanX = bezierTangent(tArrow, fromPos.x, cp1x, cp2x, toPos.x);
+            const tanY = bezierTangent(tArrow, fromPos.y, cp1y, cp2y, toPos.y);
+            const angle = Math.atan2(tanY, tanX) * 180 / Math.PI;
+
+            const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            arrow.setAttribute('points', '0,0 -9,-4 -9,4');
+            arrow.setAttribute('fill', lineColor);
+            arrow.setAttribute('transform', `translate(${arrowX},${arrowY}) rotate(${angle})`);
+            arrow.setAttribute('class', 'connection-arrow');
+            arrow.style.filter = 'drop-shadow(0 1px 2px rgba(0,0,0,.15))';
+
+            // Animated flow dot
+            const dotId = 'flow-anim-' + (connIdx++);
+            const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            dot.setAttribute('r', '3');
+            dot.setAttribute('fill', lineColor);
+            dot.setAttribute('opacity', '0.6');
+            dot.setAttribute('class', 'flow-dot');
+            const animMotion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+            animMotion.setAttribute('dur', '2.5s');
+            animMotion.setAttribute('repeatCount', 'indefinite');
+            animMotion.setAttribute('path', pathData);
+            dot.appendChild(animMotion);
+
+            // Delete button at midpoint
+            const midX = bezierPoint(0.5, fromPos.x, cp1x, cp2x, toPos.x);
+            const midY = bezierPoint(0.5, fromPos.y, cp1y, cp2y, toPos.y);
+
+            const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            deleteBtn.setAttribute('class', 'connection-delete-btn');
+            deleteBtn.setAttribute('transform', `translate(${midX},${midY})`);
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.setAttribute('data-from', String(node.id || ''));
+            deleteBtn.setAttribute('data-to', String(connection.target_node_id || ''));
+            if (optionIndex !== null) deleteBtn.setAttribute('data-option-index', optionIndex);
+            if (connectionType) deleteBtn.setAttribute('data-connection-type', connectionType);
+
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('r', '10');
+            circle.setAttribute('fill', '#1a1d24');
+            circle.setAttribute('stroke', lineColor);
+            circle.setAttribute('stroke-width', '2');
+            const xL1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            xL1.setAttribute('x1','-3.5'); xL1.setAttribute('y1','-3.5'); xL1.setAttribute('x2','3.5'); xL1.setAttribute('y2','3.5');
+            xL1.setAttribute('stroke','#fff'); xL1.setAttribute('stroke-width','2'); xL1.setAttribute('stroke-linecap','round');
+            const xL2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            xL2.setAttribute('x1','3.5'); xL2.setAttribute('y1','-3.5'); xL2.setAttribute('x2','-3.5'); xL2.setAttribute('y2','3.5');
+            xL2.setAttribute('stroke','#fff'); xL2.setAttribute('stroke-width','2'); xL2.setAttribute('stroke-linecap','round');
+
+            deleteBtn.appendChild(circle);
+            deleteBtn.appendChild(xL1);
+            deleteBtn.appendChild(xL2);
+
+            deleteBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const fromId = this.getAttribute('data-from');
+                const toId = this.getAttribute('data-to');
+                const optIdx = this.getAttribute('data-option-index');
+                const connType = this.getAttribute('data-connection-type');
+                if (confirm('Deseja remover esta conexão?')) {
+                    removeConnection(fromId, toId, optIdx, connType);
                 }
-                path.setAttribute('stroke', lineColor);
-                path.setAttribute('stroke-width', '2');
-                
-                // Remover animação após renderização inicial (opcional - descomente para animar)
-                // const pathLength = path.getTotalLength();
-                // path.style.strokeDasharray = pathLength;
-                // path.style.strokeDashoffset = pathLength;
-                // setTimeout(() => { path.style.transition = 'stroke-dashoffset 0.4s ease-out'; path.style.strokeDashoffset = '0'; }, 10);
-                
-                // Calcular ponto médio na curva (aproximação usando t=0.5)
-                const tMid = 0.5;
-                const midX = Math.pow(1-tMid, 3) * fromPos.x + 3 * Math.pow(1-tMid, 2) * tMid * cp1x + 3 * (1-tMid) * Math.pow(tMid, 2) * cp2x + Math.pow(tMid, 3) * toPos.x;
-                const midY = Math.pow(1-tMid, 3) * fromPos.y + 3 * Math.pow(1-tMid, 2) * tMid * cp1y + 3 * (1-tMid) * Math.pow(tMid, 2) * cp2y + Math.pow(tMid, 3) * toPos.y;
-                
-                // Criar botão de delete (círculo + ícone)
-                const deleteBtn = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-                deleteBtn.setAttribute('class', 'connection-delete-btn');
-                deleteBtn.setAttribute('transform', 'translate(' + midX + ',' + midY + ')');
-                deleteBtn.style.cursor = 'pointer';
-                deleteBtn.setAttribute('data-from', String(node.id || ''));
-                deleteBtn.setAttribute('data-to', String(connection.target_node_id || ''));
-                if (optionIndex !== null) deleteBtn.setAttribute('data-option-index', optionIndex);
-                if (connectionType) deleteBtn.setAttribute('data-connection-type', connectionType);
-                
-                // Círculo de fundo
-                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                circle.setAttribute('r', '10');
+            });
+            deleteBtn.addEventListener('mouseenter', function() {
                 circle.setAttribute('fill', '#f1416c');
-                circle.setAttribute('stroke', '#ffffff');
-                circle.setAttribute('stroke-width', '2');
-                
-                // Ícone X (duas linhas cruzadas)
-                const xLine1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                xLine1.setAttribute('x1', '-4');
-                xLine1.setAttribute('y1', '-4');
-                xLine1.setAttribute('x2', '4');
-                xLine1.setAttribute('y2', '4');
-                xLine1.setAttribute('stroke', '#ffffff');
-                xLine1.setAttribute('stroke-width', '2');
-                xLine1.setAttribute('stroke-linecap', 'round');
-                
-                const xLine2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                xLine2.setAttribute('x1', '4');
-                xLine2.setAttribute('y1', '-4');
-                xLine2.setAttribute('x2', '-4');
-                xLine2.setAttribute('y2', '4');
-                xLine2.setAttribute('stroke', '#ffffff');
-                xLine2.setAttribute('stroke-width', '2');
-                xLine2.setAttribute('stroke-linecap', 'round');
-                
-                // Montar botão
-                deleteBtn.appendChild(circle);
-                deleteBtn.appendChild(xLine1);
-                deleteBtn.appendChild(xLine2);
-                
-                // Evento de clique no botão de delete
-                deleteBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const fromId = this.getAttribute('data-from');
-                    const toId = this.getAttribute('data-to');
-                    const optIdx = this.getAttribute('data-option-index');
-                    const connType = this.getAttribute('data-connection-type');
-                    if (confirm('Deseja remover esta conexão?')) {
-                        removeConnection(fromId, toId, optIdx, connType);
-                    }
-                });
-                
-                // Hover no botão (só mudar cor, não tamanho para evitar "saltos")
-                deleteBtn.addEventListener('mouseenter', function() {
-                    circle.setAttribute('fill', '#d9214e');
-                    circle.setAttribute('stroke-width', '3');
-                });
-                deleteBtn.addEventListener('mouseleave', function() {
-                    circle.setAttribute('fill', '#f1416c');
-                    circle.setAttribute('stroke-width', '2');
-                });
-                
-                // Adicionar seta indicando direção do fluxo
-                const arrowSize = 8;
-                const arrowPos = 0.7; // 70% do caminho
-                const arrowX = Math.pow(1-arrowPos, 3) * fromPos.x + 3 * Math.pow(1-arrowPos, 2) * arrowPos * cp1x + 3 * (1-arrowPos) * Math.pow(arrowPos, 2) * cp2x + Math.pow(arrowPos, 3) * toPos.x;
-                const arrowY = Math.pow(1-arrowPos, 3) * fromPos.y + 3 * Math.pow(1-arrowPos, 2) * arrowPos * cp1y + 3 * (1-arrowPos) * Math.pow(arrowPos, 2) * cp2y + Math.pow(arrowPos, 3) * toPos.y;
-                
-                // Calcular ângulo da tangente (derivada da curva Bézier)
-                const tArrow = arrowPos;
-                const dxdt = 3 * Math.pow(1-tArrow, 2) * (cp1x - fromPos.x) + 6 * (1-tArrow) * tArrow * (cp2x - cp1x) + 3 * Math.pow(tArrow, 2) * (toPos.x - cp2x);
-                const dydt = 3 * Math.pow(1-tArrow, 2) * (cp1y - fromPos.y) + 6 * (1-tArrow) * tArrow * (cp2y - cp1y) + 3 * Math.pow(tArrow, 2) * (toPos.y - cp2y);
-                const angle = Math.atan2(dydt, dxdt) * 180 / Math.PI;
-                
-                // Criar seta (triângulo)
-                const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-                const arrowPoints = `0,0 ${-arrowSize},${-arrowSize/2} ${-arrowSize},${arrowSize/2}`;
-                arrow.setAttribute('points', arrowPoints);
-                arrow.setAttribute('fill', lineColor); // Mesma cor da linha
-                arrow.setAttribute('transform', `translate(${arrowX},${arrowY}) rotate(${angle})`);
-                arrow.setAttribute('class', 'connection-arrow');
-                
-                // Destacar linha ao passar mouse
-                path.addEventListener('mouseenter', function() {
-                    this.setAttribute('stroke-width', '3');
-                    this.style.opacity = '0.8';
-                    arrow.style.opacity = '0.8';
-                });
-                path.addEventListener('mouseleave', function() {
-                    this.setAttribute('stroke-width', '2');
-                    this.style.opacity = '1';
-                    arrow.style.opacity = '1';
-                });
-                
-                // Montar grupo e adicionar ao SVG
-                group.appendChild(path);
-                group.appendChild(arrow);
-                group.appendChild(deleteBtn);
-                connectionsSvg.appendChild(group);
-            }
+                circle.setAttribute('stroke', '#fff');
+            });
+            deleteBtn.addEventListener('mouseleave', function() {
+                circle.setAttribute('fill', '#1a1d24');
+                circle.setAttribute('stroke', lineColor);
+            });
+
+            // Hover glow effect on path
+            path.addEventListener('mouseenter', function() {
+                this.setAttribute('stroke-width', '3.5');
+                this.style.filter = 'url(#conn-glow)';
+                pathBg.setAttribute('opacity', '0.15');
+            });
+            path.addEventListener('mouseleave', function() {
+                this.setAttribute('stroke-width', '2.5');
+                this.style.filter = '';
+                pathBg.setAttribute('opacity', '0.08');
+            });
+
+            group.appendChild(pathBg);
+            group.appendChild(path);
+            group.appendChild(dot);
+            group.appendChild(arrow);
+            group.appendChild(deleteBtn);
+            connectionsSvg.appendChild(group);
         });
     });
 }

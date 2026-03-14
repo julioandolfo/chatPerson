@@ -273,7 +273,8 @@ class GoogleMapsProspectService
             $page++;
 
             if ($currentToken) {
-                sleep(2);
+                // Google exige delay antes de usar page token (2-3s)
+                sleep(3);
                 $endpoint = $useTextSearch ? '/textsearch/json' : '/nearbysearch/json';
                 $url = self::GOOGLE_PLACES_BASE_URL . $endpoint;
                 $params = [
@@ -331,13 +332,19 @@ class GoogleMapsProspectService
                 if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
                     $errorDetail = $data['error_message'] ?? '';
 
-                    // Fallback automático: se Text Search falhou, tentar Nearby Search
-                    if ($useTextSearch && $page === 1 && !$currentToken) {
+                    // Fallback automático: se Text Search falhou na primeira página, tentar Nearby Search
+                    if ($useTextSearch && !isset($params['pagetoken'])) {
                         Logger::warning("GoogleMaps - Text Search falhou ({$status}: {$errorDetail}), tentando Nearby Search...");
                         $useTextSearch = false;
                         $page = 0;
                         $currentToken = null;
                         continue;
+                    }
+
+                    // Se falhou na paginação (página 2/3), retornar o que já temos
+                    if (!empty($results)) {
+                        Logger::warning("GoogleMaps - Paginação falhou na página {$page} ({$status}), retornando " . count($results) . " resultados já coletados");
+                        break;
                     }
 
                     $debugInfo = "Status: {$status}";

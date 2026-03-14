@@ -148,10 +148,12 @@ class GoogleMapsProspectService
             Logger::info("GoogleMapsProspectService::sync - Iniciando busca via {$provider} - Source: {$sourceId}, Keyword: " . ($searchConfig['keyword'] ?? '') . ", Location: " . ($searchConfig['location'] ?? ''));
             
             // Buscar leads baseado no provider
+            // Nota: não reutilizar last_page_token entre syncs — a paginação é feita
+            // internamente dentro de fetchFromGooglePlaces (até 3 páginas por sync)
             if ($provider === 'outscraper') {
-                $leads = self::fetchFromOutscraper($searchConfig, $source['last_page_token']);
+                $leads = self::fetchFromOutscraper($searchConfig, null);
             } else {
-                $leads = self::fetchFromGooglePlaces($searchConfig, $source['last_page_token']);
+                $leads = self::fetchFromGooglePlaces($searchConfig, null);
             }
             
             $stats['records_fetched'] = count($leads['results']);
@@ -178,15 +180,12 @@ class GoogleMapsProspectService
                 usleep(50000); // 50ms
             }
             
-            // Atualizar fonte com page token e estatísticas
+            // Atualizar fonte com estatísticas (limpar page_token antigo)
             $updateData = [
-                'total_synced' => ($source['total_synced'] ?? 0) + $stats['records_created'] + $stats['records_updated']
+                'total_synced' => ($source['total_synced'] ?? 0) + $stats['records_created'] + $stats['records_updated'],
+                'last_page_token' => null
             ];
-            
-            if (!empty($leads['next_page_token'])) {
-                $updateData['last_page_token'] = $leads['next_page_token'];
-            }
-            
+
             ExternalDataSource::update($sourceId, $updateData);
             
             // Registrar status de sucesso

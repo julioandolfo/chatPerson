@@ -1436,7 +1436,44 @@ function renderNode(node) {
         });
         innerHtml += '</div>';
     } else if (node.node_type === 'condition') {
-        // Nó de Condição: mostrar handles TRUE e FALSE
+        // Nó de Condição: mostrar prévia e handles TRUE e FALSE
+        const condField = node.node_data?.field || node.node_data?.conditions?.[0]?.field || '';
+        const condOperator = node.node_data?.operator || node.node_data?.conditions?.[0]?.operator || '';
+        const condValue = node.node_data?.value || node.node_data?.conditions?.[0]?.value || '';
+        const fieldLabels = {
+            'last_message': 'Última msg recebida',
+            'channel': 'Canal',
+            'status': 'Status',
+            'priority': 'Prioridade',
+            'unread_count': 'Msgs não lidas',
+            'created_days_ago': 'Dias desde criação',
+            'contact.name': 'Nome do Contato',
+            'contact.phone': 'Telefone',
+            'contact.email': 'Email',
+            'agent.id': 'Agente (ID)',
+            'agent.name': 'Agente (Nome)',
+            'has_tag': 'Possui Tag',
+            'business_hours': 'Horário Atendimento'
+        };
+        const operatorLabels = {
+            'contains': 'contém',
+            'not_contains': 'não contém',
+            'contains_any': 'contém qualquer',
+            'equals': '=',
+            'not_equals': '≠',
+            'starts_with': 'começa com',
+            'ends_with': 'termina com',
+            'is_empty': 'está vazio',
+            'is_not_empty': 'não está vazio',
+            'greater_than': '>',
+            'less_than': '<'
+        };
+        if (condField) {
+            const fLabel = fieldLabels[condField] || condField;
+            const oLabel = operatorLabels[condOperator] || condOperator;
+            const vLabel = condValue ? ` "${condValue.length > 20 ? condValue.substring(0, 20) + '…' : condValue}"` : '';
+            innerHtml += `<div class="text-muted fs-8 mb-1" style="text-align:center; padding: 0 4px; word-break:break-word;">${fLabel} ${oLabel}${vLabel}</div>`;
+        }
         innerHtml += '<div class="condition-outputs" style="margin-top: 10px;">';
         innerHtml += `
             <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 8px; padding-right: 5px;">
@@ -1482,6 +1519,46 @@ function renderNode(node) {
                      data-handle-type="output" 
                      data-connection-type="outside"
                      style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #f1416c !important;">
+                </div>
+            </div>
+        `;
+        innerHtml += '</div>';
+    } else if (node.node_type === 'keyword_router') {
+        // Nó Roteador de Palavras-chave: um handle por rota + fallback
+        const routes = node.node_data?.routes || [];
+        const routeColors = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#10b981','#ef4444'];
+        innerHtml += '<div class="condition-outputs" style="margin-top: 8px;">';
+        if (routes.length === 0) {
+            innerHtml += `<div class="text-muted fs-9 text-center">Nenhuma rota configurada</div>`;
+        }
+        routes.forEach(function(route, idx) {
+            const color = routeColors[idx % routeColors.length];
+            const kw = (route.keywords || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 3).join(', ');
+            const label = route.label || ('Rota ' + (idx + 1));
+            innerHtml += `
+                <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; margin-bottom: 6px; padding-right: 5px;">
+                    <div style="display:flex; flex-direction:column; align-items:flex-end; margin-right: 4px;">
+                        <span style="font-size: 11px; color: ${color}; font-weight: 700;">${label}</span>
+                        ${kw ? `<span style="font-size: 10px; color: #a1a5b7; white-space:nowrap; overflow:hidden; max-width:130px; text-overflow:ellipsis;">${kw}</span>` : ''}
+                    </div>
+                    <div class="node-connection-handle output condition-handle"
+                         data-node-id="${String(node.id || '')}"
+                         data-handle-type="output"
+                         data-connection-type="route_${idx}"
+                         style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: ${color} !important;">
+                    </div>
+                </div>
+            `;
+        });
+        // Fallback
+        innerHtml += `
+            <div class="condition-output-row" style="position: relative; display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;">
+                <span style="font-size: 11px; color: #a1a5b7; font-weight: 600;">↩ Outro / Fallback</span>
+                <div class="node-connection-handle output condition-handle"
+                     data-node-id="${String(node.id || '')}"
+                     data-handle-type="output"
+                     data-connection-type="fallback"
+                     style="position: absolute; right: -11px; top: 50%; transform: translateY(-50%); background: #a1a5b7 !important;">
                 </div>
             </div>
         `;
@@ -2383,6 +2460,9 @@ function openNodeConfig(nodeId) {
                             <option value="agent.id">ID do Agente</option>
                             <option value="agent.name">Nome do Agente</option>
                         </optgroup>
+                        <optgroup label="Mensagem">
+                            <option value="last_message">Última mensagem recebida</option>
+                        </optgroup>
                         <optgroup label="Tags">
                             <option value="has_tag">Possui Tag</option>
                         </optgroup>
@@ -2391,12 +2471,13 @@ function openNodeConfig(nodeId) {
                 </div>
                 <div class="fv-row mb-7">
                     <label class="required fw-semibold fs-6 mb-2">Operador</label>
-                    <select name="operator" id="kt_condition_operator" class="form-select form-select-solid" required>
+                    <select name="operator" id="kt_condition_operator" class="form-select form-select-solid" required onchange="updateConditionValueHint(this.value)">
                         <option value="">Selecione um operador</option>
                         <option value="equals">Igual a (=)</option>
                         <option value="not_equals">Diferente de (≠)</option>
                         <option value="contains">Contém</option>
                         <option value="not_contains">Não contém</option>
+                        <option value="contains_any">Contém qualquer uma das palavras</option>
                         <option value="starts_with">Começa com</option>
                         <option value="ends_with">Termina com</option>
                         <option value="greater_than">Maior que (>)</option>
@@ -2830,6 +2911,46 @@ function openNodeConfig(nodeId) {
                 </div>
             `;
             break;
+        case "keyword_router":
+            formContent = `
+                <div class="alert alert-warning d-flex align-items-center p-4 mb-6">
+                    <i class="ki-duotone ki-message-question fs-2x text-warning me-3">
+                        <span class="path1"></span><span class="path2"></span>
+                    </i>
+                    <div>
+                        <div class="fw-bold">Roteador de Palavras-chave</div>
+                        <div class="fs-8 text-muted">Verifica a última mensagem do contato e roteia para o caminho certo. Cada rota tem sua própria lista de palavras. Se nenhuma corresponder, vai para <strong>Fallback</strong>.</div>
+                    </div>
+                </div>
+
+                <div id="kt_keyword_router_list">
+                    <!-- Rotas adicionadas dinamicamente -->
+                </div>
+
+                <button type="button" class="btn btn-sm btn-light-primary w-100 mt-2" onclick="addKeywordRoute()">
+                    <i class="ki-duotone ki-plus fs-4"><span class="path1"></span><span class="path2"></span></i>
+                    Adicionar Rota
+                </button>
+
+                <div class="separator separator-dashed my-5"></div>
+                <div class="d-flex align-items-center gap-3 p-3 bg-light rounded">
+                    <span class="badge badge-secondary fs-8">↩</span>
+                    <div>
+                        <div class="fw-semibold fs-7">Fallback (nenhuma rota correspondeu)</div>
+                        <div class="text-muted fs-9">Conecte a saída "Fallback" no canvas para este caminho</div>
+                    </div>
+                </div>
+            `;
+            // Preencher rotas existentes após inserir o HTML
+            setTimeout(() => {
+                const existingRoutes = node.node_data?.routes || [];
+                if (existingRoutes.length === 0) {
+                    addKeywordRoute(); // Pelo menos uma rota padrão
+                } else {
+                    existingRoutes.forEach(route => addKeywordRoute(route));
+                }
+            }, 50);
+            break;
         case "delay":
             formContent = `
                 <div class="fv-row mb-7">
@@ -3028,6 +3149,7 @@ function openNodeConfig(nodeId) {
                     const operatorSelect = document.getElementById('kt_condition_operator');
                     if (operatorSelect) {
                         operatorSelect.value = node.node_data.operator;
+                        updateConditionValueHint(node.node_data.operator);
                     }
                 }
             }, 50);
@@ -4206,6 +4328,24 @@ document.addEventListener("DOMContentLoaded", function() {
                 }
             }
             
+            // Tratamento específico para Roteador de Palavras-chave
+            if (node.node_type === "keyword_router") {
+                const labels = [...document.querySelectorAll('#kt_keyword_router_list input[name="kr_label[]"]')].map(el => el.value.trim());
+                const keywords = [...document.querySelectorAll('#kt_keyword_router_list input[name="kr_keywords[]"]')].map(el => el.value.trim());
+                const routes = labels.map((label, idx) => ({
+                    label: label || `Rota ${idx + 1}`,
+                    keywords: keywords[idx] || '',
+                    index: idx
+                })).filter(r => r.keywords !== '');
+                nodeData.routes = routes;
+                // Limpar campos genéricos que não pertencem a este nó
+                delete nodeData.kr_label;
+                delete nodeData['kr_label[]'];
+                delete nodeData.kr_keywords;
+                delete nodeData['kr_keywords[]'];
+                console.log('🔀 keyword_router - Rotas coletadas:', routes);
+            }
+
             // Tratamento específico para Horário de Atendimento
             if (node.node_type === "condition_business_hours") {
                 const bhData = collectBusinessHoursData();
@@ -4996,6 +5136,10 @@ function updateConditionOperators(field) {
     // Operadores numéricos para campos numéricos
     const numericFields = ['unread_count', 'created_days_ago'];
     const isNumeric = numericFields.includes(field);
+
+    // Campos de mensagem (texto com operadores de palavra-chave)
+    const messageFields = ['last_message'];
+    const isMessageField = messageFields.includes(field);
     
     let operatorOptions = '<option value="">Selecione um operador</option>';
     
@@ -5023,12 +5167,29 @@ function updateConditionOperators(field) {
         valueInput.placeholder = 'Digite um número...';
         valueContainer.style.display = 'block';
         valueInput.setAttribute('required', 'required');
+    } else if (isMessageField) {
+        operatorOptions += `
+            <option value="contains">Contém</option>
+            <option value="not_contains">Não contém</option>
+            <option value="contains_any">Contém qualquer uma das palavras</option>
+            <option value="starts_with">Começa com</option>
+            <option value="ends_with">Termina com</option>
+            <option value="equals">Igual a (=)</option>
+            <option value="not_equals">Diferente de (≠)</option>
+            <option value="is_empty">Está vazia</option>
+            <option value="is_not_empty">Não está vazia</option>
+        `;
+        valueInput.type = 'text';
+        valueInput.placeholder = 'Ex: sim, ok, quero (separado por vírgula para "contém qualquer")';
+        valueContainer.style.display = 'block';
+        valueInput.setAttribute('required', 'required');
     } else {
         operatorOptions += `
             <option value="equals">Igual a (=)</option>
             <option value="not_equals">Diferente de (≠)</option>
             <option value="contains">Contém</option>
             <option value="not_contains">Não contém</option>
+            <option value="contains_any">Contém qualquer uma das palavras</option>
             <option value="starts_with">Começa com</option>
             <option value="ends_with">Termina com</option>
             <option value="is_empty">Está vazio</option>
@@ -5045,8 +5206,93 @@ function updateConditionOperators(field) {
     operatorSelect.innerHTML = operatorOptions;
 }
 
+// Atualizar hint/placeholder do campo de valor baseado no operador
+function updateConditionValueHint(operator) {
+    const valueInput = document.getElementById('kt_condition_value');
+    const valueHint = document.querySelector('#kt_condition_value_container .form-text');
+    if (!valueInput) return;
+
+    if (operator === 'contains_any') {
+        valueInput.placeholder = 'Ex: sim, ok, quero, confirmar';
+        if (valueHint) valueHint.textContent = 'Separe as palavras por vírgula. Verdadeiro se a mensagem contiver QUALQUER UMA delas.';
+    } else if (operator === 'in' || operator === 'not_in') {
+        valueInput.placeholder = 'valor1, valor2, valor3';
+        if (valueHint) valueHint.textContent = 'Separe os valores por vírgula.';
+    } else if (operator === 'is_empty' || operator === 'is_not_empty') {
+        if (valueHint) valueHint.textContent = 'Nenhum valor necessário para este operador.';
+    } else {
+        valueInput.placeholder = 'Digite o valor...';
+        if (valueHint) valueHint.textContent = 'Valor para comparação. Para listas, separe por vírgula.';
+    }
+}
+
 window.loadStagesForFunnel = loadStagesForFunnel;
 window.updateConditionOperators = updateConditionOperators;
+window.updateConditionValueHint = updateConditionValueHint;
+
+// ============================================
+// FUNÇÕES PARA ROTEADOR DE PALAVRAS-CHAVE
+// ============================================
+
+const routeColors = ['#3b82f6','#8b5cf6','#ec4899','#14b8a6','#f59e0b','#6366f1','#10b981','#ef4444'];
+
+window.addKeywordRoute = function addKeywordRoute(routeData) {
+    const list = document.getElementById('kt_keyword_router_list');
+    if (!list) return;
+    const idx = list.children.length;
+    const color = routeColors[idx % routeColors.length];
+    const label = routeData?.label || '';
+    const keywords = routeData?.keywords || '';
+
+    const item = document.createElement('div');
+    item.className = 'card card-bordered mb-3 keyword-route-item';
+    item.dataset.routeIndex = idx;
+    item.style.borderLeft = `3px solid ${color}`;
+    item.innerHTML = `
+        <div class="card-body p-4">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="badge fs-8 fw-bold" style="background: ${color}20; color: ${color}; border: 1px solid ${color};">Rota ${idx + 1}</span>
+                <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeKeywordRoute(this)" title="Remover rota">
+                    <i class="ki-duotone ki-trash fs-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                </button>
+            </div>
+            <div class="fv-row mb-3">
+                <label class="fw-semibold fs-8 mb-1">Nome da Rota (opcional)</label>
+                <input type="text" name="kr_label[]" class="form-control form-control-sm form-control-solid"
+                       placeholder="Ex: Confirmação, Cancelamento, Suporte..."
+                       value="${label}" />
+            </div>
+            <div class="fv-row">
+                <label class="required fw-semibold fs-8 mb-1">Palavras-chave <span class="text-muted fw-normal">(separe por vírgula)</span></label>
+                <input type="text" name="kr_keywords[]" class="form-control form-control-sm form-control-solid"
+                       placeholder="sim, ok, quero, confirmar, aceito"
+                       value="${keywords}" required />
+                <div class="form-text fs-9">A rota será ativada se a mensagem contiver <strong>qualquer</strong> dessas palavras</div>
+            </div>
+        </div>
+    `;
+    list.appendChild(item);
+};
+
+window.removeKeywordRoute = function removeKeywordRoute(btn) {
+    const item = btn.closest('.keyword-route-item');
+    if (item) item.remove();
+    // Reindexar labels
+    const list = document.getElementById('kt_keyword_router_list');
+    if (!list) return;
+    Array.from(list.children).forEach((el, i) => {
+        const color = routeColors[i % routeColors.length];
+        el.dataset.routeIndex = i;
+        el.style.borderLeft = `3px solid ${color}`;
+        const badge = el.querySelector('.badge');
+        if (badge) {
+            badge.textContent = `Rota ${i + 1}`;
+            badge.style.background = `${color}20`;
+            badge.style.color = color;
+            badge.style.border = `1px solid ${color}`;
+        }
+    });
+};
 
 // ============================================
 // FUNÇÕES PARA RAMIFICAÇÃO DE IA

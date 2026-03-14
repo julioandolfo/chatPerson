@@ -37,618 +37,541 @@ HTML;
 
 $styles = <<<HTML
 <style>
-.automation-editor {
-    position: relative;
-    width: 100%;
-    height: 600px;
-    background: #f9f9f9;
-    border: 1px solid #e4e6ef;
-    border-radius: 0.475rem;
-    overflow: hidden;
+/* =============================================
+   SECTION 1: CSS DESIGN SYSTEM + VARIABLES
+   ============================================= */
+:root {
+    --ae-bg: #f0f2f5;
+    --ae-surface: #ffffff;
+    --ae-surface-hover: #f8f9fa;
+    --ae-border: #e2e5ec;
+    --ae-text: #1e2022;
+    --ae-text-muted: #7e8299;
+    --ae-primary: #3b82f6;
+    --ae-success: #22c55e;
+    --ae-danger: #ef4444;
+    --ae-warning: #f59e0b;
+    --ae-radius: 12px;
+    --ae-radius-sm: 8px;
+    --ae-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --ae-shadow-lg: 0 4px 16px rgba(0,0,0,.08);
+    --ae-shadow-node: 0 2px 8px rgba(0,0,0,.08);
+    --ae-shadow-node-hover: 0 8px 24px rgba(0,0,0,.12);
+    --ae-topbar-h: 56px;
+    --ae-sidebar-w: 260px;
+    --ae-sidebar-collapsed-w: 0px;
+    --ae-config-panel-w: 420px;
+    --ae-transition: .2s cubic-bezier(.4,0,.2,1);
+    --ae-grid-color: rgba(0,0,0,.04);
+    --ae-handle-size: 16px;
+    --ae-handle-border: 3px;
+    --ae-node-w: 220px;
+    --ae-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+[data-bs-theme="dark"] {
+    --ae-bg: #111318;
+    --ae-surface: #1a1d24;
+    --ae-surface-hover: #22262f;
+    --ae-border: rgba(255,255,255,.08);
+    --ae-text: #e8eaed;
+    --ae-text-muted: #8b8fa3;
+    --ae-shadow: 0 1px 3px rgba(0,0,0,.2);
+    --ae-shadow-lg: 0 4px 16px rgba(0,0,0,.3);
+    --ae-shadow-node: 0 2px 10px rgba(0,0,0,.25);
+    --ae-shadow-node-hover: 0 8px 28px rgba(0,0,0,.35);
+    --ae-grid-color: rgba(255,255,255,.04);
 }
 
-[data-bs-theme="dark"] .automation-editor {
-    background: #1e1e2d !important;
-    border-color: rgba(255, 255, 255, 0.12) !important;
-}
-
-.automation-canvas-toolbar {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    z-index: 20;
+/* =============================================
+   SECTION 2: LAYOUT (topbar, sidebar, canvas)
+   ============================================= */
+.ae-wrapper {
+    position: fixed;
+    inset: 0;
     display: flex;
-    gap: 4px;
-    align-items: center;
-    background: rgba(255, 255, 255, 0.95);
-    padding: 4px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    flex-direction: column;
+    background: var(--ae-bg);
+    z-index: 1040;
+    font-family: var(--ae-font);
 }
-
-[data-bs-theme="dark"] .automation-canvas-toolbar {
-    background: rgba(30, 30, 45, 0.95);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-.automation-canvas-toolbar .btn {
-    width: 32px;
-    height: 32px;
-    padding: 0;
+.ae-topbar {
+    height: var(--ae-topbar-h);
+    background: var(--ae-surface);
+    border-bottom: 1px solid var(--ae-border);
     display: flex;
     align-items: center;
-    justify-content: center;
+    padding: 0 16px;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 30;
+    box-shadow: var(--ae-shadow);
 }
-
-.automation-canvas-toolbar #automation_zoom_label {
-    min-width: 50px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-align: center;
-    background: transparent;
-    border: none;
-    color: #3f4254;
-    padding: 0 8px;
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
-    letter-spacing: 0.5px;
-}
-
-[data-bs-theme="dark"] .automation-canvas-toolbar #automation_zoom_label {
-    color: #b5b5c3;
-}
-
-.automation-canvas-viewport {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    cursor: grab;
-}
-
-.automation-canvas-viewport.is-panning {
-    cursor: grabbing;
-}
-
-.automation-canvas-content {
-    position: absolute;
-    top: 0;
-    left: 0;
-    transform-origin: 0 0;
-    will-change: transform;
-}
-
-#kt_automation_canvas {
-    position: relative;
-    width: 2000px;
-    height: 1200px;
-    background-color: transparent;
-    background-image: 
-        linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    background-position: 0 0;
-}
-
-[data-bs-theme="dark"] #kt_automation_canvas {
-    background-image: 
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-    background-size: 50px 50px;
-}
-
-.automation-node {
-    background: white;
-    color: #181c32;
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-    position: relative;
-    z-index: 2;
-}
-
-.automation-node:hover {
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
-}
-
-.automation-node .node-action-btn {
-    position: relative;
-    z-index: 150;
-    pointer-events: all;
-}
-
-.automation-node .chatbot-menu-options {
-    position: relative;
-    z-index: 50;
-}
-
-[data-bs-theme="dark"] .automation-node {
-    background: #1e1e2d !important;
-    color: #f1f1f2 !important;
-}
-
-[data-bs-theme="dark"] .automation-node .text-muted {
-    color: #92929f !important;
-}
-
-[data-bs-theme="dark"] .automation-node .fw-bold {
-    color: #f1f1f2 !important;
-}
-
-.automation-node .badge.badge-light-secondary {
-    background-color: rgba(0, 0, 0, 0.08);
-    color: #5e6278;
-    font-size: 0.7rem;
-    font-weight: 500;
-}
-
-[data-bs-theme="dark"] .automation-node .badge.badge-light-secondary {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #92929f;
-}
-
-.connections-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 1;
-    overflow: visible;
-}
-
-.connections-overlay path.connection-line {
-    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
-}
-
-.connection-arrow {
-    transition: opacity 0.2s ease, fill 0.2s ease;
-    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.15));
-}
-
-[data-bs-theme="dark"] .connections-overlay path.connection-line {
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
-}
-
-[data-bs-theme="dark"] .connection-arrow {
-    fill: #50cd89;
-    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.5));
-}
-
-.connections-overlay path,
-.connections-overlay line {
-    pointer-events: stroke;
-    cursor: pointer;
-}
-
-.connections-overlay path.connection-line,
-.connections-overlay line.connection-line {
-    stroke: #009ef7;
-    stroke-width: 2;
-    pointer-events: stroke;
-    cursor: default;
-    transition: stroke-width 0.2s ease, opacity 0.2s ease;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-}
-
-.connections-overlay path.connection-line:hover,
-.connections-overlay line.connection-line:hover {
-    stroke-width: 3;
-    opacity: 0.8;
-}
-
-.connection-delete-btn {
-    opacity: 0.9;
-    transition: opacity 0.2s ease;
-}
-
-.connection-delete-btn:hover {
-    opacity: 1;
-}
-
-.connection-group:hover .connection-delete-btn {
-    opacity: 1;
-}
-
-.connection-delete-btn circle {
-    transition: fill 0.2s ease, stroke-width 0.2s ease;
-}
-
-[data-bs-theme="dark"] .connections-overlay path,
-[data-bs-theme="dark"] .connections-overlay line {
-    stroke: #50cd89;
-}
-
-.node-connection-handle {
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #009ef7;
-    border: 3px solid white;
-    cursor: crosshair;
-    z-index: 80;
-    pointer-events: all;
-    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-}
-
-.node-connection-handle:hover {
-    transform: scale(1.4);
-    background: #50cd89;
-    box-shadow: 0 3px 10px rgba(80, 205, 137, 0.4);
-}
-
-.automation-canvas-tip {
-    position: absolute;
-    bottom: 15px;
-    left: 15px;
-    z-index: 20;
-    max-width: 360px;
-}
-
-.automation-canvas-tip .alert {
-    padding: 12px 14px;
-}
-
-.node-connection-handle.output {
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.node-connection-handle.output.chatbot-option-handle {
-    bottom: auto;
-    left: auto;
-    transform: translateY(-50%);
-    background: #009ef7 !important;
-    width: 14px;
-    height: 14px;
-}
-
-.node-connection-handle.output.chatbot-option-handle:hover {
-    background: #50cd89 !important;
-    transform: translateY(-50%) scale(1.5);
-}
-
-.node-connection-handle.input {
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.chatbot-menu-options {
-    border-top: 1px solid #e4e6ef;
-    padding-top: 8px;
-    font-size: 11px;
-    color: #7e8299;
-}
-
-.chatbot-option-row {
-    transition: background-color 0.2s ease, border-left 0.2s ease;
-    border-radius: 6px;
-    padding: 6px 8px;
-    margin: 3px 0;
-    border-left: 3px solid transparent;
-    position: relative;
-}
-
-.chatbot-option-row:hover {
-    background-color: rgba(0, 158, 247, 0.1);
-    border-left-color: #009ef7;
-}
-
-[data-bs-theme="dark"] .chatbot-option-row:hover {
-    background-color: rgba(0, 158, 247, 0.15);
-    border-left-color: #0dcaf0;
-}
-
-[data-bs-theme="dark"] .node-connection-handle {
-    background: #50cd89;
-    border-color: #1e1e2d;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-[data-bs-theme="dark"] .node-connection-handle:hover {
-    background: #009ef7;
-    box-shadow: 0 3px 12px rgba(0, 158, 247, 0.5);
-}
-
-.node-connection-handle.ai-intent-handle {
-    background: #6366f1 !important;
-    border: 3px solid white;
-    width: 14px;
-    height: 14px;
-    box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
-    transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.node-connection-handle.ai-intent-handle:hover {
-    background: #4f46e5 !important;
-    transform: translateY(-50%) scale(1.5);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.6);
-}
-
-[data-bs-theme="dark"] .node-connection-handle.ai-intent-handle {
-    border-color: #1e1e2d;
-    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.6);
-}
-
-.ai-intents-visual {
-    border-top: 1px solid #e4e6ef;
-    padding-top: 8px;
-    font-size: 11px;
-    color: #7e8299;
-}
-
-.ai-intent-label,
-.chatbot-option-label {
-    display: inline-block;
-    max-width: 160px;
+.ae-topbar-left { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+.ae-topbar-center { display: flex; align-items: center; gap: 4px; }
+.ae-topbar-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ae-topbar .ae-auto-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ae-text);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 11px;
-    font-weight: 500;
-    color: #3f4254;
-    line-height: 1.5;
+    max-width: 260px;
+}
+.ae-topbar .ae-badge { font-size: 11px; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+.ae-topbar .ae-zoom-group {
+    display: flex;
+    align-items: center;
+    background: var(--ae-bg);
+    border-radius: var(--ae-radius-sm);
+    padding: 2px;
+    gap: 2px;
+}
+.ae-topbar .ae-zoom-group .btn { width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; border: none; }
+.ae-topbar .ae-zoom-label {
+    min-width: 48px; text-align: center; font-size: 12px; font-weight: 700;
+    color: var(--ae-text-muted); font-family: 'SF Mono', 'Cascadia Code', monospace;
+    user-select: none;
 }
 
-[data-bs-theme="dark"] .ai-intent-label,
-[data-bs-theme="dark"] .chatbot-option-label {
-    color: #92929f;
+.ae-main { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+/* Sidebar */
+.ae-sidebar {
+    width: var(--ae-sidebar-w);
+    background: var(--ae-surface);
+    border-right: 1px solid var(--ae-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: width var(--ae-transition), opacity var(--ae-transition);
+    overflow: hidden;
+    z-index: 20;
+}
+.ae-sidebar.collapsed { width: 0; opacity: 0; pointer-events: none; }
+.ae-sidebar-header { padding: 16px; border-bottom: 1px solid var(--ae-border); }
+.ae-sidebar-header h6 { margin: 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--ae-text-muted); }
+.ae-sidebar-search {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--ae-border); border-radius: var(--ae-radius-sm);
+    background: var(--ae-bg); font-size: 13px; color: var(--ae-text); outline: none;
+    transition: border-color var(--ae-transition);
+}
+.ae-sidebar-search:focus { border-color: var(--ae-primary); }
+.ae-sidebar-body { flex: 1; overflow-y: auto; padding: 8px; }
+.ae-sidebar-category { margin-bottom: 4px; }
+.ae-sidebar-category-label {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--ae-text-muted); padding: 8px 8px 4px; user-select: none;
+}
+.ae-node-item {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border-radius: var(--ae-radius-sm); cursor: grab; transition: background var(--ae-transition);
+    user-select: none; border: 1px solid transparent;
+}
+.ae-node-item:hover { background: var(--ae-surface-hover); border-color: var(--ae-border); }
+.ae-node-item:active { cursor: grabbing; }
+.ae-node-item .ae-node-icon {
+    width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 14px;
+}
+.ae-node-item .ae-node-label { font-size: 13px; font-weight: 600; color: var(--ae-text); line-height: 1.2; }
+
+/* Canvas */
+.ae-canvas-area { flex: 1; position: relative; overflow: hidden; }
+.automation-editor { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--ae-bg); }
+.automation-canvas-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; cursor: grab; }
+.automation-canvas-viewport.is-panning { cursor: grabbing; }
+.automation-canvas-content { position: absolute; top: 0; left: 0; transform-origin: 0 0; will-change: transform; }
+
+#kt_automation_canvas {
+    position: relative; width: 4000px; height: 3000px;
+    background-color: transparent;
+    background-image:
+        radial-gradient(circle, var(--ae-grid-color) 1px, transparent 1px);
+    background-size: 24px 24px;
 }
 
-.ai-intent-row {
-    transition: background-color 0.2s ease, border-left 0.2s ease;
-    border-radius: 6px;
-    padding: 6px 8px;
-    margin: 3px 0;
-    border-left: 3px solid transparent;
+/* =============================================
+   SECTION 3: NODES, HANDLES, CONNECTIONS
+   ============================================= */
+.automation-node {
+    background: var(--ae-surface);
+    color: var(--ae-text);
+    border-radius: var(--ae-radius);
+    box-shadow: var(--ae-shadow-node);
+    transition: box-shadow var(--ae-transition), transform .15s ease;
     position: relative;
+    z-index: 2;
+    border: 1px solid var(--ae-border);
+    overflow: visible;
+}
+.automation-node:hover {
+    box-shadow: var(--ae-shadow-node-hover);
+    z-index: 5;
+}
+.automation-node .node-color-bar {
+    height: 4px; border-radius: var(--ae-radius) var(--ae-radius) 0 0;
+    position: absolute; top: 0; left: 0; right: 0;
+}
+.automation-node .node-header {
+    display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px;
+}
+.automation-node .node-header .node-icon {
+    width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; flex-shrink: 0;
+}
+.automation-node .node-header .node-title {
+    font-size: 12px; font-weight: 700; color: var(--ae-text); flex: 1; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.automation-node .node-header .node-id-badge {
+    font-size: 9px; font-family: monospace; color: var(--ae-text-muted); opacity: .5;
+    background: var(--ae-bg); padding: 1px 5px; border-radius: 4px;
+}
+.automation-node .node-preview {
+    padding: 2px 14px 8px; font-size: 11px; color: var(--ae-text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.automation-node .node-actions {
+    display: none; position: absolute; top: 8px; right: 8px;
+    gap: 4px; z-index: 100;
+}
+.automation-node:hover .node-actions { display: flex; }
+.automation-node .node-actions .btn {
+    width: 26px; height: 26px; padding: 0; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; box-shadow: var(--ae-shadow); pointer-events: all;
+    background: var(--ae-surface); border: 1px solid var(--ae-border);
 }
 
-.ai-intent-row:hover {
-    background-color: rgba(99, 102, 241, 0.08);
-    border-left-color: #6366f1;
+/* Handles */
+.node-connection-handle {
+    position: absolute; width: var(--ae-handle-size); height: var(--ae-handle-size);
+    border-radius: 50%; background: var(--ae-primary); border: var(--ae-handle-border) solid var(--ae-surface);
+    cursor: crosshair; z-index: 80; pointer-events: all;
+    transition: transform var(--ae-transition), background var(--ae-transition), box-shadow var(--ae-transition);
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+}
+.node-connection-handle:hover {
+    transform: scale(1.5); background: var(--ae-success);
+    box-shadow: 0 3px 12px rgba(34,197,94,.4);
+}
+.node-connection-handle.output { bottom: -8px; left: 50%; transform: translateX(-50%); }
+.node-connection-handle.output:hover { transform: translateX(-50%) scale(1.5); }
+.node-connection-handle.input { top: -8px; left: 50%; transform: translateX(-50%); }
+.node-connection-handle.input:hover { transform: translateX(-50%) scale(1.5); }
+.node-connection-handle.output.chatbot-option-handle,
+.node-connection-handle.output.ai-intent-handle,
+.node-connection-handle.output.condition-handle {
+    bottom: auto; left: auto; transform: translateY(-50%);
+}
+.node-connection-handle.output.chatbot-option-handle:hover,
+.node-connection-handle.output.ai-intent-handle:hover,
+.node-connection-handle.output.condition-handle:hover {
+    transform: translateY(-50%) scale(1.5);
+}
+.node-connection-handle.ai-intent-handle { background: #6366f1 !important; }
+[data-bs-theme="dark"] .node-connection-handle { background: var(--ae-success); border-color: var(--ae-surface); }
+[data-bs-theme="dark"] .node-connection-handle:hover { background: var(--ae-primary); }
+
+/* Node sub-elements */
+.chatbot-menu-options, .ai-intents-visual, .condition-outputs {
+    border-top: 1px solid var(--ae-border); padding-top: 6px; margin-top: 4px; font-size: 11px;
+}
+.chatbot-option-row, .ai-intent-row, .condition-output-row {
+    border-radius: 6px; padding: 5px 8px; margin: 2px 0;
+    border-left: 3px solid transparent; position: relative;
+    transition: background var(--ae-transition);
+}
+.chatbot-option-row:hover { background: rgba(59,130,246,.06); border-left-color: var(--ae-primary); }
+.ai-intent-row:hover { background: rgba(99,102,241,.06); border-left-color: #6366f1; }
+.chatbot-option-label, .ai-intent-label {
+    display: inline-block; max-width: 150px; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; font-size: 11px; font-weight: 500; color: var(--ae-text);
+}
+.condition-output-row {
+    display: flex; align-items: center; justify-content: flex-end; padding-right: 5px;
 }
 
-.ai-intent-row:hover .node-connection-handle.ai-intent-handle {
-    transform: translateY(-50%) scale(1.3);
+/* Connections SVG */
+.connections-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 1; overflow: visible;
 }
+.connections-overlay path, .connections-overlay line { pointer-events: stroke; cursor: pointer; }
+.connections-overlay path.connection-line {
+    stroke: var(--ae-primary); stroke-width: 2; fill: none;
+    stroke-linecap: round; stroke-linejoin: round;
+    transition: stroke-width var(--ae-transition);
+}
+.connections-overlay path.connection-line:hover { stroke-width: 3; opacity: .8; }
+.connection-arrow { filter: drop-shadow(0 1px 2px rgba(0,0,0,.1)); }
+.connection-delete-btn { opacity: 0; transition: opacity var(--ae-transition); cursor: pointer; }
+.connection-group:hover .connection-delete-btn { opacity: 1; }
+.connecting-line { stroke-dasharray: 6,4; opacity: .7; fill: none; stroke-linecap: round; animation: dash .5s linear infinite; }
+@keyframes dash { to { stroke-dashoffset: -10; } }
 
-[data-bs-theme="dark"] .ai-intents-visual {
-    border-top-color: rgba(255, 255, 255, 0.1);
+/* Config side panel */
+.ae-config-panel {
+    position: absolute; top: 0; right: 0; bottom: 0;
+    width: var(--ae-config-panel-w); max-width: 90vw;
+    background: var(--ae-surface); border-left: 1px solid var(--ae-border);
+    box-shadow: -4px 0 20px rgba(0,0,0,.08);
+    transform: translateX(100%); transition: transform .3s cubic-bezier(.4,0,.2,1);
+    z-index: 40; display: flex; flex-direction: column; overflow: hidden;
 }
+.ae-config-panel.open { transform: translateX(0); }
+.ae-config-panel-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--ae-border);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.ae-config-panel-header h5 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ae-text); }
+.ae-config-panel-body { flex: 1; overflow-y: auto; padding: 20px; }
+.ae-config-panel-footer { padding: 12px 20px; border-top: 1px solid var(--ae-border); flex-shrink: 0; }
 
-[data-bs-theme="dark"] .ai-intent-row:hover {
-    background-color: rgba(99, 102, 241, 0.15);
-    border-left-color: #818cf8;
+/* Bottom logs panel */
+.ae-bottom-panel {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--ae-surface); border-top: 1px solid var(--ae-border);
+    z-index: 25; transition: height .3s ease;
+    box-shadow: 0 -2px 10px rgba(0,0,0,.05);
 }
+.ae-bottom-panel.collapsed { height: 36px !important; }
+.ae-bottom-toggle {
+    height: 36px; display: flex; align-items: center; padding: 0 16px; gap: 8px;
+    cursor: pointer; user-select: none; font-size: 13px; font-weight: 600; color: var(--ae-text);
+    border-bottom: 1px solid var(--ae-border);
+}
+.ae-bottom-toggle:hover { background: var(--ae-surface-hover); }
+.ae-bottom-content { height: calc(100% - 36px); overflow-y: auto; padding: 12px 16px; }
 
-.connecting-line {
-    stroke-dasharray: 5,5;
-    opacity: 0.7;
-    fill: none;
-    stroke-linecap: round;
-    animation: dash 0.5s linear infinite;
+/* Minimap */
+.ae-minimap {
+    position: absolute; bottom: 48px; right: 12px; width: 180px; height: 120px;
+    background: var(--ae-surface); border: 1px solid var(--ae-border);
+    border-radius: var(--ae-radius-sm); box-shadow: var(--ae-shadow-lg);
+    z-index: 22; overflow: hidden; opacity: .85;
+    transition: opacity var(--ae-transition);
 }
+.ae-minimap:hover { opacity: 1; }
+.ae-minimap-viewport {
+    position: absolute; border: 2px solid var(--ae-primary);
+    border-radius: 2px; background: rgba(59,130,246,.08);
+    cursor: move; z-index: 2;
+}
+.ae-minimap-node { position: absolute; border-radius: 2px; z-index: 1; }
 
-@keyframes dash {
-    to {
-        stroke-dashoffset: -10;
-    }
+/* Canvas tip */
+.automation-canvas-tip {
+    position: absolute; bottom: 12px; left: 12px; z-index: 20; max-width: 320px;
 }
+.automation-canvas-tip .alert { padding: 10px 12px; font-size: 12px; border-radius: var(--ae-radius-sm); }
 
-/* Animação de "desenho" para linhas permanentes */
-@keyframes drawLine {
-    from {
-        stroke-dashoffset: var(--path-length);
-    }
-    to {
-        stroke-dashoffset: 0;
-    }
-}
+/* Utility for node palette position override */
+.automation-palette { display: none !important; }
 </style>
 HTML;
 
 ob_start();
+
+// Organizar tipos de nós por categoria para a sidebar
+$nodeCategories = [
+    'Gatilho' => [],
+    'Condições' => [],
+    'Ações' => [],
+    'Controle' => [],
+];
+foreach ($nodeTypes as $type => $config) {
+    if ($type === 'trigger') {
+        $nodeCategories['Gatilho'][$type] = $config;
+    } elseif (in_array($type, ['condition', 'condition_business_hours', 'keyword_router'])) {
+        $nodeCategories['Condições'][$type] = $config;
+    } elseif (in_array($type, ['delay', 'end'])) {
+        $nodeCategories['Controle'][$type] = $config;
+    } else {
+        $nodeCategories['Ações'][$type] = $config;
+    }
+}
 ?>
-<!--begin::Card-->
-<div class="card">
-    <div class="card-header border-0 pt-6">
-        <div class="card-title">
-            <div class="d-flex flex-column">
-                <h3 class="fw-bold m-0"><?= htmlspecialchars($automation['name']) ?></h3>
-                <?php if (!empty($automation['funnel_id']) || !empty($automation['stage_id'])): ?>
-                    <div class="text-muted fs-7 mt-1">
-                        <?php if (!empty($automation['funnel_id'])): ?>
-                            <span class="badge badge-light-primary">Funil: <?= htmlspecialchars($automation['funnel_name'] ?? 'N/A') ?></span>
-                        <?php endif; ?>
-                        <?php if (!empty($automation['stage_id'])): ?>
-                            <span class="badge badge-light-info ms-2">Estágio: <?= htmlspecialchars($automation['stage_name'] ?? 'N/A') ?></span>
-                        <?php endif; ?>
-                    </div>
-                <?php endif; ?>
+
+<!--begin::Fullscreen Automation Editor-->
+<div class="ae-wrapper" id="ae_wrapper">
+
+    <!--begin::Top Bar-->
+    <div class="ae-topbar">
+        <div class="ae-topbar-left">
+            <a href="<?= \App\Helpers\Url::to('/automations') ?>" class="btn btn-sm btn-icon btn-light" title="Voltar">
+                <i class="ki-duotone ki-arrow-left fs-3"><span class="path1"></span><span class="path2"></span></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-icon btn-light" id="ae_sidebar_toggle" title="Componentes">
+                <i class="ki-duotone ki-element-11 fs-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+            </button>
+            <div class="vr mx-1" style="height:24px; opacity:.2;"></div>
+            <span class="ae-auto-name" id="automation_title"><?= htmlspecialchars($automation['name']) ?></span>
+            <?php if (!empty($automation['funnel_name'])): ?>
+                <span class="ae-badge badge badge-light-primary"><?= htmlspecialchars($automation['funnel_name']) ?></span>
+            <?php endif; ?>
+            <?php if (!empty($automation['stage_name'])): ?>
+                <span class="ae-badge badge badge-light-info"><?= htmlspecialchars($automation['stage_name']) ?></span>
+            <?php endif; ?>
+            <span class="ae-badge badge badge-light-<?= ($automation['status'] ?? 'active') === 'active' ? 'success' : 'secondary' ?>" id="ae_status_badge">
+                <?= ($automation['status'] ?? 'active') === 'active' ? 'Ativa' : 'Inativa' ?>
+            </span>
+        </div>
+        <div class="ae-topbar-center">
+            <div class="ae-zoom-group">
+                <button type="button" class="btn btn-sm btn-light" id="automation_zoom_out" title="Diminuir zoom">
+                    <i class="ki-duotone ki-minus fs-4"></i>
+                </button>
+                <span class="ae-zoom-label" id="automation_zoom_label">100%</span>
+                <button type="button" class="btn btn-sm btn-light" id="automation_zoom_in" title="Aumentar zoom">
+                    <i class="ki-duotone ki-plus fs-4"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-light" id="automation_zoom_reset" title="Resetar">
+                    <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-light" id="automation_fit_view" title="Ajustar à tela">
+                    <i class="ki-duotone ki-maximize fs-4"><span class="path1"></span><span class="path2"></span></i>
+                </button>
             </div>
         </div>
-        <div class="card-toolbar d-flex gap-2">
+        <div class="ae-topbar-right">
+            <button type="button" class="btn btn-sm btn-light" onclick="validateAutomationConnections()" title="Validar">
+                <i class="ki-duotone ki-check-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                <span class="d-none d-md-inline ms-1">Validar</span>
+            </button>
             <div class="btn-group">
                 <button type="button" class="btn btn-sm btn-light-info" onclick="testAutomation()">
-                    <i class="ki-duotone ki-play fs-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    Teste Rápido
+                    <i class="ki-duotone ki-play fs-4"><span class="path1"></span><span class="path2"></span></i>
+                    <span class="d-none d-md-inline ms-1">Testar</span>
                 </button>
-                <button type="button" class="btn btn-sm btn-light-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
-                    <span class="sr-only">Toggle Dropdown</span>
-                </button>
+                <button type="button" class="btn btn-sm btn-light-info dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown"><span class="sr-only">Toggle</span></button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="#" onclick="testAutomation(); return false;">
-                        <i class="ki-duotone ki-flash-circle fs-2 me-2 text-info">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Teste Rápido
-                    </a></li>
-                    <li><a class="dropdown-item" href="#" onclick="advancedTestAutomation(); return false;">
-                        <i class="ki-duotone ki-setting-2 fs-2 me-2 text-primary">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Teste Avançado
-                    </a></li>
-                    <li><hr class="dropdown-divider"></li>
-                    <li><a class="dropdown-item" href="#" onclick="validateAutomationConnections(); return false;">
-                        <i class="ki-duotone ki-check-circle fs-2 me-2 text-success">
-                            <span class="path1"></span>
-                            <span class="path2"></span>
-                        </i>
-                        Validar Automação
-                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="testAutomation(); return false;">Teste Rápido</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="advancedTestAutomation(); return false;">Teste Avançado</a></li>
                 </ul>
             </div>
-            
-            <button type="button" class="btn btn-sm btn-light-primary" data-bs-toggle="modal" data-bs-target="#kt_modal_edit_automation">
-                <i class="ki-duotone ki-pencil fs-2"></i>
-                Editar Configuração
+            <button type="button" class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#kt_modal_edit_automation" title="Configurações">
+                <i class="ki-duotone ki-setting-2 fs-4"><span class="path1"></span><span class="path2"></span></i>
             </button>
-            <button type="button" class="btn btn-sm btn-light-primary" onclick="if(validateAutomationConnections()){saveLayout();}">
-                <i class="ki-duotone ki-check fs-2"></i>
-                Salvar Layout
+            <button type="button" class="btn btn-sm btn-primary" onclick="if(validateAutomationConnections()){saveLayout();}">
+                <i class="ki-duotone ki-check fs-4"></i>
+                <span class="d-none d-md-inline ms-1">Salvar</span>
             </button>
         </div>
     </div>
-    <div class="card-body pt-0">
-        <!--begin::Editor de Fluxo-->
-        <div>
-            <!--begin::Canvas Principal-->
-                <div class="automation-editor">
-                    <div class="automation-canvas-toolbar">
-                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_out" title="Diminuir zoom (Ctrl + Scroll)">
-                            <i class="ki-duotone ki-minus fs-3"></i>
-                        </button>
-                        <div id="automation_zoom_label">100%</div>
-                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_in" title="Aumentar zoom (Ctrl + Scroll)">
-                            <i class="ki-duotone ki-plus fs-3"></i>
-                        </button>
-                        <div style="width: 1px; height: 20px; background: rgba(0,0,0,0.1); margin: 0 2px;"></div>
-                        <button type="button" class="btn btn-light btn-sm" id="automation_zoom_reset" title="Resetar zoom e posição">
-                            <i class="ki-duotone ki-arrows-circle fs-3"></i>
-                        </button>
-                    </div>
-                    <div class="automation-canvas-viewport" id="automation_canvas_viewport">
-                        <div class="automation-canvas-content" id="automation_canvas_content">
-                            <svg id="kt_connections_svg" class="connections-overlay"></svg>
-                            <div id="kt_automation_canvas">
-                                <!-- Nós serão adicionados aqui via JavaScript -->
+    <!--end::Top Bar-->
+
+    <!--begin::Main Area-->
+    <div class="ae-main">
+
+        <!--begin::Sidebar-->
+        <div class="ae-sidebar" id="ae_sidebar">
+            <div class="ae-sidebar-header">
+                <h6>Componentes</h6>
+                <input type="text" class="ae-sidebar-search mt-2" id="ae_sidebar_search" placeholder="Buscar nó..." />
+            </div>
+            <div class="ae-sidebar-body">
+                <?php foreach ($nodeCategories as $catName => $catNodes): ?>
+                    <?php if (empty($catNodes)) continue; ?>
+                    <div class="ae-sidebar-category" data-category="<?= strtolower($catName) ?>">
+                        <div class="ae-sidebar-category-label"><?= htmlspecialchars($catName) ?></div>
+                        <?php foreach ($catNodes as $type => $config): ?>
+                            <div class="ae-node-item automation-node-type"
+                                 draggable="true"
+                                 data-node-type="<?= ($type === 'trigger') ? 'trigger' : (str_starts_with($type, 'action_') || str_starts_with($type, 'condition') || in_array($type, ['delay','end','keyword_router']) ? $type : 'action') ?>"
+                                 <?php if (str_starts_with($type, 'action_')): ?>data-action-type="<?= $type ?>"<?php endif; ?>
+                                 onclick="addNode('<?= $type ?>')">
+                                <div class="ae-node-icon" style="background: <?= $config['color'] ?>18; color: <?= $config['color'] ?>;">
+                                    <i class="ki-duotone <?= $config['icon'] ?> fs-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                </div>
+                                <span class="ae-node-label"><?= htmlspecialchars($config['label']) ?></span>
                             </div>
-                        </div>
+                        <?php endforeach; ?>
                     </div>
-                    <div class="automation-canvas-tip">
-                <div class="alert alert-info d-flex align-items-center mb-0" style="font-size: 0.875rem;">
-                    <i class="ki-duotone ki-information fs-2 me-2">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                    <div>
-                        <strong>Dica:</strong> Arraste o fundo para mover o canvas. Use os botões ou Ctrl + scroll para dar zoom.
-                        Arraste do ponto inferior de um nó para o superior de outro para conectar. Duplo clique em uma linha remove a conexão.
-                    </div>
-                </div>
+                <?php endforeach; ?>
             </div>
-            </div>
-            <!--end::Canvas Principal-->
-            
-            <!--begin::Paleta de Nós-->
-            <div class="automation-palette position-absolute end-0 m-5" style="z-index: 100; top: 80px;">
-                <div class="card shadow-lg">
-                    <div class="card-header">
-                        <h3 class="card-title">Componentes</h3>
-                    </div>
-                    <div class="card-body p-5">
-                        <div class="d-flex flex-column gap-3">
-                            <?php foreach ($nodeTypes as $type => $config): ?>
-                                <button type="button" class="btn btn-light-primary d-flex align-items-center gap-3 p-3" 
-                                        onclick="addNode('<?= $type ?>')"
-                                        style="text-align: left;">
-                                    <i class="ki-duotone <?= $config['icon'] ?> fs-2" style="color: <?= $config['color'] ?>;">
-                                        <span class="path1"></span>
-                                        <span class="path2"></span>
-                                    </i>
-                                    <span class="fw-semibold"><?= htmlspecialchars($config['label']) ?></span>
-                                </button>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <!--end::Paleta de Nós-->
         </div>
-        <!--end::Editor de Fluxo-->
-    </div>
-</div>
-<!--end::Card-->
+        <!--end::Sidebar-->
 
-<!--begin::Card - Logs de Execução-->
-<div class="card mt-5" id="logs">
-    <div class="card-header border-0 pt-6">
-        <div class="card-title">
-            <h3 class="fw-bold m-0">Logs de Execução</h3>
-        </div>
-        <div class="card-toolbar">
-            <button type="button" class="btn btn-sm btn-light-primary" onclick="refreshLogs()">
-                <i class="ki-duotone ki-arrows-circle fs-2">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
-                Atualizar
-            </button>
-        </div>
-    </div>
-    <div class="card-body pt-0">
-        <div id="kt_automation_logs">
-            <div class="text-center py-10">
-                <span class="spinner-border spinner-border-sm text-primary"></span>
-                <span class="ms-2">Carregando logs...</span>
+        <!--begin::Canvas Area-->
+        <div class="ae-canvas-area">
+            <div class="automation-editor">
+                <div class="automation-canvas-viewport" id="automation_canvas_viewport">
+                    <div class="automation-canvas-content" id="automation_canvas_content">
+                        <svg id="kt_connections_svg" class="connections-overlay"></svg>
+                        <div id="kt_automation_canvas"></div>
+                    </div>
+                </div>
+                <div class="automation-canvas-tip" id="ae_canvas_tip">
+                    <div class="alert alert-light d-flex align-items-center mb-0 border" style="font-size: 12px; padding: 8px 12px;">
+                        <i class="ki-duotone ki-information fs-4 me-2 text-primary"><span class="path1"></span><span class="path2"></span></i>
+                        <span>Arraste o fundo para mover &bull; Ctrl+Scroll para zoom &bull; Arraste handles para conectar</span>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
-</div>
-<!--end::Card - Logs de Execução-->
 
-<!--begin::Modal - Configurar Nó-->
-<div class="modal fade" id="kt_modal_node_config" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="fw-bold" id="kt_modal_node_config_title">Configurar Nó</h2>
-                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
-                    <i class="ki-duotone ki-cross fs-1">
-                        <span class="path1"></span>
-                        <span class="path2"></span>
-                    </i>
-                </div>
-            </div>
-            <form id="kt_modal_node_config_form" class="form">
-                <input type="hidden" id="kt_node_id" name="node_id" value="" />
-                <input type="hidden" id="kt_node_type" name="node_type" value="" />
-                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7" id="kt_node_config_content">
-                    <!-- Conteúdo dinâmico baseado no tipo de nó -->
-                </div>
-                <div class="modal-footer flex-center">
-                    <button type="reset" data-bs-dismiss="modal" class="btn btn-light me-3">Cancelar</button>
-                    <button type="submit" id="kt_modal_node_config_submit" class="btn btn-primary" onclick="console.log('🖱️ BOTÃO SALVAR CLICADO!')">
-                        <span class="indicator-label">Salvar</span>
-                        <span class="indicator-progress">Aguarde...
-                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+            <!--begin::Config Side Panel (replaces modal for node config)-->
+            <div class="ae-config-panel" id="ae_config_panel">
+                <div class="ae-config-panel-header">
+                    <h5 id="kt_modal_node_config_title">Configurar Nó</h5>
+                    <button type="button" class="btn btn-sm btn-icon btn-light" onclick="closeConfigPanel()">
+                        <i class="ki-duotone ki-cross fs-3"><span class="path1"></span><span class="path2"></span></i>
                     </button>
                 </div>
-            </form>
+                <form id="kt_modal_node_config_form" class="form" style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+                    <input type="hidden" id="kt_node_id" name="node_id" value="" />
+                    <input type="hidden" id="kt_node_type" name="node_type" value="" />
+                    <div class="ae-config-panel-body" id="kt_node_config_content"></div>
+                    <div class="ae-config-panel-footer d-flex gap-2">
+                        <button type="button" class="btn btn-light flex-fill" onclick="closeConfigPanel()">Cancelar</button>
+                        <button type="submit" id="kt_modal_node_config_submit" class="btn btn-primary flex-fill">Salvar</button>
+                    </div>
+                </form>
+            </div>
+            <!--end::Config Side Panel-->
+
+            <!--begin::Minimap-->
+            <div class="ae-minimap" id="ae_minimap">
+                <canvas id="ae_minimap_canvas" width="180" height="120"></canvas>
+                <div class="ae-minimap-viewport" id="ae_minimap_viewport"></div>
+            </div>
+            <!--end::Minimap-->
+
+            <!--begin::Bottom Logs Panel-->
+            <div class="ae-bottom-panel collapsed" id="ae_bottom_panel" style="height: 280px;">
+                <div class="ae-bottom-toggle" onclick="toggleBottomPanel()">
+                    <i class="ki-duotone ki-chart-line fs-5"><span class="path1"></span><span class="path2"></span></i>
+                    <span>Logs de Execução</span>
+                    <span class="badge badge-light-primary badge-sm ms-1" id="ae_logs_count">0</span>
+                    <span style="margin-left:auto;">
+                        <i class="ki-duotone ki-arrow-up fs-5 ae-bottom-arrow" style="transition:transform .2s;"><span class="path1"></span><span class="path2"></span></i>
+                    </span>
+                </div>
+                <div class="ae-bottom-content">
+                    <div class="d-flex justify-content-end mb-2">
+                        <button type="button" class="btn btn-sm btn-light" onclick="refreshLogs()">
+                            <i class="ki-duotone ki-arrows-circle fs-5"><span class="path1"></span><span class="path2"></span></i> Atualizar
+                        </button>
+                    </div>
+                    <div id="kt_automation_logs">
+                        <div class="text-center py-5 text-muted fs-7">Clique em "Atualizar" para carregar logs</div>
+                    </div>
+                </div>
+            </div>
+            <!--end::Bottom Logs Panel-->
         </div>
+        <!--end::Canvas Area-->
+
     </div>
+    <!--end::Main Area-->
 </div>
-<!--end::Modal - Configurar Nó-->
+<!--end::Fullscreen Automation Editor-->
+
+<!-- Hidden modal wrapper for backward compat with bootstrap.Modal calls -->
+<div class="modal fade" id="kt_modal_node_config" tabindex="-1" aria-hidden="true" style="display:none!important;">
+    <div class="modal-dialog" style="display:none;"></div>
+</div>
 
 <!--begin::Modal - Editar Automação-->
 <div class="modal fade" id="kt_modal_edit_automation" tabindex="-1" aria-hidden="true">
@@ -1119,7 +1042,7 @@ function initAccountSelect2(selectElement) {
     if (!selectElement) return;
     
     $(selectElement).select2({
-        dropdownParent: $('#kt_modal_node_config'),
+        dropdownParent: $('#ae_config_panel'),
         placeholder: 'Selecione as contas (deixe vazio para todas)',
         allowClear: true,
         closeOnSelect: false,
@@ -1172,8 +1095,12 @@ document.addEventListener("DOMContentLoaded", function() {
     const resizeObserver = new ResizeObserver(() => {
         updateSvgSize();
         renderConnections();
+        if (typeof updateMinimap === 'function') updateMinimap();
     });
     resizeObserver.observe(canvas);
+    
+    // Initial minimap render
+    setTimeout(function() { if (typeof updateMinimap === 'function') updateMinimap(); }, 300);
 });
 
 function applyCanvasTransform() {
@@ -1184,10 +1111,8 @@ function applyCanvasTransform() {
         zoomLabel.textContent = Math.round(canvasScale * 100) + '%';
     }
     
-    // Atualizar o tamanho do grid para se adaptar ao zoom
-    // Dividir por canvasScale para manter o grid visualmente do mesmo tamanho
     if (canvas) {
-        const gridSize = 50 / canvasScale;
+        const gridSize = 24 / canvasScale;
         canvas.style.backgroundSize = `${gridSize}px ${gridSize}px`;
     }
 }
@@ -1301,15 +1226,11 @@ function addNode(nodeType, x, y) {
     };
     
     nodes.push(node);
-    // Atualizar referência global
     window.nodes = nodes;
-    console.log('addNode - Nó adicionado:', node);
-    console.log('addNode - Total de nós no array:', nodes.length);
-    console.log('addNode - Array completo:', nodes);
-    console.log('addNode - window.nodes atualizado:', window.nodes.length);
     
     renderNode(node);
     makeNodeDraggable(nodeId);
+    if (typeof updateMinimap === 'function') updateMinimap();
     openNodeConfig(nodeId);
 }
 
@@ -1320,73 +1241,52 @@ function renderNodes() {
 }
 
 function renderNode(node) {
-    // Verificar se o nó já existe no DOM
     const existingElement = document.getElementById(String(node.id));
-    if (existingElement) {
-        console.warn('Nó já existe no DOM:', node.id);
-        return; // Não renderizar novamente
-    }
-    
-    console.log('🎨 renderNode chamado para:', node.id, 'Tipo:', node.node_type);
-    if (node.node_type === 'action_assign_ai_agent') {
-        console.log('  -> É AI Agent, verificando intents...');
-        console.log('  -> ai_intents existe?', !!node.node_data.ai_intents);
-        console.log('  -> É array?', Array.isArray(node.node_data.ai_intents));
-        console.log('  -> Tamanho:', node.node_data.ai_intents?.length);
-        console.log('  -> Conteúdo:', node.node_data.ai_intents);
-    }
+    if (existingElement) return;
     
     const config = nodeTypes[node.node_type] || {};
+    const color = config.color || '#3b82f6';
     const nodeElement = document.createElement("div");
-    nodeElement.id = String(node.id); // Garantir que o ID seja string para o DOM
+    nodeElement.id = String(node.id);
     nodeElement.className = "automation-node";
-    nodeElement.style.cssText = `
-        position: absolute;
-        left: ${node.position_x}px;
-        top: ${node.position_y}px;
-        width: 200px;
-        padding: 15px;
-        border: 2px solid ${config.color || "#009ef7"};
-        border-radius: 8px;
-        cursor: move;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    `;
+    nodeElement.style.cssText = `position:absolute; left:${node.position_x}px; top:${node.position_y}px; width:var(--ae-node-w); cursor:move;`;
     
-    // Determinar se é chatbot com menu
     const isChatbotMenu = node.node_type === 'action_chatbot' && 
-                          node.node_data && 
-                          node.node_data.chatbot_type === 'menu' &&
-                          node.node_data.chatbot_options &&
-                          Array.isArray(node.node_data.chatbot_options);
+                          node.node_data?.chatbot_type === 'menu' &&
+                          Array.isArray(node.node_data?.chatbot_options);
     
-    // HTML básico do nó
+    // Build preview text
+    let previewText = '';
+    if (node.node_type === 'action_send_message' && node.node_data.message) {
+        previewText = node.node_data.message.substring(0, 50) + (node.node_data.message.length > 50 ? '...' : '');
+    } else if (node.node_type === 'action_assign_agent' && node.node_data.agent_id) {
+        previewText = 'Agente ID: ' + node.node_data.agent_id;
+    } else if (node.node_type === 'action_chatbot') {
+        previewText = (node.node_data.chatbot_type === 'menu' ? 'Menu' : 'Simples');
+    } else if (node.node_type === 'delay') {
+        previewText = (node.node_data.delay_value || '5') + ' ' + (node.node_data.delay_unit || 'minutes');
+    } else if (node.node_data.label && node.node_data.label !== config.label) {
+        previewText = node.node_data.label;
+    }
+    
     let innerHtml = `
-        <div class="d-flex align-items-center justify-content-between mb-2">
-            <div class="d-flex align-items-center gap-3">
-            <i class="ki-duotone ${config.icon || "ki-gear"} fs-2" style="color: ${config.color || "#009ef7"};">
-                <span class="path1"></span>
-                <span class="path2"></span>
-            </i>
-            <span class="fw-bold">${config.label || node.node_type}</span>
-            </div>
-            <span class="badge badge-light-secondary fs-9 px-2 py-1" style="font-family: monospace; opacity: 0.7;">${String(node.id || '')}</span>
-        </div>
-        <div class="text-muted fs-7">${node.node_data.label || ""}</div>
-        <div class="mt-3 d-flex gap-2" style="position: relative; z-index: 100;">
-            <button type="button" class="btn btn-sm btn-light-primary node-action-btn" onclick="openNodeConfig('${String(node.id || '')}')">
-                <i class="ki-duotone ki-pencil fs-5">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                </i>
+        <div class="node-color-bar" style="background:${color};"></div>
+        <div class="node-actions">
+            <button type="button" class="btn btn-sm btn-light node-action-btn" onclick="openNodeConfig('${String(node.id || '')}')">
+                <i class="ki-duotone ki-pencil fs-6"><span class="path1"></span><span class="path2"></span></i>
             </button>
             <button type="button" class="btn btn-sm btn-light-danger node-action-btn" onclick="deleteNode('${String(node.id || '')}')">
-                <i class="ki-duotone ki-trash fs-5">
-                    <span class="path1"></span>
-                    <span class="path2"></span>
-                    <span class="path3"></span>
-                </i>
+                <i class="ki-duotone ki-trash fs-6"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
             </button>
         </div>
+        <div class="node-header">
+            <div class="node-icon" style="background:${color}18; color:${color};">
+                <i class="ki-duotone ${config.icon || 'ki-gear'} fs-4"><span class="path1"></span><span class="path2"></span></i>
+            </div>
+            <span class="node-title">${config.label || node.node_type}</span>
+            <span class="node-id-badge">${String(node.id || '')}</span>
+        </div>
+        ${previewText ? `<div class="node-preview">${previewText}</div>` : ''}
         <div class="node-connection-handle input" data-node-id="${String(node.id || '')}" data-handle-type="input"></div>
     `;
     
@@ -1570,6 +1470,12 @@ function renderNode(node) {
     
     nodeElement.innerHTML = innerHtml;
     
+    // Double-click to open config
+    nodeElement.addEventListener('dblclick', function(e) {
+        if (e.target.closest('.node-connection-handle') || e.target.closest('.node-actions')) return;
+        openNodeConfig(String(node.id));
+    });
+    
     canvas.appendChild(nodeElement);
     
     // Adicionar eventos aos handles de conexão
@@ -1724,32 +1630,14 @@ function openNodeConfig(nodeId) {
     const node = nodes.find(n => String(n.id) === String(nodeId));
     if (!node) return;
     
-    // Guardar referência global para uso no submit (evitar sobrescrita do hidden)
     window.currentNodeIdForModal = nodeId;
     window.currentNodeRefForModal = node;
-    
-    console.log('=== openNodeConfig chamado ===');
-    console.log('Node ID:', nodeId);
-    console.log('Node Type:', node.node_type);
-    console.log('Node Data completo:', JSON.parse(JSON.stringify(node.node_data)));
-    
-    if (node.node_type === 'action_assign_ai_agent') {
-        console.log('AI Agent - Dados ao abrir:');
-        console.log('  ai_branching_enabled:', node.node_data.ai_branching_enabled);
-        console.log('  ai_intents:', node.node_data.ai_intents);
-        console.log('  ai_max_interactions:', node.node_data.ai_max_interactions);
-        console.log('  ai_fallback_node_id:', node.node_data.ai_fallback_node_id);
-    }
     
     const config = nodeTypes[node.node_type] || {};
     document.getElementById("kt_modal_node_config_title").textContent = "Configurar: " + config.label;
     
     const nodeIdInput = document.getElementById("kt_node_id");
-    console.log('📝 Definindo Node ID no campo hidden...');
-    console.log('  Valor ANTES:', nodeIdInput.value);
-    console.log('  Novo valor:', nodeId);
     nodeIdInput.value = nodeId;
-    console.log('  Valor DEPOIS:', nodeIdInput.value);
     
     // Guard rails: manter o valor enquanto o modal estiver aberto
     if (window.nodeIdGuardInterval) clearInterval(window.nodeIdGuardInterval);
@@ -2759,7 +2647,7 @@ function openNodeConfig(nodeId) {
                             
                             // Inicializar select2
                             $(tagSelect).select2({
-                                dropdownParent: $('#kt_modal_node'),
+                                dropdownParent: $('#ae_config_panel'),
                                 templateResult: function(tag) {
                                     if (!tag.element) return tag.text;
                                     const color = tag.element.getAttribute('data-color');
@@ -3339,23 +3227,29 @@ function openNodeConfig(nodeId) {
         }, 200);
     }
     
-    console.log('✅ Abrindo modal de configuração...');
-    const modalElement = document.getElementById("kt_modal_node_config");
-    console.log('Modal element:', modalElement ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-    
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
-    
-    console.log('✅ Modal aberto!');
-    console.log('=== FIM openNodeConfig ===');
+    // Open config side panel
+    const panel = document.getElementById("ae_config_panel");
+    if (panel) {
+        panel.classList.add("open");
+        panel.dataset.nodeId = nodeId;
+    }
 }
+
+function closeConfigPanel() {
+    const panel = document.getElementById("ae_config_panel");
+    if (panel) {
+        panel.classList.remove("open");
+        delete panel.dataset.nodeId;
+    }
+    if (window.nodeIdGuardInterval) {
+        clearInterval(window.nodeIdGuardInterval);
+        window.nodeIdGuardInterval = null;
+    }
+}
+window.closeConfigPanel = closeConfigPanel;
 
 function deleteNode(nodeId) {
     if (!confirm("Tem certeza que deseja deletar este nó?")) return;
-    
-    console.log('deleteNode - Deletando nó:', nodeId, 'tipo:', typeof nodeId);
-    console.log('deleteNode - Array antes:', nodes.length, nodes);
-    console.log('deleteNode - IDs no array:', nodes.map(function(n) { return n.id + ' (' + typeof n.id + ')'; }));
     
     // Normalizar nodeId para comparação
     const nodeIdStr = String(nodeId);
@@ -3384,11 +3278,9 @@ function deleteNode(nodeId) {
     console.log('deleteNode - window.nodes atualizado:', window.nodes.length);
     
     const nodeElement = document.getElementById(String(nodeId));
-    if (nodeElement) {
-        nodeElement.remove();
-    }
-    
+    if (nodeElement) nodeElement.remove();
     renderConnections();
+    if (typeof updateMinimap === 'function') updateMinimap();
 }
 
 function updateSvgSize() {
@@ -3831,12 +3723,10 @@ function removeConnection(fromNodeId, toNodeId, optionIndex, connectionType) {
     console.log('Conexões removidas:', oldConnectionsCount - newConnectionsCount);
     console.log('Conexões restantes:', node.node_data.connections);
     
-    // Atualizar visualmente
     renderConnections();
+    if (typeof updateMinimap === 'function') updateMinimap();
     
-    // Salvar automaticamente no servidor
     if (oldConnectionsCount > newConnectionsCount) {
-        console.log('Salvando alteração no servidor...');
         saveLayout();
     }
 }
@@ -3918,20 +3808,18 @@ function saveLayout() {
         return response.json();
     })
     .then(data => {
-        console.log('Resposta do servidor:', data);
         if (data.success) {
-            alert('Layout salvo com sucesso! Total de nós salvos: ' + (data.nodes_count || 0));
-            // Aguardar um pouco antes de recarregar para garantir que o banco foi atualizado
-            setTimeout(() => {
-                location.reload();
-            }, 500);
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({ icon: 'success', title: 'Salvo!', text: 'Layout salvo com sucesso. ' + (data.nodes_count || 0) + ' nó(s).', timer: 1500, showConfirmButton: false, toast: true, position: 'top-end' });
+            }
+            setTimeout(() => { location.reload(); }, 600);
         } else {
-            alert('Erro: ' + (data.message || 'Erro ao salvar layout'));
+            Swal.fire({ icon: 'error', title: 'Erro', text: data.message || 'Erro ao salvar layout' });
         }
     })
     .catch(error => {
         console.error('Erro ao salvar layout:', error);
-        alert('Erro ao salvar layout: ' + error.message);
+        Swal.fire({ icon: 'error', title: 'Erro', text: 'Erro ao salvar layout: ' + error.message });
     });
 }
 
@@ -3942,48 +3830,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const nodeConfigForm = document.getElementById("kt_modal_node_config_form");
     console.log('🔧 Formulário encontrado:', nodeConfigForm ? 'SIM' : 'NÃO');
     
-    // Adicionar listener para quando o modal for mostrado
-    const modalElement = document.getElementById("kt_modal_node_config");
-    if (modalElement) {
-        modalElement.addEventListener('shown.bs.modal', function () {
-            console.log('📋 MODAL MOSTRADO - Formulário pronto para interação');
-            const form = document.getElementById("kt_modal_node_config_form");
-            console.log('📋 Formulário no evento shown:', form ? 'ENCONTRADO' : 'NÃO ENCONTRADO');
-            
-            // DEBUG: Monitorar mudanças no campo node_id
-            const nodeIdField = document.getElementById("kt_node_id");
-            if (nodeIdField) {
-                console.log('🔍 Node ID no modal shown:', nodeIdField.value);
-                
-                // Criar um observer para detectar mudanças
-                const observer = new MutationObserver(function(mutations) {
-                    mutations.forEach(function(mutation) {
-                        if (mutation.type === 'attributes' && mutation.attributeName === 'value') {
-                            console.log('⚠️ Node ID foi alterado via atributo para:', nodeIdField.value);
-                            console.trace('Stack trace:');
-                        }
-                    });
-                });
-                observer.observe(nodeIdField, { attributes: true });
-                
-                // Também monitorar via propriedade
-                let lastValue = nodeIdField.value;
-                setInterval(function() {
-                    if (nodeIdField.value !== lastValue) {
-                        console.log('⚠️ Node ID foi alterado de', lastValue, 'para', nodeIdField.value);
-                        console.trace('Stack trace:');
-                        lastValue = nodeIdField.value;
-                    }
-                }, 100);
-            }
-        });
-        modalElement.addEventListener('hidden.bs.modal', function () {
-            if (window.nodeIdGuardInterval) {
-                clearInterval(window.nodeIdGuardInterval);
-                window.nodeIdGuardInterval = null;
-            }
-        });
-    }
+    // Config panel uses ae_config_panel, no modal events needed
     
     if (nodeConfigForm) {
         console.log('🔧 Adicionando listener de submit ao formulário');
@@ -4390,18 +4237,7 @@ document.addEventListener("DOMContentLoaded", function() {
     rerenderNode(node);
     makeNodeDraggable(String(node.id));
             
-            console.log('💾 ===== CONFIGURAÇÃO SALVA =====');
-            console.log('💾 Fechando modal...');
-            
-            const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_node_config"));
-            if (modal) {
-                console.log('💾 Modal encontrado, fechando...');
-                modal.hide();
-            } else {
-                console.error('❌ Modal não encontrado!');
-            }
-            
-            console.log('💾 ===== FIM DO SUBMIT =====');
+            closeConfigPanel();
         });
     } else {
         console.error('❌ Formulário "kt_modal_node_config_form" não encontrado no DOM!');
@@ -4609,6 +4445,10 @@ function refreshLogs() {
 function renderLogs(logs, stats) {
     const logsContainer = document.getElementById("kt_automation_logs");
     if (!logsContainer) return;
+    
+    // Update badge count
+    const badge = document.getElementById('ae_logs_count');
+    if (badge) badge.textContent = stats?.total || logs?.length || 0;
     
     let html = "";
     
@@ -5538,6 +5378,176 @@ window.populateAIIntents = function(intents) {
     });
     
     console.log('populateAIIntents concluído');
+};
+
+// =============================================
+// SECTION: SIDEBAR TOGGLE, SEARCH, BOTTOM PANEL
+// =============================================
+
+document.addEventListener("DOMContentLoaded", function() {
+    // Sidebar toggle
+    const sidebarToggle = document.getElementById('ae_sidebar_toggle');
+    const sidebar = document.getElementById('ae_sidebar');
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            sidebar.classList.toggle('collapsed');
+        });
+    }
+
+    // Sidebar search
+    const sidebarSearch = document.getElementById('ae_sidebar_search');
+    if (sidebarSearch) {
+        sidebarSearch.addEventListener('input', function() {
+            const q = this.value.toLowerCase().trim();
+            document.querySelectorAll('.ae-node-item').forEach(function(item) {
+                const label = item.querySelector('.ae-node-label');
+                const match = !q || (label && label.textContent.toLowerCase().includes(q));
+                item.style.display = match ? '' : 'none';
+            });
+            document.querySelectorAll('.ae-sidebar-category').forEach(function(cat) {
+                const visible = cat.querySelectorAll('.ae-node-item[style=""], .ae-node-item:not([style])');
+                const hasVisible = Array.from(cat.querySelectorAll('.ae-node-item')).some(i => i.style.display !== 'none');
+                cat.style.display = hasVisible ? '' : 'none';
+            });
+        });
+    }
+
+    // Close config panel when clicking outside
+    document.addEventListener('mousedown', function(e) {
+        const panel = document.getElementById('ae_config_panel');
+        if (panel && panel.classList.contains('open')) {
+            if (!panel.contains(e.target) && !e.target.closest('.automation-node') && !e.target.closest('.swal2-container') && !e.target.closest('.select2-container')) {
+                closeConfigPanel();
+            }
+        }
+    });
+
+    // Close config panel on Escape
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            const panel = document.getElementById('ae_config_panel');
+            if (panel && panel.classList.contains('open')) {
+                closeConfigPanel();
+                e.preventDefault();
+            }
+        }
+    });
+
+    // Hide canvas tip after 8 seconds
+    const canvasTip = document.getElementById('ae_canvas_tip');
+    if (canvasTip) {
+        setTimeout(function() {
+            canvasTip.style.transition = 'opacity .5s';
+            canvasTip.style.opacity = '0';
+            setTimeout(function() { canvasTip.style.display = 'none'; }, 500);
+        }, 8000);
+    }
+});
+
+// Bottom panel toggle
+window.toggleBottomPanel = function() {
+    const panel = document.getElementById('ae_bottom_panel');
+    if (!panel) return;
+    const arrow = panel.querySelector('.ae-bottom-arrow');
+    panel.classList.toggle('collapsed');
+    if (arrow) {
+        arrow.style.transform = panel.classList.contains('collapsed') ? 'rotate(180deg)' : '';
+    }
+};
+
+// Fit to view
+document.addEventListener("DOMContentLoaded", function() {
+    const fitBtn = document.getElementById('automation_fit_view');
+    if (fitBtn) {
+        fitBtn.addEventListener('click', function() {
+            if (!canvasViewport || nodes.length === 0) return;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            nodes.forEach(function(n) {
+                const x = Number(n.position_x) || 0;
+                const y = Number(n.position_y) || 0;
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x + 220 > maxX) maxX = x + 220;
+                if (y + 120 > maxY) maxY = y + 120;
+            });
+            const padding = 60;
+            minX -= padding; minY -= padding; maxX += padding; maxY += padding;
+            const nodesW = maxX - minX;
+            const nodesH = maxY - minY;
+            const vRect = canvasViewport.getBoundingClientRect();
+            const scaleX = vRect.width / nodesW;
+            const scaleY = vRect.height / nodesH;
+            const newScale = Math.max(MIN_CANVAS_SCALE, Math.min(MAX_CANVAS_SCALE, Math.min(scaleX, scaleY)));
+            canvasScale = newScale;
+            canvasTranslate.x = (vRect.width - nodesW * newScale) / 2 - minX * newScale;
+            canvasTranslate.y = (vRect.height - nodesH * newScale) / 2 - minY * newScale;
+            applyCanvasTransform();
+            renderConnections();
+            updateMinimap();
+        });
+    }
+});
+
+// =============================================
+// SECTION: MINIMAP
+// =============================================
+
+function updateMinimap() {
+    const minimapCanvas = document.getElementById('ae_minimap_canvas');
+    const minimapViewport = document.getElementById('ae_minimap_viewport');
+    if (!minimapCanvas || !canvasViewport || nodes.length === 0) return;
+
+    const ctx = minimapCanvas.getContext('2d');
+    const mW = minimapCanvas.width;
+    const mH = minimapCanvas.height;
+    ctx.clearRect(0, 0, mW, mH);
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(function(n) {
+        const x = Number(n.position_x) || 0;
+        const y = Number(n.position_y) || 0;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x + 220 > maxX) maxX = x + 220;
+        if (y + 120 > maxY) maxY = y + 120;
+    });
+    const pad = 50;
+    minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+    const worldW = maxX - minX || 1;
+    const worldH = maxY - minY || 1;
+    const scale = Math.min(mW / worldW, mH / worldH);
+
+    nodes.forEach(function(n) {
+        const config = nodeTypes[n.node_type] || {};
+        const x = ((Number(n.position_x) || 0) - minX) * scale;
+        const y = ((Number(n.position_y) || 0) - minY) * scale;
+        const w = 220 * scale;
+        const h = 60 * scale;
+        ctx.fillStyle = config.color || '#3b82f6';
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(x, y, Math.max(w, 4), Math.max(h, 3));
+    });
+    ctx.globalAlpha = 1;
+
+    // Draw viewport rectangle
+    if (minimapViewport) {
+        const vRect = canvasViewport.getBoundingClientRect();
+        const vx = (-canvasTranslate.x / canvasScale - minX) * scale;
+        const vy = (-canvasTranslate.y / canvasScale - minY) * scale;
+        const vw = (vRect.width / canvasScale) * scale;
+        const vh = (vRect.height / canvasScale) * scale;
+        minimapViewport.style.left = Math.max(0, vx) + 'px';
+        minimapViewport.style.top = Math.max(0, vy) + 'px';
+        minimapViewport.style.width = Math.min(vw, mW) + 'px';
+        minimapViewport.style.height = Math.min(vh, mH) + 'px';
+    }
+}
+
+// Update minimap after rendering and panning
+const _origApplyCanvasTransform = applyCanvasTransform;
+applyCanvasTransform = function() {
+    _origApplyCanvasTransform();
+    updateMinimap();
 };
 
 </script>

@@ -255,7 +255,16 @@ class GoogleMapsProspectService
         $page = 0;
         $maxPages = 3; // Google Places retorna no máximo 3 páginas (60 resultados)
 
-        // Para Text Search, montar query combinando keyword + location
+        // Geocodificar localização uma vez
+        $coordinates = self::geocodeLocation($location, $apiKey);
+        if ($coordinates) {
+            Logger::info("GoogleMaps - Geocoded '{$location}': {$coordinates['lat']},{$coordinates['lng']}");
+        } else {
+            Logger::warning("GoogleMaps - Geocoding falhou para '{$location}'");
+        }
+
+        // Determinar endpoint: tentar Text Search, fallback para Nearby Search
+        $useTextSearch = true;
         $textQuery = trim("{$keyword} em {$location}");
 
         Logger::info("GoogleMaps::fetchFromGooglePlaces - query='{$textQuery}', radius={$radius}, maxResults={$maxResults}, includeNoPhone=" . ($includeNoPhone ? 'sim' : 'não'));
@@ -264,43 +273,78 @@ class GoogleMapsProspectService
             $page++;
 
             if ($currentToken) {
-                // Paginação: Google exige delay de 2s antes de usar page token
                 sleep(2);
-                $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
+                $endpoint = $useTextSearch ? '/textsearch/json' : '/nearbysearch/json';
+                $url = self::GOOGLE_PLACES_BASE_URL . $endpoint;
                 $params = [
                     'pagetoken' => $currentToken,
                     'key' => $apiKey
                 ];
-                Logger::info("GoogleMaps - Página {$page} via page_token");
+                Logger::info("GoogleMaps - Página {$page} via page_token ({$endpoint})");
             } else {
-                $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
-                $params = [
-                    'query' => $textQuery,
-                    'language' => $language,
-                    'key' => $apiKey
-                ];
-
-                // Text Search: radius só funciona COM location (coordenadas)
-                $coordinates = self::geocodeLocation($location, $apiKey);
-                if ($coordinates) {
-                    $params['location'] = "{$coordinates['lat']},{$coordinates['lng']}";
-                    $params['radius'] = $radius;
-                    Logger::info("GoogleMaps - Geocoded: {$coordinates['lat']},{$coordinates['lng']}, radius={$radius}");
+                if ($useTextSearch) {
+                    $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
+                    $params = [
+                        'query' => $textQuery,
+                        'language' => $language,
+                        'key' => $apiKey
+                    ];
+                    if ($coordinates) {
+                        $params['location'] = "{$coordinates['lat']},{$coordinates['lng']}";
+                        $params['radius'] = $radius;
+                    }
                 } else {
-                    Logger::info("GoogleMaps - Geocoding falhou, usando apenas query sem radius");
+                    // Fallback: Nearby Search
+                    if (!$coordinates) {
+                        throw new \Exception("Não foi possível geocodificar a localização: {$location}");
+                    }
+                    $url = self::GOOGLE_PLACES_BASE_URL . '/nearbysearch/json';
+                    $params = [
+                        'location' => "{$coordinates['lat']},{$coordinates['lng']}",
+                        'radius' => $radius,
+                        'keyword' => $keyword,
+                        'language' => $language,
+                        'key' => $apiKey
+                    ];
                 }
-
-                Logger::info("GoogleMaps - Página 1, query='{$textQuery}'");
+                Logger::info("GoogleMaps - Página 1 via " . ($useTextSearch ? 'TextSearch' : 'NearbySearch'));
             }
 
             try {
+                $fullUrl = $url . '?' . http_build_query(array_merge($params, ['key' => '***HIDDEN***']));
+                Logger::info("GoogleMaps - Request URL (sem key): {$fullUrl}");
+                Logger::info("GoogleMaps - Params: " . json_encode(array_diff_key($params, ['key' => 1])));
+
                 $response = $client->get($url, ['query' => $params]);
-                $data = json_decode($response->getBody()->getContents(), true);
+                $body = $response->getBody()->getContents();
+                $data = json_decode($body, true);
+
+                Logger::info("GoogleMaps - Response status: " . ($data['status'] ?? 'NULL'));
+                if (!empty($data['error_message'])) {
+                    Logger::error("GoogleMaps - error_message: " . $data['error_message']);
+                }
+                if (!empty($data['info_messages'])) {
+                    Logger::info("GoogleMaps - info_messages: " . json_encode($data['info_messages']));
+                }
 
                 $status = $data['status'] ?? 'UNKNOWN';
                 if ($status !== 'OK' && $status !== 'ZERO_RESULTS') {
-                    Logger::error("GoogleMaps - API erro: " . ($data['error_message'] ?? $status));
-                    throw new \Exception("Google Places API erro: " . ($data['error_message'] ?? $status));
+                    $errorDetail = $data['error_message'] ?? '';
+
+                    // Fallback automático: se Text Search falhou, tentar Nearby Search
+                    if ($useTextSearch && $page === 1 && !$currentToken) {
+                        Logger::warning("GoogleMaps - Text Search falhou ({$status}: {$errorDetail}), tentando Nearby Search...");
+                        $useTextSearch = false;
+                        $page = 0;
+                        $currentToken = null;
+                        continue;
+                    }
+
+                    $debugInfo = "Status: {$status}";
+                    if ($errorDetail) $debugInfo .= " | Msg: {$errorDetail}";
+                    $debugInfo .= " | Params: " . json_encode(array_diff_key($params, ['key' => 1]));
+                    Logger::error("GoogleMaps - API erro completo: {$debugInfo}");
+                    throw new \Exception("Google Places API erro: {$debugInfo}");
                 }
 
                 $pageResults = $data['results'] ?? [];

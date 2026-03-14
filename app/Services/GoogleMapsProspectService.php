@@ -277,16 +277,18 @@ class GoogleMapsProspectService
                 $url = self::GOOGLE_PLACES_BASE_URL . '/textsearch/json';
                 $params = [
                     'query' => $textQuery,
-                    'radius' => $radius,
                     'language' => $language,
                     'key' => $apiKey
                 ];
 
-                // Usar location bias (coordenadas) se possível para melhorar relevância
+                // Text Search: radius só funciona COM location (coordenadas)
                 $coordinates = self::geocodeLocation($location, $apiKey);
                 if ($coordinates) {
                     $params['location'] = "{$coordinates['lat']},{$coordinates['lng']}";
-                    Logger::info("GoogleMaps - Geocoded: {$coordinates['lat']},{$coordinates['lng']}");
+                    $params['radius'] = $radius;
+                    Logger::info("GoogleMaps - Geocoded: {$coordinates['lat']},{$coordinates['lng']}, radius={$radius}");
+                } else {
+                    Logger::info("GoogleMaps - Geocoding falhou, usando apenas query sem radius");
                 }
 
                 Logger::info("GoogleMaps - Página 1, query='{$textQuery}'");

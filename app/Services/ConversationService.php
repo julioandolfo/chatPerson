@@ -2446,12 +2446,15 @@ class ConversationService
                 }
                 
                 // Conversa SEM agente: executar automação do funil (new_conversation)
-                // Recarregar conversa para pegar estado atualizado após executeForMessageReceived
+                // Apenas para conversas já existentes (criadas há mais de 30s).
+                // Conversas recém-criadas são tratadas pelo processWebhook que já chama executeForNewConversation.
                 $freshConversation = Conversation::find($conversationId);
                 $freshAgentId = $freshConversation['agent_id'] ?? null;
                 $isUnassigned = ($freshAgentId === null || (int)$freshAgentId === 0);
+                $createdAt = strtotime($freshConversation['created_at'] ?? 'now');
+                $isRecentlyCreated = (time() - $createdAt) < 30;
                 
-                if ($isUnassigned && !empty($freshConversation['funnel_id'])) {
+                if ($isUnassigned && !empty($freshConversation['funnel_id']) && !$isRecentlyCreated) {
                     $freshMeta = json_decode($freshConversation['metadata'] ?? '{}', true);
                     $chatbotActive = !empty($freshMeta['chatbot_active']);
                     $aiBranchingActive = !empty($freshMeta['ai_branching_active']);
@@ -2467,6 +2470,8 @@ class ConversationService
                     } else {
                         \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente mas chatbot/IA já ativo. Pulando automação do funil.");
                     }
+                } elseif ($isRecentlyCreated && $isUnassigned) {
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa recém-criada (ID={$conversationId}), pulando automação do funil aqui (processWebhook já executa).");
                 }
             }
             

@@ -373,6 +373,16 @@ class CampaignSchedulerService
         $selectedAccount = IntegrationAccount::find($integrationAccountId);
         Logger::campaign("Campanha {$campaignId}: [CONTA] SELECIONADA: ID {$integrationAccountId} - {$selectedAccount['name']} ({$selectedAccount['phone_number']})");
 
+        // 2b. ROUND-ROBIN: Selecionar variante se habilitado
+        $rrVariant = null;
+        if (!empty($campaign['round_robin_enabled'])) {
+            $rrVariants = \App\Models\CampaignVariant::getByCampaignAndType($campaignId, 'round_robin');
+            if (!empty($rrVariants)) {
+                $rrVariant = Campaign::selectAndAdvanceRoundRobin($campaignId, $rrVariants);
+                Logger::campaign("Campanha {$campaignId}: [ROUND-ROBIN] Variante selecionada: " . ($rrVariant['variant_name'] ?? 'N/A'));
+            }
+        }
+
         // 3. GERAR MENSAGEM COM IA (se configurado)
         $messageContent = $message['content'];
         if (!empty($campaign['ai_message_enabled']) && !empty($campaign['ai_message_prompt'])) {
@@ -490,9 +500,34 @@ class CampaignSchedulerService
 
         // 5. ENVIAR MENSAGEM (template ou texto livre)
         Logger::campaign("Campanha {$campaignId}: [ENVIO] Iniciando envio para {$contact['phone']} via conta {$integrationAccountId}");
-        
+
         $sendResult = null;
-        $messageVars = !empty($campaign['message_variables']) ? json_decode($campaign['message_variables'], true) : [];
+
+        // Resolver conteúdo e variáveis: round-robin tem prioridade sobre configuração da campanha
+        if ($rrVariant !== null) {
+            if ($rrVariant['message_type'] === 'template') {
+                $messageVars = !empty($rrVariant['message_variables'])
+                    ? json_decode($rrVariant['message_variables'], true)
+                    : [];
+            } else {
+                $messageVars = [];
+                // Substituir variáveis padrão no conteúdo da variante
+                $contact_name = $contact['name'] ?? '';
+                $messageContent = str_replace([
+                    '{{nome}}', '{{primeiro_nome}}', '{{telefone}}', '{{email}}', '{{empresa}}', '{{cidade}}'
+                ], [
+                    $contact_name,
+                    explode(' ', $contact_name)[0] ?? $contact_name,
+                    $contact['phone'] ?? '',
+                    $contact['email'] ?? '',
+                    $contact['company'] ?? '',
+                    $contact['city'] ?? ''
+                ], $rrVariant['message_content']);
+            }
+        } else {
+            $messageVars = !empty($campaign['message_variables']) ? json_decode($campaign['message_variables'], true) : [];
+        }
+
         $isTemplateSend = !empty($messageVars['use_template']) && !empty($messageVars['template_name']);
 
         if ($isTemplateSend) {
@@ -571,6 +606,15 @@ class CampaignSchedulerService
 
         // 6. ATUALIZAR CAMPAIGN_MESSAGE
         CampaignMessage::markAsSent($message['id'], $messageId, $integrationAccountId, $conversationId);
+
+        // Registrar variante round-robin na mensagem e incrementar contadores da variante
+        if ($rrVariant !== null) {
+            \App\Helpers\Database::execute(
+                "UPDATE campaign_messages SET variant = ? WHERE id = ?",
+                [$rrVariant['variant_name'], $message['id']]
+            );
+            \App\Models\CampaignVariant::incrementSent($campaignId, $rrVariant['variant_name']);
+        }
 
         // 7. INCREMENTAR CONTADORES
         Campaign::incrementSent($campaignId);

@@ -195,6 +195,38 @@ $pageTitle = 'Dashboard';
             <!-- Tabela de Campanhas Recentes -->
             <div class="row g-5 g-xl-10">
                 <div class="col-xl-12">
+                    <!-- Top Mensagens Round-Robin -->
+                    <div class="card card-flush border-warning mb-7">
+                        <div class="card-header pt-7">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold text-gray-800">
+                                    <i class="ki-duotone ki-arrows-circle fs-4 text-warning me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    Top Mensagens com Mais Respostas
+                                </span>
+                                <span class="text-gray-500 mt-1 fw-semibold fs-6">Mensagens round-robin ordenadas por taxa de resposta</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-3">
+                                    <thead>
+                                        <tr class="fw-bold text-muted bg-light">
+                                            <th class="ps-4 min-w-150px">Campanha</th>
+                                            <th class="min-w-50px text-center">Variante</th>
+                                            <th class="min-w-200px">Mensagem</th>
+                                            <th class="min-w-80px text-center">Enviadas</th>
+                                            <th class="min-w-80px text-center">Respostas</th>
+                                            <th class="min-w-150px">Taxa de Resposta</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="top_rr_messages_tbody">
+                                        <tr><td colspan="6" class="text-center py-5 text-muted">Carregando...</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="card card-flush">
                         <div class="card-header pt-7">
                             <h3 class="card-title align-items-start flex-column">
@@ -251,6 +283,7 @@ function loadDashboard() {
             updateKPIs(data);
             renderCharts(data);
             renderRecentCampaigns(data.recent_campaigns || []);
+            loadTopRRMessages();
         })
         .catch(err => {
             console.error('Error loading dashboard:', err);
@@ -483,6 +516,55 @@ function renderTimeline(activities) {
             </div>
         </div>
     `).join('');
+}
+
+// Top Mensagens Round-Robin
+function loadTopRRMessages() {
+    const tbody = document.getElementById('top_rr_messages_tbody');
+    if (!tbody) return;
+
+    fetch('/api/campaigns/top-rr-messages')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.variants || data.variants.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Nenhuma campanha com round-robin encontrada ainda.</td></tr>';
+                return;
+            }
+
+            const maxRate = Math.max(...data.variants.map(v => parseFloat(v.reply_rate) || 0));
+
+            tbody.innerHTML = data.variants.map((v, i) => {
+                const replyRate = parseFloat(v.reply_rate) || 0;
+                const barW = maxRate > 0 ? Math.round((replyRate / maxRate) * 100) : 0;
+                const isWinner = i === 0 && replyRate > 0;
+                const msgContent = v.message_type === 'template'
+                    ? '[Template]'
+                    : (v.message_content || '').substring(0, 80) + ((v.message_content || '').length > 80 ? '…' : '');
+                return `<tr class="${isWinner ? 'bg-light-warning' : ''}">
+                    <td class="ps-4">
+                        <a href="/campaigns/${v.campaign_id}" class="text-gray-900 fw-bold text-hover-primary">${v.campaign_name || '—'}</a>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge badge-light-warning fw-bold">${v.variant_name}</span>
+                        ${isWinner ? '<span title="Melhor">⭐</span>' : ''}
+                    </td>
+                    <td class="text-gray-800 fs-7">${msgContent}</td>
+                    <td class="text-center fw-bold">${parseInt(v.total_sent || 0).toLocaleString()}</td>
+                    <td class="text-center fw-bold text-success">${parseInt(v.total_replied || 0).toLocaleString()}</td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="progress h-6px flex-grow-1 me-3">
+                                <div class="progress-bar ${isWinner ? 'bg-warning' : 'bg-primary'}" style="width:${barW}%"></div>
+                            </div>
+                            <span class="fw-bold">${replyRate.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        })
+        .catch(() => {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted">Erro ao carregar dados.</td></tr>';
+        });
 }
 
 // Render Recent Campaigns Table

@@ -145,6 +145,12 @@ class CampaignController
             'skipped' => \App\Models\CampaignMessage::countByStatus($id, 'skipped'),
         ];
 
+        // Variantes round-robin (para métricas por mensagem)
+        $roundRobinVariants = [];
+        if (!empty($campaign['round_robin_enabled'])) {
+            $roundRobinVariants = \App\Models\CampaignVariant::getRoundRobinStatsForCampaign($id);
+        }
+
         Response::view('campaigns/show', [
             'campaign' => $campaign,
             'stats' => $stats,
@@ -155,6 +161,7 @@ class CampaignController
             'totalPages' => $totalPages,
             'totalMessages' => $totalMessages,
             'statusFilter' => $statusFilter,
+            'roundRobinVariants' => $roundRobinVariants,
             'title' => $campaign['name']
         ]);
     }
@@ -813,6 +820,57 @@ class CampaignController
         }
     }
     
+    /**
+     * API: Top mensagens round-robin por taxa de resposta (global, para dashboard)
+     */
+    public function topRRMessages(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $variants = \App\Models\CampaignVariant::getTopRoundRobinByReplyRate(10);
+
+            Response::json([
+                'success' => true,
+                'variants' => $variants
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
+    /**
+     * API: Estatísticas de variantes round-robin de uma campanha
+     */
+    public function variantStats(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+
+        try {
+            $campaign = Campaign::find($id);
+            if (!$campaign) {
+                Response::json(['error' => 'Campanha não encontrada'], 404);
+                return;
+            }
+
+            $variants = \App\Models\CampaignVariant::getRoundRobinStatsForCampaign($id);
+
+            Response::json([
+                'success' => true,
+                'round_robin_enabled' => (bool)($campaign['round_robin_enabled'] ?? false),
+                'variants' => $variants
+            ]);
+        } catch (\Exception $e) {
+            Response::json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
+        }
+    }
+
     /**
      * API: Quick stats (para widgets)
      */

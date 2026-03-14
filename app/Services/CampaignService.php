@@ -25,7 +25,9 @@ class CampaignService
         // Verificar se está usando IA para gerar mensagem
         $aiMessageEnabled = !empty($data['ai_message_enabled']) && $data['ai_message_enabled'] !== '0';
         $useTemplate = !empty($data['use_template']) && $data['use_template'] !== '0';
-        
+        $roundRobinEnabled = !empty($data['round_robin_enabled']) && $data['round_robin_enabled'] !== '0';
+        $roundRobinMessages = $data['round_robin_messages'] ?? [];
+
         // Validar dados básicos
         $validationRules = [
             'name' => 'required|string|max:255',
@@ -34,7 +36,11 @@ class CampaignService
         ];
         
         // Validação condicional do conteúdo
-        if ($useTemplate) {
+        if ($roundRobinEnabled) {
+            if (empty($roundRobinMessages) || count($roundRobinMessages) < 2) {
+                throw new \InvalidArgumentException('Round-robin requer no mínimo 2 mensagens');
+            }
+        } elseif ($useTemplate) {
             $validationRules['template_name'] = 'required|string';
         } elseif ($aiMessageEnabled) {
             $validationRules['ai_message_prompt'] = 'required|string';
@@ -122,8 +128,17 @@ class CampaignService
             $data['message_content'] = $data['ai_reference_message'] ?? '[Mensagem gerada por IA]';
         }
         
+        // Round-robin: placeholder no message_content
+        if ($roundRobinEnabled) {
+            $data['round_robin_enabled'] = 1;
+            $data['round_robin_current_index'] = 0;
+            if (empty($data['message_content'])) {
+                $data['message_content'] = '[Round-Robin]';
+            }
+        }
+
         // Template Notificame: salvar dados do template no message_variables
-        if ($useTemplate && !empty($data['template_name'])) {
+        if (!$roundRobinEnabled && $useTemplate && !empty($data['template_name'])) {
             $templateMeta = [
                 'use_template' => true,
                 'template_name' => $data['template_name'],
@@ -136,7 +151,8 @@ class CampaignService
             }
         }
         // Limpar campos auxiliares que não pertencem à tabela
-        unset($data['use_template'], $data['template_name'], $data['template_params'], $data['template_account_id'], $data['message_type']);
+        unset($data['use_template'], $data['template_name'], $data['template_params'],
+              $data['template_account_id'], $data['message_type'], $data['round_robin_messages']);
         
         // Execução de automações
         $data['execute_automations'] = (!empty($data['execute_automations']) && $data['execute_automations'] !== '0') ? 1 : 0;
@@ -149,7 +165,12 @@ class CampaignService
         
         // Criar campanha
         $campaignId = Campaign::create($data);
-        
+
+        // Salvar variantes de round-robin
+        if ($roundRobinEnabled && !empty($roundRobinMessages)) {
+            self::saveRoundRobinVariants($campaignId, $roundRobinMessages);
+        }
+
         Logger::campaign("Campanha criada: ID={$campaignId}, Nome={$data['name']}");
         
         return $campaignId;
@@ -169,6 +190,23 @@ class CampaignService
         if (in_array($campaign['status'], ['running', 'completed'])) {
             throw new \Exception('Não é possível editar campanha em execução ou completa');
         }
+
+        // Round-robin
+        $roundRobinEnabled = !empty($data['round_robin_enabled']) && $data['round_robin_enabled'] !== '0';
+        $roundRobinMessages = $data['round_robin_messages'] ?? [];
+
+        if ($roundRobinEnabled && !empty($roundRobinMessages) && count($roundRobinMessages) < 2) {
+            throw new \InvalidArgumentException('Round-robin requer no mínimo 2 mensagens');
+        }
+
+        if ($roundRobinEnabled) {
+            $data['round_robin_enabled'] = 1;
+            if (empty($data['message_content'])) {
+                $data['message_content'] = '[Round-Robin]';
+            }
+        }
+
+        unset($data['round_robin_messages']);
 
         // Serializar arrays
         if (isset($data['integration_account_ids']) && is_array($data['integration_account_ids'])) {
@@ -191,7 +229,55 @@ class CampaignService
             $data['send_days'] = json_encode($data['send_days']);
         }
 
-        return Campaign::update($campaignId, $data);
+        $result = Campaign::update($campaignId, $data);
+
+        // Atualizar variantes de round-robin
+        if ($roundRobinEnabled && !empty($roundRobinMessages)) {
+            CampaignVariant::deleteRoundRobinByCampaign($campaignId);
+            self::saveRoundRobinVariants($campaignId, $roundRobinMessages);
+        } elseif (!$roundRobinEnabled) {
+            CampaignVariant::deleteRoundRobinByCampaign($campaignId);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Salvar variantes de round-robin na tabela campaign_variants
+     */
+    private static function saveRoundRobinVariants(int $campaignId, array $messages): void
+    {
+        foreach ($messages as $index => $msg) {
+            $variantName = 'RR' . ($index + 1);
+            $msgType = $msg['message_type'] ?? 'text';
+            $msgContent = $msg['message_content'] ?? '';
+            $msgVariables = null;
+
+            if ($msgType === 'template') {
+                $templateData = [
+                    'use_template' => true,
+                    'template_name' => $msg['template_name'] ?? '',
+                    'template_account_id' => $msg['template_account_id'] ?? null,
+                    'template_params' => $msg['template_params'] ?? []
+                ];
+                $msgVariables = json_encode($templateData);
+                if (empty($msgContent)) {
+                    $msgContent = '[Template: ' . ($msg['template_name'] ?? '') . ']';
+                }
+            }
+
+            CampaignVariant::create([
+                'campaign_id'      => $campaignId,
+                'variant_name'     => $variantName,
+                'message_content'  => $msgContent,
+                'percentage'       => 0,
+                'variant_type'     => 'round_robin',
+                'message_type'     => $msgType,
+                'message_variables' => $msgVariables,
+            ]);
+        }
+
+        Logger::campaign("Campanha {$campaignId}: " . count($messages) . " variantes round-robin salvas");
     }
 
     /**

@@ -377,6 +377,102 @@ ob_start();
                 </div>
             </div>
             
+            <?php if (!empty($campaign['round_robin_enabled']) && !empty($roundRobinVariants)): ?>
+            <!-- Métricas por Mensagem Round-Robin -->
+            <div class="row g-5 mb-5">
+                <div class="col-xl-12">
+                    <div class="card card-flush border-warning">
+                        <div class="card-header pt-7">
+                            <h3 class="card-title align-items-start flex-column">
+                                <span class="card-label fw-bold text-gray-800">
+                                    <i class="ki-duotone ki-arrows-circle fs-4 text-warning me-2"><span class="path1"></span><span class="path2"></span></i>
+                                    Desempenho por Mensagem (Round-Robin)
+                                </span>
+                                <span class="text-gray-500 mt-1 fw-semibold fs-6"><?php echo count($roundRobinVariants); ?> mensagens em rotação</span>
+                            </h3>
+                        </div>
+                        <div class="card-body pt-5">
+                            <?php
+                            $maxReplyRate = 0;
+                            foreach ($roundRobinVariants as $v) {
+                                if ((float)$v['reply_rate'] > $maxReplyRate) $maxReplyRate = (float)$v['reply_rate'];
+                            }
+                            ?>
+                            <div class="table-responsive">
+                                <table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">
+                                    <thead>
+                                        <tr class="fw-bold text-muted bg-light">
+                                            <th class="ps-4 min-w-50px rounded-start">#</th>
+                                            <th class="min-w-200px">Conteúdo</th>
+                                            <th class="min-w-80px text-center">Tipo</th>
+                                            <th class="min-w-80px text-center">Enviadas</th>
+                                            <th class="min-w-80px text-center">Respostas</th>
+                                            <th class="min-w-150px">Taxa de Resposta</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($roundRobinVariants as $i => $variant): ?>
+                                        <?php
+                                        $replyRate = (float)($variant['reply_rate'] ?? 0);
+                                        $totalSent = (int)($variant['total_sent'] ?? 0);
+                                        $totalReplied = (int)($variant['total_replied'] ?? 0);
+                                        $isWinner = $maxReplyRate > 0 && $replyRate === $maxReplyRate;
+                                        $barWidth = $maxReplyRate > 0 ? round(($replyRate / $maxReplyRate) * 100) : 0;
+                                        $msgContent = $variant['message_content'] ?? '';
+                                        if ($variant['message_type'] === 'template') {
+                                            $templateVars = !empty($variant['message_variables']) ? json_decode($variant['message_variables'], true) : [];
+                                            $msgContent = '[Template: ' . ($templateVars['template_name'] ?? '—') . ']';
+                                        }
+                                        ?>
+                                        <tr class="<?php echo $isWinner && $totalSent > 0 ? 'bg-light-warning' : ''; ?>">
+                                            <td class="ps-4">
+                                                <span class="badge badge-light-warning fw-bold"><?php echo htmlspecialchars($variant['variant_name']); ?></span>
+                                                <?php if ($isWinner && $totalSent > 0): ?>
+                                                <span class="ms-1" title="Melhor taxa de resposta">⭐</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="text-gray-800 fw-semibold">
+                                                    <?php echo htmlspecialchars(mb_substr($msgContent, 0, 90) . (mb_strlen($msgContent) > 90 ? '…' : '')); ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php if ($variant['message_type'] === 'template'): ?>
+                                                <span class="badge badge-light-info">Template</span>
+                                                <?php else: ?>
+                                                <span class="badge badge-light-primary">Texto</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center fw-bold"><?php echo number_format($totalSent); ?></td>
+                                            <td class="text-center fw-bold text-success"><?php echo number_format($totalReplied); ?></td>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="progress h-6px flex-grow-1 me-3">
+                                                        <div class="progress-bar <?php echo $isWinner && $totalSent > 0 ? 'bg-warning' : 'bg-primary'; ?>"
+                                                             style="width: <?php echo $barWidth; ?>%"></div>
+                                                    </div>
+                                                    <span class="fw-bold text-<?php echo $isWinner && $totalSent > 0 ? 'warning' : 'gray-700'; ?>">
+                                                        <?php echo number_format($replyRate, 1); ?>%
+                                                    </span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <?php if ($maxReplyRate === 0.0): ?>
+                            <div class="text-center py-4 text-muted">
+                                <i class="ki-duotone ki-information-5 fs-2 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                Ainda sem respostas registradas. Os dados aparecerão após o início dos envios.
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Lista de Contatos/Mensagens -->
             <div class="row g-5 mb-5">
                 <div class="col-xl-12">

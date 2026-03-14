@@ -36,7 +36,9 @@ class Campaign extends Model
         'total_contacts', 'total_sent', 'total_delivered', 'total_read',
         'total_replied', 'total_failed', 'total_skipped',
         'started_at', 'completed_at', 'paused_at', 'cancelled_at', 'last_processed_at',
-        'created_by', 'updated_by'
+        'created_by', 'updated_by',
+        // Round-robin de mensagens
+        'round_robin_enabled', 'round_robin_current_index',
     ];
     protected bool $timestamps = true;
 
@@ -192,5 +194,31 @@ class Campaign extends Model
                          ($campaign['total_skipped'] ?? 0);
 
         return round(($totalProcessed / $campaign['total_contacts']) * 100, 2);
+    }
+
+    /**
+     * Avançar índice de round-robin atomicamente e retornar variante selecionada
+     * Retorna a variante escolhida (antes do incremento)
+     */
+    public static function selectAndAdvanceRoundRobin(int $campaignId, array $variants): ?array
+    {
+        if (empty($variants)) {
+            return null;
+        }
+
+        $campaign = self::find($campaignId);
+        if (!$campaign) {
+            return null;
+        }
+
+        $currentIndex = (int)($campaign['round_robin_current_index'] ?? 0);
+        $selected = $variants[$currentIndex % count($variants)];
+
+        Database::execute(
+            "UPDATE campaigns SET round_robin_current_index = round_robin_current_index + 1 WHERE id = ?",
+            [$campaignId]
+        );
+
+        return $selected;
     }
 }

@@ -311,7 +311,7 @@ $pageTitle = 'Nova Campanha';
                                         <div class="mb-10">
                                             <label class="form-label fw-bold fs-5">Tipo de Mensagem</label>
                                             <div class="row g-5">
-                                                <div class="col-md-4">
+                                                <div class="col-md-3">
                                                     <label class="d-flex flex-stack cursor-pointer mb-5">
                                                         <span class="d-flex align-items-center me-2">
                                                             <span class="symbol symbol-50px me-6">
@@ -329,7 +329,7 @@ $pageTitle = 'Nova Campanha';
                                                         </span>
                                                     </label>
                                                 </div>
-                                                <div class="col-md-4">
+                                                <div class="col-md-3">
                                                     <label class="d-flex flex-stack cursor-pointer mb-5">
                                                         <span class="d-flex align-items-center me-2">
                                                             <span class="symbol symbol-50px me-6">
@@ -347,7 +347,7 @@ $pageTitle = 'Nova Campanha';
                                                         </span>
                                                     </label>
                                                 </div>
-                                                <div class="col-md-4">
+                                                <div class="col-md-3">
                                                     <label class="d-flex flex-stack cursor-pointer mb-5">
                                                         <span class="d-flex align-items-center me-2">
                                                             <span class="symbol symbol-50px me-6">
@@ -362,6 +362,24 @@ $pageTitle = 'Nova Campanha';
                                                         </span>
                                                         <span class="form-check form-check-custom form-check-solid">
                                                             <input class="form-check-input" type="radio" name="message_type" value="ai" onchange="toggleMessageType('ai')" />
+                                                        </span>
+                                                    </label>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="d-flex flex-stack cursor-pointer mb-5">
+                                                        <span class="d-flex align-items-center me-2">
+                                                            <span class="symbol symbol-50px me-6">
+                                                                <span class="symbol-label bg-light-warning">
+                                                                    <i class="ki-duotone ki-arrows-circle fs-1 text-warning"><span class="path1"></span><span class="path2"></span></i>
+                                                                </span>
+                                                            </span>
+                                                            <span class="d-flex flex-column">
+                                                                <span class="fw-bold fs-6">Round-Robin</span>
+                                                                <span class="fs-7 text-muted">Rotação entre mensagens</span>
+                                                            </span>
+                                                        </span>
+                                                        <span class="form-check form-check-custom form-check-solid">
+                                                            <input class="form-check-input" type="radio" name="message_type" value="roundrobin" onchange="toggleMessageType('roundrobin')" />
                                                         </span>
                                                     </label>
                                                 </div>
@@ -467,6 +485,107 @@ $pageTitle = 'Nova Campanha';
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <!-- Round-Robin de Mensagens -->
+                                        <div id="roundrobin_message_config" style="display: none;">
+                                            <input type="hidden" name="round_robin_enabled" id="round_robin_enabled_input" value="0" />
+
+                                            <div class="alert alert-warning d-flex align-items-center mb-8">
+                                                <i class="ki-duotone ki-arrows-circle fs-2 me-3 text-warning"><span class="path1"></span><span class="path2"></span></i>
+                                                <div>
+                                                    <strong>Round-Robin de Mensagens:</strong> Cada contato recebe uma mensagem diferente em rotação. Ótimo para testar variações de texto ou templates e ver qual gera mais resposta.
+                                                </div>
+                                            </div>
+
+                                            <div id="rr_messages_list">
+                                                <!-- Itens adicionados dinamicamente pelo JS -->
+                                            </div>
+
+                                            <button type="button" class="btn btn-light-warning btn-sm mt-3" onclick="addRoundRobinMessage()">
+                                                <i class="ki-duotone ki-plus fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                Adicionar Mensagem
+                                            </button>
+                                            <div class="form-text mt-2 text-muted">Mínimo 2 mensagens para ativar o round-robin.</div>
+                                        </div>
+
+                                        <!-- Template de item round-robin (oculto, clonado pelo JS) -->
+                                        <template id="rr_item_template">
+                                            <div class="rr-message-item card card-bordered border-warning mb-5" data-rr-index="__IDX__">
+                                                <div class="card-header min-h-50px">
+                                                    <h4 class="card-title text-warning fs-6 mb-0">
+                                                        <i class="ki-duotone ki-arrows-circle fs-5 text-warning me-2"><span class="path1"></span><span class="path2"></span></i>
+                                                        Mensagem <span class="rr-item-number">__NUM__</span>
+                                                    </h4>
+                                                    <div class="card-toolbar">
+                                                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" onclick="removeRoundRobinMessage(this)" title="Remover mensagem">
+                                                            <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div class="card-body py-4">
+                                                    <!-- Tipo da mensagem do item -->
+                                                    <div class="mb-5">
+                                                        <label class="form-label fw-bold">Tipo</label>
+                                                        <div class="d-flex gap-5">
+                                                            <label class="d-flex align-items-center cursor-pointer">
+                                                                <input type="radio" class="form-check-input me-2 rr-type-radio" name="rr_type___IDX__" value="text" checked onchange="toggleRRItemType(this, '__IDX__')" />
+                                                                <span>Texto livre</span>
+                                                            </label>
+                                                            <label class="d-flex align-items-center cursor-pointer">
+                                                                <input type="radio" class="form-check-input me-2 rr-type-radio" name="rr_type___IDX__" value="template" onchange="toggleRRItemType(this, '__IDX__')" />
+                                                                <span>Template META aprovado</span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Conteúdo texto -->
+                                                    <div class="rr-text-config">
+                                                        <label class="form-label required">Conteúdo da Mensagem</label>
+                                                        <textarea class="form-control rr-msg-content" rows="5"
+                                                                  placeholder="Olá {{nome}}! Esta é a mensagem __NUM__..."></textarea>
+                                                        <div class="form-text">Variáveis: {{nome}}, {{primeiro_nome}}, {{telefone}}, {{email}}, {{empresa}}, {{cidade}}</div>
+                                                    </div>
+
+                                                    <!-- Conteúdo template -->
+                                                    <div class="rr-template-config" style="display:none;">
+                                                        <div class="mb-4">
+                                                            <label class="form-label required">Conta Notificame</label>
+                                                            <select class="form-select rr-template-account" onchange="loadRRTemplates(this, '__IDX__')">
+                                                                <option value="">Selecione a conta...</option>
+                                                                <?php
+                                                                $notificameAccounts = array_filter($whatsappAccounts ?? [], function($a) {
+                                                                    return ($a['provider'] ?? '') === 'notificame';
+                                                                });
+                                                                foreach ($notificameAccounts as $acc): ?>
+                                                                    <option value="<?= $acc['id'] ?>"><?= htmlspecialchars($acc['name']) ?> (<?= htmlspecialchars($acc['phone_number'] ?? $acc['account_id'] ?? '') ?>)</option>
+                                                                <?php endforeach; ?>
+                                                                <?php if (empty($notificameAccounts)): ?>
+                                                                    <option value="" disabled>Nenhuma conta Notificame</option>
+                                                                <?php endif; ?>
+                                                            </select>
+                                                        </div>
+                                                        <div class="rr-template-select-wrap mb-4" style="display:none;">
+                                                            <label class="form-label required">Template</label>
+                                                            <select class="form-select rr-template-select" onchange="selectRRTemplate(this, '__IDX__')">
+                                                                <option value="">Selecione o template...</option>
+                                                            </select>
+                                                        </div>
+                                                        <div class="rr-template-preview-wrap" style="display:none;">
+                                                            <label class="form-label">Preview</label>
+                                                            <div class="p-3 bg-light rounded border border-dashed border-warning rr-template-preview-text" style="white-space:pre-wrap; min-height:60px;"></div>
+                                                            <input type="hidden" class="rr-template-name" value="" />
+                                                            <div class="rr-template-params-wrap mt-3" style="display:none;">
+                                                                <label class="form-label">Parâmetros do Template</label>
+                                                                <div class="alert alert-light-warning border-warning border-dashed mb-2">
+                                                                    <small>Use <code>{{nome}}</code>, <code>{{telefone}}</code>, <code>{{email}}</code> para personalizar.</small>
+                                                                </div>
+                                                                <div class="rr-template-params-fields"></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </template>
 
                                         <!-- Mensagem com IA -->
                                         <div id="ai_message_config" style="display: none;">
@@ -758,15 +877,19 @@ function toggleMessageType(type) {
     const fixedConfig = document.getElementById('fixed_message_config');
     const aiConfig = document.getElementById('ai_message_config');
     const templateConfig = document.getElementById('template_message_config');
+    const rrConfig = document.getElementById('roundrobin_message_config');
     const aiEnabledInput = document.querySelector('input[name="ai_message_enabled"]');
     const useTemplateInput = document.querySelector('input[name="use_template"]');
+    const rrEnabledInput = document.getElementById('round_robin_enabled_input');
     const messageContentInput = document.querySelector('textarea[name="message_content"]');
 
     fixedConfig.style.display = 'none';
     aiConfig.style.display = 'none';
     templateConfig.style.display = 'none';
+    rrConfig.style.display = 'none';
     if (aiEnabledInput) aiEnabledInput.value = '0';
     if (useTemplateInput) useTemplateInput.value = '0';
+    if (rrEnabledInput) rrEnabledInput.value = '0';
 
     if (type === 'ai') {
         aiConfig.style.display = 'block';
@@ -776,10 +899,158 @@ function toggleMessageType(type) {
         templateConfig.style.display = 'block';
         if (useTemplateInput) useTemplateInput.value = '1';
         if (messageContentInput) messageContentInput.removeAttribute('required');
+    } else if (type === 'roundrobin') {
+        rrConfig.style.display = 'block';
+        if (rrEnabledInput) rrEnabledInput.value = '1';
+        if (messageContentInput) messageContentInput.removeAttribute('required');
+        // Inicializar com 2 itens se vazio
+        const list = document.getElementById('rr_messages_list');
+        if (list && list.children.length === 0) {
+            addRoundRobinMessage();
+            addRoundRobinMessage();
+        }
     } else {
         fixedConfig.style.display = 'block';
         if (messageContentInput) messageContentInput.setAttribute('required', 'required');
     }
+}
+
+// ========== ROUND-ROBIN JS ==========
+let _rrIndex = 0;
+const _rrTemplatesCache = {};
+
+function addRoundRobinMessage() {
+    const list = document.getElementById('rr_messages_list');
+    const template = document.getElementById('rr_item_template');
+    if (!list || !template) return;
+
+    const idx = _rrIndex++;
+    const num = list.children.length + 1;
+    let html = template.innerHTML
+        .replace(/__IDX__/g, idx)
+        .replace(/__NUM__/g, num);
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    list.appendChild(wrapper.firstElementChild);
+    _renumberRRItems();
+}
+
+function removeRoundRobinMessage(btn) {
+    const item = btn.closest('.rr-message-item');
+    if (!item) return;
+    const list = document.getElementById('rr_messages_list');
+    if (list && list.children.length <= 2) {
+        toastr.warning('Round-robin requer no mínimo 2 mensagens');
+        return;
+    }
+    item.remove();
+    _renumberRRItems();
+}
+
+function _renumberRRItems() {
+    const items = document.querySelectorAll('#rr_messages_list .rr-message-item');
+    items.forEach((item, i) => {
+        const numEl = item.querySelector('.rr-item-number');
+        if (numEl) numEl.textContent = (i + 1);
+    });
+}
+
+function toggleRRItemType(radio, idx) {
+    const item = radio.closest('.rr-message-item');
+    if (!item) return;
+    const textConfig = item.querySelector('.rr-text-config');
+    const tplConfig = item.querySelector('.rr-template-config');
+    if (radio.value === 'template') {
+        if (textConfig) textConfig.style.display = 'none';
+        if (tplConfig) tplConfig.style.display = 'block';
+    } else {
+        if (textConfig) textConfig.style.display = 'block';
+        if (tplConfig) tplConfig.style.display = 'none';
+    }
+}
+
+function loadRRTemplates(select, idx) {
+    const accountId = select.value;
+    const item = select.closest('.rr-message-item');
+    if (!item || !accountId) return;
+
+    const selectWrap = item.querySelector('.rr-template-select-wrap');
+    const previewWrap = item.querySelector('.rr-template-preview-wrap');
+    const tplSelect = item.querySelector('.rr-template-select');
+    selectWrap.style.display = 'none';
+    previewWrap.style.display = 'none';
+
+    fetch(`/integrations/notificame/accounts/${accountId}/templates`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success || !data.templates) return;
+        const templates = data.templates.filter(t => (t.status || '').toLowerCase() === 'approved');
+        _rrTemplatesCache[idx + '_' + accountId] = {};
+        templates.forEach(t => {
+            const name = t.name || t.templateName || t.id;
+            _rrTemplatesCache[idx + '_' + accountId][name] = t;
+        });
+        let opts = '<option value="">Selecione o template...</option>';
+        templates.forEach(t => {
+            const name = t.name || t.templateName || t.id;
+            const cat = t.category || t.type || '';
+            opts += `<option value="${escapeAttr(name)}">${escapeAttr(name)}${cat ? ' (' + cat + ')' : ''}</option>`;
+        });
+        tplSelect.innerHTML = opts;
+        selectWrap.style.display = 'block';
+        if (templates.length === 0) tplSelect.innerHTML = '<option value="">Nenhum template aprovado</option>';
+    })
+    .catch(() => toastr.error('Erro ao carregar templates'));
+}
+
+function selectRRTemplate(select, idx) {
+    const name = select.value;
+    const item = select.closest('.rr-message-item');
+    if (!item) return;
+    const previewWrap = item.querySelector('.rr-template-preview-wrap');
+    const previewText = item.querySelector('.rr-template-preview-text');
+    const nameInput = item.querySelector('.rr-template-name');
+    const paramsWrap = item.querySelector('.rr-template-params-wrap');
+    const paramsFields = item.querySelector('.rr-template-params-fields');
+
+    if (!name) { previewWrap.style.display = 'none'; nameInput.value = ''; return; }
+
+    const accountSelect = item.querySelector('.rr-template-account');
+    const accountId = accountSelect ? accountSelect.value : '';
+    const cacheKey = idx + '_' + accountId;
+    const t = (_rrTemplatesCache[cacheKey] || {})[name];
+    if (!t) return;
+
+    nameInput.value = name;
+    const body = t.body || t.text || t.content || (t.components || []).find(c => c.type === 'BODY')?.text || '';
+    previewText.textContent = body;
+
+    const paramRegex = /\{\{(\d+)\}\}/g;
+    const params = [];
+    let match;
+    while ((match = paramRegex.exec(body)) !== null) {
+        if (!params.includes(match[1])) params.push(match[1]);
+    }
+
+    if (params.length > 0) {
+        let fieldsHtml = '';
+        params.sort((a, b) => parseInt(a) - parseInt(b)).forEach(p => {
+            fieldsHtml += `<div class="input-group mb-2">
+                <span class="input-group-text fw-bold">{{${p}}}</span>
+                <input type="text" class="form-control rr-tpl-param" data-param="${p}" placeholder="ex: {{nome}}" />
+            </div>`;
+        });
+        paramsFields.innerHTML = fieldsHtml;
+        paramsWrap.style.display = 'block';
+    } else {
+        paramsWrap.style.display = 'none';
+        paramsFields.innerHTML = '';
+    }
+
+    previewWrap.style.display = 'block';
 }
 
 let _campaignTemplatesCache = {};
@@ -1173,7 +1444,22 @@ function updateReviewSummary() {
                 
                 <hr class="my-4">
                 <h5 class="mb-4">Mensagem</h5>
-                ${messageType === 'template' ? `
+                ${messageType === 'roundrobin' ? (() => {
+                    const rrItems = document.querySelectorAll('#rr_messages_list .rr-message-item');
+                    let rrHtml = '<div class="alert alert-warning mb-3"><strong>Round-Robin</strong> - Rotação entre ' + rrItems.length + ' mensagens</div>';
+                    rrItems.forEach((item, i) => {
+                        const typeRadio = item.querySelector('.rr-type-radio:checked');
+                        const msgType = typeRadio ? typeRadio.value : 'text';
+                        if (msgType === 'template') {
+                            const tplName = item.querySelector('.rr-template-name')?.value || 'não selecionado';
+                            rrHtml += `<div class="mb-2"><strong>Msg ${i+1}:</strong> <span class="badge badge-light-info">Template</span> ${tplName}</div>`;
+                        } else {
+                            const content = item.querySelector('.rr-msg-content')?.value || '';
+                            rrHtml += `<div class="mb-2 p-2 bg-white rounded"><strong>Msg ${i+1}:</strong> ${content.substring(0, 80)}${content.length > 80 ? '...' : ''}</div>`;
+                        }
+                    });
+                    return rrHtml;
+                })() : messageType === 'template' ? `
                 <div class="alert alert-info mb-3">
                     <strong><i class="ki-duotone ki-document fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Template Aprovado</strong> - Envio via template META/Notificame
                 </div>
@@ -1227,6 +1513,50 @@ function submitCampaign() {
         });
         data.template_params = templateParams;
         data.template_account_id = document.getElementById('template_account_select')?.value || '';
+    }
+
+    // Round-robin: coletar mensagens
+    if (data.round_robin_enabled === '1') {
+        const rrItems = document.querySelectorAll('#rr_messages_list .rr-message-item');
+        const rrMessages = [];
+        rrItems.forEach(item => {
+            const typeRadio = item.querySelector('.rr-type-radio:checked');
+            const msgType = typeRadio ? typeRadio.value : 'text';
+
+            if (msgType === 'template') {
+                const templateName = item.querySelector('.rr-template-name')?.value || '';
+                const accountId = item.querySelector('.rr-template-account')?.value || '';
+                const paramInputs = item.querySelectorAll('.rr-tpl-param');
+                const params = {};
+                paramInputs.forEach(inp => {
+                    if (inp.dataset.param) params[inp.dataset.param] = inp.value;
+                });
+                rrMessages.push({
+                    message_type: 'template',
+                    message_content: '[Template: ' + templateName + ']',
+                    template_name: templateName,
+                    template_account_id: accountId,
+                    template_params: params
+                });
+            } else {
+                const content = item.querySelector('.rr-msg-content')?.value || '';
+                rrMessages.push({
+                    message_type: 'text',
+                    message_content: content
+                });
+            }
+        });
+
+        if (rrMessages.length < 2) {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+            toastr.error('Round-robin requer no mínimo 2 mensagens preenchidas');
+            return;
+        }
+
+        data.round_robin_messages = rrMessages;
+        // Placeholder para message_content (obrigatório no backend)
+        data.message_content = '[Round-Robin]';
     }
 
     fetch('/campaigns', {

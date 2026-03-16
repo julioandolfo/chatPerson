@@ -95,7 +95,8 @@ class CampaignController
                 'message' => 'Campanha criada com sucesso!',
                 'campaign_id' => $campaignId
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Logger::error("Campanha criar erro: " . $e->getMessage() . " | File: " . $e->getFile() . ":" . $e->getLine());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

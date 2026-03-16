@@ -88,15 +88,16 @@ class CampaignService
         $data['send_interval_seconds'] = $data['send_interval_seconds'] ?? 6;
         $data['timezone'] = $data['timezone'] ?? 'America/Sao_Paulo';
         
-        // Converter campos de data vazios para NULL
-        if (isset($data['scheduled_at']) && $data['scheduled_at'] === '') {
-            $data['scheduled_at'] = null;
-        }
-        if (isset($data['send_window_start']) && $data['send_window_start'] === '') {
-            $data['send_window_start'] = null;
-        }
-        if (isset($data['send_window_end']) && $data['send_window_end'] === '') {
-            $data['send_window_end'] = null;
+        // Converter campos de data/FK vazios para NULL
+        $nullableFields = [
+            'scheduled_at', 'send_window_start', 'send_window_end',
+            'funnel_id', 'initial_stage_id', 'reply_stage_id',
+            'contact_list_id', 'message_template_id', 'tag_on_send',
+        ];
+        foreach ($nullableFields as $field) {
+            if (isset($data[$field]) && ($data[$field] === '' || $data[$field] === '0' || $data[$field] === 0)) {
+                $data[$field] = null;
+            }
         }
         
         // Processar controles avançados de taxa de envio

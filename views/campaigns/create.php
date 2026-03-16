@@ -1561,10 +1561,19 @@ function submitCampaign() {
 
     fetch('/campaigns', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: JSON.stringify(data)
     })
-    .then(r => r.json())
+    .then(r => {
+        const contentType = r.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            return r.json();
+        }
+        return r.text().then(text => {
+            console.error('Resposta não-JSON do servidor:', text);
+            throw new Error(text.substring(0, 300) || `HTTP ${r.status}`);
+        });
+    })
     .then(result => {
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
@@ -1581,7 +1590,8 @@ function submitCampaign() {
     .catch(err => {
         btn.removeAttribute('data-kt-indicator');
         btn.disabled = false;
-        toastr.error('Erro de rede');
+        console.error('Erro ao criar campanha:', err);
+        toastr.error(err.message || 'Erro de rede');
     });
 }
 </script>

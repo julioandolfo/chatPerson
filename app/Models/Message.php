@@ -15,6 +15,14 @@ class Message extends Model
     protected array $hidden = [];
     protected bool $timestamps = false; // Tabela messages não tem updated_at (created_at é gerenciado manualmente)
 
+    public static function create(array $data): int
+    {
+        if (!isset($data['created_at'])) {
+            $data['created_at'] = date('Y-m-d H:i:s');
+        }
+        return parent::create($data);
+    }
+
     /**
      * Obter mensagens de uma conversa
      */

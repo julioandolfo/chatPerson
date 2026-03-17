@@ -85,6 +85,11 @@ class AutomationNode extends Model
                 'icon' => 'ki-time',
                 'color' => '#e67e22'
             ],
+            'action_close_conversation' => [
+                'label' => 'Encerrar Conversa',
+                'icon' => 'ki-cross-circle',
+                'color' => '#e74c3c'
+            ],
             'delay' => [
                 'label' => 'Aguardar',
                 'icon' => 'ki-time',

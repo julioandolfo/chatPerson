@@ -429,7 +429,7 @@ foreach ($nodeTypes as $type => $config) {
         $nodeCategories['Gatilho'][$type] = $config;
     } elseif (in_array($type, ['condition', 'condition_business_hours', 'keyword_router'])) {
         $nodeCategories['Condições'][$type] = $config;
-    } elseif (in_array($type, ['delay', 'end'])) {
+    } elseif (in_array($type, ['delay', 'end', 'action_close_conversation'])) {
         $nodeCategories['Controle'][$type] = $config;
     } else {
         $nodeCategories['Ações'][$type] = $config;
@@ -1425,6 +1425,13 @@ function renderNode(node) {
             const delayVal = nd.delay_value || '5';
             const delayUnit = unitLabels[nd.delay_unit] || nd.delay_unit || 'minutos';
             previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">⏳</span><span>Aguardar ${delayVal} ${delayUnit}</span></div>`;
+            break;
+        case 'action_close_conversation':
+            previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🔒</span><span>Encerrar conversa</span></div>`;
+            if (nd.send_closing_message && nd.closing_message) {
+                const closeMsg = nd.closing_message.replace(/<[^>]*>/g, '').substring(0, 50);
+                previewHtml += `<div class="node-preview-msg">${closeMsg}${nd.closing_message.length > 50 ? '…' : ''}</div>`;
+            }
             break;
         case 'end':
             previewHtml = `<div class="node-preview-detail"><span class="node-preview-icon">🏁</span><span>Fim do fluxo</span></div>`;
@@ -2857,6 +2864,41 @@ function openNodeConfig(nodeId) {
                 }
             }, 100);
             break;
+        case "action_close_conversation":
+            const sendClosingMsg = node.node_data?.send_closing_message ? 'checked' : '';
+            const closingMsg = node.node_data?.closing_message || '';
+            formContent = `
+                <div class="alert alert-warning d-flex align-items-center p-5 mb-7">
+                    <i class="ki-duotone ki-information-3 fs-2x text-warning me-4">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                        <span class="path3"></span>
+                    </i>
+                    <div class="d-flex flex-column">
+                        <h4 class="mb-1 text-dark">Atenção</h4>
+                        <span>Este nó irá encerrar/fechar a conversa. A conversa será movida para o status "Fechada" e para a etapa "Fechadas / Resolvidas" do funil (se houver).</span>
+                    </div>
+                </div>
+
+                <div class="fv-row mb-7">
+                    <label class="form-check form-switch form-check-custom form-check-solid">
+                        <input type="checkbox" name="send_closing_message" class="form-check-input" id="kt_send_closing_msg" value="1" ${sendClosingMsg} onchange="document.getElementById('kt_closing_msg_container').style.display = this.checked ? 'block' : 'none';">
+                        <span class="form-check-label fw-semibold text-gray-700">
+                            Enviar mensagem de encerramento
+                        </span>
+                    </label>
+                    <div class="form-text mt-1">Enviar uma mensagem ao contato antes de fechar a conversa</div>
+                </div>
+
+                <div id="kt_closing_msg_container" style="display: ${sendClosingMsg ? 'block' : 'none'};">
+                    <div class="fv-row mb-7">
+                        <label class="fw-semibold fs-6 mb-2">Mensagem de Encerramento</label>
+                        <textarea name="closing_message" class="form-control form-control-solid" rows="4" placeholder="Ex: Obrigado pelo contato! Caso precise de algo, estamos à disposição.">${closingMsg}</textarea>
+                        <div class="form-text mt-1">Suporta variáveis: {{contact.name}}, {{agent.name}}, {{date}}, {{time}}</div>
+                    </div>
+                </div>
+            `;
+            break;
         case "condition_business_hours":
             formContent = `
                 <div class="fv-row mb-7">
@@ -4209,7 +4251,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 'allow_ai_agents',
                 'force_assign',
                 'force_reassign',
-                'ignore_contact_agent'
+                'ignore_contact_agent',
+                'send_closing_message'
             ];
             checkboxKeys.forEach(k => {
                 if (!formData.has(k)) {

@@ -1031,6 +1031,10 @@ class AutomationService
                 \App\Helpers\Logger::automation("  Executando: definir tag");
                 self::executeSetTag($nodeData, $conversationId, $executionId);
                 break;
+            case 'action_close_conversation':
+                \App\Helpers\Logger::automation("  Executando: encerrar conversa");
+                self::executeCloseConversation($nodeData, $conversationId, $executionId);
+                break;
             case 'action_chatbot':
                 \App\Helpers\Logger::automation("  Executando: chatbot");
                 self::executeChatbot($nodeData, $conversationId, $executionId);
@@ -1648,6 +1652,41 @@ class AutomationService
         }
         
         return null;
+    }
+
+    /**
+     * Executar ação: encerrar conversa
+     */
+    private static function executeCloseConversation(array $nodeData, int $conversationId, ?int $executionId = null): void
+    {
+        \App\Helpers\Logger::automation("executeCloseConversation - INÍCIO - conversationId={$conversationId}");
+
+        try {
+            $sendMessage = !empty($nodeData['send_closing_message']);
+            $closingMessage = $nodeData['closing_message'] ?? '';
+
+            if ($sendMessage && !empty($closingMessage)) {
+                \App\Helpers\Logger::automation("  Enviando mensagem de encerramento: " . substr($closingMessage, 0, 80));
+                self::executeSendMessage(['message' => $closingMessage], $conversationId, $executionId);
+            }
+
+            $result = \App\Services\ConversationService::close($conversationId);
+            \App\Helpers\Logger::automation("  ✅ Conversa {$conversationId} encerrada com sucesso");
+
+            if ($executionId) {
+                self::logExecution($executionId, 'action_close_conversation', 'success', [
+                    'conversation_id' => $conversationId,
+                    'sent_closing_message' => $sendMessage
+                ]);
+            }
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::automation("  ❌ ERRO ao encerrar conversa: " . $e->getMessage());
+            if ($executionId) {
+                self::logExecution($executionId, 'action_close_conversation', 'error', [
+                    'error' => $e->getMessage()
+                ]);
+            }
+        }
     }
 
     /**
@@ -3940,6 +3979,14 @@ class AutomationService
                         'type' => 'move_stage',
                         'stage_id' => $stageId,
                         'stage_name' => $stage ? $stage['name'] : 'Não especificado'
+                    ];
+                    break;
+
+                case 'action_close_conversation':
+                    $step['action_preview'] = [
+                        'type' => 'close_conversation',
+                        'send_closing_message' => !empty($nodeData['send_closing_message']),
+                        'closing_message' => $nodeData['closing_message'] ?? ''
                     ];
                     break;
                     

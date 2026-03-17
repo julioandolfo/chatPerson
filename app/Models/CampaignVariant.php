@@ -31,9 +31,9 @@ class CampaignVariant extends Model
     /**
      * Buscar todas as variantes
      */
-    public static function all(): array
+    public static function all(array $columns = ['*']): array
     {
-        $sql = "SELECT * FROM campaign_variants ORDER BY created_at DESC";
+        $sql = "SELECT " . implode(', ', $columns) . " FROM campaign_variants ORDER BY created_at DESC";
         return Database::fetchAll($sql, []);
     }
     

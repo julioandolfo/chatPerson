@@ -2448,6 +2448,7 @@ class ConversationService
                 // Conversa SEM agente: executar automação do funil (new_conversation)
                 // Apenas para conversas já existentes (criadas há mais de 30s).
                 // Conversas recém-criadas são tratadas pelo processWebhook que já chama executeForNewConversation.
+                // Usa flag em metadata para garantir execução única.
                 $freshConversation = Conversation::find($conversationId);
                 $freshAgentId = $freshConversation['agent_id'] ?? null;
                 $isUnassigned = ($freshAgentId === null || (int)$freshAgentId === 0);
@@ -2458,17 +2459,25 @@ class ConversationService
                     $freshMeta = json_decode($freshConversation['metadata'] ?? '{}', true);
                     $chatbotActive = !empty($freshMeta['chatbot_active']);
                     $aiBranchingActive = !empty($freshMeta['ai_branching_active']);
+                    $funnelAutomationExecuted = !empty($freshMeta['funnel_automation_executed']);
                     
-                    if (!$chatbotActive && !$aiBranchingActive) {
+                    if (!$chatbotActive && !$aiBranchingActive && !$funnelAutomationExecuted) {
                         \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente (ID={$conversationId}, funil={$freshConversation['funnel_id']}). Executando automação do funil.");
                         try {
+                            // Marcar como executada ANTES de executar para evitar race conditions
+                            $freshMeta['funnel_automation_executed'] = true;
+                            Conversation::update($conversationId, [
+                                'metadata' => json_encode($freshMeta, JSON_UNESCAPED_UNICODE)
+                            ]);
+                            
                             \App\Services\AutomationService::executeForNewConversation($conversationId);
                             \App\Helpers\Logger::info("ConversationService::sendMessage - Automação do funil executada para conversa sem agente");
                         } catch (\Exception $e) {
                             \App\Helpers\Logger::error("ConversationService::sendMessage - ERRO ao executar automação do funil: " . $e->getMessage());
                         }
                     } else {
-                        \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente mas chatbot/IA já ativo. Pulando automação do funil.");
+                        $reason = $chatbotActive ? 'chatbot ativo' : ($aiBranchingActive ? 'IA ativa' : 'automação já executada');
+                        \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa sem agente mas {$reason}. Pulando automação do funil.");
                     }
                 } elseif ($isRecentlyCreated && $isUnassigned) {
                     \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa recém-criada (ID={$conversationId}), pulando automação do funil aqui (processWebhook já executa).");

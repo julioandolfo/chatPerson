@@ -60,15 +60,32 @@ ob_start();
                     </div>
                     
                     <div class="row g-3 mb-5">
-                        <div class="col-md-8">
+                        <div class="col-md-5">
                             <label class="form-label required">Localização</label>
                             <input type="text" class="form-control" id="gm_location" placeholder="Ex: São Paulo, SP ou CEP 01310-100" />
                             <div class="form-text">Cidade, bairro, CEP ou endereço de referência</div>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Raio (metros)</label>
+                        <div class="col-md-3">
+                            <label class="form-label">Raio da área total (metros)</label>
                             <input type="number" class="form-control" id="gm_radius" value="5000" min="100" max="50000" />
-                            <div class="form-text">5000 = 5km</div>
+                            <div class="form-text" id="gm_radius_hint">5000 = 5km. Máx: 50.000m sem grade.</div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label d-block">Busca em Grade</label>
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" id="gm_use_grid" value="1" onchange="toggleGridOptions()">
+                                <label class="form-check-label" for="gm_use_grid">Ativar</label>
+                            </div>
+                            <div class="form-text">Para cidades grandes</div>
+                        </div>
+                        <div class="col-md-2" id="gm_grid_size_wrap" style="display:none;">
+                            <label class="form-label">Tamanho da Grade</label>
+                            <select class="form-select" id="gm_grid_size">
+                                <option value="2">2×2 (4 buscas, até 240 resultados)</option>
+                                <option value="3" selected>3×3 (9 buscas, até 540 resultados)</option>
+                                <option value="4">4×4 (16 buscas, até 960 resultados)</option>
+                                <option value="5">5×5 (25 buscas, até 1500 resultados)</option>
+                            </select>
                         </div>
                     </div>
                     
@@ -91,6 +108,14 @@ ob_start();
                                 <input class="form-check-input" type="checkbox" id="gm_include_no_phone" value="1">
                                 <label class="form-check-label" for="gm_include_no_phone">Incluir na lista</label>
                             </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label d-block">Ao re-sincronizar</label>
+                            <div class="form-check form-switch mt-3">
+                                <input class="form-check-input" type="checkbox" id="gm_force_update" value="1">
+                                <label class="form-check-label" for="gm_force_update">Atualizar dados já importados</label>
+                            </div>
+                            <div class="form-text text-muted">Atualiza endereço, rating e website de contatos já na lista</div>
                         </div>
                     </div>
                     
@@ -414,6 +439,18 @@ document.getElementById('db_type').addEventListener('change', function() {
 
 // ========== FUNÇÕES GOOGLE MAPS ==========
 
+function toggleGridOptions() {
+    const enabled = document.getElementById('gm_use_grid')?.checked;
+    const wrap = document.getElementById('gm_grid_size_wrap');
+    const hint = document.getElementById('gm_radius_hint');
+    if (wrap) wrap.style.display = enabled ? 'block' : 'none';
+    if (hint) {
+        hint.textContent = enabled
+            ? 'Raio total da área. A grade divide em sub-regiões automaticamente.'
+            : '5000 = 5km. Máx: 50.000m sem grade.';
+    }
+}
+
 // Testar conexão com API do Google Maps
 function testGoogleMapsConnection() {
     const btn = event.target;
@@ -567,6 +604,9 @@ function saveGoogleMapsSource() {
             radius: parseInt(document.getElementById('gm_radius').value) || 50000,
             max_results: parseInt(document.getElementById('gm_max_results').value) || 60,
             include_no_phone: document.getElementById('gm_include_no_phone')?.checked || false,
+            force_update: document.getElementById('gm_force_update')?.checked || false,
+            use_grid: document.getElementById('gm_use_grid')?.checked || false,
+            grid_size: parseInt(document.getElementById('gm_grid_size')?.value || '3'),
             language: 'pt-BR'
         },
         sync_frequency: document.getElementById('gm_sync_frequency').value,

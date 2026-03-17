@@ -148,20 +148,23 @@ class GoogleMapsProspectService
             Logger::info("GoogleMapsProspectService::sync - Iniciando busca via {$provider} - Source: {$sourceId}, Keyword: " . ($searchConfig['keyword'] ?? '') . ", Location: " . ($searchConfig['location'] ?? ''));
             
             // Buscar leads baseado no provider
-            // Nota: não reutilizar last_page_token entre syncs — a paginação é feita
-            // internamente dentro de fetchFromGooglePlaces (até 3 páginas por sync)
             if ($provider === 'outscraper') {
                 $leads = self::fetchFromOutscraper($searchConfig, null);
+            } elseif (!empty($searchConfig['use_grid']) && (int)($searchConfig['grid_size'] ?? 2) > 1) {
+                // Busca em grade: divide a área em sub-regiões e busca cada ponto
+                $leads = self::fetchFromGooglePlacesGrid($searchConfig);
             } else {
                 $leads = self::fetchFromGooglePlaces($searchConfig, null);
             }
-            
+
             $stats['records_fetched'] = count($leads['results']);
             
+            $forceUpdate = !empty($searchConfig['force_update']);
+
             // Processar cada lead
             foreach ($leads['results'] as $lead) {
                 try {
-                    $result = self::processLead($lead, $contactListId, $sourceId);
+                    $result = self::processLead($lead, $contactListId, $sourceId, $forceUpdate);
                     
                     if ($result['action'] === 'created') {
                         $stats['records_created']++;
@@ -236,6 +239,103 @@ class GoogleMapsProspectService
     /**
      * Buscar empresas via Google Places API (Text Search + paginação automática)
      */
+    /**
+     * Gerar pontos de uma grade NxN ao redor de um centro
+     */
+    private static function generateGridPoints(float $centerLat, float $centerLng, int $radiusMeters, int $gridSize): array
+    {
+        $points = [];
+        $latDegPerMeter = 1.0 / 111000;
+        $lngDegPerMeter = 1.0 / (111000 * cos(deg2rad($centerLat)));
+
+        // Dividir o diâmetro total em gridSize células
+        $cellMeters = ($radiusMeters * 2) / $gridSize;
+        $halfGrid   = ($gridSize - 1) / 2.0;
+
+        for ($row = 0; $row < $gridSize; $row++) {
+            for ($col = 0; $col < $gridSize; $col++) {
+                $points[] = [
+                    'lat' => $centerLat + ($row - $halfGrid) * $cellMeters * $latDegPerMeter,
+                    'lng' => $centerLng + ($col - $halfGrid) * $cellMeters * $lngDegPerMeter,
+                ];
+            }
+        }
+
+        return $points;
+    }
+
+    /**
+     * Busca em grade: divide a área em sub-regiões e busca cada ponto separadamente
+     * Útil para cidades grandes como São Paulo, Rio, etc.
+     */
+    private static function fetchFromGooglePlacesGrid(array $config): array
+    {
+        $apiKey = self::getGoogleApiKey();
+        if (empty($apiKey)) {
+            throw new \Exception("API Key do Google Places não configurada");
+        }
+
+        $gridSize   = max(2, min(5, (int)($config['grid_size'] ?? 3)));
+        $totalRadius = (int)($config['radius'] ?? 50000);
+        // Sub-raio: cobre a célula com 30% de sobreposição para não perder bordas
+        $subRadius  = (int)(($totalRadius * 2 / $gridSize) * 0.75);
+        $subRadius  = min($subRadius, 50000); // Limite hard da API
+
+        $location   = $config['location'] ?? 'São Paulo, SP';
+        $coordinates = self::geocodeLocation($location, $apiKey);
+        if (!$coordinates) {
+            throw new \Exception("Não foi possível geocodificar a localização: {$location}");
+        }
+
+        $gridPoints = self::generateGridPoints(
+            (float)$coordinates['lat'],
+            (float)$coordinates['lng'],
+            $totalRadius,
+            $gridSize
+        );
+
+        Logger::info("GoogleMaps::Grid - Grade {$gridSize}x{$gridSize} = " . count($gridPoints) . " pontos, sub-raio={$subRadius}m, total esperado: até " . (count($gridPoints) * 60) . " resultados");
+
+        $allResults = [];
+        $seenPlaceIds = [];
+
+        foreach ($gridPoints as $i => $point) {
+            $pointConfig = array_merge($config, [
+                'radius' => $subRadius,
+                // Sobrescrever localização com o ponto da grade (lat,lng direto)
+                '_override_coords' => $point,
+            ]);
+
+            Logger::info("GoogleMaps::Grid - Ponto " . ($i + 1) . "/" . count($gridPoints) . " ({$point['lat']},{$point['lng']})");
+
+            try {
+                $partialResults = self::fetchFromGooglePlaces($pointConfig, null);
+
+                foreach ($partialResults['results'] as $place) {
+                    $pid = $place['place_id'] ?? null;
+                    if ($pid && isset($seenPlaceIds[$pid])) {
+                        continue; // deduplicar
+                    }
+                    if ($pid) {
+                        $seenPlaceIds[$pid] = true;
+                    }
+                    $allResults[] = $place;
+                }
+
+                // Delay entre sub-buscas para não exceder quota da API
+                if ($i < count($gridPoints) - 1) {
+                    sleep(1);
+                }
+            } catch (\Exception $e) {
+                Logger::warning("GoogleMaps::Grid - Ponto {$i} falhou: " . $e->getMessage());
+            }
+        }
+
+        Logger::info("GoogleMaps::Grid - Total após deduplicação: " . count($allResults));
+
+        return ['results' => $allResults, 'next_page_token' => null];
+    }
+
     private static function fetchFromGooglePlaces(array $config, ?string $pageToken = null): array
     {
         $apiKey = self::getGoogleApiKey();
@@ -255,12 +355,16 @@ class GoogleMapsProspectService
         $page = 0;
         $maxPages = 3; // Google Places retorna no máximo 3 páginas (60 resultados)
 
-        // Geocodificar localização uma vez
-        $coordinates = self::geocodeLocation($location, $apiKey);
-        if ($coordinates) {
-            Logger::info("GoogleMaps - Geocoded '{$location}': {$coordinates['lat']},{$coordinates['lng']}");
+        // Usar coordenadas pré-calculadas (busca em grade) ou geocodificar
+        if (!empty($config['_override_coords'])) {
+            $coordinates = $config['_override_coords'];
         } else {
-            Logger::warning("GoogleMaps - Geocoding falhou para '{$location}'");
+            $coordinates = self::geocodeLocation($location, $apiKey);
+            if ($coordinates) {
+                Logger::info("GoogleMaps - Geocoded '{$location}': {$coordinates['lat']},{$coordinates['lng']}");
+            } else {
+                Logger::warning("GoogleMaps - Geocoding falhou para '{$location}'");
+            }
         }
 
         // Determinar endpoint: tentar Text Search, fallback para Nearby Search
@@ -608,8 +712,10 @@ class GoogleMapsProspectService
     
     /**
      * Processar um lead e criar/atualizar contato
+     *
+     * @param bool $forceUpdate Se true, atualiza dados de contatos já existentes na lista
      */
-    private static function processLead(array $lead, int $contactListId, int $sourceId): array
+    private static function processLead(array $lead, int $contactListId, int $sourceId, bool $forceUpdate = false): array
     {
         $placeId = $lead['place_id'] ?? '';
         $phone = self::normalizePhone($lead['phone'] ?? $lead['international_phone'] ?? '');
@@ -620,31 +726,62 @@ class GoogleMapsProspectService
                 return ['action' => 'skipped', 'reason' => 'Sem telefone e sem nome'];
             }
         }
-        
+
+        // Montar dados frescos do Google para atualização
+        $freshData = [
+            'company'  => $lead['name'] ?? '',
+            'address'  => $lead['address'] ?? '',
+            'category' => $lead['category'] ?? '',
+        ];
+        if (!empty($lead['rating'])) {
+            $freshData['rating'] = $lead['rating'];
+        }
+        if (!empty($placeId)) {
+            $freshData['place_id'] = $placeId;
+        }
+        $addressParts = self::parseAddress($lead['address'] ?? '');
+        if ($addressParts) {
+            $freshData['city']  = $addressParts['city'] ?? null;
+            $freshData['state'] = $addressParts['state'] ?? null;
+        }
+
         // Verificar duplicata por place_id
         if (!empty($placeId)) {
             $existing = self::findContactByPlaceId($placeId);
             if ($existing) {
+                if ($forceUpdate) {
+                    // Atualizar dados do contato com informações mais recentes
+                    self::mergeCustomAttributes($existing, $lead, $sourceId);
+                    Contact::update($existing['id'], $freshData);
+                }
                 // Adicionar à lista se não estiver
                 if (!ContactList::hasContact($contactListId, $existing['id'])) {
                     ContactList::addContact($contactListId, $existing['id']);
                     return ['action' => 'updated', 'contact_id' => $existing['id']];
                 }
+                if ($forceUpdate) {
+                    return ['action' => 'updated', 'contact_id' => $existing['id']];
+                }
                 return ['action' => 'skipped', 'reason' => 'Já existe na lista'];
             }
         }
-        
+
         // Verificar duplicata por telefone
-        $existingByPhone = Contact::findByPhoneNormalized($phone);
+        $existingByPhone = !empty($phone) ? Contact::findByPhoneNormalized($phone) : null;
         if ($existingByPhone) {
-            // Atualizar place_id se não tiver
-            if (empty($existingByPhone['place_id']) && !empty($placeId)) {
+            if ($forceUpdate) {
+                self::mergeCustomAttributes($existingByPhone, $lead, $sourceId);
+                Contact::update($existingByPhone['id'], $freshData);
+            } elseif (empty($existingByPhone['place_id']) && !empty($placeId)) {
                 Contact::update($existingByPhone['id'], ['place_id' => $placeId]);
             }
-            
+
             // Adicionar à lista se não estiver
             if (!ContactList::hasContact($contactListId, $existingByPhone['id'])) {
                 ContactList::addContact($contactListId, $existingByPhone['id']);
+                return ['action' => 'updated', 'contact_id' => $existingByPhone['id']];
+            }
+            if ($forceUpdate) {
                 return ['action' => 'updated', 'contact_id' => $existingByPhone['id']];
             }
             return ['action' => 'skipped', 'reason' => 'Telefone já existe'];
@@ -690,6 +827,28 @@ class GoogleMapsProspectService
         return ['action' => 'created', 'contact_id' => $contactId];
     }
     
+    /**
+     * Mesclar/atualizar custom_attributes de um contato existente com dados frescos do Google
+     */
+    private static function mergeCustomAttributes(array $existing, array $lead, int $sourceId): void
+    {
+        $attrs = [];
+        if (!empty($existing['custom_attributes'])) {
+            $attrs = is_string($existing['custom_attributes'])
+                ? (json_decode($existing['custom_attributes'], true) ?? [])
+                : $existing['custom_attributes'];
+        }
+
+        $attrs['source_id']  = $sourceId;
+        $attrs['synced_at']  = date('Y-m-d H:i:s');
+        if (!empty($lead['website'])) $attrs['website'] = $lead['website'];
+        if (!empty($lead['email']))   $attrs['email']   = $lead['email'];
+        if (!empty($lead['lat']))     $attrs['lat']     = $lead['lat'];
+        if (!empty($lead['lng']))     $attrs['lng']     = $lead['lng'];
+
+        Contact::update($existing['id'], ['custom_attributes' => json_encode($attrs)]);
+    }
+
     /**
      * Normalizar telefone para formato WhatsApp
      */

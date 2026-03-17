@@ -71,27 +71,55 @@ ob_start();
                 
                 <div class="row g-5 mt-3">
                     <div class="col-md-3">
-                        <label class="form-label">Raio (metros)</label>
+                        <label class="form-label">Raio da área total (metros)</label>
                         <input type="number" class="form-control" name="radius" value="<?= (int)($searchConfig['radius'] ?? 50000) ?>" min="100" max="50000" />
-                        <div class="form-text text-muted">Máx: 50.000m (50km)</div>
+                        <div class="form-text text-muted edit-radius-hint">
+                            <?= !empty($searchConfig['use_grid']) ? 'Raio total dividido pela grade.' : 'Máx: 50.000m (50km)' ?>
+                        </div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Limite de Resultados</label>
                         <input type="number" class="form-control" name="max_results" value="<?= (int)($searchConfig['max_results'] ?? 60) ?>" min="10" max="500" />
                         <div class="form-text text-muted">Google Places: máx 60</div>
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">Provider</label>
                         <select class="form-select" name="provider">
                             <option value="google_places" <?= ($source['provider'] ?? 'google_places') === 'google_places' ? 'selected' : '' ?>>Google Places API</option>
                             <option value="outscraper" <?= ($source['provider'] ?? '') === 'outscraper' ? 'selected' : '' ?>>Outscraper</option>
                         </select>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label d-block">Empresas sem telefone</label>
+                    <div class="col-md-2">
+                        <label class="form-label d-block">Busca em Grade</label>
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" name="use_grid" value="1"
+                                <?= !empty($searchConfig['use_grid']) ? 'checked' : '' ?>
+                                onchange="toggleEditGridOptions(this)">
+                            <label class="form-check-label">Ativar</label>
+                        </div>
+                        <div class="form-text">Para cidades grandes</div>
+                    </div>
+                    <div class="col-md-2" id="edit_grid_size_wrap" style="<?= !empty($searchConfig['use_grid']) ? '' : 'display:none;' ?>">
+                        <label class="form-label">Tamanho da Grade</label>
+                        <select class="form-select" name="grid_size">
+                            <option value="2" <?= (int)($searchConfig['grid_size'] ?? 3) === 2 ? 'selected' : '' ?>>2×2 (240 res.)</option>
+                            <option value="3" <?= (int)($searchConfig['grid_size'] ?? 3) === 3 ? 'selected' : '' ?>>3×3 (540 res.)</option>
+                            <option value="4" <?= (int)($searchConfig['grid_size'] ?? 3) === 4 ? 'selected' : '' ?>>4×4 (960 res.)</option>
+                            <option value="5" <?= (int)($searchConfig['grid_size'] ?? 3) === 5 ? 'selected' : '' ?>>5×5 (1500 res.)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label d-block">Sem telefone</label>
                         <div class="form-check form-switch mt-3">
                             <input class="form-check-input" type="checkbox" name="include_no_phone" value="1" <?= !empty($searchConfig['include_no_phone']) ? 'checked' : '' ?>>
                             <label class="form-check-label">Incluir</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label d-block">Ao re-sincronizar</label>
+                        <div class="form-check form-switch mt-3">
+                            <input class="form-check-input" type="checkbox" name="force_update" value="1" <?= !empty($searchConfig['force_update']) ? 'checked' : '' ?>>
+                            <label class="form-check-label">Atualizar existentes</label>
                         </div>
                     </div>
                 </div>
@@ -252,6 +280,9 @@ document.getElementById('edit_source_form').addEventListener('submit', function(
             radius: parseInt(formData.get('radius')) || 50000,
             max_results: parseInt(formData.get('max_results')) || 60,
             include_no_phone: formData.get('include_no_phone') === '1',
+            force_update: formData.get('force_update') === '1',
+            use_grid: formData.get('use_grid') === '1',
+            grid_size: parseInt(formData.get('grid_size') || '3'),
             language: 'pt-BR'
         };
     } else if (type === 'woocommerce') {
@@ -338,6 +369,17 @@ function testWooCommerceConnection() {
         status.innerHTML = '<span class="badge badge-light-danger">Erro</span>';
         toastr.error('Erro de rede');
     });
+}
+
+function toggleEditGridOptions(checkbox) {
+    const wrap = document.getElementById('edit_grid_size_wrap');
+    const hint = document.querySelector('.edit-radius-hint');
+    if (wrap) wrap.style.display = checkbox.checked ? 'block' : 'none';
+    if (hint) {
+        hint.textContent = checkbox.checked
+            ? 'Raio total dividido pela grade.'
+            : 'Máx: 50.000m (50km)';
+    }
 }
 </script>
 

@@ -39,6 +39,8 @@ class Campaign extends Model
         'created_by', 'updated_by',
         // Round-robin de mensagens
         'round_robin_enabled', 'round_robin_current_index',
+        // Modo contínuo: absorve novos contatos sem encerrar a campanha
+        'continuous_mode',
     ];
     protected bool $timestamps = true;
 
@@ -169,6 +171,11 @@ class Campaign extends Model
     {
         $campaign = self::find($campaignId);
         if (!$campaign) {
+            return false;
+        }
+
+        // Campanhas em modo contínuo nunca encerram automaticamente
+        if (!empty($campaign['continuous_mode'])) {
             return false;
         }
 

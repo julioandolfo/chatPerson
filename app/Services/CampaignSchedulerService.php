@@ -139,15 +139,29 @@ class CampaignSchedulerService
                 $messages = CampaignMessage::getPending($campaignId, $effectiveLimit);
                 
                 if (empty($messages)) {
-                    // Nenhuma mensagem pendente, verificar se completou
-                    if (Campaign::isCompleted($campaignId)) {
-                        Campaign::update($campaignId, [
-                            'status' => 'completed',
-                            'completed_at' => date('Y-m-d H:i:s')
-                        ]);
-                        Logger::campaign("Campanha {$campaignId} concluída!");
+                    // Modo contínuo: tentar absorver novos contatos da lista antes de encerrar
+                    if (!empty($campaign['continuous_mode'])) {
+                        $newCount = self::syncNewContactsForCampaign($campaign);
+                        if ($newCount > 0) {
+                            Logger::campaign("Campanha {$campaignId}: [CONTÍNUO] {$newCount} novo(s) contato(s) absorvidos da lista");
+                            $messages = CampaignMessage::getPending($campaignId, $effectiveLimit);
+                        } else {
+                            Logger::campaign("Campanha {$campaignId}: [CONTÍNUO] Sem novos contatos no momento. Aguardando próxima sincronização da lista.");
+                            continue;
+                        }
                     }
-                    continue;
+
+                    if (empty($messages)) {
+                        // Nenhuma mensagem pendente, verificar se completou
+                        if (Campaign::isCompleted($campaignId)) {
+                            Campaign::update($campaignId, [
+                                'status' => 'completed',
+                                'completed_at' => date('Y-m-d H:i:s')
+                            ]);
+                            Logger::campaign("Campanha {$campaignId} concluída!");
+                        }
+                        continue;
+                    }
                 }
 
                 Logger::campaign("Campanha {$campaignId}: " . count($messages) . " mensagens a processar (limite efetivo: {$effectiveLimit})");
@@ -377,10 +391,11 @@ class CampaignSchedulerService
         $rrVariant = null;
         if (!empty($campaign['round_robin_enabled'])) {
             $rrVariants = \App\Models\CampaignVariant::getByCampaignAndType($campaignId, 'round_robin');
-            if (!empty($rrVariants)) {
-                $rrVariant = Campaign::selectAndAdvanceRoundRobin($campaignId, $rrVariants);
-                Logger::campaign("Campanha {$campaignId}: [ROUND-ROBIN] Variante selecionada: " . ($rrVariant['variant_name'] ?? 'N/A'));
+            if (empty($rrVariants)) {
+                throw new \Exception("Campanha {$campaignId} tem round-robin ativo mas nenhuma variante foi encontrada. Verifique se a campanha foi salva corretamente.");
             }
+            $rrVariant = Campaign::selectAndAdvanceRoundRobin($campaignId, $rrVariants);
+            Logger::campaign("Campanha {$campaignId}: [ROUND-ROBIN] Variante selecionada: " . ($rrVariant['variant_name'] ?? 'N/A') . " | tipo=" . ($rrVariant['message_type'] ?? 'text') . " | tem_vars=" . (!empty($rrVariant['message_variables']) ? 'sim' : 'não'));
         }
 
         // 3. GERAR MENSAGEM COM IA (se configurado)
@@ -509,6 +524,27 @@ class CampaignSchedulerService
                 $messageVars = !empty($rrVariant['message_variables'])
                     ? json_decode($rrVariant['message_variables'], true)
                     : [];
+
+                // Garantir estrutura mínima caso message_variables não tenha sido salvo
+                if (empty($messageVars['use_template']) || empty($messageVars['template_name'])) {
+                    // Tentar reconstruir a partir do message_content (ex: "[Template: nome_template]")
+                    $fallbackName = '';
+                    if (preg_match('/\[Template:\s*(.+?)\]/', $rrVariant['message_content'] ?? '', $m)) {
+                        $fallbackName = trim($m[1]);
+                    }
+                    if ($fallbackName) {
+                        $messageVars = ['use_template' => true, 'template_name' => $fallbackName];
+                        Logger::campaign("Campanha {$campaignId}: [ROUND-ROBIN] message_variables vazio, reconstruído do message_content: template={$fallbackName}");
+                    } else {
+                        Logger::campaign("Campanha {$campaignId}: [ROUND-ROBIN] AVISO - variante template sem message_variables e sem nome recuperável. Verifique o cadastro da campanha.");
+                    }
+                }
+
+                // Atualizar messageContent com nome do template para exibição na conversa
+                $templateDisplayName = $messageVars['template_name'] ?? '';
+                if ($templateDisplayName) {
+                    $messageContent = '[Template: ' . $templateDisplayName . '] - ' . ($rrVariant['variant_name'] ?? '');
+                }
             } else {
                 $messageVars = [];
                 // Substituir variáveis padrão no conteúdo da variante
@@ -528,7 +564,11 @@ class CampaignSchedulerService
             $messageVars = !empty($campaign['message_variables']) ? json_decode($campaign['message_variables'], true) : [];
         }
 
-        $isTemplateSend = !empty($messageVars['use_template']) && !empty($messageVars['template_name']);
+        // Round-robin template: também considerar se variante é do tipo template diretamente
+        $isTemplateSend = (!empty($messageVars['use_template']) && !empty($messageVars['template_name']))
+                       || ($rrVariant !== null && ($rrVariant['message_type'] ?? '') === 'template' && !empty($messageVars['template_name']));
+
+        Logger::campaign("Campanha {$campaignId}: [ENVIO] isTemplate={$isTemplateSend}, rrVariant=" . ($rrVariant ? $rrVariant['variant_name'] : 'null') . ", template_name=" . ($messageVars['template_name'] ?? 'N/A'));
 
         if ($isTemplateSend) {
             // Envio via template Notificame
@@ -643,6 +683,62 @@ class CampaignSchedulerService
             'account_id' => $integrationAccountId,
             'status' => 'sent'
         ];
+    }
+
+    /**
+     * MODO CONTÍNUO — absorver novos contatos da lista para a campanha
+     * Chamado quando não há mensagens pendentes e continuous_mode está ativo.
+     * Cria campaign_messages apenas para contatos ainda não contemplados.
+     */
+    private static function syncNewContactsForCampaign(array $campaign): int
+    {
+        $campaignId = $campaign['id'];
+
+        if (empty($campaign['contact_list_id'])) {
+            Logger::campaign("Campanha {$campaignId}: [CONTÍNUO] Sem lista de contatos associada.");
+            return 0;
+        }
+
+        try {
+            $contacts = \App\Models\ContactList::getContacts((int)$campaign['contact_list_id']);
+        } catch (\Exception $e) {
+            Logger::campaign("Campanha {$campaignId}: [CONTÍNUO] Erro ao buscar contatos: " . $e->getMessage());
+            return 0;
+        }
+
+        if (empty($contacts)) {
+            return 0;
+        }
+
+        $created = 0;
+        $messageContent = $campaign['message_content'] ?? '';
+
+        foreach ($contacts as $contact) {
+            if (CampaignMessage::hasContactReceived($campaignId, $contact['id'])) {
+                continue;
+            }
+
+            CampaignMessage::create([
+                'campaign_id'  => $campaignId,
+                'contact_id'   => $contact['id'],
+                'content'      => $messageContent,
+                'attachments'  => $campaign['attachments'] ?? null,
+                'status'       => 'pending',
+                'scheduled_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $created++;
+        }
+
+        if ($created > 0) {
+            // Incrementar total_contacts atomicamente em vez de sobrescrever
+            \App\Helpers\Database::execute(
+                "UPDATE campaigns SET total_contacts = total_contacts + ? WHERE id = ?",
+                [$created, $campaignId]
+            );
+        }
+
+        return $created;
     }
 
     /**

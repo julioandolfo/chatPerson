@@ -528,16 +528,26 @@ class NotificameService
             if (!empty($mediaName)) {
                 $mediaContent['fileName'] = $mediaName;
             }
-            if (!empty($options['caption'])) {
-                $mediaContent['fileCaption'] = $options['caption'];
+            $captionText = $options['caption'] ?? '';
+            $captionTooLong = mb_strlen($captionText) > 150;
+
+            if (!empty($captionText) && !$captionTooLong) {
+                $mediaContent['fileCaption'] = $captionText;
             }
 
             self::logInfo("Notificame sendMessage - Mídia: rawMime={$rawMime}, simplified={$simplifiedMime}, url=" . substr($mediaUrl, 0, 120));
 
-            if (!empty($message) && empty($options['caption'])) {
+            $textToSendSeparately = '';
+            if (!empty($message) && empty($captionText)) {
+                $textToSendSeparately = $message;
+            } elseif ($captionTooLong) {
+                $textToSendSeparately = $captionText;
+            }
+
+            if (!empty($textToSendSeparately)) {
                 $payload['contents'] = [
                     $mediaContent,
-                    ['type' => 'text', 'text' => $message]
+                    ['type' => 'text', 'text' => $textToSendSeparately]
                 ];
             } else {
                 $payload['contents'] = [$mediaContent];

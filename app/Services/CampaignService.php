@@ -163,7 +163,10 @@ class CampaignService
         $data['skip_recent_conversations'] = (!empty($data['skip_recent_conversations']) && $data['skip_recent_conversations'] !== '0') ? 1 : 0;
         $data['skip_recent_hours'] = (int)($data['skip_recent_hours'] ?? 24);
         $data['respect_blacklist'] = (!empty($data['respect_blacklist']) && $data['respect_blacklist'] !== '0') ? 1 : 0;
-        
+
+        // Modo contínuo
+        $data['continuous_mode'] = (!empty($data['continuous_mode']) && $data['continuous_mode'] !== '0') ? 1 : 0;
+
         // Criar campanha
         $campaignId = Campaign::create($data);
 
@@ -208,6 +211,11 @@ class CampaignService
         }
 
         unset($data['round_robin_messages']);
+
+        // Modo contínuo
+        if (isset($data['continuous_mode'])) {
+            $data['continuous_mode'] = (!empty($data['continuous_mode']) && $data['continuous_mode'] !== '0') ? 1 : 0;
+        }
 
         // Serializar arrays
         if (isset($data['integration_account_ids']) && is_array($data['integration_account_ids'])) {

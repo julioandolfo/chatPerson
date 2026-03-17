@@ -873,6 +873,34 @@ class CampaignController
     }
 
     /**
+     * API: Ativar/desativar modo contínuo
+     */
+    public function setContinuousMode(int $id): void
+    {
+        Permission::abortIfCannot('campaigns.edit');
+        try {
+            $campaign = Campaign::find($id);
+            if (!$campaign) {
+                Response::json(['error' => 'Campanha não encontrada'], 404);
+                return;
+            }
+
+            $data = Request::all();
+            $enabled = !empty($data['continuous_mode']) && $data['continuous_mode'] !== '0' ? 1 : 0;
+
+            Campaign::update($id, ['continuous_mode' => $enabled]);
+
+            Response::json([
+                'success' => true,
+                'continuous_mode' => (bool)$enabled,
+                'message' => $enabled ? 'Modo Contínuo ativado' : 'Modo Contínuo desativado'
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
      * API: Quick stats (para widgets)
      */
     public function quickStats(): void

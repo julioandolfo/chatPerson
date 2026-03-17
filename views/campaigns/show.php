@@ -473,6 +473,44 @@ ob_start();
             </div>
             <?php endif; ?>
 
+            <!-- Modo Contínuo -->
+            <div class="row g-5 mb-5">
+                <div class="col-xl-12">
+                    <div class="card card-flush border <?php echo !empty($campaign['continuous_mode']) ? 'border-primary' : 'border-dashed border-gray-300'; ?>">
+                        <div class="card-body py-5 d-flex align-items-center gap-5">
+                            <div class="symbol symbol-50px">
+                                <div class="symbol-label bg-light-<?php echo !empty($campaign['continuous_mode']) ? 'primary' : 'secondary'; ?>">
+                                    <i class="ki-duotone ki-arrows-circle fs-2 text-<?php echo !empty($campaign['continuous_mode']) ? 'primary' : 'gray-400'; ?>">
+                                        <span class="path1"></span><span class="path2"></span>
+                                    </i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="fw-bold text-gray-800 fs-5">Modo Contínuo</div>
+                                <div class="text-gray-500 fs-7 mt-1">
+                                    <?php if (!empty($campaign['continuous_mode'])): ?>
+                                        <span class="badge badge-light-primary me-2">Ativo</span>
+                                        A campanha verifica novos contatos a cada ciclo do scheduler e continua enviando automaticamente.
+                                    <?php else: ?>
+                                        <span class="badge badge-light-secondary me-2">Inativo</span>
+                                        Quando todos os contatos forem processados, a campanha será marcada como concluída.
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <?php if (in_array($campaign['status'], ['draft', 'paused'])): ?>
+                            <div>
+                                <button type="button"
+                                    class="btn btn-sm <?php echo !empty($campaign['continuous_mode']) ? 'btn-light-danger' : 'btn-light-primary'; ?>"
+                                    onclick="toggleContinuousMode(<?php echo $campaign['id']; ?>, <?php echo !empty($campaign['continuous_mode']) ? '0' : '1'; ?>)">
+                                    <?php echo !empty($campaign['continuous_mode']) ? 'Desativar' : 'Ativar'; ?>
+                                </button>
+                            </div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Lista de Contatos/Mensagens -->
             <div class="row g-5 mb-5">
                 <div class="col-xl-12">
@@ -518,6 +556,7 @@ ob_start();
                                             <th class="min-w-120px">Conta Envio</th>
                                             <th class="min-w-100px">Enviado em</th>
                                             <th class="min-w-150px">Detalhes</th>
+                                            <th class="w-60px text-end">Conversa</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -597,6 +636,22 @@ ob_start();
                                                 <span class="text-muted fs-7">Entregue em <?php echo date('d/m H:i', strtotime($msg['delivered_at'])); ?></span>
                                                 <?php else: ?>
                                                 <span class="text-muted fs-7">-</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-end">
+                                                <?php if (!empty($msg['conversation_id'])): ?>
+                                                <a href="/conversations?id=<?php echo (int)$msg['conversation_id']; ?>"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-icon btn-light-primary"
+                                                   title="Abrir conversa">
+                                                    <i class="ki-duotone ki-message-text-2 fs-4">
+                                                        <span class="path1"></span>
+                                                        <span class="path2"></span>
+                                                        <span class="path3"></span>
+                                                    </i>
+                                                </a>
+                                                <?php else: ?>
+                                                <span class="text-muted fs-8">—</span>
                                                 <?php endif; ?>
                                             </td>
                                         </tr>
@@ -701,6 +756,27 @@ function prepareCampaign() {
             }
         })
         .catch(err => toastr.error('Erro de rede'));
+}
+
+function toggleContinuousMode(id, enable) {
+    const label = enable ? 'ativar' : 'desativar';
+    if (!confirm(`Deseja ${label} o Modo Contínuo para esta campanha?`)) return;
+
+    fetch(`/api/campaigns/${id}/continuous-mode`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ continuous_mode: enable })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            toastr.success(enable ? 'Modo Contínuo ativado!' : 'Modo Contínuo desativado!');
+            setTimeout(() => location.reload(), 1200);
+        } else {
+            toastr.error(data.message || 'Erro ao atualizar');
+        }
+    })
+    .catch(() => toastr.error('Erro de rede'));
 }
 
 function startCampaign() {

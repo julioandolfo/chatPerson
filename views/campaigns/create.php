@@ -164,6 +164,27 @@ $pageTitle = 'Nova Campanha';
                                                 <a href="/contact-lists/create" target="_blank">Criar nova lista</a> se necessário
                                             </div>
                                         </div>
+
+                                        <div class="separator separator-dashed my-5"></div>
+
+                                        <div class="d-flex align-items-start gap-4 p-5 bg-light-primary rounded border border-dashed border-primary">
+                                            <div class="form-check form-switch mt-1">
+                                                <input class="form-check-input" type="checkbox" id="continuous_mode" name="continuous_mode" value="1">
+                                            </div>
+                                            <div>
+                                                <label class="fw-bold text-gray-800 cursor-pointer" for="continuous_mode">
+                                                    <i class="ki-duotone ki-arrows-circle fs-4 text-primary me-1">
+                                                        <span class="path1"></span><span class="path2"></span>
+                                                    </i>
+                                                    Modo Contínuo
+                                                </label>
+                                                <div class="text-gray-600 fs-7 mt-1">
+                                                    A campanha <strong>não encerra</strong> quando todos os contatos forem enviados.
+                                                    A cada ciclo do scheduler, ela verifica se há <strong>novos contatos</strong> na lista (adicionados via sincronização diária) e os inclui automaticamente.
+                                                    Ideal para listas alimentadas por fontes externas (Google Maps, etc.).
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 
@@ -1501,6 +1522,7 @@ function submitCampaign() {
     });
     
     data.channel = 'whatsapp';
+    data.continuous_mode = document.getElementById('continuous_mode')?.checked ? '1' : '0';
     data.target_type = 'list';
 
     // Template Notificame: coletar parâmetros

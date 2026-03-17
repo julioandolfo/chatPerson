@@ -803,6 +803,7 @@ Router::get('/api/campaigns/export', [CampaignController::class, 'exportCSV'], [
 Router::get('/api/campaigns/notifications', [CampaignController::class, 'getNotifications'], ['Authentication']);
 Router::post('/api/campaigns/notifications/read', [CampaignController::class, 'markNotificationsRead'], ['Authentication']);
 Router::get('/api/campaigns/top-rr-messages', [CampaignController::class, 'topRRMessages'], ['Authentication']);
+Router::post('/api/campaigns/{id}/continuous-mode', [CampaignController::class, 'setContinuousMode'], ['Authentication']);
 Router::get('/api/campaigns/{id}/stats', [CampaignController::class, 'stats'], ['Authentication']);
 Router::get('/api/campaigns/{id}/variant-stats', [CampaignController::class, 'variantStats'], ['Authentication']);
 Router::post('/api/campaigns/preview-ai-message', [CampaignController::class, 'previewAIMessage'], ['Authentication']);

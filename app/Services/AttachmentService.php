@@ -268,7 +268,20 @@ class AttachmentService
         curl_close($ch);
 
         if ($httpCode !== 200 || empty($fileContent)) {
-            throw new \Exception('Erro ao baixar arquivo da URL');
+            throw new \Exception("Erro ao baixar arquivo da URL (HTTP {$httpCode})");
+        }
+
+        // Validar se o conteúdo não é um erro JSON/HTML disfarçado de arquivo
+        $contentLen = strlen($fileContent);
+        if ($contentLen < 100) {
+            throw new \Exception("Arquivo muito pequeno ({$contentLen} bytes), possivelmente inválido");
+        }
+        $firstBytes = substr($fileContent, 0, 200);
+        $isJson = json_decode($firstBytes) !== null || (str_starts_with(trim($firstBytes), '{') && str_contains($firstBytes, '"error"'));
+        $isHtml = stripos($firstBytes, '<html') !== false || stripos($firstBytes, '<!doctype') !== false;
+        if ($isJson || $isHtml) {
+            $preview = substr($firstBytes, 0, 150);
+            throw new \Exception("Download retornou resposta inválida (JSON/HTML) ao invés de arquivo binário: {$preview}");
         }
 
         // Criar diretório

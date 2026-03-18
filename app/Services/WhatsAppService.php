@@ -2875,7 +2875,16 @@ class WhatsAppService
                 || !empty($mimetype)  // Se tem mimetype, há um arquivo
                 || !empty($filename); // Se tem filename, há um arquivo
             
-            $needsDownload = in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker']) && !$mediaUrl && $hasAttachmentIndicator;
+            // URLs do CDN WhatsApp são criptografadas e precisam ser baixadas via QuePasa (não via curl direto)
+            $isWhatsAppCdnUrl = $mediaUrl && (
+                str_contains($mediaUrl, 'mmg.whatsapp.net') ||
+                str_contains($mediaUrl, 'media.whatsapp') ||
+                str_contains($mediaUrl, 'whatsapp.net/v/') ||
+                str_contains($mediaUrl, 'lookaside.fbsbx.com') ||
+                str_contains($mediaUrl, 'whatsapp_business/attachments') ||
+                str_contains($mediaUrl, 'enc=')
+            );
+            $needsDownload = in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker']) && (!$mediaUrl || $isWhatsAppCdnUrl) && $hasAttachmentIndicator;
             
             if ($needsDownload) {
                 $attachmentKeys = isset($payload['attachment']) && is_array($payload['attachment']) ? implode(',', array_keys($payload['attachment'])) : 'NULL';
@@ -4188,6 +4197,47 @@ class WhatsAppService
                     }
                 } catch (\Exception $e) {
                     Logger::quepasa("Erro ao salvar mídia do WhatsApp: " . $e->getMessage());
+                    
+                    // Fallback: enfileirar download via MediaQueueService
+                    if (in_array($messageType, ['audio', 'image', 'video', 'document', 'ptt', 'sticker'])) {
+                        Logger::quepasa("processWebhook - 📋 Fallback: enfileirando download na MediaQueue após falha do saveFromUrl");
+                        $messageWid = $payload['id'] ?? $messageId ?? null;
+                        $messageIdOnly = $messageWid;
+                        if ($messageIdOnly && strpos($messageIdOnly, '@') !== false) {
+                            $messageIdOnly = explode('@', $messageIdOnly)[0];
+                        }
+                        if ($messageWid) {
+                            $originalFilename = $payload['attachment']['filename'] ?? $filename ?? null;
+                            $originalMimetype = $payload['attachment']['mime'] ?? $mimetype ?? null;
+                            $originalFilesize = $payload['attachment']['filelength'] ?? $size ?? null;
+                            $pendingQueuePayload = [
+                                'account_id'          => $account['id'],
+                                'external_message_id' => $messageWid,
+                                'media_type'          => $messageType,
+                                'api_url'             => rtrim($account['api_url'], '/'),
+                                'token'               => $account['quepasa_token'] ?? '',
+                                'trackid'             => $account['quepasa_trackid'] ?? $account['name'],
+                                'message_id_only'     => $messageIdOnly,
+                                'message_wid'         => $messageWid,
+                                'filename'            => $originalFilename,
+                                'mimetype'            => $originalMimetype,
+                                'filesize'            => $originalFilesize,
+                                'attachment_meta'     => $payload['attachment'] ?? [],
+                            ];
+                            $downloadedFile = [
+                                'filename'         => $originalFilename ?: ($messageType . '_pendente'),
+                                'original_name'    => $originalFilename ?: ($messageType . '_pendente'),
+                                'type'             => $messageType,
+                                'mime_type'        => $originalMimetype,
+                                'mimetype'         => $originalMimetype,
+                                'size'             => $originalFilesize,
+                                'download_pending' => true,
+                                'queue_status'     => 'queued',
+                            ];
+                            $attachments[] = $downloadedFile;
+                            Logger::quepasa("processWebhook - 📋 Placeholder criado para download posterior: " . ($originalFilename ?? $messageType));
+                        }
+                    }
                 }
             }
 

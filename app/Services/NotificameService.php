@@ -1242,6 +1242,22 @@ class NotificameService
                         if ($simpleMime === 'audio') $ext = 'ogg';
                         elseif ($simpleMime === 'image') $ext = 'jpg';
                         elseif ($simpleMime === 'video') $ext = 'mp4';
+                        elseif ($simpleMime === 'document') {
+                            // Determinar extensão do documento pelo MIME ou nome do arquivo
+                            $docMime = strtolower($fileMime ?: '');
+                            if (str_contains($docMime, 'pdf')) $ext = 'pdf';
+                            elseif (str_contains($docMime, 'msword') || str_contains($docMime, 'wordprocessing')) $ext = 'docx';
+                            elseif (str_contains($docMime, 'spreadsheet') || str_contains($docMime, 'excel')) $ext = 'xlsx';
+                            elseif (str_contains($docMime, 'presentation') || str_contains($docMime, 'powerpoint')) $ext = 'pptx';
+                            elseif (str_contains($docMime, 'text/plain')) $ext = 'txt';
+                            elseif (str_contains($docMime, 'text/csv')) $ext = 'csv';
+                            elseif (str_contains($docMime, 'zip')) $ext = 'zip';
+                            elseif (str_contains($docMime, 'rar')) $ext = 'rar';
+                            elseif ($fileName) {
+                                $origExt = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
+                                if (!empty($origExt)) $ext = $origExt;
+                            }
+                        }
 
                         $savedName = 'notificame_' . uniqid('', true) . '_' . time() . '.' . $ext;
                         $savedPath = $uploadDir . $savedName;

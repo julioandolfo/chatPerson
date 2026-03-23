@@ -42,6 +42,19 @@ ob_start();
 <!--end::Toolbar-->
 
 <!--begin::Row - Métricas-->
+<?php
+    $clientInitiated = $metrics['conversations_client_initiated'] ?? 0;
+    $agentInitiated = $metrics['conversations_agent_initiated'] ?? 0;
+    $receptivasAtivas = $metrics['conversations_receptivas_ativas'] ?? 0;
+    $interactiveConversations = $metrics['interactive_conversations'] ?? 0;
+    $conversionRateClientOnly = $metrics['conversion_rate_client_only'] ?? 0;
+    $conversionRateRecAtivas = $metrics['conversion_rate_receptivas_ativas'] ?? 0;
+    $conversionRateInteractive = $metrics['conversion_rate_interactive'] ?? 0;
+
+    $progressColorRec = $conversionRateClientOnly >= 30 ? 'success' : ($conversionRateClientOnly >= 15 ? 'warning' : 'danger');
+    $progressColorRecAtivas = $conversionRateRecAtivas >= 30 ? 'success' : ($conversionRateRecAtivas >= 15 ? 'warning' : 'danger');
+    $progressColorInteractive = $conversionRateInteractive >= 30 ? 'success' : ($conversionRateInteractive >= 15 ? 'warning' : 'danger');
+?>
 <div class="row g-5 g-xl-10 mb-5 mb-xl-10">
     <!--begin::Col-->
     <div class="col-sm-6 col-xl-3">
@@ -81,22 +94,49 @@ ob_start();
     </div>
     <!--end::Col-->
     
-    <!--begin::Col-->
+    <!--begin::Col - Três taxas (igual ao dashboard principal)-->
     <div class="col-sm-6 col-xl-3">
         <div class="card card-flush h-100">
-            <div class="card-body d-flex flex-column justify-content-between">
-                <i class="ki-duotone ki-chart-simple fs-3x text-warning mb-3">
+            <div class="card-body d-flex flex-column">
+                <i class="ki-duotone ki-chart-simple fs-3x text-warning mb-2">
                     <span class="path1"></span>
                     <span class="path2"></span>
                     <span class="path3"></span>
                     <span class="path4"></span>
                 </i>
-                <div class="d-flex flex-column">
-                    <span class="fs-2hx fw-bold text-gray-800"><?= number_format($metrics['conversion_rate'] ?? 0, 1) ?>%</span>
-                    <span class="text-gray-500 fw-semibold fs-6">Taxa de Conversão</span>
-                    <div class="progress h-8px w-100 mt-2">
-                        <div class="progress-bar bg-<?= ($metrics['conversion_rate'] ?? 0) >= 30 ? 'success' : (($metrics['conversion_rate'] ?? 0) >= 15 ? 'warning' : 'danger') ?>" 
-                             style="width: <?= min(100, (($metrics['conversion_rate'] ?? 0) / 30) * 100) ?>%">
+                <span class="text-gray-500 fw-semibold fs-7 mb-3">Taxas de conversão</span>
+                <div class="d-flex flex-column gap-3 flex-grow-1">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                            <span class="fs-8 text-muted">Apenas receptivas</span>
+                            <span class="fs-7 fw-bold text-<?= $progressColorRec ?>"><?= number_format($conversionRateClientOnly, 1) ?>%</span>
+                        </div>
+                        <div class="fs-9 text-muted mb-1"><?= number_format($clientInitiated) ?> conversas · cliente chamou</div>
+                        <div class="progress h-4px">
+                            <div class="progress-bar bg-<?= $progressColorRec ?>" style="width: <?= min(100, ($conversionRateClientOnly / 30) * 100) ?>%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                            <span class="fs-8 text-muted">Rec + ativas</span>
+                            <span class="fs-7 fw-bold text-<?= $progressColorRecAtivas ?>"><?= number_format($conversionRateRecAtivas, 1) ?>%</span>
+                        </div>
+                        <div class="fs-9 text-muted mb-1"><?= number_format($receptivasAtivas) ?> novas no período
+                            <span class="badge badge-light-info fs-10 py-1 ms-1"><i class="bi bi-chat-fill fs-9"></i> <?= number_format($clientInitiated) ?></span>
+                            <span class="badge badge-light-primary fs-10 py-1"><i class="bi bi-person-fill fs-9"></i> <?= number_format($agentInitiated) ?></span>
+                        </div>
+                        <div class="progress h-4px">
+                            <div class="progress-bar bg-<?= $progressColorRecAtivas ?>" style="width: <?= min(100, ($conversionRateRecAtivas / 30) * 100) ?>%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex justify-content-between align-items-baseline mb-1">
+                            <span class="fs-8 text-muted">Interativas</span>
+                            <span class="fs-7 fw-bold text-<?= $progressColorInteractive ?>"><?= number_format($conversionRateInteractive, 1) ?>%</span>
+                        </div>
+                        <div class="fs-9 text-muted mb-1"><?= number_format($interactiveConversations) ?> atendidas no período</div>
+                        <div class="progress h-4px">
+                            <div class="progress-bar bg-<?= $progressColorInteractive ?>" style="width: <?= min(100, ($conversionRateInteractive / 30) * 100) ?>%"></div>
                         </div>
                     </div>
                 </div>

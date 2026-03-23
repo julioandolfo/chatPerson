@@ -68,8 +68,8 @@ class AgentConversionController
                 return;
             }
             
-            // Métricas do agente
-            $metrics = AgentConversionService::getConversionMetrics($agentId, $dateFrom, $dateTo);
+            // Métricas do agente (mesmas 3 taxas do dashboard principal)
+            $metrics = AgentConversionService::getDetailedConversionMetrics($agentId, $dateFrom, $dateTo);
             
             // Pedidos do agente
             $orders = AgentConversionService::getAgentOrders($agentId, $dateFrom, $dateTo);

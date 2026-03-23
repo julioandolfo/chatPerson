@@ -509,12 +509,15 @@ function formatTimeDisplay($seconds, $showUnit = true) {
 <?php endif; ?>
 
 <!-- Métricas de Conversão (WooCommerce) -->
-<?php if (!empty($conversionMetrics) && ($conversionMetrics['total_orders'] > 0 || $conversionMetrics['total_conversations'] > 0)): ?>
+<?php if (!empty($conversionMetrics) && ($conversionMetrics['total_orders'] > 0 || $conversionMetrics['total_conversations'] > 0 || ($conversionMetrics['interactive_conversations'] ?? 0) > 0)): ?>
 <?php
     $agentInitiated = $conversionMetrics['conversations_agent_initiated'] ?? 0;
     $clientInitiated = $conversionMetrics['conversations_client_initiated'] ?? 0;
-    $conversionRateTotal = $conversionMetrics['conversion_rate'] ?? 0;
+    $receptivasAtivas = $conversionMetrics['conversations_receptivas_ativas'] ?? 0;
+    $interactiveConversations = $conversionMetrics['interactive_conversations'] ?? 0;
     $conversionRateClientOnly = $conversionMetrics['conversion_rate_client_only'] ?? 0;
+    $conversionRateRecAtivas = $conversionMetrics['conversion_rate_receptivas_ativas'] ?? 0;
+    $conversionRateInteractive = $conversionMetrics['conversion_rate_interactive'] ?? 0;
 ?>
 <div class="row g-5 mb-7">
     <div class="col-12">
@@ -573,9 +576,9 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     </div>
                 </div>
                 
-                <!-- Linha 2: Taxas de Conversão e Ticket -->
+                <!-- Linha 2: Ticket e as 3 taxas (mesmo critério do dashboard principal) -->
                 <div class="row g-5">
-                    <div class="col-md-4">
+                    <div class="col-md-6 col-xl-3">
                         <div class="border border-gray-300 border-dashed rounded p-4 text-center">
                             <div class="fs-2x fw-bold text-info">
                                 R$ <?= number_format($conversionMetrics['avg_ticket'] ?? 0, 2, ',', '.') ?>
@@ -583,25 +586,36 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                             <div class="fw-semibold text-muted">Ticket Médio</div>
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success">
-                            <div class="fs-2x fw-bold text-success">
-                                <?= number_format($conversionRateTotal, 1) ?>%
-                            </div>
-                            <div class="fw-semibold text-muted">Taxa Conversão (Geral)</div>
-                            <div class="fs-8 text-muted mt-1">
-                                Todas as conversas incluídas
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
+                    <div class="col-md-6 col-xl-3">
                         <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary">
                             <div class="fs-2x fw-bold text-primary">
                                 <?= number_format($conversionRateClientOnly, 1) ?>%
                             </div>
-                            <div class="fw-semibold text-muted">Taxa Conversão (Cliente)</div>
+                            <div class="fw-semibold text-muted">Apenas receptivas</div>
                             <div class="fs-8 text-muted mt-1">
-                                Apenas conversas iniciadas pelo cliente
+                                <?= number_format($clientInitiated) ?> conversas · cliente chamou
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <div class="border border-info border-dashed rounded p-4 text-center bg-light-info">
+                            <div class="fs-2x fw-bold text-info">
+                                <?= number_format($conversionRateRecAtivas, 1) ?>%
+                            </div>
+                            <div class="fw-semibold text-muted">Rec + ativas</div>
+                            <div class="fs-8 text-muted mt-1">
+                                <?= number_format($receptivasAtivas) ?> novas no período
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 col-xl-3">
+                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success">
+                            <div class="fs-2x fw-bold text-success">
+                                <?= number_format($conversionRateInteractive, 1) ?>%
+                            </div>
+                            <div class="fw-semibold text-muted">Interativas</div>
+                            <div class="fs-8 text-muted mt-1">
+                                <?= number_format($interactiveConversations) ?> atendidas no período
                             </div>
                         </div>
                     </div>

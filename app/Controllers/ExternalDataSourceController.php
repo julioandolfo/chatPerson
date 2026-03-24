@@ -7,6 +7,7 @@
 namespace App\Controllers;
 
 use App\Services\ExternalDataSourceService;
+use App\Services\OpenAIService;
 use App\Models\ExternalDataSource;
 use App\Helpers\Response;
 use App\Helpers\Request;
@@ -398,6 +399,43 @@ class ExternalDataSourceController
                 'success' => false,
                 'message' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * IA: sugere palavra-chave + localização para Google Places a partir de descrição em texto livre.
+     * Não executa busca no Google — apenas gera termos para preencher a fonte Maps.
+     */
+    public function suggestProspectTerms(): void
+    {
+        Permission::abortIfCannotAny(['campaigns.create', 'campaigns.edit']);
+
+        try {
+            $data = Request::json();
+            $description = trim((string)($data['description'] ?? ''));
+
+            if ($description === '') {
+                Response::json(['success' => false, 'message' => 'Descreva o público-alvo (ex: empresas de software em Florianópolis).'], 400);
+                return;
+            }
+
+            $suggestion = OpenAIService::suggestGoogleMapsProspectTerms($description);
+            if ($suggestion === null) {
+                Response::json([
+                    'success' => false,
+                    'message' => 'Não foi possível gerar sugestões. Verifique a chave OpenAI em Integrações / configurações da IA.',
+                ], 400);
+                return;
+            }
+
+            Response::json([
+                'success' => true,
+                'keyword' => $suggestion['keyword'],
+                'location' => $suggestion['location'],
+                'alternatives' => $suggestion['alternatives'],
+            ]);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
         }
     }
     

@@ -57,15 +57,33 @@ ob_start();
             <div class="separator my-10"></div>
             <div class="mb-10">
                 <h4 class="mb-5">Configuração de Busca - Google Maps</h4>
+
+                <div class="alert alert-info d-flex align-items-start mb-5">
+                    <i class="ki-duotone ki-abstract-26 fs-2 text-info me-3 mt-1"><span class="path1"></span><span class="path2"></span></i>
+                    <div class="fs-7">
+                        A IA <strong>não navega no Google</strong>. Ela só sugere <strong>palavra-chave + localização</strong> para a API Places.
+                        Os contatos continuam sendo buscados pelo Google Maps / Outscraper como hoje.
+                    </div>
+                </div>
+
+                <div class="card card-bordered bg-light mb-5">
+                    <div class="card-body py-4">
+                        <label class="form-label fw-bold">Descreva o público (IA sugere termos)</label>
+                        <textarea class="form-control mb-2" id="gm_edit_ai_description" rows="2" placeholder="Ex: Oficinas mecânicas especializadas em diesel no Rio Grande do Sul"></textarea>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="suggestProspectTermsEdit()">Sugerir com IA</button>
+                        <span id="gm_edit_ai_status" class="ms-2 text-muted fs-8"></span>
+                        <div id="gm_edit_ai_alternatives" class="mt-3" style="display:none;"></div>
+                    </div>
+                </div>
                 
                 <div class="row g-5">
                     <div class="col-md-6">
                         <label class="form-label required">Palavra-chave</label>
-                        <input type="text" class="form-control" name="keyword" value="<?= htmlspecialchars($searchConfig['keyword'] ?? '') ?>" placeholder="Ex: dentistas, restaurantes" />
+                        <input type="text" class="form-control" name="keyword" id="gm_edit_keyword" value="<?= htmlspecialchars($searchConfig['keyword'] ?? '') ?>" placeholder="Ex: dentistas, restaurantes" />
                     </div>
                     <div class="col-md-6">
                         <label class="form-label required">Localização</label>
-                        <input type="text" class="form-control" name="location" value="<?= htmlspecialchars($searchConfig['location'] ?? '') ?>" placeholder="Ex: São Paulo, SP" />
+                        <input type="text" class="form-control" name="location" id="gm_edit_location" value="<?= htmlspecialchars($searchConfig['location'] ?? '') ?>" placeholder="Ex: São Paulo, SP" />
                     </div>
                 </div>
                 
@@ -369,6 +387,62 @@ function testWooCommerceConnection() {
         status.innerHTML = '<span class="badge badge-light-danger">Erro</span>';
         toastr.error('Erro de rede');
     });
+}
+
+function suggestProspectTermsEdit() {
+    const desc = document.getElementById('gm_edit_ai_description')?.value?.trim() || '';
+    const st = document.getElementById('gm_edit_ai_status');
+    const altWrap = document.getElementById('gm_edit_ai_alternatives');
+    if (!desc) {
+        if (typeof toastr !== 'undefined') toastr.warning('Descreva o público-alvo.');
+        return;
+    }
+    if (st) st.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    if (altWrap) { altWrap.style.display = 'none'; altWrap.innerHTML = ''; }
+
+    fetch('/api/external-sources/suggest-prospect-terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ description: desc })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (st) st.textContent = '';
+        if (!data.success) {
+            if (typeof toastr !== 'undefined') toastr.error(data.message || 'Erro');
+            return;
+        }
+        const kw = document.getElementById('gm_edit_keyword');
+        const loc = document.getElementById('gm_edit_location');
+        if (kw) kw.value = data.keyword || '';
+        if (loc) loc.value = data.location || '';
+        if (typeof toastr !== 'undefined') toastr.success('Sugestão aplicada. Salve a fonte para persistir.');
+
+        if (altWrap && Array.isArray(data.alternatives) && data.alternatives.length > 0) {
+            altWrap.innerHTML = '';
+            const t = document.createElement('div');
+            t.className = 'fw-bold mb-2 fs-7';
+            t.textContent = 'Alternativas:';
+            altWrap.appendChild(t);
+            const row = document.createElement('div');
+            row.className = 'd-flex flex-wrap gap-2';
+            data.alternatives.forEach(a => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-sm btn-light';
+                btn.textContent = (a.keyword || '') + ' · ' + (a.location || '');
+                btn.addEventListener('click', () => {
+                    if (kw) kw.value = a.keyword || '';
+                    if (loc) loc.value = a.location || '';
+                    if (typeof toastr !== 'undefined') toastr.info('Aplicado');
+                });
+                row.appendChild(btn);
+            });
+            altWrap.appendChild(row);
+            altWrap.style.display = 'block';
+        }
+    })
+    .catch(() => { if (st) st.textContent = ''; if (typeof toastr !== 'undefined') toastr.error('Rede'); });
 }
 
 function toggleEditGridOptions(checkbox) {

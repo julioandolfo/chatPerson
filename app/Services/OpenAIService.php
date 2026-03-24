@@ -584,6 +584,12 @@ class OpenAIService
 
         \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Iniciando execução de " . count($toolCalls) . " tool calls para conversationId={$conversationId}, agentId={$agentId}");
 
+        $agentTools = AIAgent::getTools($agentId);
+        $agentToolRowByToolId = [];
+        foreach ($agentTools as $row) {
+            $agentToolRowByToolId[(int)($row['id'] ?? 0)] = $row;
+        }
+
         foreach ($toolCalls as $call) {
             $toolCallId = $call['id'] ?? null;
             $functionName = $call['function']['name'] ?? null;
@@ -615,15 +621,9 @@ class OpenAIService
                     continue;
                 }
 
-                // Verificar se tool está atribuída ao agente
-                $agentTools = AIAgent::getTools($agentId);
-                $toolAssigned = false;
-                foreach ($agentTools as $agentTool) {
-                    if ($agentTool['id'] == $tool['id']) {
-                        $toolAssigned = true;
-                        break;
-                    }
-                }
+                // Verificar se tool está atribuída ao agente e obter config específica do vínculo (ai_agent_tools)
+                $assignedRow = $agentToolRowByToolId[(int)$tool['id']] ?? null;
+                $toolAssigned = $assignedRow !== null;
 
                 \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool atribuída ao agente: " . ($toolAssigned ? "SIM" : "NÃO"));
 
@@ -638,8 +638,15 @@ class OpenAIService
                     continue;
                 }
 
+                // Mesclar config da tool global com a config por agente (credenciais WooCommerce, N8N, etc. ficam no vínculo)
+                $toolForExec = $tool;
+                $toolForExec['config'] = self::mergeAgentToolExecutionConfig(
+                    $tool['config'] ?? null,
+                    $assignedRow['agent_tool_config'] ?? null
+                );
+
                 // Executar tool
-                $result = self::executeTool($tool, $functionArguments, $conversationId, $context);
+                $result = self::executeTool($toolForExec, $functionArguments, $conversationId, $context);
                 
                 \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, $result, !isset($result['error']));
 
@@ -678,6 +685,40 @@ class OpenAIService
         \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Finalizou execução de tools. Total de resultados: " . count($results));
 
         return $results;
+    }
+
+    /**
+     * Decodifica JSON de config de tool (ai_tools ou ai_agent_tools).
+     */
+    private static function decodeToolConfigJson($raw): array
+    {
+        if ($raw === null || $raw === '') {
+            return [];
+        }
+        if (is_array($raw)) {
+            return $raw;
+        }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return [];
+    }
+
+    /**
+     * Base: config da tool (ai_tools). Sobreposição: config do vínculo agente–tool (ai_agent_tools).
+     */
+    private static function mergeAgentToolExecutionConfig($toolConfig, $agentLinkConfig): array
+    {
+        $base = self::decodeToolConfigJson($toolConfig);
+        $overlay = self::decodeToolConfigJson($agentLinkConfig);
+        if ($overlay === []) {
+            return $base;
+        }
+        if ($base === []) {
+            return $overlay;
+        }
+        return array_merge($base, $overlay);
     }
 
     /**
@@ -1214,10 +1255,25 @@ class OpenAIService
     private static function executeWooCommerceTool(array $tool, array $arguments, array $config): array
     {
         $functionName = $tool['name'] ?? '';
-        $wcUrl = $config['woocommerce_url'] ?? null;
+        // UI das tools usa "url"; integração nativa usa "woocommerce_url"; fontes externas podem usar "store_url"
+        $wcUrl = $config['woocommerce_url'] ?? $config['url'] ?? $config['store_url'] ?? null;
         $consumerKey = $config['consumer_key'] ?? null;
         $consumerSecret = $config['consumer_secret'] ?? null;
-        
+
+        $trimStr = static function ($v) {
+            if ($v === null) {
+                return null;
+            }
+            if (!is_string($v)) {
+                return $v;
+            }
+            $t = trim($v);
+            return $t === '' ? null : $t;
+        };
+        $wcUrl = $trimStr($wcUrl);
+        $consumerKey = $trimStr($consumerKey);
+        $consumerSecret = $trimStr($consumerSecret);
+
         if (!$wcUrl || !$consumerKey || !$consumerSecret) {
             return ['error' => 'Configurações do WooCommerce não completas (URL, Consumer Key, Consumer Secret)'];
         }
@@ -2835,6 +2891,93 @@ Informações do contato:
             
         } catch (\Exception $e) {
             \App\Helpers\Logger::error('OpenAIService::generateText - Erro: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Sugere palavra-chave e localização para prospecção Google Places a partir de uma descrição em linguagem natural.
+     * A IA não acessa a internet: apenas traduz o objetivo em termos adequados à API Places (negócios locais).
+     *
+     * @return array{keyword:string,location:string,alternatives:array<int,array{keyword:string,location:string}>}|null
+     */
+    public static function suggestGoogleMapsProspectTerms(string $userDescription, string $model = 'gpt-4o-mini'): ?array
+    {
+        $userDescription = trim($userDescription);
+        if ($userDescription === '') {
+            return null;
+        }
+
+        $descLen = function_exists('mb_strlen') ? mb_strlen($userDescription, 'UTF-8') : strlen($userDescription);
+        if ($descLen > 2000) {
+            $userDescription = function_exists('mb_substr')
+                ? mb_substr($userDescription, 0, 2000, 'UTF-8')
+                : substr($userDescription, 0, 2000);
+        }
+
+        $apiKey = self::getApiKey();
+        if (empty($apiKey)) {
+            \App\Helpers\Logger::error('OpenAIService::suggestGoogleMapsProspectTerms - API Key não configurada');
+            return null;
+        }
+
+        $system = <<<'SYS'
+Você é especialista em prospecção B2B no Brasil. O usuário descreve o público-alvo em linguagem natural.
+Sua tarefa é sugerir termos para busca na API Google Places (estabelecimentos no mapa), NÃO para "Google pesquisa web".
+
+Responda APENAS um objeto JSON (sem markdown, sem texto fora do JSON) com exatamente estas chaves:
+- "keyword": string curta em português (2 a 8 palavras), o que alguém digitaria no Maps (ex: "clínicas odontológicas", "auto peças caminhão").
+- "location": cidade/estado/região em português (ex: "Curitiba, PR"). Se não houver região, use "Brasil".
+- "alternatives": array com até 3 objetos {"keyword":"...","location":"..."} com combinações úteis (sinônimos ou nichos próximos).
+
+Não inclua telefones, e-mails ou URLs inventados. Apenas termos de busca e localização.
+SYS;
+
+        $payload = [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $system],
+                ['role' => 'user', 'content' => $userDescription],
+            ],
+            'temperature' => 0.35,
+            'max_tokens' => 500,
+            'response_format' => ['type' => 'json_object'],
+        ];
+
+        try {
+            $response = self::makeRequest($apiKey, $payload);
+            $content = $response['choices'][0]['message']['content'] ?? '';
+            $decoded = json_decode($content, true);
+            if (!is_array($decoded) || empty($decoded['keyword']) || empty($decoded['location'])) {
+                \App\Helpers\Logger::error('OpenAIService::suggestGoogleMapsProspectTerms - JSON inválido');
+                return null;
+            }
+
+            $out = [
+                'keyword' => trim((string)$decoded['keyword']),
+                'location' => trim((string)$decoded['location']),
+                'alternatives' => [],
+            ];
+
+            if (!empty($decoded['alternatives']) && is_array($decoded['alternatives'])) {
+                foreach ($decoded['alternatives'] as $alt) {
+                    if (!is_array($alt)) {
+                        continue;
+                    }
+                    $k = trim((string)($alt['keyword'] ?? ''));
+                    $l = trim((string)($alt['location'] ?? ''));
+                    if ($k !== '' && $l !== '') {
+                        $out['alternatives'][] = ['keyword' => $k, 'location' => $l];
+                    }
+                    if (count($out['alternatives']) >= 3) {
+                        break;
+                    }
+                }
+            }
+
+            return $out;
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error('OpenAIService::suggestGoogleMapsProspectTerms - ' . $e->getMessage());
             return null;
         }
     }

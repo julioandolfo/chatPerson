@@ -52,6 +52,30 @@ ob_start();
                         <i class="ki-duotone ki-information fs-2 me-3"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
                         <strong>Prospecção B2B:</strong> Busque empresas por categoria e região. Apenas contatos com telefone serão importados.
                     </div>
+
+                    <div class="alert alert-info d-flex align-items-start mb-5">
+                        <i class="ki-duotone ki-abstract-26 fs-2 text-info me-3 mt-1"><span class="path1"></span><span class="path2"></span></i>
+                        <div>
+                            <strong>Sobre IA e Google:</strong> Nenhum modelo de IA “entra” no Google por conta própria.
+                            Os contatos vêm da <strong>API Google Places</strong> (ou Outscraper), com palavra-chave + localização.
+                            Abaixo você pode usar a <strong>OpenAI</strong> (chave já usada no sistema) só para <strong>sugerir</strong> esses termos a partir de uma descrição em português.
+                        </div>
+                    </div>
+
+                    <div class="card card-bordered bg-light mb-8">
+                        <div class="card-body">
+                            <label class="form-label fw-bold">Descreva quem você quer prospectar (opcional — IA sugere palavra-chave e cidade)</label>
+                            <textarea class="form-control mb-3" id="gm_ai_description" rows="3" placeholder="Ex: Clínicas de estética e spa na região metropolitana de Belo Horizonte que atendam mulheres 30-50 anos"></textarea>
+                            <div class="d-flex flex-wrap align-items-center gap-3">
+                                <button type="button" class="btn btn-primary" onclick="suggestProspectTermsWithAI()">
+                                    <i class="ki-duotone ki-technology-2 fs-3"><span class="path1"></span><span class="path2"></span></i>
+                                    Sugerir com IA
+                                </button>
+                                <span id="gm_ai_suggest_status" class="text-muted fs-7"></span>
+                            </div>
+                            <div id="gm_ai_alternatives" class="mt-4" style="display:none;"></div>
+                        </div>
+                    </div>
                     
                     <div class="mb-5">
                         <label class="form-label required">Palavra-chave</label>
@@ -438,6 +462,67 @@ document.getElementById('db_type').addEventListener('change', function() {
 });
 
 // ========== FUNÇÕES GOOGLE MAPS ==========
+
+function suggestProspectTermsWithAI() {
+    const desc = document.getElementById('gm_ai_description')?.value?.trim() || '';
+    const statusEl = document.getElementById('gm_ai_suggest_status');
+    const altWrap = document.getElementById('gm_ai_alternatives');
+    if (!desc) {
+        toastr.warning('Descreva o público-alvo antes de pedir sugestão à IA.');
+        return;
+    }
+    if (statusEl) statusEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Gerando...';
+    if (altWrap) { altWrap.style.display = 'none'; altWrap.innerHTML = ''; }
+
+    fetch('/api/external-sources/suggest-prospect-terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ description: desc })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (statusEl) statusEl.textContent = '';
+        if (!data.success) {
+            toastr.error(data.message || 'Falha na sugestão');
+            return;
+        }
+        const kw = document.getElementById('gm_keyword');
+        const loc = document.getElementById('gm_location');
+        if (kw) kw.value = data.keyword || '';
+        if (loc) loc.value = data.location || '';
+        toastr.success('Palavra-chave e localização preenchidas. Revise e ajuste se quiser.');
+
+        if (altWrap && Array.isArray(data.alternatives) && data.alternatives.length > 0) {
+            altWrap.innerHTML = '';
+            const title = document.createElement('div');
+            title.className = 'fw-bold mb-2';
+            title.textContent = 'Outras sugestões (clique para aplicar):';
+            altWrap.appendChild(title);
+            const row = document.createElement('div');
+            row.className = 'd-flex flex-wrap gap-2';
+            data.alternatives.forEach(a => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'btn btn-sm btn-light';
+                btn.textContent = (a.keyword || '') + ' · ' + (a.location || '');
+                btn.addEventListener('click', () => {
+                    const kwEl = document.getElementById('gm_keyword');
+                    const locEl = document.getElementById('gm_location');
+                    if (kwEl) kwEl.value = a.keyword || '';
+                    if (locEl) locEl.value = a.location || '';
+                    toastr.info('Sugestão aplicada');
+                });
+                row.appendChild(btn);
+            });
+            altWrap.appendChild(row);
+            altWrap.style.display = 'block';
+        }
+    })
+    .catch(() => {
+        if (statusEl) statusEl.textContent = '';
+        toastr.error('Erro de rede');
+    });
+}
 
 function toggleGridOptions() {
     const enabled = document.getElementById('gm_use_grid')?.checked;

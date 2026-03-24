@@ -722,6 +722,38 @@ class OpenAIService
     }
 
     /**
+     * Nome da função usado na invocação (igual ao enviado pela OpenAI): function_schema, depois slug, depois name.
+     */
+    private static function getToolInvocationFunctionName(array $tool): string
+    {
+        $schema = $tool['function_schema'] ?? null;
+        if (is_string($schema)) {
+            $schema = json_decode($schema, true) ?: [];
+        }
+        if (is_array($schema)) {
+            $n = $schema['function']['name'] ?? $schema['name'] ?? '';
+            if (is_string($n) && trim($n) !== '') {
+                return trim($n);
+            }
+        }
+        $slug = trim((string)($tool['slug'] ?? ''));
+        if ($slug !== '') {
+            return $slug;
+        }
+        return trim((string)($tool['name'] ?? ''));
+    }
+
+    /**
+     * Alinha nomes vindos do schema ("Buscar Pedidos Woocommerce") aos cases em snake_case.
+     */
+    private static function normalizeWooCommerceFunctionName(string $name): string
+    {
+        $n = strtolower(trim($name));
+        $n = preg_replace('/\s+/', '_', $n);
+        return preg_replace('/_+/', '_', $n);
+    }
+
+    /**
      * Executar uma tool específica
      */
     private static function executeTool(array $tool, array $arguments, int $conversationId, array $context): array
@@ -1254,7 +1286,7 @@ class OpenAIService
      */
     private static function executeWooCommerceTool(array $tool, array $arguments, array $config): array
     {
-        $functionName = $tool['name'] ?? '';
+        $functionName = self::normalizeWooCommerceFunctionName(self::getToolInvocationFunctionName($tool));
         // UI das tools usa "url"; integração nativa usa "woocommerce_url"; fontes externas podem usar "store_url"
         $wcUrl = $config['woocommerce_url'] ?? $config['url'] ?? $config['store_url'] ?? null;
         $consumerKey = $config['consumer_key'] ?? null;
@@ -1331,6 +1363,31 @@ class OpenAIService
                     return [
                         'success' => $result['success'],
                         'order' => $result['data']
+                    ];
+
+                case 'buscar_pedidos_woocommerce':
+                case 'listar_pedidos_cliente_woocommerce':
+                    $q = [];
+                    $customer = $arguments['customer'] ?? $arguments['customer_id'] ?? null;
+                    if ($customer !== null && $customer !== '') {
+                        $q['customer'] = (int)$customer;
+                    }
+                    foreach (['status', 'search', 'after', 'before', 'product'] as $k) {
+                        if (!empty($arguments[$k])) {
+                            $q[$k] = $arguments[$k];
+                        }
+                    }
+                    $perPage = min(max((int)($arguments['per_page'] ?? 20), 1), 100);
+                    $page = max((int)($arguments['page'] ?? 1), 1);
+                    $q['per_page'] = $perPage;
+                    $q['page'] = $page;
+                    $query = http_build_query($q);
+                    $result = $makeWCRequest('orders?' . $query);
+                    $data = $result['data'] ?? [];
+                    return [
+                        'success' => $result['success'],
+                        'orders' => is_array($data) ? $data : [],
+                        'http_code' => $result['http_code'] ?? null
                     ];
                 
                 case 'buscar_produto_woocommerce':

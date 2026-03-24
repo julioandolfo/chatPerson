@@ -279,7 +279,14 @@ class AIToolValidationService
         $executionMethods = [
             'system' => ['buscar_conversas_anteriores', 'buscar_informacoes_contato', 'adicionar_tag', 'adicionar_tag_conversa', 'mover_para_estagio', 'escalar_para_humano'],
             'followup' => ['verificar_status_conversa', 'verificar_ultima_interacao'],
-            'woocommerce' => ['buscar_pedido_woocommerce', 'buscar_produto_woocommerce', 'criar_pedido_woocommerce', 'atualizar_status_pedido'],
+            'woocommerce' => [
+                'buscar_pedido_woocommerce',
+                'buscar_pedidos_woocommerce',
+                'listar_pedidos_cliente_woocommerce',
+                'buscar_produto_woocommerce',
+                'criar_pedido_woocommerce',
+                'atualizar_status_pedido',
+            ],
             'database' => ['consultar_banco_dados'],
             'n8n' => ['executar_workflow_n8n', 'buscar_dados_n8n', 'chamar_webhook_n8n', 'consultar_api_n8n'],
             'api' => ['chamar_api_externa'],

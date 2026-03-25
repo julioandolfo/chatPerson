@@ -22,16 +22,16 @@ class ExternalDataSourceService
         // Validação diferente para google_maps e woocommerce
         $type = $data['type'] ?? '';
         
-        if ($type === 'google_maps' || $type === 'woocommerce') {
+        if ($type === 'google_maps' || $type === 'woocommerce' || $type === 'casa_dos_dados') {
             $errors = Validator::validate($data, [
                 'name' => 'required|string|max:255',
-                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce,casa_dos_dados',
                 'search_config' => 'required|array'
             ]);
         } else {
             $errors = Validator::validate($data, [
                 'name' => 'required|string|max:255',
-                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce',
+                'type' => 'required|string|in:mysql,postgresql,api,google_maps,woocommerce,casa_dos_dados',
                 'connection_config' => 'required|array'
             ]);
         }
@@ -71,6 +71,11 @@ class ExternalDataSourceService
         if ($type === 'google_maps') {
             $provider = $provider ?? 'google_places';
             return GoogleMapsProspectService::testConnection($provider);
+        }
+
+        if ($type === 'casa_dos_dados') {
+            $key = (string)($connectionConfig['api_key'] ?? '');
+            return CasaDosDadosProspectService::testConnection($key);
         }
         
         // Para WooCommerce, delegar para o service específico
@@ -361,6 +366,11 @@ class ExternalDataSourceService
                 Logger::log("Delegando para GoogleMapsProspectService::sync", $logFile);
                 return GoogleMapsProspectService::sync($sourceId, $contactListId);
             }
+
+            if ($source['type'] === 'casa_dos_dados') {
+                Logger::log("Delegando para CasaDosDadosProspectService::sync", $logFile);
+                return CasaDosDadosProspectService::sync($sourceId, $contactListId);
+            }
             
             // Para WooCommerce, delegar para o service específico
             if ($source['type'] === 'woocommerce') {
@@ -544,6 +554,8 @@ class ExternalDataSourceService
                     
                     if ($sourceType === 'google_maps') {
                         GoogleMapsProspectService::sync($sourceId, $list['id']);
+                    } elseif ($sourceType === 'casa_dos_dados') {
+                        CasaDosDadosProspectService::sync($sourceId, $list['id']);
                     } elseif ($sourceType === 'woocommerce') {
                         WooCommerceProspectService::sync($sourceId, $list['id']);
                     } else {
@@ -573,6 +585,14 @@ class ExternalDataSourceService
     public static function previewWooCommerce(string $storeUrl, string $consumerKey, string $consumerSecret, int $limit = 10): array
     {
         return WooCommerceProspectService::preview($storeUrl, $consumerKey, $consumerSecret, $limit);
+    }
+
+    /**
+     * Preview Casa dos Dados (sem gravar)
+     */
+    public static function previewCasaDosDados(array $searchConfig, int $limit = 5): array
+    {
+        return CasaDosDadosProspectService::preview($searchConfig, $limit);
     }
 
     /**

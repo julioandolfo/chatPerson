@@ -11,7 +11,7 @@ ob_start();
     <div class="card-header">
         <h3 class="card-title">Editar Fonte: <?= htmlspecialchars($source['name']) ?></h3>
         <div class="card-toolbar">
-            <span class="badge badge-light-<?= $source['type'] === 'google_maps' ? 'success' : ($source['type'] === 'woocommerce' ? 'info' : 'primary') ?>">
+            <span class="badge badge-light-<?= $source['type'] === 'google_maps' ? 'success' : ($source['type'] === 'woocommerce' ? 'info' : ($source['type'] === 'casa_dos_dados' ? 'warning' : 'primary')) ?>">
                 <?= strtoupper($source['type']) ?>
             </span>
         </div>
@@ -45,6 +45,7 @@ ob_start();
                         <label class="form-label">Frequência de Sincronização</label>
                         <select class="form-select" name="sync_frequency">
                             <option value="manual" <?= ($source['sync_frequency'] ?? '') === 'manual' ? 'selected' : '' ?>>Manual</option>
+                            <option value="hourly" <?= ($source['sync_frequency'] ?? '') === 'hourly' ? 'selected' : '' ?>>A cada hora</option>
                             <option value="daily" <?= ($source['sync_frequency'] ?? '') === 'daily' ? 'selected' : '' ?>>Diariamente</option>
                             <option value="weekly" <?= ($source['sync_frequency'] ?? '') === 'weekly' ? 'selected' : '' ?>>Semanalmente</option>
                         </select>
@@ -193,6 +194,100 @@ ob_start();
                 </div>
             </div>
             <?php endif; ?>
+
+            <?php if ($source['type'] === 'casa_dos_dados'):
+                $cddUf = $searchConfig['uf'] ?? '';
+                if (is_array($cddUf)) $cddUf = implode(', ', $cddUf);
+                $cddMun = $searchConfig['municipio'] ?? '';
+                if (is_array($cddMun)) $cddMun = implode(', ', $cddMun);
+                $cddCnae = $searchConfig['cnae_principal'] ?? '';
+                if (is_array($cddCnae)) $cddCnae = implode(', ', $cddCnae);
+            ?>
+            <div class="separator my-10"></div>
+            <div class="mb-10">
+                <h4 class="mb-5">Casa dos Dados — Pesquisa v5</h4>
+                <p class="text-muted fs-7">Documentação: <a href="https://docs.casadosdados.com.br/" target="_blank" rel="noopener">docs.casadosdados.com.br</a></p>
+
+                <div class="mb-5">
+                    <label class="form-label required">Chave API</label>
+                    <input type="password" class="form-control font-monospace" name="cdd_api_key" value="<?= htmlspecialchars($searchConfig['api_key'] ?? '') ?>" autocomplete="off" />
+                </div>
+                <div class="row g-5">
+                    <div class="col-md-4">
+                        <label class="form-label">UF(s)</label>
+                        <input type="text" class="form-control" name="cdd_uf" value="<?= htmlspecialchars($cddUf) ?>" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Município(s)</label>
+                        <input type="text" class="form-control" name="cdd_municipio" value="<?= htmlspecialchars($cddMun) ?>" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">CNAE principal</label>
+                        <input type="text" class="form-control" name="cdd_cnae" value="<?= htmlspecialchars($cddCnae) ?>" />
+                    </div>
+                </div>
+                <div class="row g-5 mt-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Busca textual</label>
+                        <input type="text" class="form-control" name="cdd_busca_texto" value="<?= htmlspecialchars($searchConfig['busca_texto'] ?? '') ?>" />
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tipo busca</label>
+                        <select class="form-select" name="cdd_busca_tipo">
+                            <option value="radical" <?= ($searchConfig['busca_tipo'] ?? 'radical') === 'radical' ? 'selected' : '' ?>>Radical</option>
+                            <option value="exata" <?= ($searchConfig['busca_tipo'] ?? '') === 'exata' ? 'selected' : '' ?>>Exata</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Resultado</label>
+                        <select class="form-select" name="cdd_tipo_resultado">
+                            <option value="completo" <?= ($searchConfig['tipo_resultado'] ?? 'completo') === 'completo' ? 'selected' : '' ?>>Completo</option>
+                            <option value="simples" <?= ($searchConfig['tipo_resultado'] ?? '') === 'simples' ? 'selected' : '' ?>>Simples</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Limite</label>
+                        <input type="number" class="form-control" name="cdd_limite" value="<?= (int)($searchConfig['limite'] ?? 100) ?>" min="1" max="1000" />
+                    </div>
+                </div>
+                <div class="row g-5 mt-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Máx. páginas/sync</label>
+                        <input type="number" class="form-control" name="cdd_max_pages" value="<?= (int)($searchConfig['max_pages'] ?? 5) ?>" min="1" max="50" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Situação cadastral</label>
+                        <input type="text" class="form-control" name="cdd_situacao" value="<?= htmlspecialchars(is_array($searchConfig['situacao_cadastral'] ?? null) ? implode(',', $searchConfig['situacao_cadastral']) : ($searchConfig['situacao_cadastral'] ?? 'ATIVA')) ?>" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Abertura últimos dias</label>
+                        <input type="number" class="form-control" name="cdd_abertura_dias" value="<?= !empty($searchConfig['data_abertura_ultimos_dias']) ? (int)$searchConfig['data_abertura_ultimos_dias'] : '' ?>" min="0" placeholder="opcional" />
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap gap-4 mt-5">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_com_telefone" value="1" <?= !empty($searchConfig['com_telefone']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Somente com telefone</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_com_email" value="1" <?= !empty($searchConfig['com_email']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Com e-mail</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_somente_matriz" value="1" <?= !empty($searchConfig['somente_matriz']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Somente matriz</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_force_update" value="1" <?= !empty($searchConfig['force_update']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Atualizar já importados</label>
+                    </div>
+                </div>
+                <div class="mt-5">
+                    <button type="button" class="btn btn-light-info btn-sm" onclick="previewCddEdit()">Preview (5)</button>
+                </div>
+                <div id="cdd_edit_preview" class="mt-3 fs-7" style="display:none;"></div>
+            </div>
+            <?php endif; ?>
             
             <?php if ($source['type'] === 'mysql' || $source['type'] === 'postgresql'): ?>
             <!-- Configuração Banco de Dados -->
@@ -312,6 +407,27 @@ document.getElementById('edit_source_form').addEventListener('submit', function(
             days_back: parseInt(formData.get('days_back')) || 30,
             min_orders: parseInt(formData.get('min_orders')) || 0
         };
+    } else if (type === 'casa_dos_dados') {
+        const ab = parseInt(formData.get('cdd_abertura_dias') || '0', 10);
+        data.provider = 'casadosdados_v5';
+        data.search_config = {
+            api_key: formData.get('cdd_api_key') || '',
+            uf: formData.get('cdd_uf') || '',
+            municipio: formData.get('cdd_municipio') || '',
+            cnae_principal: formData.get('cdd_cnae') || '',
+            busca_texto: formData.get('cdd_busca_texto') || '',
+            busca_tipo: formData.get('cdd_busca_tipo') || 'radical',
+            tipo_resultado: formData.get('cdd_tipo_resultado') || 'completo',
+            limite: parseInt(formData.get('cdd_limite')) || 100,
+            max_pages: parseInt(formData.get('cdd_max_pages')) || 5,
+            pagina: 1,
+            situacao_cadastral: formData.get('cdd_situacao') || 'ATIVA',
+            com_telefone: formData.get('cdd_com_telefone') === '1',
+            com_email: formData.get('cdd_com_email') === '1',
+            somente_matriz: formData.get('cdd_somente_matriz') === '1',
+            force_update: formData.get('cdd_force_update') === '1',
+        };
+        if (ab > 0) data.search_config.data_abertura_ultimos_dias = ab;
     } else {
         data.connection_config = {
             host: formData.get('host'),
@@ -387,6 +503,49 @@ function testWooCommerceConnection() {
         status.innerHTML = '<span class="badge badge-light-danger">Erro</span>';
         toastr.error('Erro de rede');
     });
+}
+
+function previewCddEdit() {
+    const form = document.getElementById('edit_source_form');
+    const fd = new FormData(form);
+    const ab = parseInt(fd.get('cdd_abertura_dias') || '0', 10);
+    const cfg = {
+        api_key: fd.get('cdd_api_key') || '',
+        uf: fd.get('cdd_uf') || '',
+        municipio: fd.get('cdd_municipio') || '',
+        cnae_principal: fd.get('cdd_cnae') || '',
+        busca_texto: fd.get('cdd_busca_texto') || '',
+        busca_tipo: fd.get('cdd_busca_tipo') || 'radical',
+        tipo_resultado: fd.get('cdd_tipo_resultado') || 'completo',
+        limite: 5,
+        pagina: 1,
+        situacao_cadastral: fd.get('cdd_situacao') || 'ATIVA',
+        com_telefone: fd.get('cdd_com_telefone') === '1',
+        com_email: fd.get('cdd_com_email') === '1',
+        somente_matriz: fd.get('cdd_somente_matriz') === '1',
+    };
+    if (ab > 0) cfg.data_abertura_ultimos_dias = ab;
+    const wrap = document.getElementById('cdd_edit_preview');
+    if (!cfg.api_key) { if (typeof toastr !== 'undefined') toastr.warning('Chave API obrigatória'); return; }
+    if (wrap) { wrap.style.display = 'block'; wrap.textContent = 'Carregando…'; }
+    fetch('/api/external-sources/preview-casa-dos-dados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ search_config: cfg, limit: 5 })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!wrap) return;
+        if (!data.success) {
+            wrap.innerHTML = '<span class="text-danger">' + (data.message || 'Erro') + '</span>';
+            return;
+        }
+        const rows = data.results || [];
+        let h = '<strong>Total API:</strong> ' + (data.total ?? 0) + '<br>';
+        rows.forEach(r => { h += (r.cnpj || '') + ' — ' + (r.name || '') + ' — tel: ' + (r.phone || '-') + '<br>'; });
+        wrap.innerHTML = h;
+    })
+    .catch(() => { if (wrap) wrap.textContent = 'Erro de rede'; });
 }
 
 function suggestProspectTermsEdit() {

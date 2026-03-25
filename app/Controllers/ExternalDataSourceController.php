@@ -403,6 +403,39 @@ class ExternalDataSourceController
     }
 
     /**
+     * Testar chave API Casa dos Dados (GET /v5/saldo)
+     */
+    public function testCasaDosDados(): void
+    {
+        Permission::abortIfCannot('campaigns.create');
+        try {
+            $data = Request::json();
+            $apiKey = trim((string)($data['api_key'] ?? ''));
+            $result = ExternalDataSourceService::testConnection(['api_key' => $apiKey], 'casa_dos_dados');
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
+     * Preview pesquisa Casa dos Dados (POST /v5/cnpj/pesquisa)
+     */
+    public function previewCasaDosDados(): void
+    {
+        Permission::abortIfCannot('campaigns.view');
+        try {
+            $data = Request::json();
+            $searchConfig = $data['search_config'] ?? [];
+            $limit = min(20, max(1, (int)($data['limit'] ?? 5)));
+            $result = ExternalDataSourceService::previewCasaDosDados($searchConfig, $limit);
+            Response::json($result);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+        }
+    }
+
+    /**
      * IA: sugere palavra-chave + localização para Google Places a partir de descrição em texto livre.
      * Não executa busca no Google — apenas gera termos para preencher a fonte Maps.
      */

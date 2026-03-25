@@ -110,6 +110,14 @@ class OpenAIService
                 if (!empty($functionSchema)) {
                     // Corrigir schema se properties for array vazio (deveria ser objeto)
                     $functionSchema = self::normalizeToolSchema($functionSchema);
+                    if (($tool['tool_type'] ?? '') === 'woocommerce') {
+                        $wcHint = ' Invocar somente quando o cliente pediu dados ou ação sobre pedido, produto, entrega ou loja; não usar em saudações (oi/olá) nem conversa genérica.';
+                        if (isset($functionSchema['function']['description']) && is_string($functionSchema['function']['description'])) {
+                            $functionSchema['function']['description'] .= $wcHint;
+                        } elseif (isset($functionSchema['description']) && is_string($functionSchema['description'])) {
+                            $functionSchema['description'] .= $wcHint;
+                        }
+                    }
                     $functions[] = $functionSchema;
                     
                     // Extrair nome e descrição da tool para o prompt
@@ -125,8 +133,16 @@ class OpenAIService
                 'tools_full' => $functions
             ]);
 
+            $toolTypesAttached = [];
+            foreach ($tools as $t) {
+                $tt = $t['tool_type'] ?? '';
+                if ($tt !== '') {
+                    $toolTypesAttached[$tt] = true;
+                }
+            }
+
             // Construir mensagens do histórico (passando tools para incluir no prompt)
-            $messages = self::buildMessages($agent, $message, $context, $toolDescriptions);
+            $messages = self::buildMessages($agent, $message, $context, $toolDescriptions, array_keys($toolTypesAttached));
 
             // Preparar payload
             $payload = [
@@ -340,18 +356,27 @@ class OpenAIService
     /**
      * Construir array de mensagens para a API
      */
-    private static function buildMessages(array $agent, string $userMessage, array $context, array $toolDescriptions = []): array
+    private static function buildMessages(array $agent, string $userMessage, array $context, array $toolDescriptions = [], array $attachedToolTypes = []): array
     {
         $messages = [];
 
         // Mensagem do sistema (prompt do agente)
         $systemPrompt = $agent['prompt'];
+        $hasWooCommerceTools = in_array('woocommerce', $attachedToolTypes, true);
         
         // IMPORTANTE: Adicionar instruções sobre tools disponíveis
         if (!empty($toolDescriptions)) {
             $systemPrompt .= "\n\n## FERRAMENTAS DISPONÍVEIS\n\n";
-            $systemPrompt .= "Você tem acesso às seguintes ferramentas (tools) para ajudar o cliente:\n\n";
+            $systemPrompt .= "Você tem acesso às seguintes ferramentas (tools). Elas existem para quando forem **realmente necessárias** — não é obrigatório usá-las em toda mensagem.\n\n";
             $systemPrompt .= implode("\n", $toolDescriptions);
+
+            if ($hasWooCommerceTools) {
+                $systemPrompt .= "\n\n### Uso de ferramentas WooCommerce (pedidos / produtos / loja)\n";
+                $systemPrompt .= "- Chame essas ferramentas **somente** quando o cliente pedir algo objetivo sobre **pedido, compra, entrega, rastreamento, produto, estoque, preço ou cupom**, ou quando já houver **dados concretos** (ex.: número do pedido, SKU) na mensagem.\n";
+                $systemPrompt .= "- **Não** chame WooCommerce em **saudações** (\"oi\", \"olá\", \"bom dia\"), agradecimentos, conversa geral ou quando o cliente ainda não pediu nada sobre a loja.\n";
+                $systemPrompt .= "- Se precisar de um dado que a ferramenta exige (ex.: ID do pedido) e o cliente não informou, **pergunte em texto** antes de chamar a ferramenta.\n";
+                $systemPrompt .= "- Se não houver pedido explícito relacionado à loja, responda normalmente **sem** tool calls.\n";
+            }
             
             // Verificar se agente tem preferência por usar tools
             $settings = is_string($agent['settings'] ?? '') 
@@ -360,9 +385,18 @@ class OpenAIService
             $preferTools = !empty($settings['prefer_tools']);
             
             if ($preferTools) {
-                $systemPrompt .= "\n\n**INSTRUÇÃO CRÍTICA**: Você DEVE usar as ferramentas disponíveis sempre que a solicitação do cliente envolver buscar dados, verificar status, consultar informações ou realizar ações no sistema. NUNCA invente informações que podem ser obtidas através das ferramentas. Se houver dúvida se deve usar uma ferramenta, USE-A.";
+                $systemPrompt .= "\n\n**INSTRUÇÃO CRÍTICA**: Use as ferramentas sempre que a solicitação do cliente envolver **dados ou ações do sistema** que essas ferramentas cobrem. Não invente fatos verificáveis por ferramenta quando o cliente pediu essa verificação.";
+                if ($hasWooCommerceTools) {
+                    $systemPrompt .= " **Exceção obrigatória:** ferramentas WooCommerce — aplique as regras da seção \"Uso de ferramentas WooCommerce\" acima (nunca em saudação ou conversa genérica).";
+                } else {
+                    $systemPrompt .= " Se houver dúvida razoável se uma ferramenta resolve o pedido, prefira usá-la.";
+                }
             } else {
-                $systemPrompt .= "\n\n**IMPORTANTE**: Use essas ferramentas sempre que necessário para buscar informações, realizar ações ou ajudar o cliente de forma mais eficaz. Não invente informações quando você pode buscá-las usando as ferramentas disponíveis.";
+                $systemPrompt .= "\n\n**IMPORTANTE (modo padrão — preferência por tools desligada)**:\n";
+                $systemPrompt .= "- A resposta **padrão** é em **texto direto**, sem chamar ferramentas, principalmente em saudações e conversa leve.\n";
+                $systemPrompt .= "- Chame uma ferramenta **somente** quando o cliente pedir **claramente** uma consulta ou ação que só ela pode resolver **e** você tiver (ou puder pedir e depois obter) os dados necessários.\n";
+                $systemPrompt .= "- **Não** use ferramentas por precaução, por hábito ou porque estão listadas; omitir tool call é correto na maioria das mensagens curtas ou genéricas.\n";
+                $systemPrompt .= "- Quando o cliente **explicitamente** pedir uma verificação no sistema, aí sim use a ferramenta adequada — sem inventar o resultado.";
             }
         }
         
@@ -751,6 +785,34 @@ class OpenAIService
         $n = strtolower(trim($name));
         $n = preg_replace('/\s+/', '_', $n);
         return preg_replace('/_+/', '_', $n);
+    }
+
+    /**
+     * Mapeia slugs customizados (ex.: buscar_pedidos_personizi) para o handler interno correspondente.
+     * Ordem: padrões mais específicos antes dos genéricos (buscar_pedidos antes de buscar_pedido).
+     */
+    private static function canonicalizeWooCommerceFunctionName(string $normalizedName): string
+    {
+        $n = $normalizedName;
+        if (preg_match('/^buscar_pedidos[_a-z0-9]*$/', $n)) {
+            return 'buscar_pedidos_woocommerce';
+        }
+        if (preg_match('/^listar_pedidos[_a-z0-9]*$/', $n)) {
+            return 'listar_pedidos_cliente_woocommerce';
+        }
+        if (preg_match('/^buscar_pedido[_a-z0-9]*$/', $n)) {
+            return 'buscar_pedido_woocommerce';
+        }
+        if (preg_match('/^buscar_produto[_a-z0-9]*$/', $n)) {
+            return 'buscar_produto_woocommerce';
+        }
+        if (preg_match('/^criar_pedido[_a-z0-9]*$/', $n)) {
+            return 'criar_pedido_woocommerce';
+        }
+        if (preg_match('/^atualizar_status_pedido[_a-z0-9]*$/', $n)) {
+            return 'atualizar_status_pedido';
+        }
+        return $n;
     }
 
     /**
@@ -1286,7 +1348,8 @@ class OpenAIService
      */
     private static function executeWooCommerceTool(array $tool, array $arguments, array $config): array
     {
-        $functionName = self::normalizeWooCommerceFunctionName(self::getToolInvocationFunctionName($tool));
+        $invocationName = self::normalizeWooCommerceFunctionName(self::getToolInvocationFunctionName($tool));
+        $functionName = self::canonicalizeWooCommerceFunctionName($invocationName);
         // UI das tools usa "url"; integração nativa usa "woocommerce_url"; fontes externas podem usar "store_url"
         $wcUrl = $config['woocommerce_url'] ?? $config['url'] ?? $config['store_url'] ?? null;
         $consumerKey = $config['consumer_key'] ?? null;
@@ -1464,7 +1527,7 @@ class OpenAIService
                     ];
                 
                 default:
-                    return ['error' => 'WooCommerce tool não reconhecida: ' . $functionName];
+                    return ['error' => 'WooCommerce tool não reconhecida: ' . $invocationName];
             }
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];

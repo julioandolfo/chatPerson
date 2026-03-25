@@ -33,6 +33,7 @@ ob_start();
                     <select class="form-select" name="type" id="db_type" required>
                         <option value="">Selecione...</option>
                         <option value="google_maps">Google Maps (Prospecção de Leads)</option>
+                        <option value="casa_dos_dados">Casa dos Dados (CNPJ / empresas)</option>
                         <option value="woocommerce">WooCommerce (Clientes de E-commerce)</option>
                         <option value="mysql">MySQL (Banco de Dados)</option>
                         <option value="postgresql">PostgreSQL (Banco de Dados)</option>
@@ -281,6 +282,154 @@ ob_start();
                 </div>
             </div>
             <!-- ========== FIM SEÇÃO WOOCOMMERCE ========== -->
+
+            <!-- ========== SEÇÃO CASA DOS DADOS ========== -->
+            <div id="section_casa_dos_dados" style="display:none;">
+                <div class="separator my-10"></div>
+                <div class="mb-10">
+                    <h4 class="mb-5">2. Casa dos Dados — Pesquisa de empresas (CNPJ)</h4>
+                    <div class="alert alert-primary d-flex align-items-start mb-5">
+                        <i class="ki-duotone ki-book fs-2 me-3"><span class="path1"></span><span class="path2"></span></i>
+                        <div class="fs-7">
+                            API oficial <strong>v5</strong>: <code>POST /v5/cnpj/pesquisa</code> em
+                            <a href="https://api.casadosdados.com.br" target="_blank" rel="noopener">api.casadosdados.com.br</a>.
+                            Documentação:
+                            <a href="https://docs.casadosdados.com.br/" target="_blank" rel="noopener">docs.casadosdados.com.br</a>.
+                            Chave em
+                            <a href="https://portal.casadosdados.com.br/plataforma/api/chave" target="_blank" rel="noopener">portal → API</a>.
+                            Pesquisa avançada consome <strong>saldo</strong> da conta.
+                        </div>
+                    </div>
+
+                    <div class="mb-5">
+                        <label class="form-label required">Chave de API (header <code>api-key</code>)</label>
+                        <input type="password" class="form-control font-monospace" id="cdd_api_key" placeholder="Cole a chave do portal" autocomplete="off" />
+                    </div>
+
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-4">
+                            <label class="form-label">UF(s)</label>
+                            <input type="text" class="form-control" id="cdd_uf" placeholder="sp, mg (minúsculas)" />
+                            <div class="form-text">Separadas por vírgula</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Município(s)</label>
+                            <input type="text" class="form-control" id="cdd_municipio" placeholder="sao paulo, belo horizonte" />
+                            <div class="form-text">Minúsculas, como na API</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">CNAE principal</label>
+                            <input type="text" class="form-control" id="cdd_cnae" placeholder="6201501, 4711302" />
+                            <div class="form-text">Códigos separados por vírgula</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-5">
+                        <label class="form-label">Busca textual (razão / fantasia)</label>
+                        <input type="text" class="form-control" id="cdd_busca_texto" placeholder="Ex: software, marketing digital" />
+                        <div class="form-text">Vários termos separados por vírgula. Tipo: radical (padrão) ou exata abaixo.</div>
+                    </div>
+
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-3">
+                            <label class="form-label">Tipo busca textual</label>
+                            <select class="form-select" id="cdd_busca_tipo">
+                                <option value="radical" selected>Radical</option>
+                                <option value="exata">Exata</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Resultado API</label>
+                            <select class="form-select" id="cdd_tipo_resultado">
+                                <option value="completo" selected>Completo (mais campos, recomendado p/ telefone)</option>
+                                <option value="simples">Simples</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Limite por requisição</label>
+                            <input type="number" class="form-control" id="cdd_limite" value="100" min="1" max="1000" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Máx. páginas por sync</label>
+                            <input type="number" class="form-control" id="cdd_max_pages" value="5" min="1" max="50" />
+                            <div class="form-text">Cada página = 1 chamada à API</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-5">
+                        <div class="col-md-6">
+                            <label class="form-label">Situação cadastral</label>
+                            <input type="text" class="form-control" id="cdd_situacao" value="ATIVA" placeholder="ATIVA" />
+                            <div class="form-text">Ex: ATIVA, BAIXADA (separadas por vírgula)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Abertura — últimos X dias (opcional)</label>
+                            <input type="number" class="form-control" id="cdd_abertura_dias" placeholder="Ex: 30" min="0" />
+                            <div class="form-text">Deixe vazio para não filtrar por data de abertura</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-5">
+                        <div class="col-12">
+                            <label class="form-label d-block">Filtros adicionais (API <code>mais_filtros</code>)</label>
+                            <div class="d-flex flex-wrap gap-4">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_com_telefone" checked>
+                                    <label class="form-check-label" for="cdd_com_telefone">Somente com telefone</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_com_email">
+                                    <label class="form-check-label" for="cdd_com_email">Com e-mail</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_somente_matriz">
+                                    <label class="form-check-label" for="cdd_somente_matriz">Somente matriz</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_force_update">
+                                    <label class="form-check-label" for="cdd_force_update">Atualizar contatos já importados</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3 flex-wrap">
+                        <button type="button" class="btn btn-light-primary" onclick="testCasaDosDadosConnection()">
+                            <i class="ki-duotone ki-flash fs-3"></i> Testar chave / saldo
+                        </button>
+                        <button type="button" class="btn btn-light-info" onclick="previewCasaDosDadosSearch()">
+                            <i class="ki-duotone ki-eye fs-3"></i> Preview (5 registros)
+                        </button>
+                    </div>
+                    <span id="cdd_connection_status" class="ms-3"></span>
+                    <div id="cdd_preview_container" class="mt-5" style="display:none;"></div>
+                </div>
+
+                <div class="separator my-10"></div>
+                <div class="mb-10">
+                    <h4 class="mb-5">3. Sincronização automática</h4>
+                    <div class="mb-5">
+                        <label class="form-label">Frequência</label>
+                        <select class="form-select" id="cdd_sync_frequency">
+                            <option value="manual">Manual</option>
+                            <option value="daily" selected>Diária</option>
+                            <option value="weekly">Semanal</option>
+                            <option value="hourly">A cada hora</option>
+                        </select>
+                        <div class="form-text">Combine com campanha em <strong>modo contínuo</strong> para novos CNPJs entrarem na lista após cada sync.</div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-10">
+                    <button type="button" class="btn btn-light me-3" onclick="window.history.back()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn_save_cdd" onclick="saveCasaDosDadosSource()">
+                        <span class="indicator-label">Criar fonte Casa dos Dados</span>
+                        <span class="indicator-progress">Salvando…
+                        <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                    </button>
+                </div>
+            </div>
+            <!-- ========== FIM CASA DOS DADOS ========== -->
             
             <!-- ========== SEÇÃO BANCO DE DADOS ========== -->
             <div id="section_database" style="display:none;">
@@ -441,15 +590,19 @@ document.getElementById('db_type').addEventListener('change', function() {
     const type = this.value;
     const sectionGoogleMaps = document.getElementById('section_google_maps');
     const sectionWooCommerce = document.getElementById('section_woocommerce');
+    const sectionCdd = document.getElementById('section_casa_dos_dados');
     const sectionDatabase = document.getElementById('section_database');
     
     // Esconder todas primeiro
     sectionGoogleMaps.style.display = 'none';
     sectionWooCommerce.style.display = 'none';
+    if (sectionCdd) sectionCdd.style.display = 'none';
     sectionDatabase.style.display = 'none';
     
     if (type === 'google_maps') {
         sectionGoogleMaps.style.display = 'block';
+    } else if (type === 'casa_dos_dados') {
+        if (sectionCdd) sectionCdd.style.display = 'block';
     } else if (type === 'woocommerce') {
         sectionWooCommerce.style.display = 'block';
     } else if (type === 'mysql' || type === 'postgresql') {
@@ -841,6 +994,151 @@ function renderWooCommercePreview(result) {
     }
     
     container.innerHTML = html;
+}
+
+// ========== CASA DOS DADOS ==========
+function buildCddSearchConfig() {
+    const abertura = parseInt(document.getElementById('cdd_abertura_dias')?.value || '0', 10);
+    const cfg = {
+        api_key: document.getElementById('cdd_api_key')?.value?.trim() || '',
+        uf: document.getElementById('cdd_uf')?.value?.trim() || '',
+        municipio: document.getElementById('cdd_municipio')?.value?.trim() || '',
+        cnae_principal: document.getElementById('cdd_cnae')?.value?.trim() || '',
+        busca_texto: document.getElementById('cdd_busca_texto')?.value?.trim() || '',
+        busca_tipo: document.getElementById('cdd_busca_tipo')?.value || 'radical',
+        tipo_resultado: document.getElementById('cdd_tipo_resultado')?.value || 'completo',
+        limite: parseInt(document.getElementById('cdd_limite')?.value || '100', 10),
+        max_pages: parseInt(document.getElementById('cdd_max_pages')?.value || '5', 10),
+        pagina: 1,
+        situacao_cadastral: document.getElementById('cdd_situacao')?.value?.trim() || 'ATIVA',
+        com_telefone: document.getElementById('cdd_com_telefone')?.checked || false,
+        com_email: document.getElementById('cdd_com_email')?.checked || false,
+        somente_matriz: document.getElementById('cdd_somente_matriz')?.checked || false,
+        force_update: document.getElementById('cdd_force_update')?.checked || false,
+    };
+    if (abertura > 0) cfg.data_abertura_ultimos_dias = abertura;
+    return cfg;
+}
+
+function testCasaDosDadosConnection() {
+    const key = document.getElementById('cdd_api_key')?.value?.trim();
+    if (!key) { toastr.warning('Informe a chave de API'); return; }
+    const st = document.getElementById('cdd_connection_status');
+    if (st) st.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    fetch('/api/external-sources/test-casa-dos-dados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ api_key: key })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (st) st.innerHTML = '';
+        if (data.success) {
+            toastr.success(data.message || 'OK');
+            if (st) st.innerHTML = '<span class="badge badge-light-success">Conectado</span>';
+        } else {
+            toastr.error(data.message || 'Falha');
+            if (st) st.innerHTML = '<span class="badge badge-light-danger">Erro</span>';
+        }
+    })
+    .catch(() => { if (st) st.innerHTML = ''; toastr.error('Rede'); });
+}
+
+function previewCasaDosDadosSearch() {
+    const cfg = buildCddSearchConfig();
+    if (!cfg.api_key) { toastr.warning('Informe a chave de API'); return; }
+    const container = document.getElementById('cdd_preview_container');
+    if (container) {
+        container.style.display = 'block';
+        container.innerHTML = '<div class="text-muted">Buscando…</div>';
+    }
+    fetch('/api/external-sources/preview-casa-dos-dados', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ search_config: cfg, limit: 5 })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            if (container) container.innerHTML = '<div class="alert alert-danger">' + escapeHtml(data.message || 'Erro') + '</div>';
+            toastr.error(data.message || 'Preview falhou');
+            return;
+        }
+        renderCddPreview(data);
+        toastr.success('Total na API: ' + (data.total ?? 0));
+    })
+    .catch(err => {
+        if (container) container.innerHTML = '<div class="alert alert-danger">Rede</div>';
+        toastr.error('Erro de rede');
+    });
+}
+
+function renderCddPreview(data) {
+    const container = document.getElementById('cdd_preview_container');
+    if (!container) return;
+    const rows = data.results || [];
+    if (!rows.length) {
+        container.innerHTML = '<div class="alert alert-warning">Nenhum resultado com os filtros atuais.</div>';
+        container.style.display = 'block';
+        return;
+    }
+    let html = '<div class="card card-flush bg-light"><div class="card-header"><h5 class="card-title">Preview: ' + rows.length + ' empresa(s)</h5></div>';
+    html += '<div class="card-body p-0 table-responsive"><table class="table table-sm table-row-bordered mb-0"><thead><tr class="text-muted fw-bold">';
+    html += '<th>CNPJ</th><th>Nome</th><th>Telefone</th><th>Email</th><th>Endereço</th></tr></thead><tbody>';
+    rows.forEach(r => {
+        html += '<tr><td class="font-monospace">' + escapeHtml(r.cnpj || '') + '</td>';
+        html += '<td>' + escapeHtml(r.name || '') + '</td>';
+        html += '<td><code>' + escapeHtml(r.phone || '-') + '</code></td>';
+        html += '<td class="fs-7">' + escapeHtml(r.email || '-') + '</td>';
+        html += '<td class="text-muted fs-7">' + escapeHtml((r.address || '').substring(0, 80)) + '</td></tr>';
+    });
+    html += '</tbody></table></div><div class="card-footer text-muted fs-7">Total informado pela API: ' + (data.total ?? '-') + '</div></div>';
+    container.innerHTML = html;
+    container.style.display = 'block';
+}
+
+function saveCasaDosDadosSource() {
+    const name = document.querySelector('[name="name"]')?.value?.trim();
+    const cfg = buildCddSearchConfig();
+    if (!name) { toastr.warning('Informe o nome da fonte'); return; }
+    if (!cfg.api_key) { toastr.warning('Informe a chave de API'); return; }
+    const hasFilter = (cfg.uf || cfg.municipio || cfg.cnae_principal || cfg.busca_texto);
+    if (!hasFilter) {
+        toastr.warning('Preencha ao menos UF, município, CNAE ou busca textual.');
+        return;
+    }
+    const btn = document.getElementById('btn_save_cdd');
+    btn.setAttribute('data-kt-indicator', 'on');
+    btn.disabled = true;
+    const payload = {
+        name,
+        type: 'casa_dos_dados',
+        provider: 'casadosdados_v5',
+        search_config: cfg,
+        sync_frequency: document.getElementById('cdd_sync_frequency')?.value || 'daily',
+        status: 'active'
+    };
+    fetch('/external-sources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(result => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        if (result.success) {
+            toastr.success('Fonte Casa dos Dados criada!');
+            setTimeout(() => { window.location.href = '/external-sources'; }, 900);
+        } else {
+            toastr.error(result.message || 'Erro ao criar');
+        }
+    })
+    .catch(err => {
+        btn.removeAttribute('data-kt-indicator');
+        btn.disabled = false;
+        toastr.error('Rede: ' + err.message);
+    });
 }
 
 // Salvar fonte WooCommerce

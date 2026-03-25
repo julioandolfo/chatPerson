@@ -357,15 +357,83 @@ ob_start();
                     </div>
 
                     <div class="row g-3 mb-5">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Situação cadastral</label>
                             <input type="text" class="form-control" id="cdd_situacao" value="ATIVA" placeholder="ATIVA" />
                             <div class="form-text">Ex: ATIVA, BAIXADA (separadas por vírgula)</div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Abertura — últimos X dias (opcional)</label>
-                            <input type="number" class="form-control" id="cdd_abertura_dias" placeholder="Ex: 30" min="0" />
-                            <div class="form-text">Deixe vazio para não filtrar por data de abertura</div>
+                        <div class="col-md-4">
+                            <label class="form-label">Empresas abertas nos últimos X dias</label>
+                            <div class="input-group">
+                                <select class="form-select" id="cdd_abertura_preset" style="max-width:140px;">
+                                    <option value="">Personalizado</option>
+                                    <option value="7">7 dias</option>
+                                    <option value="30">30 dias</option>
+                                    <option value="90">90 dias</option>
+                                    <option value="180">180 dias</option>
+                                    <option value="365">365 dias</option>
+                                </select>
+                                <input type="number" class="form-control" id="cdd_abertura_dias" placeholder="Ex: 30" min="0" title="Recém-abertas: use com UF/município/CNAE" />
+                            </div>
+                            <div class="form-text">Atalho para “recém criadas” (API <code>data_abertura.ultimos_dias</code>)</div>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Abertura de (data)</label>
+                            <input type="date" class="form-control" id="cdd_abertura_inicio" />
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Abertura até (data)</label>
+                            <input type="date" class="form-control" id="cdd_abertura_fim" />
+                        </div>
+                    </div>
+
+                    <div class="card card-bordered bg-light mb-5">
+                        <div class="card-body py-5">
+                            <h5 class="mb-4">Filtros avançados (MEI, Simples, porte, capital…)</h5>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">MEI</label>
+                                    <select class="form-select" id="cdd_mei">
+                                        <option value="">Não filtrar por MEI</option>
+                                        <option value="optante">Somente optantes pelo MEI</option>
+                                        <option value="excluir">Excluir optantes pelo MEI</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Simples Nacional</label>
+                                    <select class="form-select" id="cdd_simples">
+                                        <option value="">Não filtrar por Simples</option>
+                                        <option value="optante">Somente optantes pelo Simples</option>
+                                        <option value="excluir">Excluir optantes pelo Simples</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Porte da empresa</label>
+                                    <div class="d-flex flex-wrap gap-3 mt-2">
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" id="cdd_porte_01" value="01"><label class="form-check-label" for="cdd_porte_01">Micro (01)</label></div>
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" id="cdd_porte_03" value="03"><label class="form-check-label" for="cdd_porte_03">EPP (03)</label></div>
+                                        <div class="form-check"><input class="form-check-input" type="checkbox" id="cdd_porte_05" value="05"><label class="form-check-label" for="cdd_porte_05">Demais (05)</label></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mb-3">
+                                <div class="col-md-3">
+                                    <label class="form-label">Capital social mín. (R$)</label>
+                                    <input type="number" class="form-control" id="cdd_capital_min" min="0" step="1" placeholder="Opcional" />
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Capital social máx. (R$)</label>
+                                    <input type="number" class="form-control" id="cdd_capital_max" min="0" step="1" placeholder="Opcional" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Código natureza jurídica</label>
+                                    <input type="text" class="form-control" id="cdd_natureza" placeholder="Ex: 2062, 2305 (separados por vírgula)" />
+                                </div>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="cdd_incluir_cnae_sec" />
+                                <label class="form-check-label" for="cdd_incluir_cnae_sec">Incluir CNAE secundário na busca</label>
+                            </div>
                         </div>
                     </div>
 
@@ -384,6 +452,22 @@ ob_start();
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="cdd_somente_matriz">
                                     <label class="form-check-label" for="cdd_somente_matriz">Somente matriz</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_somente_filial">
+                                    <label class="form-check-label" for="cdd_somente_filial">Somente filial</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_somente_celular">
+                                    <label class="form-check-label" for="cdd_somente_celular">Somente celular</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_somente_fixo">
+                                    <label class="form-check-label" for="cdd_somente_fixo">Somente telefone fixo</label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="cdd_excluir_email_contab">
+                                    <label class="form-check-label" for="cdd_excluir_email_contab">Excluir e-mail de contabilidade</label>
                                 </div>
                                 <div class="form-check form-switch">
                                     <input class="form-check-input" type="checkbox" id="cdd_force_update">
@@ -999,6 +1083,15 @@ function renderWooCommercePreview(result) {
 // ========== CASA DOS DADOS ==========
 function buildCddSearchConfig() {
     const abertura = parseInt(document.getElementById('cdd_abertura_dias')?.value || '0', 10);
+    const mei = document.getElementById('cdd_mei')?.value || '';
+    const simples = document.getElementById('cdd_simples')?.value || '';
+    const portes = [];
+    ['cdd_porte_01', 'cdd_porte_03', 'cdd_porte_05'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el?.checked) portes.push(el.value);
+    });
+    const capMin = document.getElementById('cdd_capital_min')?.value?.trim();
+    const capMax = document.getElementById('cdd_capital_max')?.value?.trim();
     const cfg = {
         api_key: document.getElementById('cdd_api_key')?.value?.trim() || '',
         uf: document.getElementById('cdd_uf')?.value?.trim() || '',
@@ -1014,11 +1107,41 @@ function buildCddSearchConfig() {
         com_telefone: document.getElementById('cdd_com_telefone')?.checked || false,
         com_email: document.getElementById('cdd_com_email')?.checked || false,
         somente_matriz: document.getElementById('cdd_somente_matriz')?.checked || false,
+        somente_filial: document.getElementById('cdd_somente_filial')?.checked || false,
+        somente_celular: document.getElementById('cdd_somente_celular')?.checked || false,
+        somente_fixo: document.getElementById('cdd_somente_fixo')?.checked || false,
+        excluir_email_contab: document.getElementById('cdd_excluir_email_contab')?.checked || false,
         force_update: document.getElementById('cdd_force_update')?.checked || false,
+        incluir_cnae_secundaria: document.getElementById('cdd_incluir_cnae_sec')?.checked || false,
+        natureza_juridica: document.getElementById('cdd_natureza')?.value?.trim() || '',
+        mei_optante: mei === 'optante',
+        mei_excluir_optante: mei === 'excluir',
+        simples_optante: simples === 'optante',
+        simples_excluir_optante: simples === 'excluir',
     };
-    if (abertura > 0) cfg.data_abertura_ultimos_dias = abertura;
+    if (portes.length) cfg.porte_codigos = portes;
+    if (capMin !== '') cfg.capital_min = parseInt(capMin, 10);
+    if (capMax !== '') cfg.capital_max = parseInt(capMax, 10);
+    if (abertura > 0) {
+        cfg.data_abertura_ultimos_dias = abertura;
+    } else {
+        const di = document.getElementById('cdd_abertura_inicio')?.value || '';
+        const df = document.getElementById('cdd_abertura_fim')?.value || '';
+        if (di) cfg.data_abertura_inicio = di;
+        if (df) cfg.data_abertura_fim = df;
+    }
     return cfg;
 }
+
+(function () {
+    const preset = document.getElementById('cdd_abertura_preset');
+    const dias = document.getElementById('cdd_abertura_dias');
+    if (preset && dias) {
+        preset.addEventListener('change', function () {
+            if (this.value) dias.value = this.value;
+        });
+    }
+})();
 
 function testCasaDosDadosConnection() {
     const key = document.getElementById('cdd_api_key')?.value?.trim();

@@ -263,6 +263,80 @@ ob_start();
                         <label class="form-label">Abertura últimos dias</label>
                         <input type="number" class="form-control" name="cdd_abertura_dias" value="<?= !empty($searchConfig['data_abertura_ultimos_dias']) ? (int)$searchConfig['data_abertura_ultimos_dias'] : '' ?>" min="0" placeholder="opcional" />
                     </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Abertura de (data)</label>
+                        <input type="date" class="form-control" name="cdd_abertura_inicio" value="<?= htmlspecialchars($searchConfig['data_abertura_inicio'] ?? '') ?>" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Abertura até (data)</label>
+                        <input type="date" class="form-control" name="cdd_abertura_fim" value="<?= htmlspecialchars($searchConfig['data_abertura_fim'] ?? '') ?>" />
+                    </div>
+                </div>
+                <?php
+                $cddMei = '';
+                if (!empty($searchConfig['mei_optante'])) {
+                    $cddMei = 'optante';
+                } elseif (!empty($searchConfig['mei_excluir_optante'])) {
+                    $cddMei = 'excluir';
+                }
+                $cddSimples = '';
+                if (!empty($searchConfig['simples_optante'])) {
+                    $cddSimples = 'optante';
+                } elseif (!empty($searchConfig['simples_excluir_optante'])) {
+                    $cddSimples = 'excluir';
+                }
+                $porteArr = $searchConfig['porte_codigos'] ?? [];
+                if (is_string($porteArr)) {
+                    $porteArr = preg_split('/[\s,]+/', $porteArr, -1, PREG_SPLIT_NO_EMPTY);
+                }
+                $nj = $searchConfig['natureza_juridica'] ?? '';
+                if (is_array($nj)) {
+                    $nj = implode(', ', $nj);
+                }
+                ?>
+                <div class="row g-5 mt-3">
+                    <div class="col-md-4">
+                        <label class="form-label">MEI</label>
+                        <select class="form-select" name="cdd_mei">
+                            <option value="" <?= $cddMei === '' ? 'selected' : '' ?>>Não filtrar</option>
+                            <option value="optante" <?= $cddMei === 'optante' ? 'selected' : '' ?>>Somente optantes MEI</option>
+                            <option value="excluir" <?= $cddMei === 'excluir' ? 'selected' : '' ?>>Excluir optantes MEI</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Simples Nacional</label>
+                        <select class="form-select" name="cdd_simples">
+                            <option value="" <?= $cddSimples === '' ? 'selected' : '' ?>>Não filtrar</option>
+                            <option value="optante" <?= $cddSimples === 'optante' ? 'selected' : '' ?>>Somente optantes Simples</option>
+                            <option value="excluir" <?= $cddSimples === 'excluir' ? 'selected' : '' ?>>Excluir optantes Simples</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Porte</label>
+                        <div class="d-flex flex-wrap gap-3 mt-2">
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="cdd_porte[]" value="01" <?= in_array('01', $porteArr, true) ? 'checked' : '' ?> id="ep01"><label class="form-check-label" for="ep01">Micro 01</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="cdd_porte[]" value="03" <?= in_array('03', $porteArr, true) ? 'checked' : '' ?> id="ep03"><label class="form-check-label" for="ep03">EPP 03</label></div>
+                            <div class="form-check"><input class="form-check-input" type="checkbox" name="cdd_porte[]" value="05" <?= in_array('05', $porteArr, true) ? 'checked' : '' ?> id="ep05"><label class="form-check-label" for="ep05">Demais 05</label></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row g-5 mt-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Capital mín. (R$)</label>
+                        <input type="number" class="form-control" name="cdd_capital_min" value="<?= htmlspecialchars((string)($searchConfig['capital_min'] ?? '')) ?>" min="0" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Capital máx. (R$)</label>
+                        <input type="number" class="form-control" name="cdd_capital_max" value="<?= htmlspecialchars((string)($searchConfig['capital_max'] ?? '')) ?>" min="0" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Natureza jurídica (códigos)</label>
+                        <input type="text" class="form-control" name="cdd_natureza" value="<?= htmlspecialchars((string)$nj) ?>" />
+                    </div>
+                </div>
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" name="cdd_incluir_cnae_sec" value="1" id="cdd_incluir_cnae_sec" <?= !empty($searchConfig['incluir_cnae_secundaria']) ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="cdd_incluir_cnae_sec">Incluir CNAE secundário na busca</label>
                 </div>
                 <div class="d-flex flex-wrap gap-4 mt-5">
                     <div class="form-check form-switch">
@@ -276,6 +350,22 @@ ob_start();
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="cdd_somente_matriz" value="1" <?= !empty($searchConfig['somente_matriz']) ? 'checked' : '' ?>>
                         <label class="form-check-label">Somente matriz</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_somente_filial" value="1" <?= !empty($searchConfig['somente_filial']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Somente filial</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_somente_celular" value="1" <?= !empty($searchConfig['somente_celular']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Somente celular</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_somente_fixo" value="1" <?= !empty($searchConfig['somente_fixo']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Somente fixo</label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" name="cdd_excluir_email_contab" value="1" <?= !empty($searchConfig['excluir_email_contab']) ? 'checked' : '' ?>>
+                        <label class="form-check-label">Excluir e-mail contab.</label>
                     </div>
                     <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" name="cdd_force_update" value="1" <?= !empty($searchConfig['force_update']) ? 'checked' : '' ?>>
@@ -368,6 +458,57 @@ ob_start();
 </div>
 
 <script>
+/** Monta search_config Casa dos Dados a partir do FormData (mesma lógica que create.php buildCddSearchConfig). */
+function buildCddSearchConfigFromForm(formData, forPreview) {
+    const ab = parseInt(formData.get('cdd_abertura_dias') || '0', 10);
+    const mei = formData.get('cdd_mei') || '';
+    const simples = formData.get('cdd_simples') || '';
+    const portes = formData.getAll('cdd_porte[]').filter(Boolean);
+    const capMin = (formData.get('cdd_capital_min') || '').toString().trim();
+    const capMax = (formData.get('cdd_capital_max') || '').toString().trim();
+    const limRaw = parseInt(formData.get('cdd_limite'), 10);
+    const maxPRaw = parseInt(formData.get('cdd_max_pages'), 10);
+    const cfg = {
+        api_key: formData.get('cdd_api_key') || '',
+        uf: formData.get('cdd_uf') || '',
+        municipio: formData.get('cdd_municipio') || '',
+        cnae_principal: formData.get('cdd_cnae') || '',
+        busca_texto: formData.get('cdd_busca_texto') || '',
+        busca_tipo: formData.get('cdd_busca_tipo') || 'radical',
+        tipo_resultado: formData.get('cdd_tipo_resultado') || 'completo',
+        limite: forPreview ? 5 : (Number.isFinite(limRaw) ? limRaw : 100),
+        max_pages: forPreview ? 1 : (Number.isFinite(maxPRaw) ? maxPRaw : 5),
+        pagina: 1,
+        situacao_cadastral: formData.get('cdd_situacao') || 'ATIVA',
+        com_telefone: formData.get('cdd_com_telefone') === '1',
+        com_email: formData.get('cdd_com_email') === '1',
+        somente_matriz: formData.get('cdd_somente_matriz') === '1',
+        somente_filial: formData.get('cdd_somente_filial') === '1',
+        somente_celular: formData.get('cdd_somente_celular') === '1',
+        somente_fixo: formData.get('cdd_somente_fixo') === '1',
+        excluir_email_contab: formData.get('cdd_excluir_email_contab') === '1',
+        force_update: formData.get('cdd_force_update') === '1',
+        incluir_cnae_secundaria: formData.get('cdd_incluir_cnae_sec') === '1',
+        natureza_juridica: formData.get('cdd_natureza') || '',
+        mei_optante: mei === 'optante',
+        mei_excluir_optante: mei === 'excluir',
+        simples_optante: simples === 'optante',
+        simples_excluir_optante: simples === 'excluir',
+    };
+    if (portes.length) cfg.porte_codigos = portes;
+    if (capMin !== '') cfg.capital_min = parseInt(capMin, 10);
+    if (capMax !== '') cfg.capital_max = parseInt(capMax, 10);
+    if (ab > 0) {
+        cfg.data_abertura_ultimos_dias = ab;
+    } else {
+        const di = formData.get('cdd_abertura_inicio') || '';
+        const df = formData.get('cdd_abertura_fim') || '';
+        if (di) cfg.data_abertura_inicio = di;
+        if (df) cfg.data_abertura_fim = df;
+    }
+    return cfg;
+}
+
 document.getElementById('edit_source_form').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -408,26 +549,8 @@ document.getElementById('edit_source_form').addEventListener('submit', function(
             min_orders: parseInt(formData.get('min_orders')) || 0
         };
     } else if (type === 'casa_dos_dados') {
-        const ab = parseInt(formData.get('cdd_abertura_dias') || '0', 10);
         data.provider = 'casadosdados_v5';
-        data.search_config = {
-            api_key: formData.get('cdd_api_key') || '',
-            uf: formData.get('cdd_uf') || '',
-            municipio: formData.get('cdd_municipio') || '',
-            cnae_principal: formData.get('cdd_cnae') || '',
-            busca_texto: formData.get('cdd_busca_texto') || '',
-            busca_tipo: formData.get('cdd_busca_tipo') || 'radical',
-            tipo_resultado: formData.get('cdd_tipo_resultado') || 'completo',
-            limite: parseInt(formData.get('cdd_limite')) || 100,
-            max_pages: parseInt(formData.get('cdd_max_pages')) || 5,
-            pagina: 1,
-            situacao_cadastral: formData.get('cdd_situacao') || 'ATIVA',
-            com_telefone: formData.get('cdd_com_telefone') === '1',
-            com_email: formData.get('cdd_com_email') === '1',
-            somente_matriz: formData.get('cdd_somente_matriz') === '1',
-            force_update: formData.get('cdd_force_update') === '1',
-        };
-        if (ab > 0) data.search_config.data_abertura_ultimos_dias = ab;
+        data.search_config = buildCddSearchConfigFromForm(formData, false);
     } else {
         data.connection_config = {
             host: formData.get('host'),
@@ -508,23 +631,7 @@ function testWooCommerceConnection() {
 function previewCddEdit() {
     const form = document.getElementById('edit_source_form');
     const fd = new FormData(form);
-    const ab = parseInt(fd.get('cdd_abertura_dias') || '0', 10);
-    const cfg = {
-        api_key: fd.get('cdd_api_key') || '',
-        uf: fd.get('cdd_uf') || '',
-        municipio: fd.get('cdd_municipio') || '',
-        cnae_principal: fd.get('cdd_cnae') || '',
-        busca_texto: fd.get('cdd_busca_texto') || '',
-        busca_tipo: fd.get('cdd_busca_tipo') || 'radical',
-        tipo_resultado: fd.get('cdd_tipo_resultado') || 'completo',
-        limite: 5,
-        pagina: 1,
-        situacao_cadastral: fd.get('cdd_situacao') || 'ATIVA',
-        com_telefone: fd.get('cdd_com_telefone') === '1',
-        com_email: fd.get('cdd_com_email') === '1',
-        somente_matriz: fd.get('cdd_somente_matriz') === '1',
-    };
-    if (ab > 0) cfg.data_abertura_ultimos_dias = ab;
+    const cfg = buildCddSearchConfigFromForm(fd, true);
     const wrap = document.getElementById('cdd_edit_preview');
     if (!cfg.api_key) { if (typeof toastr !== 'undefined') toastr.warning('Chave API obrigatória'); return; }
     if (wrap) { wrap.style.display = 'block'; wrap.textContent = 'Carregando…'; }

@@ -888,7 +888,7 @@ PROMPT;
                 return self::executeFollowupTool($tool, $arguments, $conversationId, $context);
             
             case 'woocommerce':
-                return self::executeWooCommerceTool($tool, $arguments, $config);
+                return self::executeWooCommerceTool($tool, $arguments, $config, $context);
             
             case 'database':
                 return self::executeDatabaseTool($tool, $arguments, $config);
@@ -1401,22 +1401,17 @@ PROMPT;
     /**
      * Executar WooCommerce Tools (integração com WooCommerce REST API)
      */
-    private static function executeWooCommerceTool(array $tool, array $arguments, array $config): array
+    private static function executeWooCommerceTool(array $tool, array $arguments, array $config, array $context = []): array
     {
         $invocationName = self::normalizeWooCommerceFunctionName(self::getToolInvocationFunctionName($tool));
         $functionName = self::canonicalizeWooCommerceFunctionName($invocationName);
-        // UI das tools usa "url"; integração nativa usa "woocommerce_url"; fontes externas podem usar "store_url"
         $wcUrl = $config['woocommerce_url'] ?? $config['url'] ?? $config['store_url'] ?? null;
         $consumerKey = $config['consumer_key'] ?? null;
         $consumerSecret = $config['consumer_secret'] ?? null;
 
         $trimStr = static function ($v) {
-            if ($v === null) {
-                return null;
-            }
-            if (!is_string($v)) {
-                return $v;
-            }
+            if ($v === null) return null;
+            if (!is_string($v)) return $v;
             $t = trim($v);
             return $t === '' ? null : $t;
         };
@@ -1427,166 +1422,298 @@ PROMPT;
         if (!$wcUrl || !$consumerKey || !$consumerSecret) {
             return ['error' => 'Configurações do WooCommerce não completas (URL, Consumer Key, Consumer Secret)'];
         }
-        
-        // Função auxiliar para fazer requisições à API do WooCommerce
-        $makeWCRequest = function($endpoint, $method = 'GET', $data = []) use ($wcUrl, $consumerKey, $consumerSecret) {
+
+        $makeWCRequest = function(string $endpoint, string $method = 'GET', array $data = []) use ($wcUrl, $consumerKey, $consumerSecret): array {
             $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/' . ltrim($endpoint, '/');
-            
-            // Autenticação OAuth 1.0 ou Basic Auth
             $ch = curl_init($url);
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CUSTOMREQUEST => $method,
-                CURLOPT_USERPWD => $consumerKey . ':' . $consumerSecret,
-                CURLOPT_TIMEOUT => 30,
-                CURLOPT_CONNECTTIMEOUT => 10
+                CURLOPT_CUSTOMREQUEST  => $method,
+                CURLOPT_USERPWD        => $consumerKey . ':' . $consumerSecret,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_CONNECTTIMEOUT => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
             ]);
-            
             if (in_array($method, ['POST', 'PUT', 'PATCH']) && !empty($data)) {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
                 curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
             }
-            
             $response = curl_exec($ch);
             $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             $error = curl_error($ch);
             curl_close($ch);
-            
             if ($error) {
                 throw new \Exception('Erro ao chamar WooCommerce API: ' . $error);
             }
-            
             $responseData = json_decode($response, true);
             if (json_last_error() !== JSON_ERROR_NONE) {
                 throw new \Exception('Resposta inválida da API WooCommerce');
             }
-            
             return [
-                'success' => $httpCode >= 200 && $httpCode < 300,
+                'success'   => $httpCode >= 200 && $httpCode < 300,
                 'http_code' => $httpCode,
-                'data' => $responseData
+                'data'      => $responseData,
             ];
         };
-        
+
+        // ─── Dados do contato da conversa (usados para validação de posse) ───
+        $contactEmail = mb_strtolower(trim((string)($context['contact']['email'] ?? '')));
+        $contactPhone = preg_replace('/\D/', '', trim((string)($context['contact']['phone'] ?? '')));
+        $contactName  = mb_strtolower(trim((string)($context['contact']['name'] ?? '')));
+
+        // ─── Helper: resolve a referência de busca que a IA ou o cliente forneceu ───
+        $resolveSearchRef = function () use ($arguments, $contactEmail, $contactPhone, $contactName): ?string {
+            // 1. Argumento explícito da IA (email, telefone, nome, search)
+            foreach (['email', 'search', 'phone', 'telefone', 'nome', 'name'] as $key) {
+                $v = trim((string)($arguments[$key] ?? ''));
+                if ($v !== '') return $v;
+            }
+            // 2. Fallback: dados do contato da conversa atual
+            if ($contactEmail !== '') return $contactEmail;
+            if ($contactPhone !== '') return $contactPhone;
+            if ($contactName  !== '') return $contactName;
+            return null;
+        };
+
+        // ─── Helper: o pedido pertence ao contato da conversa? ───
+        $orderBelongsToContact = function (array $order) use ($contactEmail, $contactPhone, $contactName): bool {
+            // Se não temos dados do contato, não podemos validar — libera
+            if ($contactEmail === '' && $contactPhone === '' && $contactName === '') {
+                return true;
+            }
+            $bEmail = mb_strtolower(trim($order['billing']['email'] ?? ''));
+            $bPhone = preg_replace('/\D/', '', trim($order['billing']['phone'] ?? $order['billing']['cellphone'] ?? ''));
+            $bName  = mb_strtolower(trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? '')));
+
+            if ($contactEmail !== '' && $bEmail === $contactEmail) return true;
+            if ($contactPhone !== '' && strlen($contactPhone) >= 8 && str_contains($bPhone, substr($contactPhone, -8))) return true;
+            if ($contactName  !== '' && strlen($contactName) >= 4 && str_contains($bName, $contactName)) return true;
+            return false;
+        };
+
         try {
             switch ($functionName) {
+
+                // ══════════════ PEDIDO ÚNICO POR ID ══════════════
                 case 'buscar_pedido_woocommerce':
                     $orderId = $arguments['order_id'] ?? null;
-                    
                     if (!$orderId) {
-                        return ['error' => 'ID do pedido não fornecido'];
+                        return ['error' => 'Informe o ID (número) do pedido para consultar.'];
                     }
-                    
                     $result = $makeWCRequest("orders/{$orderId}");
-                    return [
-                        'success' => $result['success'],
-                        'order' => $result['data']
-                    ];
+                    if (!$result['success']) {
+                        return ['error' => 'Pedido #' . $orderId . ' não encontrado.', 'http_code' => $result['http_code']];
+                    }
+                    $raw = $result['data'];
+                    if (!$orderBelongsToContact($raw)) {
+                        return ['error' => 'Este pedido não pertence ao contato desta conversa. Por segurança, não é possível exibir dados de outro cliente.'];
+                    }
+                    return ['success' => true, 'order' => self::sanitizeWCOrder($raw)];
 
+                // ══════════════ LISTAR PEDIDOS (exige referência) ══════════════
                 case 'buscar_pedidos_woocommerce':
                 case 'listar_pedidos_cliente_woocommerce':
                     $q = [];
+
+                    // Customer ID explícito
                     $customer = $arguments['customer'] ?? $arguments['customer_id'] ?? null;
                     if ($customer !== null && $customer !== '') {
                         $q['customer'] = (int)$customer;
                     }
-                    foreach (['status', 'search', 'after', 'before', 'product'] as $k) {
+
+                    // Filtros opcionais
+                    foreach (['status', 'after', 'before', 'product'] as $k) {
                         if (!empty($arguments[$k])) {
                             $q[$k] = $arguments[$k];
                         }
                     }
-                    $perPage = min(max((int)($arguments['per_page'] ?? 20), 1), 100);
-                    $page = max((int)($arguments['page'] ?? 1), 1);
+
+                    // Referência obrigatória (email, telefone, nome, ou customer_id)
+                    if (empty($q['customer'])) {
+                        $ref = $resolveSearchRef();
+                        if ($ref === null) {
+                            return [
+                                'error' => 'Para buscar pedidos, informe ao menos um dado de identificação do cliente: email, telefone, nome completo ou ID do pedido. Sem essa referência, a busca não pode ser realizada por segurança.',
+                            ];
+                        }
+                        $q['search'] = $ref;
+                    }
+
+                    $perPage = min(max((int)($arguments['per_page'] ?? 5), 1), 10);
                     $q['per_page'] = $perPage;
-                    $q['page'] = $page;
-                    $query = http_build_query($q);
-                    $result = $makeWCRequest('orders?' . $query);
-                    $data = $result['data'] ?? [];
+                    $q['page']     = max((int)($arguments['page'] ?? 1), 1);
+                    $q['orderby']  = 'date';
+                    $q['order']    = 'desc';
+
+                    $result = $makeWCRequest('orders?' . http_build_query($q));
+                    $rawOrders = is_array($result['data'] ?? null) ? $result['data'] : [];
+
+                    // Filtrar apenas pedidos que pertencem ao contato
+                    $filteredOrders = array_values(array_filter($rawOrders, $orderBelongsToContact));
+
+                    if (empty($filteredOrders)) {
+                        return [
+                            'success' => true,
+                            'orders'  => [],
+                            'message' => 'Nenhum pedido encontrado para este cliente.',
+                            'filter_used' => $q['search'] ?? $q['customer'] ?? null,
+                        ];
+                    }
+
                     return [
-                        'success' => $result['success'],
-                        'orders' => is_array($data) ? $data : [],
-                        'http_code' => $result['http_code'] ?? null
+                        'success'      => true,
+                        'orders'       => array_map([self::class, 'sanitizeWCOrder'], $filteredOrders),
+                        'total_found'  => count($filteredOrders),
+                        'filter_used'  => $q['search'] ?? $q['customer'] ?? null,
                     ];
-                
+
+                // ══════════════ PRODUTO ══════════════
                 case 'buscar_produto_woocommerce':
                     $productId = $arguments['product_id'] ?? null;
-                    $sku = $arguments['sku'] ?? null;
-                    $search = $arguments['search'] ?? null;
-                    $limit = min((int)($arguments['limit'] ?? 10), 100);
-                    
+                    $sku       = $arguments['sku'] ?? null;
+                    $search    = $arguments['search'] ?? null;
+                    $limit     = min((int)($arguments['limit'] ?? 5), 20);
+
                     if ($productId) {
                         $result = $makeWCRequest("products/{$productId}");
-                        return [
-                            'success' => $result['success'],
-                            'product' => $result['data']
-                        ];
+                        return ['success' => $result['success'], 'product' => self::sanitizeWCProduct($result['data'])];
                     } elseif ($sku) {
-                        $result = $makeWCRequest("products?sku={$sku}&per_page={$limit}");
-                        return [
-                            'success' => $result['success'],
-                            'products' => $result['data'] ?? []
-                        ];
+                        $result = $makeWCRequest("products?sku=" . urlencode($sku) . "&per_page={$limit}");
+                        return ['success' => $result['success'], 'products' => array_map([self::class, 'sanitizeWCProduct'], $result['data'] ?? [])];
                     } elseif ($search) {
-                        $result = $makeWCRequest("products?search={$search}&per_page={$limit}");
-                        return [
-                            'success' => $result['success'],
-                            'products' => $result['data'] ?? []
-                        ];
+                        $result = $makeWCRequest("products?search=" . urlencode($search) . "&per_page={$limit}");
+                        return ['success' => $result['success'], 'products' => array_map([self::class, 'sanitizeWCProduct'], $result['data'] ?? [])];
                     } else {
-                        return ['error' => 'Forneça product_id, sku ou search'];
+                        return ['error' => 'Forneça product_id, sku ou termo de busca do produto.'];
                     }
-                
+
+                // ══════════════ CRIAR PEDIDO ══════════════
                 case 'criar_pedido_woocommerce':
                     $lineItems = $arguments['line_items'] ?? [];
-                    $billing = $arguments['billing'] ?? [];
-                    $shipping = $arguments['shipping'] ?? [];
-                    $paymentMethod = $arguments['payment_method'] ?? 'bacs';
-                    $status = $arguments['status'] ?? 'pending';
-                    
                     if (empty($lineItems)) {
-                        return ['error' => 'Itens do pedido não fornecidos'];
+                        return ['error' => 'Itens do pedido não fornecidos.'];
                     }
-                    
                     $orderData = [
-                        'payment_method' => $paymentMethod,
-                        'payment_method_title' => $arguments['payment_method_title'] ?? 'Pagamento direto',
-                        'status' => $status,
-                        'line_items' => $lineItems,
-                        'billing' => $billing,
-                        'shipping' => $shipping
+                        'payment_method'       => $arguments['payment_method'] ?? 'bacs',
+                        'payment_method_title'  => $arguments['payment_method_title'] ?? 'Pagamento direto',
+                        'status'               => $arguments['status'] ?? 'pending',
+                        'line_items'           => $lineItems,
+                        'billing'              => $arguments['billing'] ?? [],
+                        'shipping'             => $arguments['shipping'] ?? [],
                     ];
-                    
                     $result = $makeWCRequest('orders', 'POST', $orderData);
-                    return [
-                        'success' => $result['success'],
-                        'order' => $result['data']
-                    ];
-                
+                    return ['success' => $result['success'], 'order' => self::sanitizeWCOrder($result['data'])];
+
+                // ══════════════ ATUALIZAR STATUS ══════════════
                 case 'atualizar_status_pedido':
                     $orderId = $arguments['order_id'] ?? null;
-                    $status = $arguments['status'] ?? null;
-                    
+                    $status  = $arguments['status'] ?? null;
                     if (!$orderId || !$status) {
-                        return ['error' => 'ID do pedido e novo status são obrigatórios'];
+                        return ['error' => 'ID do pedido e novo status são obrigatórios.'];
                     }
-                    
                     $validStatuses = ['pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed'];
                     if (!in_array($status, $validStatuses)) {
                         return ['error' => 'Status inválido. Use: ' . implode(', ', $validStatuses)];
                     }
-                    
+                    // Validar que o pedido pertence ao contato antes de alterar
+                    $checkResult = $makeWCRequest("orders/{$orderId}");
+                    if ($checkResult['success'] && !$orderBelongsToContact($checkResult['data'])) {
+                        return ['error' => 'Este pedido não pertence ao contato desta conversa. Alteração bloqueada.'];
+                    }
                     $result = $makeWCRequest("orders/{$orderId}", 'PUT', ['status' => $status]);
-                    return [
-                        'success' => $result['success'],
-                        'order' => $result['data']
-                    ];
-                
+                    return ['success' => $result['success'], 'order' => self::sanitizeWCOrder($result['data'])];
+
                 default:
                     return ['error' => 'WooCommerce tool não reconhecida: ' . $invocationName];
             }
         } catch (\Exception $e) {
             return ['error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Limpa resposta de pedido WooCommerce: só campos úteis para o agente, sem dados sensíveis.
+     */
+    private static function sanitizeWCOrder($order): array
+    {
+        if (!is_array($order)) {
+            return [];
+        }
+
+        $items = [];
+        foreach ($order['line_items'] ?? [] as $li) {
+            $items[] = [
+                'name'         => $li['name'] ?? '',
+                'sku'          => $li['sku'] ?? '',
+                'quantity'     => $li['quantity'] ?? 0,
+                'price'        => $li['price'] ?? 0,
+                'total'        => $li['total'] ?? '0',
+                'product_id'   => $li['product_id'] ?? null,
+                'image_url'    => $li['image']['src'] ?? null,
+            ];
+        }
+
+        $shipping = [];
+        foreach ($order['shipping_lines'] ?? [] as $sl) {
+            $shipping[] = [
+                'method'         => $sl['method_title'] ?? '',
+                'total'          => $sl['total'] ?? '0',
+            ];
+        }
+
+        $tracking = $order['shipping_tracking_code'] ?? [];
+
+        return [
+            'id'                  => $order['id'] ?? null,
+            'number'              => $order['number'] ?? null,
+            'status'              => $order['status'] ?? null,
+            'total'               => $order['total'] ?? '0',
+            'currency'            => $order['currency_symbol'] ?? $order['currency'] ?? 'BRL',
+            'payment_method'      => $order['payment_method_title'] ?? $order['payment_method'] ?? '',
+            'date_created'        => $order['date_created'] ?? null,
+            'date_paid'           => $order['date_paid'] ?? null,
+            'date_completed'      => $order['date_completed'] ?? null,
+            'customer_note'       => $order['customer_note'] ?? '',
+            'billing_name'        => trim(($order['billing']['first_name'] ?? '') . ' ' . ($order['billing']['last_name'] ?? '')),
+            'billing_email'       => $order['billing']['email'] ?? '',
+            'billing_phone'       => $order['billing']['phone'] ?? $order['billing']['cellphone'] ?? '',
+            'billing_city'        => $order['billing']['city'] ?? '',
+            'billing_state'       => $order['billing']['state'] ?? '',
+            'shipping_name'       => trim(($order['shipping']['first_name'] ?? '') . ' ' . ($order['shipping']['last_name'] ?? '')),
+            'shipping_city'       => $order['shipping']['city'] ?? '',
+            'shipping_state'      => $order['shipping']['state'] ?? '',
+            'items'               => $items,
+            'shipping_lines'      => $shipping,
+            'shipping_total'      => $order['shipping_total'] ?? '0',
+            'discount_total'      => $order['discount_total'] ?? '0',
+            'tracking'            => !empty($tracking) ? $tracking : null,
+            'needs_payment'       => $order['needs_payment'] ?? false,
+            'payment_url'         => ($order['needs_payment'] ?? false) ? ($order['payment_url'] ?? null) : null,
+        ];
+    }
+
+    /**
+     * Limpa resposta de produto WooCommerce.
+     */
+    private static function sanitizeWCProduct($product): array
+    {
+        if (!is_array($product)) {
+            return [];
+        }
+        return [
+            'id'              => $product['id'] ?? null,
+            'name'            => $product['name'] ?? '',
+            'sku'             => $product['sku'] ?? '',
+            'price'           => $product['price'] ?? '',
+            'regular_price'   => $product['regular_price'] ?? '',
+            'sale_price'      => $product['sale_price'] ?? '',
+            'stock_status'    => $product['stock_status'] ?? '',
+            'stock_quantity'  => $product['stock_quantity'] ?? null,
+            'short_description' => strip_tags($product['short_description'] ?? ''),
+            'permalink'       => $product['permalink'] ?? '',
+            'image_url'       => $product['images'][0]['src'] ?? null,
+            'categories'      => array_map(fn($c) => $c['name'] ?? '', $product['categories'] ?? []),
+        ];
     }
 
     /**

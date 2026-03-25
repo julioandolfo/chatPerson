@@ -353,6 +353,17 @@ class CasaDosDadosProspectService
 
         if (!empty($cfg['data_abertura_ultimos_dias'])) {
             $body['data_abertura'] = ['ultimos_dias' => max(1, (int)$cfg['data_abertura_ultimos_dias'])];
+        } elseif (!empty($cfg['data_abertura_inicio']) || !empty($cfg['data_abertura_fim'])) {
+            $da = [];
+            if (!empty($cfg['data_abertura_inicio'])) {
+                $da['inicio'] = substr((string)$cfg['data_abertura_inicio'], 0, 10);
+            }
+            if (!empty($cfg['data_abertura_fim'])) {
+                $da['fim'] = substr((string)$cfg['data_abertura_fim'], 0, 10);
+            }
+            if ($da !== []) {
+                $body['data_abertura'] = $da;
+            }
         }
 
         if (isset($cfg['capital_min']) || isset($cfg['capital_max'])) {
@@ -370,6 +381,42 @@ class CasaDosDadosProspectService
 
         if (!empty($cfg['matriz_filial']) && in_array($cfg['matriz_filial'], ['MATRIZ', 'FILIAL'], true)) {
             $body['matriz_filial'] = $cfg['matriz_filial'];
+        }
+
+        // MEI (Microempreendedor Individual)
+        if (!empty($cfg['mei_optante'])) {
+            $body['mei'] = ['optante' => true];
+        } elseif (!empty($cfg['mei_excluir_optante'])) {
+            $body['mei'] = ['excluir_optante' => true];
+        }
+
+        // Simples Nacional
+        if (!empty($cfg['simples_optante'])) {
+            $body['simples'] = ['optante' => true];
+        } elseif (!empty($cfg['simples_excluir_optante'])) {
+            $body['simples'] = ['excluir_optante' => true];
+        }
+
+        // Porte: 01 Micro, 03 EPP, 05 demais
+        if (!empty($cfg['porte_codigos'])) {
+            $rawP = is_array($cfg['porte_codigos'])
+                ? $cfg['porte_codigos']
+                : preg_split('/[\s,;]+/', (string)$cfg['porte_codigos'], -1, PREG_SPLIT_NO_EMPTY);
+            $codes = array_values(array_filter($rawP, static fn ($c) => in_array((string)$c, ['01', '03', '05'], true)));
+            if ($codes !== []) {
+                $body['porte_empresa'] = ['codigos' => $codes];
+            }
+        }
+
+        // Natureza jurídica (códigos Receita)
+        if (!empty($cfg['natureza_juridica'])) {
+            $nj = is_array($cfg['natureza_juridica'])
+                ? $cfg['natureza_juridica']
+                : preg_split('/[\s,;]+/', trim((string)$cfg['natureza_juridica']), -1, PREG_SPLIT_NO_EMPTY);
+            $nj = array_values(array_filter(array_map('trim', $nj)));
+            if ($nj !== []) {
+                $body['codigo_natureza_juridica'] = $nj;
+            }
         }
 
         $mais = [];
@@ -390,6 +437,12 @@ class CasaDosDadosProspectService
         }
         if (!empty($cfg['somente_fixo'])) {
             $mais['somente_fixo'] = true;
+        }
+        if (!empty($cfg['excluir_email_contab'])) {
+            $mais['excluir_email_contab'] = true;
+        }
+        if (!empty($cfg['excluir_empresas_visualizadas'])) {
+            $mais['excluir_empresas_visualizadas'] = true;
         }
         if ($mais !== []) {
             $body['mais_filtros'] = $mais;

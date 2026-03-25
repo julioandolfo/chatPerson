@@ -152,27 +152,30 @@ class OpenAIService
                 'max_tokens' => (int)($agent['max_tokens'] ?? 2000),
             ];
 
-            // Adicionar tools se houver
+            // Classificar com IA se a mensagem precisa de tools antes de incluí-las
             if (!empty($functions)) {
-                $payload['tools'] = array_map(function($func) {
-                    // Se já tem o wrapper {type: function, function: {...}}, usar diretamente
-                    if (isset($func['type']) && $func['type'] === 'function' && isset($func['function'])) {
-                        return $func;
-                    }
-                    // Senão, adicionar o wrapper
-                    return ['type' => 'function', 'function' => $func];
-                }, $functions);
-                
-                // IMPORTANTE: Usar 'auto' permite que a IA escolha, mas com instruções claras no prompt
-                // Use 'required' apenas se quiser FORÇAR o uso de uma tool
-                $payload['tool_choice'] = 'auto';
+                $needsTools = self::classifyToolIntent($message, $toolDescriptions, $apiKey, $conversationId);
+
+                if ($needsTools) {
+                    $payload['tools'] = array_map(function($func) {
+                        if (isset($func['type']) && $func['type'] === 'function' && isset($func['function'])) {
+                            return $func;
+                        }
+                        return ['type' => 'function', 'function' => $func];
+                    }, $functions);
+
+                    $payload['tool_choice'] = 'auto';
+                }
             }
 
             // Fazer requisição à API
+            $toolsSent = isset($payload['tools']) ? count($payload['tools']) : 0;
             \App\Helpers\ConversationDebug::openAIRequest($conversationId, 'chat/completions', [
                 'model' => $payload['model'],
                 'messages_count' => count($payload['messages']),
-                'tools_count' => count($functions),
+                'tools_count' => $toolsSent,
+                'tools_available' => count($functions),
+                'tools_suppressed' => !isset($payload['tools']) && !empty($functions),
                 'temperature' => $payload['temperature']
             ]);
             
@@ -778,6 +781,57 @@ class OpenAIService
     }
 
     /**
+     * Classificação por IA: a mensagem do usuário requer uso de ferramentas externas?
+     * Usa gpt-4o-mini com ~100 tokens — rápido e barato (~0,01 centavo por chamada).
+     * Em caso de falha, libera tools por segurança.
+     */
+    private static function classifyToolIntent(string $message, array $toolDescriptions, string $apiKey, int $conversationId = 0): bool
+    {
+        $toolList = implode("\n", $toolDescriptions);
+
+        $classificationPrompt = <<<PROMPT
+Você é um classificador de intenção. Analise a mensagem do cliente e decida se ela requer consulta ou ação em algum sistema externo (ferramentas disponíveis abaixo) ou se é apenas conversa normal.
+
+Ferramentas disponíveis:
+{$toolList}
+
+Mensagem do cliente: "{$message}"
+
+Responda APENAS com uma única palavra:
+- TOOLS  → se a mensagem pede dados, ações, consultas, status, informações que só as ferramentas podem fornecer
+- TEXT   → se é saudação, agradecimento, conversa genérica, pergunta sobre a empresa, dúvida geral ou qualquer coisa que não precise de ferramenta
+
+Responda:
+PROMPT;
+
+        try {
+            $payload = [
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'user', 'content' => $classificationPrompt]
+                ],
+                'temperature' => 0,
+                'max_tokens' => 5,
+            ];
+
+            $response = self::makeRequest($apiKey, $payload);
+            $answer = strtoupper(trim($response['choices'][0]['message']['content'] ?? 'TOOLS'));
+            $needsTools = str_contains($answer, 'TOOLS');
+
+            \App\Helpers\ConversationDebug::aiAgent($conversationId, "Classificação de intent (IA): {$answer} — tools " . ($needsTools ? 'ATIVAS' : 'SUPRIMIDAS'), [
+                'message' => mb_substr($message, 0, 100),
+                'classification' => $answer
+            ]);
+
+            return $needsTools;
+
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::warning("classifyToolIntent falhou, liberando tools por segurança: " . $e->getMessage());
+            return true;
+        }
+    }
+
+    /**
      * Alinha nomes vindos do schema ("Buscar Pedidos Woocommerce") aos cases em snake_case.
      */
     private static function normalizeWooCommerceFunctionName(string $name): string
@@ -789,27 +843,28 @@ class OpenAIService
 
     /**
      * Mapeia slugs customizados (ex.: buscar_pedidos_personizi) para o handler interno correspondente.
-     * Ordem: padrões mais específicos antes dos genéricos (buscar_pedidos antes de buscar_pedido).
+     * Usa prefixo (não regex restrita) para aceitar sufixos com qualquer caractere válido no nome da função.
+     * Ordem: buscar_pedidos antes de buscar_pedido (este é prefixo daquele).
      */
     private static function canonicalizeWooCommerceFunctionName(string $normalizedName): string
     {
         $n = $normalizedName;
-        if (preg_match('/^buscar_pedidos[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'buscar_pedidos')) {
             return 'buscar_pedidos_woocommerce';
         }
-        if (preg_match('/^listar_pedidos[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'listar_pedidos')) {
             return 'listar_pedidos_cliente_woocommerce';
         }
-        if (preg_match('/^buscar_pedido[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'buscar_pedido')) {
             return 'buscar_pedido_woocommerce';
         }
-        if (preg_match('/^buscar_produto[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'buscar_produto')) {
             return 'buscar_produto_woocommerce';
         }
-        if (preg_match('/^criar_pedido[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'criar_pedido')) {
             return 'criar_pedido_woocommerce';
         }
-        if (preg_match('/^atualizar_status_pedido[_a-z0-9]*$/', $n)) {
+        if (str_starts_with($n, 'atualizar_status_pedido')) {
             return 'atualizar_status_pedido';
         }
         return $n;

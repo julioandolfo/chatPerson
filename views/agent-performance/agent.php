@@ -536,6 +536,9 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     </span>
                     <span class="text-muted mt-1 fw-semibold fs-7">Vendas e conversões via WooCommerce</span>
                 </h3>
+                <div class="card-toolbar">
+                    <span class="badge badge-light-primary fs-8">Clique nos totais abaixo para ver origem (1ª conversa vs retorno)</span>
+                </div>
             </div>
             <div class="card-body py-3">
                 <!-- Linha 1: Conversas e Vendas -->
@@ -587,35 +590,38 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary">
+                        <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary" role="button" style="cursor:pointer;" title="Ver detalhes da origem"
+                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
                             <div class="fs-2x fw-bold text-primary">
                                 <?= number_format($conversionRateClientOnly, 1) ?>%
                             </div>
                             <div class="fw-semibold text-muted">Apenas receptivas</div>
                             <div class="fs-8 text-muted mt-1">
-                                <?= number_format($clientInitiated) ?> conversas · cliente chamou
+                                <span class="text-decoration-underline"><?= number_format($clientInitiated) ?></span> conversas · cliente chamou
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-info border-dashed rounded p-4 text-center bg-light-info">
+                        <div class="border border-info border-dashed rounded p-4 text-center bg-light-info" role="button" style="cursor:pointer;" title="Ver detalhes"
+                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
                             <div class="fs-2x fw-bold text-info">
                                 <?= number_format($conversionRateRecAtivas, 1) ?>%
                             </div>
                             <div class="fw-semibold text-muted">Rec + ativas</div>
                             <div class="fs-8 text-muted mt-1">
-                                <?= number_format($receptivasAtivas) ?> novas no período
+                                <span class="text-decoration-underline"><?= number_format($receptivasAtivas) ?></span> novas no período
                             </div>
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success">
+                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success" role="button" style="cursor:pointer;" title="Ver detalhes"
+                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
                             <div class="fs-2x fw-bold text-success">
                                 <?= number_format($conversionRateInteractive, 1) ?>%
                             </div>
                             <div class="fw-semibold text-muted">Interativas</div>
                             <div class="fs-8 text-muted mt-1">
-                                <?= number_format($interactiveConversations) ?> atendidas no período
+                                <span class="text-decoration-underline"><?= number_format($interactiveConversations) ?></span> atendidas no período
                             </div>
                         </div>
                     </div>
@@ -624,6 +630,96 @@ function formatTimeDisplay($seconds, $showUnit = true) {
         </div>
     </div>
 </div>
+
+<!-- Modal: mesma origem de métricas do dashboard -->
+<div class="modal fade" id="modal_wc_metric_breakdown" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bold" id="modal_wc_metric_breakdown_title">Detalhes</h2>
+                <button type="button" class="btn btn-icon btn-sm btn-active-light-primary" data-bs-dismiss="modal"><i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i></button>
+            </div>
+            <div class="modal-body" id="modal_wc_metric_breakdown_body">
+                <div class="text-center py-10"><span class="spinner-border text-primary"></span></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const breakdownUrl = <?= json_encode(Url::to('/api/agent-conversion/metric-breakdown')) ?>;
+    window.openWcMetricBreakdown = function (agentId, agentName) {
+        const body = document.getElementById('modal_wc_metric_breakdown_body');
+        const title = document.getElementById('modal_wc_metric_breakdown_title');
+        const df = document.getElementById('kt_dashboard_date_from')?.value
+            || document.getElementById('date_from_agent')?.value
+            || document.getElementById('filter-date-from')?.value || '';
+        const dt = document.getElementById('kt_dashboard_date_to')?.value
+            || document.getElementById('date_to_agent')?.value
+            || document.getElementById('filter-date-to')?.value || '';
+        title.textContent = 'Origem das métricas — ' + (agentName || '');
+        body.innerHTML = '<div class="text-center py-10"><span class="spinner-border text-primary"></span></div>';
+        const modal = new bootstrap.Modal(document.getElementById('modal_wc_metric_breakdown'));
+        modal.show();
+        const u = new URL(breakdownUrl, window.location.origin);
+        u.searchParams.set('agent_id', agentId);
+        u.searchParams.set('date_from', df);
+        u.searchParams.set('date_to', dt);
+        fetch(u.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+            .then(function (r) { return r.json(); })
+            .then(function (j) {
+                if (!j.success) throw new Error(j.message || 'Erro');
+                const d = j.data;
+                const ci = d.client_initiated || {};
+                const ai = d.agent_initiated || {};
+                const ra = d.receptivas_ativas || {};
+                const it = d.interactive || {};
+                const esc = function (s) {
+                    const x = document.createElement('div');
+                    x.textContent = s == null ? '' : String(s);
+                    return x.innerHTML;
+                };
+                const row = function (label, val, hint) {
+                    return '<tr><td class="text-gray-700">' + esc(label) + '</td><td class="text-end fw-bold">' + esc(val) + '</td></tr>' +
+                        (hint ? '<tr><td colspan="2" class="fs-8 text-muted pt-0 pb-2">' + esc(hint) + '</td></tr>' : '');
+                };
+                let html = '<p class="text-muted fs-7 mb-4">Período: <strong>' + esc((d.period && d.period.from) || '') + '</strong> até <strong>' + esc((d.period && d.period.to) || '') + '</strong>.</p>';
+                html += '<h6 class="fw-bold text-primary mb-2"><i class="bi bi-chat-fill me-1"></i> Apenas receptivas (cliente chamou)</h6>';
+                html += '<p class="fs-8 text-muted mb-2">Inclui <strong>novos contatos</strong> e <strong>retornos</strong> em que a primeira mensagem da conversa foi do cliente.</p>';
+                html += '<table class="table table-sm table-row-dashed gs-0 mb-6"><tbody>';
+                html += row('Total', ci.total);
+                html += row('Primeira conversa do contato', ci.primeira_conversa_do_contato);
+                html += row('Retorno', ci.retorno, 'Contato já tinha conversa anterior.');
+                html += row('1ª conversa e agente = principal no cadastro', ci.primeira_vida_agente_eh_principal);
+                html += row('Retorno e agente = principal no cadastro', ci.retorno_agente_eh_principal);
+                html += '</tbody></table>';
+                html += '<h6 class="fw-bold text-info mb-2"><i class="bi bi-person-fill me-1"></i> Ativas (agente iniciou)</h6>';
+                html += '<table class="table table-sm table-row-dashed gs-0 mb-6"><tbody>';
+                html += row('Total', ai.total);
+                html += row('Primeira conversa do contato', ai.primeira_conversa_do_contato);
+                html += row('Retorno', ai.retorno);
+                html += '</tbody></table>';
+                html += '<h6 class="fw-bold text-gray-800 mb-2">Rec + ativas</h6>';
+                html += '<table class="table table-sm table-row-dashed gs-0 mb-6"><tbody>';
+                html += row('Total', ra.total);
+                html += row('Receptivas', ra.receptivas);
+                html += row('Ativas', ra.ativas);
+                html += '</tbody></table>';
+                html += '<h6 class="fw-bold text-success mb-2"><i class="bi bi-arrow-repeat me-1"></i> Interativas</h6>';
+                html += '<table class="table table-sm table-row-dashed gs-0 mb-0"><tbody>';
+                html += row('Total', it.total);
+                html += row('Em conversas criadas no período', it.em_conversas_criadas_no_periodo);
+                html += row('Em conversas já existentes', it.em_conversas_ja_existentes);
+                html += '</tbody></table>';
+                body.innerHTML = html;
+            })
+            .catch(function (e) {
+                const msg = (e && e.message) ? String(e.message) : 'Erro ao carregar';
+                body.innerHTML = '<div class="alert alert-danger">' + msg.replace(/</g, '&lt;') + '</div>';
+            });
+    };
+})();
+</script>
 <?php endif; ?>
 
 <!-- Estatísticas de Ligações API4Com -->

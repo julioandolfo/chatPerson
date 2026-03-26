@@ -731,6 +731,10 @@ $logFileMap = [
     'notificame' => __DIR__ . '/../logs/notificame.log',
     'meta' => __DIR__ . '/../logs/meta.log',
     'auto_close' => __DIR__ . '/../logs/auto_close.log',
+    'templates' => __DIR__ . '/../logs/app.log',
+    'ai_tools' => __DIR__ . '/../logs/ai_tools.log',
+    'ai_debug' => __DIR__ . '/../logs/conversation-debug.log',
+    'campaigns' => __DIR__ . '/../logs/campaigns.log',
 ];
 // Fallback: se não existir em logs/, tentar em storage/logs/
 foreach ($logFileMap as $key => $path) {
@@ -1165,6 +1169,10 @@ function colorizeLog($log) {
             <a href="?tab=webhook" class="tab <?= $activeTab === 'webhook' ? 'active' : '' ?>">🛒 Webhook WooCommerce</a>
             <a href="?tab=wc_sync" class="tab <?= $activeTab === 'wc_sync' ? 'active' : '' ?>">🔄 Cron Sync WooCommerce</a>
             <a href="?tab=auto_close" class="tab <?= $activeTab === 'auto_close' ? 'active' : '' ?>" style="<?= $activeTab === 'auto_close' ? '' : 'border-color:#f44747;color:#f48771;' ?>">⏰ Auto Close</a>
+            <a href="?tab=templates" class="tab <?= $activeTab === 'templates' ? 'active' : '' ?>" style="<?= $activeTab === 'templates' ? '' : 'border-color:#25D366;color:#25D366;' ?>">📋 Templates WhatsApp</a>
+            <a href="?tab=ai_tools" class="tab <?= $activeTab === 'ai_tools' ? 'active' : '' ?>" style="<?= $activeTab === 'ai_tools' ? '' : 'border-color:#a855f7;color:#c084fc;' ?>">🧠 AI Tools</a>
+            <a href="?tab=ai_debug" class="tab <?= $activeTab === 'ai_debug' ? 'active' : '' ?>" style="<?= $activeTab === 'ai_debug' ? '' : 'border-color:#06b6d4;color:#22d3ee;' ?>">🔬 AI Debug Conversa</a>
+            <a href="?tab=campaigns" class="tab <?= $activeTab === 'campaigns' ? 'active' : '' ?>" style="<?= $activeTab === 'campaigns' ? '' : 'border-color:#f59e0b;color:#fbbf24;' ?>">📢 Campanhas</a>
         </div>
         
         <?php if ($activeTab === 'unificacao'): ?>
@@ -3885,6 +3893,174 @@ WHERE c.whatsapp_account_id IS NOT NULL
                 <a href="/api-test.php" style="color: #4ec9b0;">Test API</a>
             </p>
         </div>
+
+        <?php /* ═══════════════ ABA TEMPLATES WHATSAPP (inline no else genérico) ═══════════════ */ ?>
+        <?php if ($activeTab === 'templates'): ?>
+        <?php
+            // Ler logs filtrados por [TEMPLATE]
+            $tplLogFile = __DIR__ . '/../logs/app.log';
+            if (!file_exists($tplLogFile)) {
+                $tplLogFile = __DIR__ . '/../storage/logs/app.log';
+            }
+            $tplLines = [];
+            $tplDbTemplates = [];
+            if (file_exists($tplLogFile)) {
+                $allTplRaw = file($tplLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                $tplAllFiltered = array_filter($allTplRaw, fn($l) => stripos($l, '[TEMPLATE') !== false);
+                $tplLines = array_slice(array_reverse($tplAllFiltered), 0, 200);
+            }
+            if (!empty($filter)) {
+                $tplLines = array_filter($tplLines, fn($l) => stripos($l, $filter) !== false);
+            }
+
+            // Buscar templates do banco
+            try {
+                if (!class_exists('\\App\\Helpers\\Database')) {
+                    require_once __DIR__ . '/../config/bootstrap.php';
+                }
+                $db = \App\Helpers\Database::getInstance();
+                $tplDbTemplates = $db->query("
+                    SELECT id, waba_id, name, display_name, language, category, status, quality_score,
+                           body_text, sent_count, delivered_count, read_count, failed_count,
+                           rejection_reason, last_synced_at, created_at, updated_at
+                    FROM whatsapp_templates
+                    ORDER BY 
+                        CASE status 
+                            WHEN 'PENDING' THEN 1 
+                            WHEN 'DRAFT' THEN 2 
+                            WHEN 'APPROVED' THEN 3 
+                            WHEN 'REJECTED' THEN 4 
+                        END, 
+                        updated_at DESC
+                    LIMIT 50
+                ")->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (\Exception $e) {
+                $tplDbTemplates = [];
+            }
+
+            $tplTotal = count($tplLines);
+            $tplErrors = count(array_filter($tplLines, fn($l) => stripos($l, '[ERROR]') !== false || stripos($l, 'ERRO') !== false));
+            $tplSuccess = count(array_filter($tplLines, fn($l) => stripos($l, 'sucesso') !== false || stripos($l, 'Resultado Meta') !== false));
+        ?>
+        <header>
+            <h1>📋 Templates WhatsApp Cloud API</h1>
+            <p>Diagnóstico de criação, submissão e sincronização de templates com a Meta.</p>
+        </header>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 20px;">
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #569cd6;">
+                <div style="font-size: 24px; font-weight: bold; color: #569cd6;"><?= count($tplDbTemplates) ?></div>
+                <div style="color: #888; font-size: 12px;">Templates</div>
+            </div>
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #4ec9b0;">
+                <div style="font-size: 24px; font-weight: bold; color: #4ec9b0;"><?= count(array_filter($tplDbTemplates, fn($t) => $t['status'] === 'APPROVED')) ?></div>
+                <div style="color: #888; font-size: 12px;">Aprovados</div>
+            </div>
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #dcdcaa;">
+                <div style="font-size: 24px; font-weight: bold; color: #dcdcaa;"><?= count(array_filter($tplDbTemplates, fn($t) => $t['status'] === 'PENDING')) ?></div>
+                <div style="color: #888; font-size: 12px;">Pendentes</div>
+            </div>
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #f48771;">
+                <div style="font-size: 24px; font-weight: bold; color: #f48771;"><?= count(array_filter($tplDbTemplates, fn($t) => $t['status'] === 'REJECTED')) ?></div>
+                <div style="color: #888; font-size: 12px;">Rejeitados</div>
+            </div>
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #ce9178;">
+                <div style="font-size: 24px; font-weight: bold; color: #ce9178;"><?= count(array_filter($tplDbTemplates, fn($t) => $t['status'] === 'DRAFT')) ?></div>
+                <div style="color: #888; font-size: 12px;">Rascunhos</div>
+            </div>
+            <div style="background: #1e1e2e; padding: 12px; border-radius: 8px; text-align: center; border-left: 3px solid #f48771;">
+                <div style="font-size: 24px; font-weight: bold; color: #f48771;"><?= $tplErrors ?></div>
+                <div style="color: #888; font-size: 12px;">Erros nos logs</div>
+            </div>
+        </div>
+
+        <?php if (!empty($tplDbTemplates)): ?>
+        <details open style="margin-bottom: 20px;">
+            <summary style="cursor: pointer; padding: 8px; background: #1e1e2e; border-radius: 6px; color: #569cd6; font-weight: bold;">
+                📄 Templates no Banco de Dados (<?= count($tplDbTemplates) ?>)
+            </summary>
+            <div style="overflow-x: auto; margin-top: 8px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead>
+                        <tr style="background: #2d2d3d; color: #888;">
+                            <th style="padding: 6px 8px; text-align: left;">ID</th>
+                            <th style="padding: 6px 8px; text-align: left;">Nome</th>
+                            <th style="padding: 6px 8px; text-align: left;">Categoria</th>
+                            <th style="padding: 6px 8px; text-align: left;">Idioma</th>
+                            <th style="padding: 6px 8px; text-align: center;">Status</th>
+                            <th style="padding: 6px 8px; text-align: right;">Enviados</th>
+                            <th style="padding: 6px 8px; text-align: right;">Falhas</th>
+                            <th style="padding: 6px 8px; text-align: left;">WABA ID</th>
+                            <th style="padding: 6px 8px; text-align: left;">Atualizado</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($tplDbTemplates as $tpl):
+                            $statusColors = [
+                                'APPROVED' => '#4ec9b0',
+                                'PENDING' => '#dcdcaa',
+                                'REJECTED' => '#f48771',
+                                'DRAFT' => '#ce9178',
+                            ];
+                            $sColor = $statusColors[$tpl['status']] ?? '#888';
+                        ?>
+                        <tr style="border-bottom: 1px solid #2a2a2a;">
+                            <td style="padding: 6px 8px; color: #888;"><?= $tpl['id'] ?></td>
+                            <td style="padding: 6px 8px; color: #dcdcaa;"><?= htmlspecialchars($tpl['display_name'] ?: $tpl['name']) ?></td>
+                            <td style="padding: 6px 8px; color: #888;"><?= $tpl['category'] ?></td>
+                            <td style="padding: 6px 8px; color: #888;"><?= $tpl['language'] ?></td>
+                            <td style="padding: 6px 8px; text-align: center;"><span style="color: <?= $sColor ?>; font-weight: bold;"><?= $tpl['status'] ?></span></td>
+                            <td style="padding: 6px 8px; text-align: right; color: #4ec9b0;"><?= $tpl['sent_count'] ?></td>
+                            <td style="padding: 6px 8px; text-align: right; color: <?= $tpl['failed_count'] > 0 ? '#f48771' : '#888' ?>;"><?= $tpl['failed_count'] ?></td>
+                            <td style="padding: 6px 8px; color: #888; font-size: 11px;"><?= $tpl['waba_id'] ?></td>
+                            <td style="padding: 6px 8px; color: #888; font-size: 11px;"><?= $tpl['updated_at'] ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        <?php endif; ?>
+
+        <details open>
+            <summary style="cursor: pointer; padding: 8px; background: #1e1e2e; border-radius: 6px; color: #569cd6; font-weight: bold;">
+                📜 Logs de Templates (<?= $tplTotal ?> entradas)
+            </summary>
+            <div style="margin-top: 8px;">
+                <div style="margin-bottom: 10px;">
+                    <form method="get" style="display: flex; gap: 8px; align-items: center;">
+                        <input type="hidden" name="tab" value="templates">
+                        <input type="text" name="filter" value="<?= htmlspecialchars($filter) ?>" placeholder="Filtrar logs..." 
+                               style="background: #2d2d3d; border: 1px solid #444; color: #ccc; padding: 5px 10px; border-radius: 4px; flex: 1;">
+                        <button type="submit" style="background: #25D366; color: #fff; border: none; padding: 5px 12px; border-radius: 4px; cursor: pointer;">Filtrar</button>
+                        <a href="?tab=templates" style="color: #888; text-decoration: none; padding: 5px;">Limpar</a>
+                    </form>
+                </div>
+                <?php if (empty($tplLines)): ?>
+                    <div style="padding: 20px; text-align: center; color: #888;">
+                        Nenhum log de template encontrado. Os logs aparecem com o prefixo <code>[TEMPLATE]</code> no app.log.
+                    </div>
+                <?php else: ?>
+                    <div style="background: #1a1a2e; padding: 8px; border-radius: 6px; max-height: 500px; overflow-y: auto; font-family: 'Consolas', monospace; font-size: 12px;">
+                    <?php foreach ($tplLines as $line):
+                        $cls = '';
+                        if (stripos($line, 'ERRO') !== false || stripos($line, '[ERROR]') !== false) $cls = 'color: #f48771;';
+                        elseif (stripos($line, 'sucesso') !== false || stripos($line, 'Resultado Meta') !== false) $cls = 'color: #4ec9b0;';
+                        elseif (stripos($line, 'Enviando') !== false || stripos($line, 'Payload') !== false) $cls = 'color: #dcdcaa;';
+                        else $cls = 'color: #ccc;';
+                    ?>
+                        <div style="<?= $cls ?> padding: 2px 4px; border-bottom: 1px solid #2a2a2a; word-break: break-all;"><?= htmlspecialchars($line) ?></div>
+                    <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        </details>
+
+        <div class="footer" style="margin-top: 15px;">
+            <p>Última atualização: <?= date('d/m/Y H:i:s') ?> | <a href="?tab=templates" style="color:#25D366;">🔄 Atualizar</a></p>
+        </div>
+
+        <?php endif; // templates ?>
         <?php endif; // activeTab ?>
     </div>
     

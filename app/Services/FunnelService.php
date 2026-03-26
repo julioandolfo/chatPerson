@@ -1232,7 +1232,7 @@ class FunnelService
         $sql = "SELECT u.id, u.name, 
                        (SELECT COUNT(*) FROM conversations WHERE agent_id = u.id AND status IN ('open', 'pending')) as current_conversations,
                        u.max_conversations, u.availability_status,
-                       MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
+                       MAX(COALESCE(c.assigned_at, c.created_at)) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 

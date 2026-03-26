@@ -1000,7 +1000,13 @@ class IntegrationController
         
         try {
             $data = Request::all();
+            
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] createTemplate - Account #{$id}, dados: " . json_encode(array_keys($data)));
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] createTemplate - name={$data['name']}, category={$data['category']}, language={$data['language']}");
+            
             $result = NotificameService::createTemplate($id, $data);
+            
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] createTemplate - Resultado: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             
             Response::json([
                 'success' => true,
@@ -1008,6 +1014,7 @@ class IntegrationController
                 'template' => $result
             ]);
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[TEMPLATE-NOTIFICAME] createTemplate - ERRO: " . $e->getMessage());
             Response::json([
                 'success' => false,
                 'message' => $e->getMessage()

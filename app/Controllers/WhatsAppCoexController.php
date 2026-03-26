@@ -323,7 +323,10 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
+            
+            \App\Helpers\Logger::info("[TEMPLATE] createTemplate - Dados recebidos: " . json_encode(array_keys($data)));
+            \App\Helpers\Logger::info("[TEMPLATE] createTemplate - waba_id={$data['waba_id']}, name={$data['name']}, category={$data['category']}, language={$data['language']}");
             
             // Montar botões
             $buttons = [];
@@ -338,6 +341,8 @@ class WhatsAppCoexController
             
             $id = WhatsAppTemplateService::createDraft($data);
             
+            \App\Helpers\Logger::info("[TEMPLATE] createTemplate - Rascunho criado com ID: {$id}");
+            
             Response::json([
                 'success' => true,
                 'id' => $id,
@@ -345,6 +350,7 @@ class WhatsAppCoexController
             ]);
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[TEMPLATE] createTemplate - ERRO: " . $e->getMessage());
             Response::json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -357,7 +363,7 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
             $id = (int)($data['id'] ?? 0);
             unset($data['id']);
             
@@ -391,13 +397,19 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
             $templateId = (int)($data['template_id'] ?? 0);
+            
+            \App\Helpers\Logger::info("[TEMPLATE] submitTemplate - Enviando template #{$templateId} para aprovação na Meta");
             
             // Obter token válido
             $accessToken = $this->getAccessTokenForTemplate($templateId);
             
+            \App\Helpers\Logger::info("[TEMPLATE] submitTemplate - Token obtido: " . (strlen($accessToken) > 10 ? substr($accessToken, 0, 10) . '...' : 'VAZIO'));
+            
             $result = WhatsAppTemplateService::submitForApproval($templateId, $accessToken);
+            
+            \App\Helpers\Logger::info("[TEMPLATE] submitTemplate - Resultado Meta: " . json_encode($result));
             
             Response::json([
                 'success' => true,
@@ -406,6 +418,7 @@ class WhatsAppCoexController
             ]);
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[TEMPLATE] submitTemplate - ERRO: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             Response::json(['success' => false, 'error' => $e->getMessage()]);
         }
     }
@@ -418,7 +431,7 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.view');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
             $templateId = (int)($data['template_id'] ?? 0);
             
             $accessToken = $this->getAccessTokenForTemplate($templateId);
@@ -443,7 +456,7 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
             $wabaId = $data['waba_id'] ?? '';
             
             if (empty($wabaId)) {
@@ -473,7 +486,7 @@ class WhatsAppCoexController
         Permission::abortIfCannot('integrations.manage');
         
         try {
-            $data = Request::postJson();
+            $data = Request::json();
             $templateId = (int)($data['template_id'] ?? 0);
             
             $template = WhatsAppTemplate::find($templateId);

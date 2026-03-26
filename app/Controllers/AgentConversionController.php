@@ -107,6 +107,40 @@ class AgentConversionController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * API: Detalhamento de origem das métricas (1ª conversa vs retorno, interativas, etc.)
+     */
+    public function metricBreakdown(): void
+    {
+        $agentId = (int)Request::get('agent_id');
+        $currentUserId = (int)(\App\Helpers\Auth::user()['id'] ?? 0);
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
+        $dateTo = Request::get('date_to', date('Y-m-d'));
+
+        $canViewAll = Permission::can('conversion.view')
+            || Permission::can('agent_performance.view.all')
+            || Permission::can('conversations.view.all');
+        if ($agentId !== $currentUserId && !$canViewAll) {
+            Response::json(['success' => false, 'message' => 'Sem permissão'], 403);
+            return;
+        }
+
+        if ($agentId < 1) {
+            Response::json(['success' => false, 'message' => 'agent_id inválido'], 400);
+            return;
+        }
+
+        try {
+            $data = AgentConversionService::getConversationMetricBreakdown($agentId, $dateFrom, $dateTo);
+            $agent = User::find($agentId);
+            $data['agent_name'] = $agent['name'] ?? '';
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            error_log('metricBreakdown: ' . $e->getMessage());
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
     
     /**
      * API: Testar meta_key do vendedor no WooCommerce

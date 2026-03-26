@@ -286,6 +286,147 @@ class AgentConversionService
             'conversion_rate_interactive' => $conversionRateInteractive,         // Interativas
         ]);
     }
+
+    /**
+     * Detalhamento das métricas de conversa (origem: 1ª conversa do contato vs retorno, primary, etc.)
+     * Usado em modais no dashboard e na performance do agente.
+     */
+    public static function getConversationMetricBreakdown(
+        int $agentId,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): array {
+        $dateFrom = $dateFrom ?? date('Y-m-01');
+        $dateTo = $dateTo ?? date('Y-m-d H:i:s');
+        if (!str_contains($dateTo, ':')) {
+            $dateTo = $dateTo . ' 23:59:59';
+        }
+
+        $clientEx = self::sqlFirstMessageFromContactExists();
+        $agentEx = self::sqlFirstMessageFromHumanAgentExists();
+
+        // --- Apenas receptivas: 1ª conversa ever do contato × retorno × alinhamento ao principal cadastrado
+        $sqlClient = "SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN is_first = 1 THEN 1 ELSE 0 END) AS primeira_vida,
+                SUM(CASE WHEN is_first = 0 THEN 1 ELSE 0 END) AS retorno,
+                SUM(CASE WHEN is_first = 1 AND is_primary = 1 THEN 1 ELSE 0 END) AS primeira_vida_como_principal,
+                SUM(CASE WHEN is_first = 0 AND is_primary = 1 THEN 1 ELSE 0 END) AS retorno_como_principal
+            FROM (
+                SELECT
+                    c.id,
+                    CASE WHEN c.id = (
+                        SELECT MIN(c2.id) FROM conversations c2 WHERE c2.contact_id = c.contact_id
+                    ) THEN 1 ELSE 0 END AS is_first,
+                    CASE WHEN c.agent_id = COALESCE(
+                        ct.primary_agent_id,
+                        (SELECT ca.agent_id FROM contact_agents ca
+                         WHERE ca.contact_id = c.contact_id AND ca.is_primary = 1 LIMIT 1)
+                    ) THEN 1 ELSE 0 END AS is_primary
+                FROM conversations c
+                LEFT JOIN contacts ct ON ct.id = c.contact_id
+                WHERE c.agent_id = ?
+                  AND c.created_at >= ? AND c.created_at <= ?
+                  AND {$clientEx}
+            ) t";
+
+        $rowClient = Database::fetch($sqlClient, [$agentId, $dateFrom, $dateTo]) ?: [];
+
+        // --- Ativas (prospecção): mesmo critério
+        $sqlAgent = "SELECT
+                COUNT(*) AS total,
+                SUM(CASE WHEN is_first = 1 THEN 1 ELSE 0 END) AS primeira_vida,
+                SUM(CASE WHEN is_first = 0 THEN 1 ELSE 0 END) AS retorno
+            FROM (
+                SELECT c.id,
+                    CASE WHEN c.id = (
+                        SELECT MIN(c2.id) FROM conversations c2 WHERE c2.contact_id = c.contact_id
+                    ) THEN 1 ELSE 0 END AS is_first
+                FROM conversations c
+                WHERE c.agent_id = ?
+                  AND c.created_at >= ? AND c.created_at <= ?
+                  AND {$agentEx}
+            ) t2";
+
+        $rowAgent = Database::fetch($sqlAgent, [$agentId, $dateFrom, $dateTo]) ?: [];
+
+        // --- Interativas: atividade no período em conversa criada no período vs conversa mais antiga
+        $sqlInteractive = "SELECT
+                COUNT(DISTINCT m.conversation_id) AS total,
+                COUNT(DISTINCT CASE
+                    WHEN c.created_at >= ? AND c.created_at <= ? THEN m.conversation_id END) AS em_conversas_novas_no_periodo,
+                COUNT(DISTINCT CASE
+                    WHEN c.created_at < ? THEN m.conversation_id END) AS em_conversas_iniciadas_antes
+            FROM messages m
+            INNER JOIN conversations c ON c.id = m.conversation_id
+            WHERE m.sender_type = 'agent'
+              AND m.sender_id = ?
+              AND m.created_at >= ? AND m.created_at <= ?";
+
+        $rowInteractive = Database::fetch($sqlInteractive, [
+            $dateFrom, $dateTo, $dateFrom,
+            $agentId,
+            $dateFrom, $dateTo,
+        ]) ?: [];
+
+        return [
+            'period' => ['from' => $dateFrom, 'to' => $dateTo],
+            'client_initiated' => [
+                'total' => (int)($rowClient['total'] ?? 0),
+                'primeira_conversa_do_contato' => (int)($rowClient['primeira_vida'] ?? 0),
+                'retorno' => (int)($rowClient['retorno'] ?? 0),
+                'primeira_vida_agente_eh_principal' => (int)($rowClient['primeira_vida_como_principal'] ?? 0),
+                'retorno_agente_eh_principal' => (int)($rowClient['retorno_como_principal'] ?? 0),
+            ],
+            'agent_initiated' => [
+                'total' => (int)($rowAgent['total'] ?? 0),
+                'primeira_conversa_do_contato' => (int)($rowAgent['primeira_vida'] ?? 0),
+                'retorno' => (int)($rowAgent['retorno'] ?? 0),
+            ],
+            'receptivas_ativas' => [
+                'total' => (int)($rowClient['total'] ?? 0) + (int)($rowAgent['total'] ?? 0),
+                'receptivas' => (int)($rowClient['total'] ?? 0),
+                'ativas' => (int)($rowAgent['total'] ?? 0),
+            ],
+            'interactive' => [
+                'total' => (int)($rowInteractive['total'] ?? 0),
+                'em_conversas_criadas_no_periodo' => (int)($rowInteractive['em_conversas_novas_no_periodo'] ?? 0),
+                'em_conversas_ja_existentes' => (int)($rowInteractive['em_conversas_iniciadas_antes'] ?? 0),
+            ],
+        ];
+    }
+
+    private static function sqlFirstMessageFromContactExists(): string
+    {
+        return "EXISTS (
+            SELECT 1 FROM messages m
+            WHERE m.conversation_id = c.id
+            AND m.sender_type = 'contact'
+            AND m.sender_id > 0
+            AND m.created_at = (
+                SELECT MIN(m2.created_at)
+                FROM messages m2
+                WHERE m2.conversation_id = c.id
+                AND m2.sender_id > 0
+            )
+        )";
+    }
+
+    private static function sqlFirstMessageFromHumanAgentExists(): string
+    {
+        return "EXISTS (
+            SELECT 1 FROM messages m
+            WHERE m.conversation_id = c.id
+            AND m.sender_type = 'agent'
+            AND m.sender_id > 0
+            AND m.created_at = (
+                SELECT MIN(m2.created_at)
+                FROM messages m2
+                WHERE m2.conversation_id = c.id
+                AND m2.sender_id > 0
+            )
+        )";
+    }
     
     /**
      * Obter ranking de agentes por conversão

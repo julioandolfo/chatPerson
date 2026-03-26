@@ -644,6 +644,7 @@ Router::post('/api/goals/create-monthly', [\App\Controllers\GoalController::clas
 Router::get('/agent-conversion', [AgentConversionController::class, 'index'], ['Authentication']);
 Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'], ['Authentication']);
 Router::get('/api/agent-conversion/metrics', [AgentConversionController::class, 'getMetrics'], ['Authentication']);
+Router::get('/api/agent-conversion/metric-breakdown', [AgentConversionController::class, 'metricBreakdown'], ['Authentication']);
 Router::post('/api/agent-conversion/sync', [AgentConversionController::class, 'syncOrders'], ['Authentication']);
 Router::post('/api/woocommerce/test-meta-key', [WooCommerceController::class, 'testSellerMetaKey'], ['Authentication']);
 Router::post('/api/woocommerce/sync-orders', [WooCommerceController::class, 'syncOrders'], ['Authentication', 'Permission:conversion.view']);

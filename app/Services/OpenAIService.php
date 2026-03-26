@@ -65,6 +65,7 @@ class OpenAIService
         $startTime = microtime(true);
         
         // Debug log
+        Logger::aiTools("[PROCESS] conv={$conversationId} agent={$agentId} msg=\"" . mb_substr($message, 0, 80) . "\"");
         \App\Helpers\ConversationDebug::aiAgent($conversationId, "processMessage iniciado", [
             'agentId' => $agentId,
             'message' => substr($message, 0, 200),
@@ -348,9 +349,14 @@ class OpenAIService
             ];
 
         } catch (\Exception $e) {
-            error_log("Erro ao processar mensagem com OpenAI: " . $e->getMessage());
+            $elapsed = round((microtime(true) - $startTime) * 1000);
+            $errorMsg = "OpenAI::processMessage FALHOU conv={$conversationId} agent={$agentId} elapsed={$elapsed}ms: " . $e->getMessage();
+            error_log($errorMsg);
+            Logger::aiTools("[PROCESS ERROR] {$errorMsg}");
+            Logger::error($errorMsg);
             \App\Helpers\ConversationDebug::error($conversationId, 'OpenAI::processMessage', $e->getMessage(), [
-                'trace' => substr($e->getTraceAsString(), 0, 1000)
+                'trace' => substr($e->getTraceAsString(), 0, 1000),
+                'elapsed_ms' => $elapsed
             ]);
             throw $e;
         }
@@ -804,6 +810,7 @@ Responda APENAS com uma única palavra:
 Responda:
 PROMPT;
 
+        $classStart = microtime(true);
         try {
             $payload = [
                 'model' => 'gpt-4o-mini',
@@ -817,15 +824,20 @@ PROMPT;
             $response = self::makeRequest($apiKey, $payload);
             $answer = strtoupper(trim($response['choices'][0]['message']['content'] ?? 'TOOLS'));
             $needsTools = str_contains($answer, 'TOOLS');
+            $classElapsed = round((microtime(true) - $classStart) * 1000);
 
-            \App\Helpers\ConversationDebug::aiAgent($conversationId, "Classificação de intent (IA): {$answer} — tools " . ($needsTools ? 'ATIVAS' : 'SUPRIMIDAS'), [
+            \App\Helpers\Logger::aiTools("[CLASSIFY] conv={$conversationId} msg=\"" . mb_substr($message, 0, 60) . "\" => {$answer} ({$classElapsed}ms)");
+            \App\Helpers\ConversationDebug::aiAgent($conversationId, "Classificação de intent (IA): {$answer} — tools " . ($needsTools ? 'ATIVAS' : 'SUPRIMIDAS') . " ({$classElapsed}ms)", [
                 'message' => mb_substr($message, 0, 100),
-                'classification' => $answer
+                'classification' => $answer,
+                'elapsed_ms' => $classElapsed
             ]);
 
             return $needsTools;
 
         } catch (\Exception $e) {
+            $classElapsed = round((microtime(true) - $classStart) * 1000);
+            \App\Helpers\Logger::aiTools("[CLASSIFY ERROR] conv={$conversationId} ({$classElapsed}ms): " . $e->getMessage());
             \App\Helpers\Logger::warning("classifyToolIntent falhou, liberando tools por segurança: " . $e->getMessage());
             return true;
         }

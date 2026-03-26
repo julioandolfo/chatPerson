@@ -847,7 +847,7 @@ class ConversationSettingsService
         // Query para buscar agentes ativos (SEM filtro de availability_status = 'online')
         $sql = "SELECT u.id, u.name, u.role, u.current_conversations, u.max_conversations, 
                        u.availability_status, u.queue_enabled, u.department_id,
-                       MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
+                       MAX(COALESCE(c.assigned_at, c.created_at)) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 
@@ -1090,8 +1090,10 @@ class ConversationSettingsService
         $agents = [];
         
         // Agentes humanos
+        // Round-robin: ordenar por "última vez que recebeu uma conversa" (atribuição), NÃO por updated_at
+        // (mensagens do cliente alteram updated_at e distorcem a fila).
         $sql = "SELECT u.id, u.name, u.role, u.current_conversations, u.max_conversations, u.availability_status, u.queue_enabled,
-                       MAX(c.updated_at) as last_assignment_at, 'human' as agent_type
+                       MAX(COALESCE(c.assigned_at, c.created_at)) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
                 WHERE u.status = 'active' 

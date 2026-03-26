@@ -94,10 +94,15 @@ class WhatsAppTemplateService extends MetaIntegrationService
     {
         self::initConfig();
         
+        \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - Início para template #{$templateId}");
+        
         $template = WhatsAppTemplate::find($templateId);
         if (!$template) {
+            \App\Helpers\Logger::error("[TEMPLATE-SERVICE] submitForApproval - Template #{$templateId} NÃO encontrado no banco");
             throw new \Exception("Template #{$templateId} não encontrado");
         }
+        
+        \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - Template encontrado: name={$template['name']}, status={$template['status']}, waba_id={$template['waba_id']}");
         
         if (!in_array($template['status'], ['DRAFT', 'REJECTED'])) {
             throw new \Exception("Apenas rascunhos ou rejeitados podem ser enviados. Status: {$template['status']}");
@@ -107,6 +112,8 @@ class WhatsAppTemplateService extends MetaIntegrationService
         $apiVersion = $config['api_version'] ?? self::$apiVersion;
         
         $url = self::$baseUrl . "/{$apiVersion}/{$template['waba_id']}/message_templates";
+        
+        \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - URL da Meta API: {$url}");
         
         // Montar componentes
         $components = self::buildComponents($template);
@@ -118,10 +125,14 @@ class WhatsAppTemplateService extends MetaIntegrationService
             'components' => $components,
         ];
         
+        \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - Payload: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
+        
         self::logInfo("Enviando template para aprovação: {$template['name']}", $payload);
         
         try {
             $response = self::makeRequest($url, $accessToken, 'POST', $payload);
+            
+            \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - Resposta Meta: " . json_encode($response, JSON_UNESCAPED_UNICODE));
             
             // Atualizar status local
             $updateData = [
@@ -132,6 +143,8 @@ class WhatsAppTemplateService extends MetaIntegrationService
             
             WhatsAppTemplate::update($templateId, $updateData);
             
+            \App\Helpers\Logger::info("[TEMPLATE-SERVICE] submitForApproval - Template #{$templateId} atualizado para status: " . ($response['status'] ?? 'PENDING'));
+            
             self::logInfo("Template enviado para aprovação com sucesso", [
                 'template_id' => $response['id'] ?? null,
                 'status' => $response['status'] ?? 'PENDING',
@@ -140,6 +153,7 @@ class WhatsAppTemplateService extends MetaIntegrationService
             return $response;
             
         } catch (\Exception $e) {
+            \App\Helpers\Logger::error("[TEMPLATE-SERVICE] submitForApproval - ERRO Meta API: " . $e->getMessage());
             self::logError("Erro ao enviar template para aprovação: {$e->getMessage()}");
             throw $e;
         }

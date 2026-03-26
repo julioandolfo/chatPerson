@@ -2071,11 +2071,19 @@ class NotificameService
         try {
             self::logInfo("Criando template Notificame - Account: {$accountId}, Endpoint: {$endpoint}");
             self::logInfo("Template payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] API Request: POST {$endpoint}");
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Token: " . (strlen($token) > 10 ? substr($token, 0, 10) . '...' : 'VAZIO'));
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Channel ID: {$channelId}");
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Payload: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
+            
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
+            
             self::logInfo("Template criado com sucesso: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Resposta API: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             return $result;
         } catch (\Exception $e) {
             self::logError("Erro ao criar template Notificame: " . $e->getMessage());
+            \App\Helpers\Logger::error("[TEMPLATE-NOTIFICAME] ERRO ao criar template: " . $e->getMessage());
             throw $e;
         }
     }

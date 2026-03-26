@@ -2078,8 +2078,20 @@ class NotificameService
             
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
             
-            self::logInfo("Template criado com sucesso: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            self::logInfo("Template resposta API: " . json_encode($result, JSON_UNESCAPED_UNICODE));
             \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Resposta API: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            
+            if (isset($result['error'])) {
+                $errorMsg = $result['error']['error_user_msg'] 
+                    ?? $result['error']['message'] 
+                    ?? json_encode($result['error']);
+                self::logError("Erro Meta ao criar template: {$errorMsg}");
+                \App\Helpers\Logger::error("[TEMPLATE-NOTIFICAME] Erro Meta: {$errorMsg}");
+                throw new \Exception("Erro Meta: {$errorMsg}");
+            }
+            
+            self::logInfo("Template criado com sucesso!");
+            \App\Helpers\Logger::info("[TEMPLATE-NOTIFICAME] Template criado com sucesso!");
             return $result;
         } catch (\Exception $e) {
             self::logError("Erro ao criar template Notificame: " . $e->getMessage());
@@ -2121,7 +2133,7 @@ class NotificameService
                 $headerComponent['text'] = $headerText;
                 $headerExamples = self::extractVariableExamples($headerText);
                 if (!empty($headerExamples)) {
-                    $headerComponent['example'] = ['header_text' => $headerExamples];
+                    $headerComponent['example'] = ['header_text' => [$headerExamples]];
                 }
             }
             $components[] = $headerComponent;
@@ -2139,7 +2151,7 @@ class NotificameService
         ];
         $bodyExamples = self::extractVariableExamples($bodyText);
         if (!empty($bodyExamples)) {
-            $bodyComponent['example'] = ['body_text' => $bodyExamples];
+            $bodyComponent['example'] = ['body_text' => [$bodyExamples]];
         }
         $components[] = $bodyComponent;
 
@@ -2229,7 +2241,16 @@ class NotificameService
             self::logInfo("Atualizando template Notificame - Account: {$accountId}, TemplateId: {$templateId}");
             self::logInfo("Update payload: " . json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             $result = self::makeRequest($endpoint, $token, 'POST', $payload, $apiUrl);
-            self::logInfo("Template atualizado: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            self::logInfo("Template update resposta: " . json_encode($result, JSON_UNESCAPED_UNICODE));
+            
+            if (isset($result['error'])) {
+                $errorMsg = $result['error']['error_user_msg'] 
+                    ?? $result['error']['message'] 
+                    ?? json_encode($result['error']);
+                self::logError("Erro Meta ao atualizar template: {$errorMsg}");
+                throw new \Exception("Erro Meta: {$errorMsg}");
+            }
+            
             return $result;
         } catch (\Exception $e) {
             self::logError("Erro ao atualizar template Notificame: " . $e->getMessage());

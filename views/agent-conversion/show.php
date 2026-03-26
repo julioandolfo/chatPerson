@@ -106,7 +106,9 @@ ob_start();
                 </i>
                 <div class="d-flex align-items-center flex-wrap gap-2 mb-3">
                     <span class="text-gray-500 fw-semibold fs-7 mb-0">Taxas de conversão</span>
-                    <button type="button" class="btn btn-sm btn-light-primary py-1" onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">Ver origem</button>
+                    <button type="button" class="btn btn-sm btn-light-primary py-1 js-wc-metric-breakdown"
+                            data-agent-id="<?= (int)($agent['id'] ?? 0) ?>"
+                            data-agent-name="<?= htmlspecialchars($agent['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">Ver origem</button>
                 </div>
                 <div class="d-flex flex-column gap-3 flex-grow-1">
                     <div>
@@ -305,12 +307,12 @@ ob_start();
     window.openWcMetricBreakdown = function (agentId, agentName) {
         const body = document.getElementById('modal_wc_metric_breakdown_body');
         const title = document.getElementById('modal_wc_metric_breakdown_title');
-        const df = document.getElementById('filter-date-from')?.value
-            || document.getElementById('date_from_agent')?.value
-            || document.getElementById('kt_dashboard_date_from')?.value || '';
-        const dt = document.getElementById('filter-date-to')?.value
-            || document.getElementById('date_to_agent')?.value
-            || document.getElementById('kt_dashboard_date_to')?.value || '';
+        function val(id) {
+            var el = document.getElementById(id);
+            return el && el.value ? el.value : '';
+        }
+        const df = val('filter-date-from') || val('date_from_agent') || val('kt_dashboard_date_from');
+        const dt = val('filter-date-to') || val('date_to_agent') || val('kt_dashboard_date_to');
         title.textContent = 'Origem das métricas — ' + (agentName || '');
         body.innerHTML = '<div class="text-center py-10"><span class="spinner-border text-primary"></span></div>';
         const modal = new bootstrap.Modal(document.getElementById('modal_wc_metric_breakdown'));
@@ -371,6 +373,15 @@ ob_start();
                 body.innerHTML = '<div class="alert alert-danger">' + msg.replace(/</g, '&lt;') + '</div>';
             });
     };
+    document.addEventListener('click', function (ev) {
+        var t = ev.target.closest && ev.target.closest('.js-wc-metric-breakdown');
+        if (!t || !document.getElementById('modal_wc_metric_breakdown')) return;
+        var id = parseInt(t.getAttribute('data-agent-id'), 10);
+        if (!id) return;
+        var name = t.getAttribute('data-agent-name') || '';
+        ev.preventDefault();
+        window.openWcMetricBreakdown(id, name);
+    });
 })();
 </script>
 <script>

@@ -1638,9 +1638,10 @@ ob_start();
                                         <!-- 1. APENAS RECEPTIVAS (só cliente iniciou) -->
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
-                                                <span class="fw-bold text-gray-800 fs-5 text-hover-primary cursor-pointer text-decoration-underline" style="cursor:pointer;" title="Ver detalhes da origem (1ª conversa vs retorno)"
+                                                <span class="fw-bold text-gray-800 fs-5 text-hover-primary cursor-pointer text-decoration-underline js-wc-metric-breakdown" style="cursor:pointer;" title="Ver detalhes da origem (1ª conversa vs retorno)"
                                                     role="button" tabindex="0"
-                                                    onclick="openWcMetricBreakdown(<?= (int)$seller['agent_id'] ?>, <?= json_encode($seller['agent_name'] ?? '') ?>)">
+                                                    data-agent-id="<?= (int)$seller['agent_id'] ?>"
+                                                    data-agent-name="<?= htmlspecialchars($seller['agent_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                                     <?= number_format($clientInitiated) ?>
                                                 </span>
                                                 <div class="fs-9 text-muted mt-1">
@@ -1654,9 +1655,10 @@ ob_start();
                                         <!-- 2. RECEPTIVAS + ATIVAS (novas conversas do período) -->
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
-                                                <span class="fw-bold text-info fs-5 text-hover-primary cursor-pointer text-decoration-underline" style="cursor:pointer;" title="Ver detalhes (receptivas + ativas)"
+                                                <span class="fw-bold text-info fs-5 text-hover-primary cursor-pointer text-decoration-underline js-wc-metric-breakdown" style="cursor:pointer;" title="Ver detalhes (receptivas + ativas)"
                                                     role="button" tabindex="0"
-                                                    onclick="openWcMetricBreakdown(<?= (int)$seller['agent_id'] ?>, <?= json_encode($seller['agent_name'] ?? '') ?>)">
+                                                    data-agent-id="<?= (int)$seller['agent_id'] ?>"
+                                                    data-agent-name="<?= htmlspecialchars($seller['agent_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                                     <?= number_format($receptivasAtivas) ?>
                                                 </span>
                                                 <div class="d-flex gap-2 fs-8 mt-1">
@@ -1675,9 +1677,10 @@ ob_start();
                                         <!-- 3. INTERATIVAS (todas que atendeu no período) -->
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
-                                                <span class="fw-bold text-primary fs-5 text-hover-primary cursor-pointer text-decoration-underline" style="cursor:pointer;" title="Ver detalhes (conversas novas vs antigas)"
+                                                <span class="fw-bold text-primary fs-5 text-hover-primary cursor-pointer text-decoration-underline js-wc-metric-breakdown" style="cursor:pointer;" title="Ver detalhes (conversas novas vs antigas)"
                                                     role="button" tabindex="0"
-                                                    onclick="openWcMetricBreakdown(<?= (int)$seller['agent_id'] ?>, <?= json_encode($seller['agent_name'] ?? '') ?>)">
+                                                    data-agent-id="<?= (int)$seller['agent_id'] ?>"
+                                                    data-agent-name="<?= htmlspecialchars($seller['agent_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                                                     <?= number_format($interactiveConversations) ?>
                                                 </span>
                                                 <div class="fs-9 text-muted mt-1">
@@ -1763,15 +1766,15 @@ ob_start();
 <script>
 (function () {
     const breakdownUrl = <?= json_encode(\App\Helpers\Url::to('/api/agent-conversion/metric-breakdown')) ?>;
+    function val(id) {
+        var el = document.getElementById(id);
+        return el && el.value ? el.value : '';
+    }
     window.openWcMetricBreakdown = function (agentId, agentName) {
         const body = document.getElementById('modal_wc_metric_breakdown_body');
         const title = document.getElementById('modal_wc_metric_breakdown_title');
-        const df = document.getElementById('kt_dashboard_date_from')?.value
-            || document.getElementById('date_from_agent')?.value
-            || document.getElementById('filter-date-from')?.value || '';
-        const dt = document.getElementById('kt_dashboard_date_to')?.value
-            || document.getElementById('date_to_agent')?.value
-            || document.getElementById('filter-date-to')?.value || '';
+        const df = val('kt_dashboard_date_from') || val('date_from_agent') || val('filter-date-from');
+        const dt = val('kt_dashboard_date_to') || val('date_to_agent') || val('filter-date-to');
         title.textContent = 'Origem das métricas — ' + (agentName || '');
         body.innerHTML = '<div class="text-center py-10"><span class="spinner-border text-primary"></span></div>';
         const modal = new bootstrap.Modal(document.getElementById('modal_wc_metric_breakdown'));
@@ -1801,7 +1804,7 @@ ob_start();
                 let html = '<p class="text-muted fs-7 mb-4">Período: <strong>' + esc((d.period && d.period.from) || '') + '</strong> até <strong>' + esc((d.period && d.period.to) || '') + '</strong>. '
                     + 'Os totais seguem as mesmas regras do ranking (primeira mensagem com <code>sender_id &gt; 0</code> define se foi cliente ou agente).</p>';
                 html += '<h6 class="fw-bold text-primary mb-2"><i class="bi bi-chat-fill me-1"></i> Apenas receptivas (cliente chamou)</h6>';
-                html += '<p class="fs-8 text-muted mb-2">Inclui <strong>novos contatos</strong> e <strong>retornos</strong> em que a primeira mensagem da conversa foi do cliente. Por isso o número pode ser maior que “só leads novos”.</p>';
+                html += '<p class="fs-8 text-muted mb-2">Inclui <strong>novos contatos</strong> e <strong>retornos</strong> em que a primeira mensagem da conversa foi do cliente. Por isso o numero pode ser maior que so leads novos.</p>';
                 html += '<table class="table table-sm table-row-dashed gs-0 mb-6"><tbody>';
                 html += row('Total (receptivas no período)', ci.total);
                 html += row('Primeira conversa do contato (contato novo no CRM)', ci.primeira_conversa_do_contato, 'Primeira conversa registrada para esse contato.');
@@ -1838,6 +1841,15 @@ ob_start();
                 body.innerHTML = '<div class="alert alert-danger">' + msg.replace(/</g, '&lt;') + '</div>';
             });
     };
+    document.addEventListener('click', function (ev) {
+        var t = ev.target.closest('.js-wc-metric-breakdown');
+        if (!t || !document.getElementById('modal_wc_metric_breakdown')) return;
+        var id = parseInt(t.getAttribute('data-agent-id'), 10);
+        if (!id) return;
+        var name = t.getAttribute('data-agent-name') || '';
+        ev.preventDefault();
+        window.openWcMetricBreakdown(id, name);
+    });
 })();
 </script>
 <?php endif; ?>

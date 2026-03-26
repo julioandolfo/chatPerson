@@ -590,8 +590,9 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary" role="button" style="cursor:pointer;" title="Ver detalhes da origem"
-                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
+                        <div class="border border-primary border-dashed rounded p-4 text-center bg-light-primary js-wc-metric-breakdown" role="button" style="cursor:pointer;" title="Ver detalhes da origem"
+                             data-agent-id="<?= (int)($agent['id'] ?? 0) ?>"
+                             data-agent-name="<?= htmlspecialchars($agent['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <div class="fs-2x fw-bold text-primary">
                                 <?= number_format($conversionRateClientOnly, 1) ?>%
                             </div>
@@ -602,8 +603,9 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-info border-dashed rounded p-4 text-center bg-light-info" role="button" style="cursor:pointer;" title="Ver detalhes"
-                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
+                        <div class="border border-info border-dashed rounded p-4 text-center bg-light-info js-wc-metric-breakdown" role="button" style="cursor:pointer;" title="Ver detalhes"
+                             data-agent-id="<?= (int)($agent['id'] ?? 0) ?>"
+                             data-agent-name="<?= htmlspecialchars($agent['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <div class="fs-2x fw-bold text-info">
                                 <?= number_format($conversionRateRecAtivas, 1) ?>%
                             </div>
@@ -614,8 +616,9 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                         </div>
                     </div>
                     <div class="col-md-6 col-xl-3">
-                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success" role="button" style="cursor:pointer;" title="Ver detalhes"
-                             onclick="openWcMetricBreakdown(<?= (int)($agent['id'] ?? 0) ?>, <?= json_encode($agent['name'] ?? '') ?>)">
+                        <div class="border border-success border-dashed rounded p-4 text-center bg-light-success js-wc-metric-breakdown" role="button" style="cursor:pointer;" title="Ver detalhes"
+                             data-agent-id="<?= (int)($agent['id'] ?? 0) ?>"
+                             data-agent-name="<?= htmlspecialchars($agent['name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <div class="fs-2x fw-bold text-success">
                                 <?= number_format($conversionRateInteractive, 1) ?>%
                             </div>
@@ -651,12 +654,12 @@ function formatTimeDisplay($seconds, $showUnit = true) {
     window.openWcMetricBreakdown = function (agentId, agentName) {
         const body = document.getElementById('modal_wc_metric_breakdown_body');
         const title = document.getElementById('modal_wc_metric_breakdown_title');
-        const df = document.getElementById('kt_dashboard_date_from')?.value
-            || document.getElementById('date_from_agent')?.value
-            || document.getElementById('filter-date-from')?.value || '';
-        const dt = document.getElementById('kt_dashboard_date_to')?.value
-            || document.getElementById('date_to_agent')?.value
-            || document.getElementById('filter-date-to')?.value || '';
+        function val(id) {
+            var el = document.getElementById(id);
+            return el && el.value ? el.value : '';
+        }
+        const df = val('kt_dashboard_date_from') || val('date_from_agent') || val('filter-date-from');
+        const dt = val('kt_dashboard_date_to') || val('date_to_agent') || val('filter-date-to');
         title.textContent = 'Origem das métricas — ' + (agentName || '');
         body.innerHTML = '<div class="text-center py-10"><span class="spinner-border text-primary"></span></div>';
         const modal = new bootstrap.Modal(document.getElementById('modal_wc_metric_breakdown'));
@@ -718,6 +721,15 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                 body.innerHTML = '<div class="alert alert-danger">' + msg.replace(/</g, '&lt;') + '</div>';
             });
     };
+    document.addEventListener('click', function (ev) {
+        var t = ev.target.closest && ev.target.closest('.js-wc-metric-breakdown');
+        if (!t || !document.getElementById('modal_wc_metric_breakdown')) return;
+        var id = parseInt(t.getAttribute('data-agent-id'), 10);
+        if (!id) return;
+        var name = t.getAttribute('data-agent-name') || '';
+        ev.preventDefault();
+        window.openWcMetricBreakdown(id, name);
+    });
 })();
 </script>
 <?php endif; ?>

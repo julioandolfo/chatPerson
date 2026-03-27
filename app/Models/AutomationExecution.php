@@ -56,6 +56,26 @@ class AutomationExecution extends Model
     }
 
     /**
+     * Verificar se já existe execução recente (completed/running) desta automação para esta conversa.
+     * Usado para prevenir re-execuções duplicadas em triggers como message_received.
+     */
+    public static function hasRecentExecution(int $automationId, int $conversationId, int $cooldownMinutes = 0): bool
+    {
+        $sql = "SELECT COUNT(*) as c FROM automation_executions
+                WHERE automation_id = ? AND conversation_id = ?
+                AND status IN ('completed', 'running')";
+        $params = [$automationId, $conversationId];
+
+        if ($cooldownMinutes > 0) {
+            $sql .= " AND created_at >= DATE_SUB(NOW(), INTERVAL ? MINUTE)";
+            $params[] = $cooldownMinutes;
+        }
+
+        $result = Database::fetch($sql, $params);
+        return ($result['c'] ?? 0) > 0;
+    }
+
+    /**
      * Obter execuções de uma automação
      */
     public static function getByAutomation(int $automationId, int $limit = 50): array

@@ -357,6 +357,12 @@ class AutomationService
         }
 
         foreach ($automations as $automation) {
+            // Proteção contra re-execução duplicada
+            if (\App\Models\AutomationExecution::hasRecentExecution((int)$automation['id'], (int)$conversationId)) {
+                \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): já executada para conversa {$conversationId} — ignorando re-execução");
+                continue;
+            }
+
             \App\Helpers\Logger::automation("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}");
             try {
                 self::executeAutomation($automation['id'], $conversationId);
@@ -423,6 +429,12 @@ class AutomationService
         \App\Helpers\Logger::automation("Automações encontradas: " . count($automations));
 
         foreach ($automations as $automation) {
+            // Proteção contra re-execução
+            if (\App\Models\AutomationExecution::hasRecentExecution((int)$automation['id'], (int)$conversation['id'])) {
+                \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): já executada para conversa {$conversation['id']} — ignorando re-execução");
+                continue;
+            }
+
             \App\Helpers\Logger::automation("Executando automação ID: {$automation['id']}, Nome: {$automation['name']}");
             try {
                 self::executeAutomation($automation['id'], $conversation['id']);
@@ -678,6 +690,12 @@ class AutomationService
             }
             if ($autoStageId && (int)$autoStageId !== (int)$convStageId) {
                 \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): etapa não corresponde (auto={$autoStageId}, conv={$convStageId})");
+                continue;
+            }
+
+            // Proteção contra re-execução: verificar se esta automação já rodou para esta conversa
+            if (\App\Models\AutomationExecution::hasRecentExecution((int)$automation['id'], (int)$conversation['id'])) {
+                \App\Helpers\Logger::automation("⏭️ Automação {$automation['id']} ({$automation['name']}): já executada para conversa {$conversation['id']} — ignorando re-execução");
                 continue;
             }
 

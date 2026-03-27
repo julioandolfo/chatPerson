@@ -337,7 +337,7 @@ window.deleteAgent = function(agentId, agentName) {
                     </thead>
                     <tbody class="text-gray-600 fw-semibold">
                         <?php foreach ($agents as $agent): ?>
-                            <tr>
+                            <tr class="<?= (($agent['status'] ?? 'active') === 'inactive') ? 'table-secondary' : '' ?>">
                                 <td>
                                     <div class="d-flex align-items-center">
                                         <div class="symbol symbol-45px me-5">

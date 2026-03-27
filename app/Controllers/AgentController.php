@@ -44,7 +44,8 @@ class AgentController
         }
         
         $filters = [
-            'status' => Request::get('status', 'active'),
+            // Sem padrão: lista ativos e inativos; use ?status=active ou ?status=inactive para filtrar
+            'status' => Request::get('status'),
             'role' => Request::get('role', 'agent'),
             'availability_status' => Request::get('availability_status'),
             'search' => Request::get('search'),
@@ -72,7 +73,7 @@ class AgentController
             
             $params = [];
 
-            if (!empty($filters['status'])) {
+            if (!empty($filters['status']) && in_array($filters['status'], ['active', 'inactive'], true)) {
                 $sql .= " AND u.status = ?";
                 $params[] = $filters['status'];
             }

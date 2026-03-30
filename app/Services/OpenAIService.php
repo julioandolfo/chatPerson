@@ -2283,7 +2283,7 @@ PROMPT;
     private static function executeHumanEscalationTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
     {
         try {
-            \App\Helpers\ConversationDebug::log($conversationId, "🧑‍💼 Executando Human Escalation Tool");
+            \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "🧑‍💼 Executando Human Escalation Tool");
             
             $escalationType = $config['escalation_type'] ?? 'auto';
             $departmentId = $config['department_id'] ?? null;
@@ -2456,10 +2456,10 @@ PROMPT;
             // Notificar agente humano
             if ($sendNotification && $assignedAgentId) {
                 // TODO: Implementar notificação via WebSocket
-                \App\Helpers\ConversationDebug::log($conversationId, "Notificação enviada para agente: {$assignedAgentName}");
+                \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "Notificação enviada para agente: {$assignedAgentName}");
             }
             
-            \App\Helpers\ConversationDebug::log($conversationId, "✅ Escalado para: {$assignedAgentName} (ID: {$assignedAgentId})");
+            \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "✅ Escalado para: {$assignedAgentName} (ID: {$assignedAgentId})");
             
             return [
                 'success' => true,
@@ -2485,7 +2485,7 @@ PROMPT;
     private static function executeFunnelStageTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
     {
         try {
-            \App\Helpers\ConversationDebug::log($conversationId, "📊 Executando Funnel Stage Tool");
+            \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL', "📊 Executando Funnel Stage Tool");
             
             $funnelId = $config['funnel_id'] ?? null;
             $stageId = $config['stage_id'] ?? null;
@@ -2568,7 +2568,7 @@ PROMPT;
                 AutomationService::triggerByStageChange($conversationId, $stageId);
             }
             
-            \App\Helpers\ConversationDebug::log($conversationId, "✅ Movido para Funil: {$funnel['name']} / Etapa: {$stage['name']}");
+            \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL', "✅ Movido para Funil: {$funnel['name']} / Etapa: {$stage['name']}");
             
             return [
                 'success' => true,
@@ -2593,7 +2593,7 @@ PROMPT;
     private static function executeFunnelStageSmartTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
     {
         try {
-            \App\Helpers\ConversationDebug::log($conversationId, "🧠 Executando Funnel Stage Smart Tool");
+            \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL_SMART', "🧠 Executando Funnel Stage Smart Tool");
             
             // Configurações
             $maxOptions = (int)($config['max_options'] ?? 30);
@@ -2649,7 +2649,7 @@ PROMPT;
             // Classificar com OpenAI
             $classification = self::classifyFunnelStage($conversationContext, $funnelsData, $conversationId);
             
-            \App\Helpers\ConversationDebug::log($conversationId, "Classificação: " . json_encode($classification));
+            \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL_SMART', "Classificação: " . json_encode($classification));
             
             // Verificar confiança
             $confidence = $classification['confidence'] ?? 0;
@@ -2658,7 +2658,7 @@ PROMPT;
             $reason = $classification['reason'] ?? 'Classificação automática pela IA';
             
             if ($confidence < $minConfidence || !$selectedFunnelId || !$selectedStageId) {
-                \App\Helpers\ConversationDebug::log($conversationId, "Confiança baixa ({$confidence} < {$minConfidence}), usando fallback: {$fallbackAction}");
+                \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL_SMART', "Confiança baixa ({$confidence} < {$minConfidence}), usando fallback: {$fallbackAction}");
                 
                 switch ($fallbackAction) {
                     case 'use_fallback':
@@ -2760,7 +2760,7 @@ PROMPT;
                 AutomationService::triggerByStageChange($conversationId, $selectedStageId);
             }
             
-            \App\Helpers\ConversationDebug::log($conversationId, "✅ Smart: Movido para {$funnel['name']} / {$stage['name']} (confiança: " . round($confidence * 100) . "%)");
+            \App\Helpers\ConversationDebug::log($conversationId, 'FUNNEL_SMART', "✅ Smart: Movido para {$funnel['name']} / {$stage['name']} (confiança: " . round($confidence * 100) . "%)");
             
             return [
                 'success' => true,

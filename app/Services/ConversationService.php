@@ -1602,8 +1602,30 @@ class ConversationService
         $updateData = [
             'status' => 'open',
             'resolved_at' => null,
-            'sla_warning_sent' => 0 // ✅ Reset warning para novo ciclo de SLA
+            'sla_warning_sent' => 0
         ];
+        
+        // Restaurar etapa do funil: se está em "Fechadas", mover para "Entrada"
+        if (!empty($conversation['funnel_id'])) {
+            $currentStageId = $conversation['funnel_stage_id'] ?? null;
+            $fechadasStage = \App\Models\FunnelStage::getSystemStage($conversation['funnel_id'], 'fechadas');
+            
+            if ($fechadasStage && $currentStageId == $fechadasStage['id']) {
+                $entradaStage = \App\Models\FunnelStage::getSystemStage($conversation['funnel_id'], 'entrada');
+                if ($entradaStage) {
+                    $updateData['funnel_stage_id'] = $entradaStage['id'];
+                    error_log("ConversationService::reopen - Conversa {$conversationId} restaurada de 'Fechadas' para 'Entrada' (ID: {$entradaStage['id']})");
+                }
+            }
+        }
+        
+        // Resetar flag funnel_automation_executed para permitir re-execução de automações
+        $metadata = json_decode($conversation['metadata'] ?? '{}', true);
+        if (!empty($metadata['funnel_automation_executed'])) {
+            $metadata['funnel_automation_executed'] = false;
+            $updateData['metadata'] = json_encode($metadata, JSON_UNESCAPED_UNICODE);
+            error_log("ConversationService::reopen - Reset funnel_automation_executed para conversa {$conversationId}");
+        }
         
         // Se deve atribuir ao agente do contato, atualizar agent_id
         if ($shouldAssignToContactAgent && $contactAgentId) {
@@ -1672,7 +1694,7 @@ class ConversationService
     /**
      * Enviar mensagem na conversa
      */
-    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false, bool $deferIntegrationSend = false): ?int
+    public static function sendMessage(int $conversationId, string $content, string $senderType = 'agent', ?int $senderId = null, array $attachments = [], ?string $messageType = null, ?int $quotedMessageId = null, ?int $aiAgentId = null, ?int $messageTimestamp = null, bool $skipAutomations = false, bool $deferIntegrationSend = false, ?string $externalId = null): ?int
     {
         \App\Helpers\Logger::info("═══ ConversationService::sendMessage INÍCIO ═══ conv={$conversationId}, type={$senderType}, sender={$senderId}, aiAgent={$aiAgentId}, contentLen=" . strlen($content) . ", attachments=" . count($attachments));
         
@@ -1746,6 +1768,11 @@ class ConversationService
         // Se foi fornecido timestamp customizado (ex: do WhatsApp), usar ele para created_at
         if ($messageTimestamp !== null) {
             $messageData['created_at'] = date('Y-m-d H:i:s', $messageTimestamp);
+        }
+        
+        // Adicionar external_id se fornecido (previne race condition em deduplicação)
+        if ($externalId !== null) {
+            $messageData['external_id'] = $externalId;
         }
         
         // Adicionar ai_agent_id se fornecido

@@ -4504,20 +4504,13 @@ class WhatsAppService
                     null,              // messageType
                     $quotedMessageId,  // quoted_message_id
                     null,              // aiAgentId
-                    $timestamp         // timestamp original da mensagem do WhatsApp
+                    $timestamp,        // timestamp original da mensagem do WhatsApp
+                    false,             // skipAutomations
+                    false,             // deferIntegrationSend
+                    $externalId        // external_id (setar na criação para evitar duplicatas)
                 );
                 
                 \App\Helpers\Logger::info("WhatsAppService::processWebhook - ConversationService::sendMessage RETORNOU messageId={$messageId}");
-                
-                if (!empty($externalId) && $messageId) {
-                    Logger::quepasa("processWebhook - Salvando external_id: externalId={$externalId}, messageId={$messageId}");
-                    \App\Models\Message::update($messageId, [
-                        'external_id' => $externalId
-                    ]);
-                    Logger::quepasa("processWebhook - ✅ external_id salvo com sucesso");
-                } else {
-                    Logger::quepasa("processWebhook - ⚠️ Não foi possível salvar external_id: externalId=" . ($externalId ?? 'NULL') . ", messageId=" . ($messageId ?? 'NULL'));
-                }
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem criada com sucesso: messageId={$messageId}");
                 

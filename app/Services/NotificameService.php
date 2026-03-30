@@ -1328,6 +1328,30 @@ class NotificameService
             }
         }
 
+        // Verificar duplicata por external_id antes de criar
+        $externalId = $messageData['external_id'] ?? null;
+        if (!empty($externalId)) {
+            $existingMessage = Message::findByExternalId($externalId);
+            if ($existingMessage) {
+                self::logInfo("Notificame webhook: ⚠️ Mensagem duplicada (external_id={$externalId}, existingId={$existingMessage['id']}). Ignorando.");
+                self::logInfo("========== Notificame Webhook FIM (Duplicata ignorada) ==========");
+                return;
+            }
+            
+            // Verificar também por conteúdo recente (proteção contra race condition com webhook WhatsApp)
+            $recentDuplicate = \App\Helpers\Database::fetch(
+                "SELECT id FROM messages WHERE conversation_id = ? AND sender_id = ? AND content = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 10 SECOND) LIMIT 1",
+                [$conversation['id'], $contact['id'], $messageData['content']]
+            );
+            if ($recentDuplicate) {
+                // Mensagem já existe (criada por outro webhook sem external_id). Apenas setar external_id.
+                Message::update($recentDuplicate['id'], ['external_id' => $externalId]);
+                self::logInfo("Notificame webhook: ⚠️ Mensagem recente duplicada encontrada (id={$recentDuplicate['id']}). Atualizado external_id e ignorando criação.");
+                self::logInfo("========== Notificame Webhook FIM (Duplicata por conteúdo) ==========");
+                return;
+            }
+        }
+
         $messageCreateData = [
             'conversation_id' => $conversation['id'],
             'contact_id' => $contact['id'],

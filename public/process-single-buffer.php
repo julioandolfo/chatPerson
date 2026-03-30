@@ -11,7 +11,6 @@ if (php_sapi_name() !== 'cli') {
     die('Access denied');
 }
 
-// Obter argumentos
 $conversationId = isset($argv[1]) ? (int)$argv[1] : 0;
 $timerSeconds = isset($argv[2]) ? (int)$argv[2] : 5;
 
@@ -19,24 +18,33 @@ if (!$conversationId) {
     die("Usage: php process-single-buffer.php <conversationId> <timerSeconds>\n");
 }
 
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../config/app.php';
 require_once __DIR__ . '/../config/database.php';
 
-// ✅ CRÍTICO: Definir timezone ANTES de qualquer operação com data/hora
 date_default_timezone_set('America/Sao_Paulo');
 
 use App\Helpers\Logger;
 use App\Services\AIAgentService;
 
+// Registrar shutdown handler para capturar fatal errors
+register_shutdown_function(function() use ($conversationId) {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        Logger::aiTools("[BUFFER BG FATAL] conv={$conversationId}: {$error['message']} em {$error['file']}:{$error['line']}");
+    }
+});
+
 Logger::aiTools("[BUFFER BG] Iniciando processamento background: conv={$conversationId}, timer={$timerSeconds}s");
 
-// Aguardar o timer
 sleep($timerSeconds);
 
 Logger::aiTools("[BUFFER BG] Timer expirado, processando: conv={$conversationId}");
 
-// Diretório de buffers
 $bufferDir = __DIR__ . '/../storage/ai_buffers/';
 $bufferFile = $bufferDir . 'buffer_' . $conversationId . '.json';
 
@@ -45,7 +53,6 @@ if (!file_exists($bufferFile)) {
     exit(0);
 }
 
-// ✅ LOCK EXCLUSIVO NÃO-BLOQUEANTE para evitar processamento duplicado
 $lockFile = $bufferDir . 'lock_' . $conversationId . '.lock';
 $lockFp = fopen($lockFile, 'c');
 if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
@@ -55,14 +62,12 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 }
 
 try {
-    // Re-verificar se buffer ainda existe após adquirir lock
     if (!file_exists($bufferFile)) {
         Logger::aiTools("[BUFFER BG] Buffer já foi processado por outro processo: conv={$conversationId}");
         flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
         exit(0);
     }
     
-    // Ler dados do buffer
     $bufferData = json_decode(file_get_contents($bufferFile), true);
     
     if (!$bufferData) {
@@ -78,48 +83,42 @@ try {
     $now = time();
     
     if (!$agentId || empty($messages)) {
-        Logger::aiTools("[BUFFER BG ERROR] Dados incompletos: conv={$conversationId}");
+        Logger::aiTools("[BUFFER BG ERROR] Dados incompletos: conv={$conversationId}, agentId=" . ($agentId ?? 'NULL') . ", messages=" . count($messages));
         @unlink($bufferFile);
         flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
         exit(1);
     }
     
-    // Verificar se não foi renovado (nova mensagem chegou)
     if ($expiresAt > $now) {
         $remaining = $expiresAt - $now;
         Logger::aiTools("[BUFFER BG] Timer renovado, aguardando mais {$remaining}s: conv={$conversationId}");
-        // Liberar lock antes de dormir (permitir que bufferMessage escreva)
         flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
-        // Reagendar
         sleep($remaining);
-        // Reprocessar (recursivo)
         exec(sprintf('php %s %d %d > /dev/null 2>&1 &', __FILE__, $conversationId, $remaining));
         exit(0);
     }
     
-    // Agrupar mensagens
     $groupedMessage = implode("\n\n", array_map(function($msg) {
         return $msg['content'];
     }, $messages));
     
-    Logger::aiTools("[BUFFER BG] Processando " . count($messages) . " mensagens agrupadas: conv={$conversationId}");
+    Logger::aiTools("[BUFFER BG] Processando " . count($messages) . " mensagens agrupadas: conv={$conversationId}, agentId={$agentId}, msgLen=" . strlen($groupedMessage));
     
-    // ✅ DELETAR buffer ANTES de processar (evita que outro processador pegue o mesmo)
     @unlink($bufferFile);
     
-    // Processar
-    AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
-    
-    Logger::aiTools("[BUFFER BG] ✅ Processamento concluído: conv={$conversationId}");
+    Logger::aiTools("[BUFFER BG] Chamando AIAgentService::processMessage...");
+    $result = AIAgentService::processMessage($conversationId, $agentId, $groupedMessage);
+    Logger::aiTools("[BUFFER BG] ✅ Processamento concluído: conv={$conversationId}, result=" . json_encode($result ?? 'null'));
     
     flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
     exit(0);
     
-} catch (\Exception $e) {
-    Logger::aiTools("[BUFFER BG ERROR] Erro: " . $e->getMessage());
+} catch (\Throwable $e) {
+    Logger::aiTools("[BUFFER BG ERROR] " . get_class($e) . ": " . $e->getMessage());
+    Logger::aiTools("[BUFFER BG ERROR] File: " . $e->getFile() . ":" . $e->getLine());
     Logger::aiTools("[BUFFER BG ERROR] Stack: " . $e->getTraceAsString());
-    @unlink($bufferFile);
-    flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+    @unlink($bufferFile ?? '');
+    if (isset($lockFp) && $lockFp) { flock($lockFp, LOCK_UN); fclose($lockFp); }
+    if (isset($lockFile)) @unlink($lockFile);
     exit(1);
 }
-

@@ -268,7 +268,7 @@ class ConversationAIService
         // Processar mensagem imediatamente se solicitado
         if ($processImmediately) {
             try {
-                // Buscar última mensagem do contato usando SQL direto
+                self::logAI("processImmediately: Buscando última mensagem do contato...");
                 $lastMessageSql = "SELECT * 
                                   FROM messages 
                                   WHERE conversation_id = ? 
@@ -278,18 +278,22 @@ class ConversationAIService
                 $lastMessage = \App\Helpers\Database::fetch($lastMessageSql, [$conversationId]);
 
                 if ($lastMessage) {
+                    self::logAI("processImmediately: Mensagem encontrada (id={$lastMessage['id']}, content='" . substr($lastMessage['content'], 0, 50) . "'). Chamando processMessage...");
                     AIAgentService::processMessage(
                         $conversationId,
                         $aiAgentId,
                         $lastMessage['content']
                     );
+                    self::logAI("processImmediately: ✅ processMessage concluído");
                 } else {
-                    // Se não há mensagens, processar conversa (pode enviar boas-vindas)
+                    self::logAI("processImmediately: Sem mensagens do contato. Chamando processConversation...");
                     AIAgentService::processConversation($conversationId, $aiAgentId);
+                    self::logAI("processImmediately: ✅ processConversation concluído");
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
+                self::logAI("processImmediately: ❌ ERRO: " . get_class($e) . ": " . $e->getMessage());
+                self::logAI("processImmediately: ❌ File: " . $e->getFile() . ":" . $e->getLine());
                 error_log("Erro ao processar mensagem imediatamente: " . $e->getMessage());
-                // Não falhar a criação se processamento falhar
             }
         }
 

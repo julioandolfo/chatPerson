@@ -7891,7 +7891,12 @@ window.addAIAgentToConversation = function(conversationId, data) {
         },
         body: JSON.stringify(data)
     })
-    .then(response => response.json())
+    .then(response => response.text())
+    .then(text => {
+        const jsonMatch = text.match(/\{[\s\S]*\}$/);
+        if (!jsonMatch) throw new Error('Resposta inválida do servidor');
+        return JSON.parse(jsonMatch[0]);
+    })
     .then(result => {
         if (result.success) {
             Swal.fire({

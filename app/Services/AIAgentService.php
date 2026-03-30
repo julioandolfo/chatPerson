@@ -318,11 +318,24 @@ class AIAgentService
     public static function processMessage(int $conversationId, int $agentId, string $message): array
     {
         \App\Helpers\Logger::info("═══ AIAgentService::processMessage INÍCIO ═══ conv={$conversationId}, agent={$agentId}, msgLen=" . strlen($message));
+        \App\Helpers\Logger::aiTools("[AI AGENT] processMessage INÍCIO: conv={$conversationId}, agent={$agentId}, msgLen=" . strlen($message));
         
         // Obter contexto da conversa
         $conversation = \App\Models\Conversation::findWithRelations($conversationId);
+        if (!$conversation) {
+            \App\Helpers\Logger::aiTools("[AI AGENT] ❌ Conversa não encontrada: conv={$conversationId}");
+            throw new \Exception("Conversa {$conversationId} não encontrada");
+        }
+        \App\Helpers\Logger::aiTools("[AI AGENT] Conversa carregada: contact_id=" . ($conversation['contact_id'] ?? 'NULL'));
+        
         $contact = \App\Models\Contact::find($conversation['contact_id'] ?? null);
         $agent = \App\Models\AIAgent::find($agentId);
+        
+        if (!$agent) {
+            \App\Helpers\Logger::aiTools("[AI AGENT] ❌ Agente não encontrado: agentId={$agentId}");
+            throw new \Exception("Agente IA {$agentId} não encontrado");
+        }
+        \App\Helpers\Logger::aiTools("[AI AGENT] Agente: {$agent['name']}, model=" . ($agent['model'] ?? 'NULL'));
         
         $context = [
             'conversation' => $conversation,
@@ -331,7 +344,7 @@ class AIAgentService
                 'email' => $contact['email'],
                 'phone' => $contact['phone']
             ] : null,
-            'user_message' => $message, // Mensagem do usuário para passar às tools
+            'user_message' => $message,
             'agent' => $agent ? [
                 'id' => $agent['id'],
                 'name' => $agent['name'],
@@ -343,8 +356,10 @@ class AIAgentService
         // Processar com OpenAI
         try {
             \App\Helpers\Logger::info("AIAgentService::processMessage - Chamando OpenAIService::processMessage");
+            \App\Helpers\Logger::aiTools("[AI AGENT] Chamando OpenAIService::processMessage...");
             $response = OpenAIService::processMessage($conversationId, $agentId, $message, $context);
             \App\Helpers\Logger::info("AIAgentService::processMessage - OpenAI respondeu (contentLen=" . strlen($response['content'] ?? '') . ")");
+            \App\Helpers\Logger::aiTools("[AI AGENT] ✅ OpenAI respondeu: contentLen=" . strlen($response['content'] ?? ''));
 
             // Delay humanizado antes de responder (configurável por agente)
             $settings = is_string($agent['settings'] ?? null) 
@@ -582,8 +597,9 @@ class AIAgentService
             \App\Helpers\Logger::info("═══ AIAgentService::processMessage SUCESSO ═══ conv={$conversationId}, aiMessageId={$aiMessageId}");
             
             return $response;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \App\Helpers\Logger::error("═══ AIAgentService::processMessage ERRO ═══ conv={$conversationId}: " . $e->getMessage() . " at " . $e->getFile() . ":" . $e->getLine());
+            \App\Helpers\Logger::aiTools("[AI AGENT] ❌ ERRO: " . get_class($e) . ": " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
             
             error_log("Erro ao processar mensagem com agente de IA: " . $e->getMessage());
             

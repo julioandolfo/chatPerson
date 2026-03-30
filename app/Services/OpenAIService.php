@@ -19,6 +19,7 @@ use App\Models\Funnel;
 use App\Models\FunnelStage;
 use App\Models\Activity;
 use App\Helpers\Database;
+use App\Helpers\Logger;
 use App\Services\ConversationAIService;
 use App\Services\RAGService;
 use App\Services\FeedbackDetectionService;

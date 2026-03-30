@@ -265,7 +265,7 @@ class ConversationAIService
         AIAgent::updateConversationsCount($aiAgentId);
         self::logAI("Contagem do agente atualizada");
 
-        // Processar mensagem imediatamente se solicitado
+        // Processar mensagem imediatamente se solicitado (em background para não bloquear HTTP)
         if ($processImmediately) {
             try {
                 self::logAI("processImmediately: Buscando última mensagem do contato...");
@@ -278,17 +278,31 @@ class ConversationAIService
                 $lastMessage = \App\Helpers\Database::fetch($lastMessageSql, [$conversationId]);
 
                 if ($lastMessage) {
-                    self::logAI("processImmediately: Mensagem encontrada (id={$lastMessage['id']}, content='" . substr($lastMessage['content'], 0, 50) . "'). Chamando processMessage...");
-                    AIAgentService::processMessage(
+                    self::logAI("processImmediately: Mensagem encontrada (id={$lastMessage['id']}, content='" . substr($lastMessage['content'], 0, 50) . "'). Agendando processamento em background...");
+                    AIAgentService::scheduleImmediateProcessing(
                         $conversationId,
                         $aiAgentId,
                         $lastMessage['content']
                     );
-                    self::logAI("processImmediately: ✅ processMessage concluído");
+                    self::logAI("processImmediately: ✅ Processamento agendado em background");
                 } else {
-                    self::logAI("processImmediately: Sem mensagens do contato. Chamando processConversation...");
-                    AIAgentService::processConversation($conversationId, $aiAgentId);
-                    self::logAI("processImmediately: ✅ processConversation concluído");
+                    self::logAI("processImmediately: Sem mensagens do contato. Enviando welcome message (se configurada)...");
+                    $agent = \App\Models\AIAgent::find($aiAgentId);
+                    if ($agent && !empty($agent['settings'])) {
+                        $settings = is_string($agent['settings']) 
+                            ? json_decode($agent['settings'], true) 
+                            : $agent['settings'];
+                        if (!empty($settings['welcome_message'])) {
+                            ConversationService::sendMessage(
+                                $conversationId,
+                                $settings['welcome_message'],
+                                'agent',
+                                null,
+                                []
+                            );
+                            self::logAI("processImmediately: ✅ Welcome message enviada");
+                        }
+                    }
                 }
             } catch (\Throwable $e) {
                 self::logAI("processImmediately: ❌ ERRO: " . get_class($e) . ": " . $e->getMessage());

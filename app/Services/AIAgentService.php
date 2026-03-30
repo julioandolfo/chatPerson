@@ -789,6 +789,31 @@ class AIAgentService
     }
     
     /**
+     * Agendar processamento imediato em background (não bloqueia a thread HTTP)
+     */
+    public static function scheduleImmediateProcessing(int $conversationId, int $agentId, string $message): void
+    {
+        $bufferDir = self::getBufferDirectory();
+        $bufferFile = $bufferDir . '/buffer_' . $conversationId . '.json';
+        
+        $now = time();
+        $bufferData = [
+            'messages' => [['content' => $message, 'timestamp' => $now]],
+            'agent_id' => $agentId,
+            'timer_seconds' => 0,
+            'first_message_at' => $now,
+            'last_message_at' => $now,
+            'expires_at' => $now,
+            'scheduled' => true
+        ];
+        
+        file_put_contents($bufferFile, json_encode($bufferData, JSON_UNESCAPED_UNICODE));
+        \App\Helpers\Logger::aiTools("[BUFFER] Agendamento imediato criado: conv={$conversationId}, agent={$agentId}, msgLen=" . strlen($message));
+        
+        self::triggerBackgroundProcessing($conversationId, 0);
+    }
+
+    /**
      * Obter diretório de buffers
      */
     private static function getBufferDirectory(): string

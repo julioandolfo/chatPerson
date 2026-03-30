@@ -805,7 +805,7 @@ Ferramentas disponíveis:
 Mensagem do cliente: "{$message}"
 
 Responda APENAS com uma única palavra:
-- TOOLS  → se a mensagem pede dados, ações, consultas, status, informações que só as ferramentas podem fornecer
+- TOOLS  → se a mensagem pede dados, ações, consultas, status, informações que só as ferramentas podem fornecer, OU se o cliente pede para falar com humano/atendente/transferir/escalar
 - TEXT   → se é saudação, agradecimento, conversa genérica, pergunta sobre a empresa, dúvida geral ou qualquer coisa que não precise de ferramenta
 
 Responda:
@@ -824,7 +824,7 @@ PROMPT;
 
             $response = self::makeRequest($apiKey, $payload);
             $answer = strtoupper(trim($response['choices'][0]['message']['content'] ?? 'TOOLS'));
-            $needsTools = str_contains($answer, 'TOOLS');
+            $needsTools = str_contains($answer, 'TOOLS') || str_contains($answer, 'ESCALAR');
             $classElapsed = round((microtime(true) - $classStart) * 1000);
 
             \App\Helpers\Logger::aiTools("[CLASSIFY] conv={$conversationId} msg=\"" . mb_substr($message, 0, 60) . "\" => {$answer} ({$classElapsed}ms)");

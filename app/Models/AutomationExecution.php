@@ -76,6 +76,21 @@ class AutomationExecution extends Model
     }
 
     /**
+     * Resetar execuções de uma conversa ao encerrá-la.
+     * Muda status de 'completed' para 'conversation_closed' para que
+     * automações possam re-executar se a conversa for reaberta.
+     */
+    public static function resetForConversation(int $conversationId): int
+    {
+        $sql = "UPDATE automation_executions
+                SET status = 'conversation_closed'
+                WHERE conversation_id = ?
+                AND status IN ('completed', 'running')";
+
+        return Database::execute($sql, [$conversationId]);
+    }
+
+    /**
      * Obter execuções de uma automação
      */
     public static function getByAutomation(int $automationId, int $limit = 50): array

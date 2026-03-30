@@ -1493,6 +1493,13 @@ class ConversationService
                 error_log("Erro ao notificar WebSocket: " . $e->getMessage());
             }
             
+            // Resetar execuções de automação para permitir re-execução se conversa reabrir
+            try {
+                \App\Models\AutomationExecution::resetForConversation($conversationId);
+            } catch (\Exception $e) {
+                error_log("Erro ao resetar execuções de automação: " . $e->getMessage());
+            }
+
             // Executar automações para resolução
             try {
                 \App\Services\AutomationService::executeForConversationResolved($conversationId);

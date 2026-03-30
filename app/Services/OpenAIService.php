@@ -1175,7 +1175,16 @@ PROMPT;
                 case 'auto':
                 default:
                     // Sistema decide automaticamente (usa regras de distribuição)
-                    $assignedTo = self::autoAssignAgent($conversationId);
+                    $conv = Conversation::find($conversationId);
+                    $assignedTo = \App\Services\ConversationSettingsService::autoAssignConversation(
+                        $conversationId,
+                        $conv['department_id'] ?? null,
+                        $conv['funnel_id'] ?? null,
+                        $conv['funnel_stage_id'] ?? null
+                    );
+                    if ($assignedTo && $assignedTo < 0) {
+                        $assignedTo = null;
+                    }
                     $escalationMethod = 'auto';
                     break;
             }
@@ -1187,7 +1196,7 @@ PROMPT;
             ];
 
             if ($assignedTo !== null) {
-                $updateData['assigned_to'] = $assignedTo;
+                $updateData['agent_id'] = $assignedTo;
             }
 
             Conversation::update($conversationId, $updateData);
@@ -2380,31 +2389,18 @@ PROMPT;
                     break;
                     
                 case 'custom':
-                    // Distribuição personalizada
-                    $settings = [
-                        'method' => $distributionMethod,
-                        'department_id' => $departmentId,
-                        'consider_availability' => $considerAvailability,
-                        'consider_limits' => $considerLimits,
-                        'allow_ai_agents' => $allowAIAgents
-                    ];
-                    
-                    $assignedAgentId = ConversationService::autoAssignAgent($conversationId, $settings);
-                    
-                    if (!$assignedAgentId) {
-                        return ['error' => 'Não foi possível encontrar um agente disponível'];
-                    }
-                    
-                    $agent = User::find($assignedAgentId);
-                    $assignedAgentName = $agent['name'] ?? 'Agente';
-                    break;
-                    
                 case 'auto':
                 default:
                     // Usar distribuição automática do sistema
-                    $assignedAgentId = ConversationService::autoAssignAgent($conversationId);
+                    $conversation = Conversation::find($conversationId);
+                    $assignedAgentId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                        $conversationId,
+                        $departmentId ?? ($conversation['department_id'] ?? null),
+                        $conversation['funnel_id'] ?? null,
+                        $conversation['funnel_stage_id'] ?? null
+                    );
                     
-                    if (!$assignedAgentId) {
+                    if (!$assignedAgentId || $assignedAgentId < 0) {
                         return ['error' => 'Não foi possível atribuir a um agente automaticamente'];
                     }
                     
@@ -2415,7 +2411,7 @@ PROMPT;
             
             // Atribuir conversa ao agente
             $updateData = [
-                'assigned_user_id' => $assignedAgentId,
+                'agent_id' => $assignedAgentId,
                 'status' => 'open'
             ];
             

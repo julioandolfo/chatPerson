@@ -750,6 +750,16 @@ $maxLines = isset($_GET['lines']) ? (int)$_GET['lines'] : 500;
 $filter = isset($_GET['filter']) ? $_GET['filter'] : '';
 $level = isset($_GET['level']) ? $_GET['level'] : '';
 
+// Auto-criar diretório e arquivo de log se não existirem
+if (!file_exists($logFile)) {
+    $logDir = dirname($logFile);
+    if (!is_dir($logDir)) {
+        @mkdir($logDir, 0777, true);
+    }
+    @touch($logFile);
+    @chmod($logFile, 0666);
+}
+
 // Ler logs
 $logs = [];
 if (file_exists($logFile)) {

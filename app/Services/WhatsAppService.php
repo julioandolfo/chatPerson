@@ -3433,20 +3433,37 @@ class WhatsAppService
                 }
                 
                 // ✅ VERIFICAR DUPLICATA: Não criar mensagem se já existe (enviada pela API)
-                Logger::quepasa("processWebhook - 🔍 Verificando se mensagem já existe (evitar duplicata)...");
+                Logger::quepasa("processWebhook - 🔍 Verificando se mensagem já existe (evitar duplicata eco)...");
+                
+                // 1. Verificar por external_id (mais confiável - é o ID retornado pela API ao enviar)
+                $webhookMsgId = $messageId ?? null;
+                if (!empty($webhookMsgId)) {
+                    $existingByExtId = \App\Models\Message::findByExternalId($webhookMsgId);
+                    if ($existingByExtId) {
+                        Logger::quepasa("processWebhook - ⚠️ Duplicata detectada por external_id={$webhookMsgId}, existingId={$existingByExtId['id']}. Ignorando eco.");
+                        return;
+                    }
+                }
+                
+                // 2. Verificar por conteúdo com TRIM (fallback para diferenças de whitespace/encoding)
                 $existingMessage = \App\Helpers\Database::fetch(
-                    "SELECT id FROM messages 
+                    "SELECT id, external_id FROM messages 
                      WHERE conversation_id = ? 
                      AND sender_type = 'agent' 
-                     AND content = ? 
-                     AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                     AND TRIM(content) = TRIM(?) 
+                     AND created_at >= DATE_SUB(NOW(), INTERVAL 120 SECOND)
                      LIMIT 1",
                     [$conversation['id'], $message ?: '']
                 );
                 
                 if ($existingMessage) {
-                    Logger::quepasa("processWebhook - ⚠️ Mensagem duplicada detectada! Já existe mensagem ID={$existingMessage['id']} com mesmo conteúdo nos últimos 60s. Ignorando webhook.");
-                    return; // Não criar mensagem duplicada
+                    // Atualizar external_id se a mensagem existente não tem (para futuras deduplicações)
+                    if (!empty($webhookMsgId) && empty($existingMessage['external_id'])) {
+                        \App\Models\Message::update($existingMessage['id'], ['external_id' => $webhookMsgId]);
+                        Logger::quepasa("processWebhook - external_id atualizado na msg existente ID={$existingMessage['id']}");
+                    }
+                    Logger::quepasa("processWebhook - ⚠️ Duplicata detectada por conteúdo! existingId={$existingMessage['id']}. Ignorando eco.");
+                    return;
                 }
                 
                 Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");

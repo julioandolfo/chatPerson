@@ -106,7 +106,6 @@ foreach ($bufferFiles as $bufferFile) {
             // Re-verificar se buffer ainda existe após adquirir lock
             if (!file_exists($bufferFile)) {
                 Logger::aiTools("[BUFFER PROCESSOR] Buffer já processado por outro processo: conv={$conversationId}");
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
                 continue;
             }
             
@@ -116,7 +115,6 @@ foreach ($bufferFiles as $bufferFile) {
             if (!$bufferData) {
                 Logger::aiTools("[BUFFER PROCESSOR] Arquivo de buffer inválido: " . basename($bufferFile));
                 @unlink($bufferFile);
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
                 continue;
             }
             
@@ -127,7 +125,6 @@ foreach ($bufferFiles as $bufferFile) {
             if (!$conversationId || !$agentId || empty($messages)) {
                 Logger::aiTools("[BUFFER PROCESSOR] Dados incompletos no buffer: convId={$conversationId}, agentId={$agentId}, msgs=" . count($messages));
                 @unlink($bufferFile);
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
                 continue;
             }
             
@@ -136,22 +133,19 @@ foreach ($bufferFiles as $bufferFile) {
             if (empty($conversation) || empty($conversation['contact_id'])) {
                 Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: conversa inexistente ou sem contato (convId={$conversationId})");
                 @unlink($bufferFile);
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
                 continue;
             }
             $agentModel = AIAgent::find($agentId);
             if (empty($agentModel) || empty($agentModel['enabled'])) {
                 Logger::aiTools("[BUFFER PROCESSOR] 🔥 Descartando buffer: agente inexistente/inativo (agentId={$agentId}, convId={$conversationId})");
                 @unlink($bufferFile);
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
                 continue;
             }
             
             // Verificar se já passou o tempo de expiração
             if ($expiresAt > $now) {
                 $skipped++;
-                flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
-                continue; // Ainda não expirou
+                continue;
             }
             
             // Agrupar mensagens
@@ -172,7 +166,11 @@ foreach ($bufferFiles as $bufferFile) {
             $processed++;
             
         } finally {
-            flock($lockFp, LOCK_UN); fclose($lockFp); @unlink($lockFile);
+            if (is_resource($lockFp)) {
+                flock($lockFp, LOCK_UN);
+                fclose($lockFp);
+            }
+            @unlink($lockFile);
         }
         
     } catch (\Throwable $e) {

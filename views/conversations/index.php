@@ -7878,10 +7878,7 @@ window.showAddAIAgentModal = function() {
  * Adicionar agente de IA á conversa
  */
 window.addAIAgentToConversation = function(conversationId, data) {
-    const btn = Swal.getConfirmButton();
-    const originalText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Adicionando...';
+    Swal.fire({ title: 'Adicionando IA...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
     
     fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/ai-agents`, {
         method: 'POST',
@@ -7927,10 +7924,6 @@ window.addAIAgentToConversation = function(conversationId, data) {
             title: 'Erro',
             text: error.message || 'Erro ao adicionar agente de IA'
         });
-    })
-    .finally(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalText;
     });
 };
 

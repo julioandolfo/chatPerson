@@ -789,6 +789,12 @@ const toolTypeConfigs = {
                 { value: "high", label: "Alta" },
                 { value: "urgent", label: "Urgente" }
               ], default: "normal", help: "Prioridade ao escalar para humano" },
+            { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
+              showIf: "escalation_type:department",
+              options: [
+                { value: "round_robin", label: "Round Robin (sequencial)" },
+                { value: "by_load", label: "Por Carga (menos conversas)" }
+              ], default: "round_robin", help: "Como distribuir entre agentes do setor" },
             { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
               showIf: "escalation_type:department", help: "Só atribui a agentes que estão online" },
             { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
@@ -828,7 +834,7 @@ const toolTypeConfigs = {
             { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
               showIf: "escalation_type:agent", help: "Selecione o agente específico" },
             { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
-              showIf: "escalation_type:custom",
+              showIf: "escalation_type:department,custom",
               options: [
                 { value: "round_robin", label: "Round Robin (sequencial)" },
                 { value: "by_load", label: "Por Carga (menos conversas)" },
@@ -838,9 +844,9 @@ const toolTypeConfigs = {
                 { value: "percentage", label: "Por Porcentagem" }
               ], default: "round_robin" },
             { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
-              showIf: "escalation_type:custom" },
+              showIf: "escalation_type:department,custom" },
             { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
-              showIf: "escalation_type:custom" },
+              showIf: "escalation_type:department,custom" },
             { name: "allow_ai_agents", label: "Permitir agentes de IA", type: "checkbox", required: false, default: false,
               showIf: "escalation_type:custom" },
             { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
@@ -1116,7 +1122,7 @@ function updateConfigFields() {
             inputHtml += `</select>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "funnel_select") {
-            const stageSelectId = field.dependsOn ? "config_" + field.name.replace("funnel", "stage") : "config_stage_id";
+            const stageSelectId = "config_" + field.name.replace("funnel_id", "stage_id");
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="config_${field.name}" ${field.required ? "required" : ""} onchange="loadFunnelStages(this.value, '${stageSelectId}')">`;
             inputHtml += `<option value="">Selecione o funil...</option>`;
             availableFunnels.forEach(funnel => {
@@ -1302,7 +1308,7 @@ function buildConfig() {
     const config = {};
     let hasConfig = false;
     
-    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id'];
+    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id', 'fallback_funnel_id', 'fallback_stage_id'];
     
     document.querySelectorAll(".config-field").forEach(field => {
         const fieldName = field.dataset.field;
@@ -1310,6 +1316,16 @@ function buildConfig() {
         if (field.type === "checkbox") {
             config[fieldName] = field.checked;
             if (field.checked) hasConfig = true;
+            return;
+        }
+        
+        // Multi-select
+        if (field.multiple) {
+            const selected = Array.from(field.selectedOptions).map(opt => parseInt(opt.value) || opt.value);
+            if (selected.length > 0) {
+                config[fieldName] = selected;
+                hasConfig = true;
+            }
             return;
         }
         

@@ -653,6 +653,12 @@ const toolTypeConfigs = {
               showIf: "escalation_type:department", help: "Selecione o setor de destino" },
             { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
               showIf: "escalation_type:agent", help: "Selecione o agente que receberá a conversa" },
+            { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
+              showIf: "escalation_type:department",
+              options: [
+                { value: "round_robin", label: "Round Robin (sequencial)" },
+                { value: "by_load", label: "Por Carga (menos conversas)" }
+              ], default: "round_robin", help: "Como distribuir entre agentes do setor" },
             { name: "priority", label: "Prioridade da Conversa", type: "select", required: false, 
               options: [
                 { value: "low", label: "Baixa" },
@@ -699,7 +705,7 @@ const toolTypeConfigs = {
             { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
               showIf: "escalation_type:agent", help: "Selecione o agente específico" },
             { name: "distribution_method", label: "Método de Distribuição", type: "select", required: false,
-              showIf: "escalation_type:custom",
+              showIf: "escalation_type:department,custom",
               options: [
                 { value: "round_robin", label: "Round Robin (sequencial)" },
                 { value: "by_load", label: "Por Carga (menos conversas)" },
@@ -709,9 +715,9 @@ const toolTypeConfigs = {
                 { value: "percentage", label: "Por Porcentagem" }
               ], default: "round_robin" },
             { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
-              showIf: "escalation_type:custom" },
+              showIf: "escalation_type:department,custom" },
             { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
-              showIf: "escalation_type:custom" },
+              showIf: "escalation_type:department,custom" },
             { name: "allow_ai_agents", label: "Permitir agentes de IA", type: "checkbox", required: false, default: false,
               showIf: "escalation_type:custom" },
             { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
@@ -890,6 +896,42 @@ function updateEditFunctionSchemaVisibility(toolType) {
     }
 }
 
+// Carregar etapas do funil selecionado (edição)
+async function loadEditFunnelStages(funnelId, stageSelectId) {
+    const stageSelect = document.getElementById(stageSelectId);
+    if (!stageSelect) {
+        console.warn("Stage select não encontrado:", stageSelectId);
+        return;
+    }
+    
+    if (!funnelId) {
+        stageSelect.innerHTML = `<option value="">Selecione o funil primeiro...</option>`;
+        stageSelect.disabled = true;
+        return;
+    }
+    
+    stageSelect.innerHTML = `<option value="">Carregando...</option>`;
+    stageSelect.disabled = true;
+    
+    try {
+        const response = await fetch(`/funnels/${funnelId}/stages/json`);
+        const data = await response.json();
+        
+        stageSelect.innerHTML = `<option value="">Selecione a etapa...</option>`;
+        if (data.stages && data.stages.length > 0) {
+            data.stages.forEach(stage => {
+                stageSelect.innerHTML += `<option value="${stage.id}">${stage.name}</option>`;
+            });
+            stageSelect.disabled = false;
+        } else {
+            stageSelect.innerHTML = `<option value="">Nenhuma etapa encontrada</option>`;
+        }
+    } catch (error) {
+        console.error("Erro ao carregar etapas:", error);
+        stageSelect.innerHTML = `<option value="">Erro ao carregar etapas</option>`;
+    }
+}
+
 // Atualizar campos de config baseado no tipo (edição)
 function updateEditConfigFields() {
     const toolType = document.getElementById("kt_edit_tool_type").value;
@@ -964,12 +1006,22 @@ function updateEditConfigFields() {
             inputHtml += `</select>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "funnel_select") {
-            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.required ? "required" : ""}>`;
+            const stageFieldName = field.name.replace("funnel_id", "stage_id");
+            const stageSelectId = `edit_config_${stageFieldName}`;
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.required ? "required" : ""} onchange="loadEditFunnelStages(this.value, '${stageSelectId}')">`;
             inputHtml += `<option value="">Selecione o funil...</option>`;
             (typeof availableFunnels !== 'undefined' ? availableFunnels : []).forEach(funnel => {
                 inputHtml += `<option value="${funnel.id}">${funnel.name}</option>`;
             });
             inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "funnel_multi_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" multiple size="5">`;
+            (typeof availableFunnels !== 'undefined' ? availableFunnels : []).forEach(funnel => {
+                inputHtml += `<option value="${funnel.id}">${funnel.name}</option>`;
+            });
+            inputHtml += `</select>`;
+            inputHtml += `<div class="form-text text-muted">Segure Ctrl para selecionar múltiplos</div>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "stage_select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.required ? "required" : ""} disabled>`;
@@ -1109,7 +1161,7 @@ function buildEditConfig() {
     const config = {};
     let hasConfig = false;
     
-    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id'];
+    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id', 'fallback_funnel_id', 'fallback_stage_id'];
     
     document.querySelectorAll("#kt_edit_config_fields .config-field").forEach(field => {
         const fieldName = field.dataset.field;
@@ -1118,6 +1170,16 @@ function buildEditConfig() {
         if (field.type === "checkbox") {
             config[fieldName] = field.checked;
             if (field.checked) hasConfig = true;
+            return;
+        }
+        
+        // Tratar multi-select
+        if (field.multiple) {
+            const selected = Array.from(field.selectedOptions).map(opt => parseInt(opt.value) || opt.value);
+            if (selected.length > 0) {
+                config[fieldName] = selected;
+                hasConfig = true;
+            }
             return;
         }
         
@@ -1188,25 +1250,50 @@ function populateEditFields() {
         
         // Preencher valores de config após renderizar os campos
         if (config && Object.keys(config).length > 0) {
-            setTimeout(() => {
+            setTimeout(async () => {
                 console.log("Preenchendo campos de config...");
-                // Preencher selects/inputs primeiro (para que showIf funcione)
+                
+                // Primeira passada: preencher todos os campos (exceto stage_select que depende de funil)
+                const stageFieldsToFill = [];
+                
                 Object.keys(config).forEach(key => {
                     const field = document.querySelector(`#kt_edit_config_fields .config-field[data-field="${key}"]`);
-                    if (field) {
-                        if (field.type === "checkbox") {
-                            field.checked = !!config[key];
-                        } else if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
-                            field.value = JSON.stringify(config[key], null, 2);
-                        } else if (field.tagName === "TEXTAREA" && typeof config[key] === "string") {
-                            field.value = config[key];
-                        } else {
-                            field.value = config[key] || "";
-                        }
-                        // Disparar change para atualizar campos condicionais (showIf)
-                        field.dispatchEvent(new Event('change'));
+                    if (!field) return;
+                    
+                    if (field.type === "checkbox") {
+                        field.checked = !!config[key];
+                    } else if (field.multiple && Array.isArray(config[key])) {
+                        // Multi-select: marcar opções selecionadas
+                        const values = config[key].map(v => String(v));
+                        Array.from(field.options).forEach(opt => {
+                            opt.selected = values.includes(opt.value);
+                        });
+                    } else if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
+                        field.value = JSON.stringify(config[key], null, 2);
+                    } else if (field.tagName === "TEXTAREA" && typeof config[key] === "string") {
+                        field.value = config[key];
+                    } else if (field.disabled && key.includes('stage_id')) {
+                        // Stage selects precisam carregar após o funil
+                        stageFieldsToFill.push({ key, value: config[key] });
+                    } else {
+                        field.value = config[key] || "";
                     }
+                    field.dispatchEvent(new Event('change'));
                 });
+                
+                // Segunda passada: carregar etapas de funis e preencher stage selects
+                for (const stageField of stageFieldsToFill) {
+                    const funnelKey = stageField.key.replace('stage_id', 'funnel_id');
+                    const funnelValue = config[funnelKey];
+                    if (funnelValue) {
+                        const stageSelectId = `edit_config_${stageField.key}`;
+                        await loadEditFunnelStages(funnelValue, stageSelectId);
+                        const stageSelect = document.getElementById(stageSelectId);
+                        if (stageSelect) {
+                            stageSelect.value = stageField.value;
+                        }
+                    }
+                }
             }, 200);
         } else {
             console.log("Nenhuma config para preencher");

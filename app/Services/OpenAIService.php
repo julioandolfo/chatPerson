@@ -2384,23 +2384,78 @@ PROMPT;
                     
                     if (!$deptFailed) {
                         $selectedAgent = null;
-                        $minConversations = PHP_INT_MAX;
                         
-                        foreach ($agentsInDept as $agent) {
-                            $row = Database::fetch(
-                                "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
-                                [$agent['id']]
-                            );
-                            $count = (int) ($row['total'] ?? 0);
+                        if ($distributionMethod === 'round_robin') {
+                            // Round-robin: próximo agente na sequência após o último atribuído
+                            $agentIds = array_map(fn($a) => $a['id'], $agentsInDept);
+                            $agentMap = [];
+                            foreach ($agentsInDept as $a) $agentMap[$a['id']] = $a;
+                            sort($agentIds);
                             
-                            if ($considerLimits) {
-                                $maxConversations = $agent['max_conversations'] ?? 50;
-                                if ($count >= $maxConversations) continue;
+                            $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+                            $lastAssigned = Database::fetch(
+                                "SELECT agent_id FROM conversations 
+                                 WHERE agent_id IN ({$placeholders}) AND agent_id IS NOT NULL
+                                 ORDER BY updated_at DESC LIMIT 1",
+                                $agentIds
+                            );
+                            $lastAgentId = $lastAssigned['agent_id'] ?? null;
+                            $tried = 0;
+                            $startIndex = 0;
+                            
+                            if ($lastAgentId !== null) {
+                                $lastIndex = array_search((int) $lastAgentId, $agentIds);
+                                $startIndex = ($lastIndex !== false) ? ($lastIndex + 1) % count($agentIds) : 0;
                             }
                             
-                            if ($count < $minConversations) {
-                                $minConversations = $count;
-                                $selectedAgent = $agent;
+                            // Percorrer sequencialmente a partir do próximo, respeitando limites
+                            while ($tried < count($agentIds)) {
+                                $idx = ($startIndex + $tried) % count($agentIds);
+                                $candidate = $agentMap[$agentIds[$idx]];
+                                
+                                if ($considerLimits) {
+                                    $row = Database::fetch(
+                                        "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
+                                        [$candidate['id']]
+                                    );
+                                    $count = (int) ($row['total'] ?? 0);
+                                    $maxConversations = $candidate['max_conversations'] ?? 50;
+                                    if ($count >= $maxConversations) {
+                                        $tried++;
+                                        continue;
+                                    }
+                                }
+                                
+                                $selectedAgent = $candidate;
+                                break;
+                            }
+                            
+                            if ($selectedAgent) {
+                                Logger::aiTools("[ESCALATION] ✅ Round-robin setor: {$selectedAgent['name']} (ID={$selectedAgent['id']}), último foi ID=" . ($lastAgentId ?? 'nenhum'));
+                            }
+                        } else {
+                            // by_load: agente com menos conversas abertas
+                            $minConversations = PHP_INT_MAX;
+                            foreach ($agentsInDept as $agent) {
+                                $row = Database::fetch(
+                                    "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
+                                    [$agent['id']]
+                                );
+                                $count = (int) ($row['total'] ?? 0);
+                                
+                                if ($considerLimits) {
+                                    $maxConversations = $agent['max_conversations'] ?? 50;
+                                    if ($count >= $maxConversations) continue;
+                                }
+                                
+                                if ($count < $minConversations) {
+                                    $minConversations = $count;
+                                    $selectedAgent = $agent;
+                                }
+                            }
+                            
+                            if ($selectedAgent) {
+                                Logger::aiTools("[ESCALATION] ✅ By-load setor: {$selectedAgent['name']} (ID={$selectedAgent['id']})");
                             }
                         }
                         
@@ -2410,7 +2465,6 @@ PROMPT;
                         } else {
                             $assignedAgentId = $selectedAgent['id'];
                             $assignedAgentName = $selectedAgent['name'];
-                            Logger::aiTools("[ESCALATION] ✅ Agente do setor: {$assignedAgentName} (ID={$assignedAgentId})");
                         }
                     }
                     
@@ -2420,31 +2474,42 @@ PROMPT;
                         
                         switch ($fallbackAction) {
                             case 'any_agent_same_dept':
-                                // Re-buscar agentes do setor ignorando limites e disponibilidade
+                                // Round-robin no mesmo setor, ignorando limites e disponibilidade
                                 $allAgentsInDept = Department::getAgents($departmentId);
                                 if (!empty($allAgentsInDept)) {
+                                    $agentIds = array_column($allAgentsInDept, 'id');
+                                    $agentMap = array_column($allAgentsInDept, null, 'id');
+                                    sort($agentIds);
+                                    
+                                    // Buscar último agente atribuído neste setor (round-robin)
+                                    $placeholders = implode(',', array_fill(0, count($agentIds), '?'));
+                                    $lastAssigned = Database::fetch(
+                                        "SELECT agent_id FROM conversations 
+                                         WHERE agent_id IN ({$placeholders}) AND agent_id IS NOT NULL
+                                         ORDER BY updated_at DESC LIMIT 1",
+                                        $agentIds
+                                    );
+                                    
+                                    $lastAgentId = $lastAssigned['agent_id'] ?? null;
                                     $selectedAgent = null;
-                                    $minConversations = PHP_INT_MAX;
-                                    foreach ($allAgentsInDept as $agent) {
-                                        $row = Database::fetch(
-                                            "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
-                                            [$agent['id']]
-                                        );
-                                        $count = (int) ($row['total'] ?? 0);
-                                        if ($count < $minConversations) {
-                                            $minConversations = $count;
-                                            $selectedAgent = $agent;
+                                    
+                                    if ($lastAgentId !== null) {
+                                        // Pegar o próximo na sequência após o último atribuído
+                                        $lastIndex = array_search((int) $lastAgentId, $agentIds);
+                                        if ($lastIndex !== false) {
+                                            $nextIndex = ($lastIndex + 1) % count($agentIds);
+                                            $selectedAgent = $agentMap[$agentIds[$nextIndex]];
                                         }
                                     }
-                                    if ($selectedAgent) {
-                                        $assignedAgentId = $selectedAgent['id'];
-                                        $assignedAgentName = $selectedAgent['name'];
-                                        Logger::aiTools("[ESCALATION] ✅ Fallback same_dept (ignorando limites): {$assignedAgentName} (ID={$assignedAgentId})");
-                                    } else {
-                                        $assignedAgentId = null;
-                                        $assignedAgentName = null;
-                                        Logger::aiTools("[ESCALATION] ⚠️ Fallback same_dept: setor vazio, conversa vai para fila");
+                                    
+                                    // Se não encontrou (primeiro uso), pegar o primeiro da lista
+                                    if (!$selectedAgent) {
+                                        $selectedAgent = $agentMap[$agentIds[0]];
                                     }
+                                    
+                                    $assignedAgentId = $selectedAgent['id'];
+                                    $assignedAgentName = $selectedAgent['name'];
+                                    Logger::aiTools("[ESCALATION] ✅ Fallback same_dept round-robin: {$assignedAgentName} (ID={$assignedAgentId}), último foi ID=" . ($lastAgentId ?? 'nenhum'));
                                 } else {
                                     $assignedAgentId = null;
                                     $assignedAgentName = null;
@@ -2539,20 +2604,24 @@ PROMPT;
             // Adicionar nota interna (não-crítico)
             try {
                 if ($notes || $reason) {
-                    Activity::create([
-                        'conversation_id' => $conversationId,
-                        'user_id' => null,
-                        'activity_type' => 'ai_escalation',
-                        'content' => json_encode([
+                    $description = "IA escalou conversa para " . ($assignedAgentName ?? 'fila de atendimento') . ". Motivo: {$reason}";
+                    if ($notes) $description .= " | Notas: {$notes}";
+                    
+                    Activity::log(
+                        'ai_escalation',
+                        'conversation',
+                        $conversationId,
+                        null,
+                        $description,
+                        [
                             'reason' => $reason,
                             'notes' => $notes,
                             'assigned_to' => $assignedAgentName ?? 'Fila de atendimento',
                             'escalation_type' => $escalationType
-                        ]),
-                        'is_internal' => true
-                    ]);
+                        ]
+                    );
                 }
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 Logger::aiTools("[ESCALATION] Erro ao criar nota interna (não-crítico): " . $e->getMessage());
             }
             

@@ -33,7 +33,7 @@ class Message extends Model
                 FROM messages m
                 LEFT JOIN users u ON m.sender_id = u.id AND m.sender_type = 'agent'
                 WHERE m.conversation_id = ?
-                ORDER BY m.created_at ASC
+                ORDER BY m.id ASC
                 LIMIT ? OFFSET ?";
         
         $messages = Database::fetchAll($sql, [$conversationId, $limit, $offset]);
@@ -94,8 +94,8 @@ class Message extends Model
                 LEFT JOIN contacts ct ON m.sender_type = 'contact' AND m.sender_id = ct.id
                 LEFT JOIN ai_agents aia ON m.ai_agent_id = aia.id
                 WHERE " . implode(' AND ', $whereConditions) . "
-                ORDER BY m.created_at DESC";
-        
+                ORDER BY m.id DESC";
+
         // Adicionar LIMIT e OFFSET se fornecidos
         if ($limit !== null) {
             $sql .= " LIMIT ?";
@@ -328,7 +328,7 @@ class Message extends Model
             $params[] = $since;
         }
         
-        $sql .= " ORDER BY m.created_at ASC";
+        $sql .= " ORDER BY m.id ASC";
         
         $messages = Database::fetchAll($sql, $params);
         

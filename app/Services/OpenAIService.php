@@ -726,6 +726,11 @@ class OpenAIService
             }
         }
 
+        foreach ($results as $r) {
+            $resultPreview = json_encode($r['result'] ?? [], JSON_UNESCAPED_UNICODE);
+            if (strlen($resultPreview) > 300) $resultPreview = substr($resultPreview, 0, 300) . '...';
+            \App\Helpers\Logger::aiTools("[TOOL RESULT] {$r['name']}: {$resultPreview}");
+        }
         \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Finalizou execução de tools. Total de resultados: " . count($results));
 
         return $results;
@@ -2292,6 +2297,7 @@ PROMPT;
     private static function executeHumanEscalationTool(array $tool, array $arguments, array $config, int $conversationId, array $context): array
     {
         try {
+            Logger::aiTools("[ESCALATION] INÍCIO: conv={$conversationId}, config=" . json_encode($config, JSON_UNESCAPED_UNICODE));
             \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "🧑‍💼 Executando Human Escalation Tool");
             
             $escalationType = $config['escalation_type'] ?? 'auto';
@@ -2310,8 +2316,11 @@ PROMPT;
             $reason = $arguments['reason'] ?? 'Solicitado pela IA';
             $notes = $arguments['notes'] ?? null;
             
+            Logger::aiTools("[ESCALATION] Tipo={$escalationType}, departmentId=" . ($departmentId ?? 'NULL') . ", agentId=" . ($agentId ?? 'NULL'));
+            
             $conversation = Conversation::find($conversationId);
             if (!$conversation) {
+                Logger::aiTools("[ESCALATION] ❌ Conversa não encontrada");
                 return ['error' => 'Conversa não encontrada'];
             }
             
@@ -2322,30 +2331,37 @@ PROMPT;
                 case 'agent':
                     // Atribuir a agente específico
                     if (!$agentId) {
+                        Logger::aiTools("[ESCALATION] ❌ Agente não configurado na tool");
                         return ['error' => 'Agente não configurado na tool'];
                     }
                     
                     $agent = User::find($agentId);
                     if (!$agent) {
+                        Logger::aiTools("[ESCALATION] ❌ Agente ID={$agentId} não encontrado");
                         return ['error' => 'Agente não encontrado'];
                     }
                     
                     // Verificar disponibilidade se não forçar
                     if (!$forceAssign && $considerAvailability && $agent['status'] !== 'active') {
+                        Logger::aiTools("[ESCALATION] ❌ Agente ID={$agentId} não disponível (status={$agent['status']})");
                         return ['error' => 'Agente não está disponível no momento'];
                     }
                     
                     $assignedAgentId = $agentId;
                     $assignedAgentName = $agent['name'];
+                    Logger::aiTools("[ESCALATION] ✅ Agente fixo: {$assignedAgentName} (ID={$assignedAgentId})");
                     break;
                     
                 case 'department':
                     // Atribuir a agente do setor
                     if (!$departmentId) {
+                        Logger::aiTools("[ESCALATION] ❌ Setor não configurado na tool");
                         return ['error' => 'Setor não configurado na tool'];
                     }
                     
                     $agentsInDept = Department::getAgents($departmentId);
+                    Logger::aiTools("[ESCALATION] Agentes no setor {$departmentId}: " . count($agentsInDept ?: []));
+                    
                     if (empty($agentsInDept)) {
                         return ['error' => 'Nenhum agente encontrado no setor'];
                     }
@@ -2356,6 +2372,7 @@ PROMPT;
                     }
                     
                     if (empty($agentsInDept)) {
+                        Logger::aiTools("[ESCALATION] ❌ Nenhum agente disponível no setor {$departmentId}");
                         return ['error' => 'Nenhum agente disponível no setor'];
                     }
                     
@@ -2365,7 +2382,7 @@ PROMPT;
                     
                     foreach ($agentsInDept as $agent) {
                         $count = Database::fetchColumn(
-                            "SELECT COUNT(*) FROM conversations WHERE assigned_user_id = ? AND status = 'open'",
+                            "SELECT COUNT(*) FROM conversations WHERE agent_id = ? AND status = 'open'",
                             [$agent['id']]
                         );
                         
@@ -2381,18 +2398,21 @@ PROMPT;
                     }
                     
                     if (!$selectedAgent) {
+                        Logger::aiTools("[ESCALATION] ❌ Todos agentes do setor {$departmentId} no limite");
                         return ['error' => 'Todos os agentes do setor estão no limite'];
                     }
                     
                     $assignedAgentId = $selectedAgent['id'];
                     $assignedAgentName = $selectedAgent['name'];
+                    Logger::aiTools("[ESCALATION] ✅ Agente do setor: {$assignedAgentName} (ID={$assignedAgentId})");
                     break;
                     
                 case 'custom':
                 case 'auto':
                 default:
                     // Usar distribuição automática do sistema
-                    $conversation = Conversation::find($conversationId);
+                    Logger::aiTools("[ESCALATION] Chamando autoAssignConversation: dept=" . ($departmentId ?? ($conversation['department_id'] ?? 'NULL')) . ", funnel=" . ($conversation['funnel_id'] ?? 'NULL') . ", stage=" . ($conversation['funnel_stage_id'] ?? 'NULL'));
+                    
                     $assignedAgentId = \App\Services\ConversationSettingsService::autoAssignConversation(
                         $conversationId,
                         $departmentId ?? ($conversation['department_id'] ?? null),
@@ -2400,12 +2420,16 @@ PROMPT;
                         $conversation['funnel_stage_id'] ?? null
                     );
                     
+                    Logger::aiTools("[ESCALATION] autoAssignConversation retornou: " . var_export($assignedAgentId, true));
+                    
                     if (!$assignedAgentId || $assignedAgentId < 0) {
+                        Logger::aiTools("[ESCALATION] ❌ Auto-assign falhou (retornou " . var_export($assignedAgentId, true) . ")");
                         return ['error' => 'Não foi possível atribuir a um agente automaticamente'];
                     }
                     
                     $agent = User::find($assignedAgentId);
                     $assignedAgentName = $agent['name'] ?? 'Agente';
+                    Logger::aiTools("[ESCALATION] ✅ Auto-assign: {$assignedAgentName} (ID={$assignedAgentId})");
                     break;
             }
             
@@ -2478,7 +2502,9 @@ PROMPT;
                 'raw_message' => $escalationMessage
             ];
             
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Logger::aiTools("[ESCALATION] ❌ EXCEÇÃO: " . get_class($e) . ": " . $e->getMessage() . " em " . $e->getFile() . ":" . $e->getLine());
+            Logger::aiTools("[ESCALATION] Stack: " . $e->getTraceAsString());
             \App\Helpers\ConversationDebug::error($conversationId, 'executeHumanEscalationTool', $e->getMessage());
             return ['error' => 'Erro ao escalar para humano: ' . $e->getMessage()];
         }

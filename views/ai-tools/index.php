@@ -771,7 +771,38 @@ const toolTypeConfigs = {
         ]
     },
     system: {
-        fields: []
+        fields: [
+            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: false, 
+              options: [
+                { value: "auto", label: "Automático (fila geral)" },
+                { value: "department", label: "Setor Específico" },
+                { value: "agent", label: "Agente Específico" }
+              ], default: "auto", help: "Automático: conversa vai para fila geral | Setor: distribui entre agentes do setor | Agente: atribui a agente específico" },
+            { name: "department_id", label: "Setor", type: "department_select", required: false, 
+              showIf: "escalation_type:department", help: "Selecione o setor de destino" },
+            { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
+              showIf: "escalation_type:agent", help: "Selecione o agente que receberá a conversa" },
+            { name: "priority", label: "Prioridade da Conversa", type: "select", required: false, 
+              options: [
+                { value: "low", label: "Baixa" },
+                { value: "normal", label: "Normal" },
+                { value: "high", label: "Alta" },
+                { value: "urgent", label: "Urgente" }
+              ], default: "normal", help: "Prioridade ao escalar para humano" },
+            { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:department", help: "Só atribui a agentes que estão online" },
+            { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:department", help: "Respeita o limite de conversas do agente" },
+            { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:agent", help: "Atribui mesmo se o agente estiver offline ou no limite" },
+            { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,
+              help: "Remove o agente de IA da conversa após escalar" },
+            { name: "send_notification", label: "Notificar agente humano", type: "checkbox", required: false, default: true },
+            { name: "escalation_message", label: "Mensagem de transição ao cliente", type: "textarea", required: false,
+              placeholder: "Vou transferir você para um de nossos especialistas...",
+              default: "Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.",
+              help: "Mensagem enviada ao cliente ao escalar (deixe vazio para a IA decidir)" }
+        ]
     },
     followup: {
         fields: []
@@ -1263,10 +1294,11 @@ function buildConfig() {
     const config = {};
     let hasConfig = false;
     
+    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id'];
+    
     document.querySelectorAll(".config-field").forEach(field => {
         const fieldName = field.dataset.field;
         
-        // Tratar checkbox separadamente
         if (field.type === "checkbox") {
             config[fieldName] = field.checked;
             if (field.checked) hasConfig = true;
@@ -1276,11 +1308,9 @@ function buildConfig() {
         const value = field.value.trim();
         
         if (value) {
-            // Tentar converter para número se for campo numérico
-            if (field.type === "number") {
-                config[fieldName] = value ? parseFloat(value) : null;
+            if (field.type === "number" || idFields.includes(fieldName)) {
+                config[fieldName] = parseInt(value) || null;
             } else if (field.tagName === "TEXTAREA" && (fieldName === "headers" || fieldName === "custom_headers")) {
-                // Tentar parsear JSON para headers
                 try {
                     config[fieldName] = JSON.parse(value);
                 } catch (e) {
@@ -1290,6 +1320,8 @@ function buildConfig() {
                 config[fieldName] = value;
             }
             hasConfig = true;
+        } else if (idFields.includes(fieldName)) {
+            config[fieldName] = null;
         }
     });
     

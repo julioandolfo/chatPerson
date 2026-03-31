@@ -533,6 +533,16 @@ const FUNCTION_SCHEMA_DATA = <?= json_encode(!empty($functionSchema) ? $function
 const CONFIG_DATA = <?= json_encode(!empty($config) ? $config : null, $jsonFlags) ?>;
 const TOOL_ID = <?= json_encode($tool['id'] ?? 0, $jsonFlags) ?>;
 
+// Dados do backend para selects dinâmicos
+<?php
+$departmentsJson = json_encode($departments ?? [], $jsonFlags) ?: '[]';
+$funnelsJson = json_encode($funnels ?? [], $jsonFlags) ?: '[]';
+$agentsJson = json_encode($agents ?? [], $jsonFlags) ?: '[]';
+?>
+const availableDepartments = <?= $departmentsJson ?>;
+const availableFunnels = <?= $funnelsJson ?>;
+const availableAgents = <?= $agentsJson ?>;
+
 let editParameterCounter = 0;
 
 // Tipos que têm function schema automático (não precisam de configuração manual)
@@ -633,15 +643,36 @@ const toolTypeConfigs = {
     },
     system: {
         fields: [
-            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: false, options: ["auto", "department", "agent", "round_robin", "funnel_stage"], default: "auto", help: "auto: Sistema decide | department: Setor específico | agent: Agente específico | round_robin: Distribuição | funnel_stage: Automação via etapa" },
-            { name: "department_id", label: "Setor (se escalation_type = department)", type: "number", required: false, placeholder: "ID do setor" },
-            { name: "agent_id", label: "Agente (se escalation_type = agent)", type: "number", required: false, placeholder: "ID do agente" },
-            { name: "funnel_stage_id", label: "Etapa do Funil (se escalation_type = funnel_stage)", type: "number", required: false, placeholder: "ID da etapa", help: "Mover para esta etapa e usar automação dela" },
-            { name: "priority", label: "Prioridade da Conversa", type: "select", required: false, options: ["low", "normal", "high", "urgent"], default: "normal", help: "Prioridade ao escalar para humano" },
-            { name: "add_escalation_note", label: "Adicionar nota de escalação", type: "checkbox", required: false, default: true, help: "Adiciona nota interna explicando motivo da escalação" },
-            { name: "notify_agent", label: "Notificar agente via WhatsApp/Email", type: "checkbox", required: false, default: false, help: "Envia notificação externa ao agente atribuído" },
-            { name: "send_transition_message", label: "Enviar mensagem de transição ao cliente", type: "checkbox", required: false, default: true, help: "Envia mensagem informando que será transferido" },
-            { name: "transition_message", label: "Mensagem de transição", type: "textarea", required: false, placeholder: "Vou transferir você para um de nossos especialistas...", default: "Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.", help: "Mensagem enviada ao cliente antes da transferência" }
+            { name: "escalation_type", label: "Tipo de Escalação", type: "select", required: false, 
+              options: [
+                { value: "auto", label: "Automático (fila geral)" },
+                { value: "department", label: "Setor Específico" },
+                { value: "agent", label: "Agente Específico" }
+              ], default: "auto", help: "Automático: conversa vai para fila geral | Setor: distribui entre agentes do setor | Agente: atribui a agente específico" },
+            { name: "department_id", label: "Setor", type: "department_select", required: false, 
+              showIf: "escalation_type:department", help: "Selecione o setor de destino" },
+            { name: "agent_id", label: "Agente", type: "agent_select", required: false, 
+              showIf: "escalation_type:agent", help: "Selecione o agente que receberá a conversa" },
+            { name: "priority", label: "Prioridade da Conversa", type: "select", required: false, 
+              options: [
+                { value: "low", label: "Baixa" },
+                { value: "normal", label: "Normal" },
+                { value: "high", label: "Alta" },
+                { value: "urgent", label: "Urgente" }
+              ], default: "normal", help: "Prioridade ao escalar para humano" },
+            { name: "consider_availability", label: "Considerar disponibilidade (online)", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:department", help: "Só atribui a agentes que estão online" },
+            { name: "consider_limits", label: "Considerar limite máximo de conversas", type: "checkbox", required: false, default: true,
+              showIf: "escalation_type:department", help: "Respeita o limite de conversas do agente" },
+            { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
+              showIf: "escalation_type:agent", help: "Atribui mesmo se o agente estiver offline ou no limite" },
+            { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,
+              help: "Remove o agente de IA da conversa após escalar" },
+            { name: "send_notification", label: "Notificar agente humano", type: "checkbox", required: false, default: true },
+            { name: "escalation_message", label: "Mensagem de transição ao cliente", type: "textarea", required: false,
+              placeholder: "Vou transferir você para um de nossos especialistas...",
+              default: "Vou transferir você para um de nossos especialistas. Aguarde um momento, por favor.",
+              help: "Mensagem enviada ao cliente ao escalar (deixe vazio para a IA decidir)" }
         ]
     },
     followup: {
@@ -879,12 +910,13 @@ function updateEditConfigFields() {
     fields.forEach(field => {
         const fieldDiv = document.createElement("div");
         fieldDiv.className = "fv-row mb-5";
+        fieldDiv.id = `edit_field_wrapper_${field.name}`;
+        if (field.showIf) fieldDiv.dataset.showIf = field.showIf;
         
         let inputHtml = "";
-        let labelHtml = "";
+        let labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
         
         if (field.type === "checkbox") {
-            // Checkbox com label inline
             inputHtml = `
                 <div class="form-check form-switch">
                     <input type="checkbox" class="form-check-input config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.default ? "checked" : ""} />
@@ -895,27 +927,60 @@ function updateEditConfigFields() {
             fieldDiv.innerHTML = inputHtml;
         } else if (field.type === "select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione...</option>`;
             if (field.options) {
                 field.options.forEach(opt => {
-                    inputHtml += `<option value="${opt}" ${opt === field.default ? "selected" : ""}>${opt}</option>`;
+                    if (typeof opt === "object") {
+                        inputHtml += `<option value="${opt.value}" ${opt.value === field.default ? "selected" : ""}>${opt.label}</option>`;
+                    } else {
+                        inputHtml += `<option value="${opt}" ${opt === field.default ? "selected" : ""}>${opt}</option>`;
+                    }
                 });
             }
             inputHtml += `</select>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "department_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione o setor...</option>`;
+            (typeof availableDepartments !== 'undefined' ? availableDepartments : []).forEach(dept => {
+                inputHtml += `<option value="${dept.id}">${dept.name}</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "agent_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione o agente...</option>`;
+            (typeof availableAgents !== 'undefined' ? availableAgents : []).forEach(agent => {
+                inputHtml += `<option value="${agent.id}">${agent.name}${agent.email ? ` (${agent.email})` : ''}</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "funnel_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.required ? "required" : ""}>`;
+            inputHtml += `<option value="">Selecione o funil...</option>`;
+            (typeof availableFunnels !== 'undefined' ? availableFunnels : []).forEach(funnel => {
+                inputHtml += `<option value="${funnel.id}">${funnel.name}</option>`;
+            });
+            inputHtml += `</select>`;
+            fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
+        } else if (field.type === "stage_select") {
+            inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" id="edit_config_${field.name}" ${field.required ? "required" : ""} disabled>`;
+            inputHtml += `<option value="">Selecione o funil primeiro...</option>`;
+            inputHtml += `</select>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "textarea") {
             inputHtml = `<textarea class="form-control form-control-solid config-field" data-field="${field.name}" rows="3" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}"></textarea>`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else {
             inputHtml = `<input type="${field.type}" class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""} placeholder="${field.placeholder || ""}" value="${field.default || ""}" />`;
-            labelHtml = `<label class="fw-semibold fs-7 mb-2">${field.label}${field.required ? ' <span class="text-danger">*</span>' : ""}</label>`;
             fieldDiv.innerHTML = labelHtml + inputHtml + (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         }
         
         configFields.appendChild(fieldDiv);
-        console.log(`Campo ${field.name} adicionado`);
     });
+    
+    // Configurar campos condicionais (showIf)
+    setupEditConditionalFields();
     
     // Adicionar listener para desabilitar "consider_availability" quando método é "by_pending_response"
     const distributionMethodField = document.querySelector('[data-field="distribution_method"]');
@@ -949,6 +1014,30 @@ function updateEditConfigFields() {
     }
     
     console.log("Campos de config renderizados com sucesso");
+}
+
+// Configurar campos condicionais (showIf) na edição
+function setupEditConditionalFields() {
+    const configFields = document.querySelectorAll("#kt_edit_config_fields .config-field");
+    configFields.forEach(field => {
+        field.addEventListener("change", updateEditConditionalVisibility);
+    });
+    updateEditConditionalVisibility();
+}
+
+function updateEditConditionalVisibility() {
+    const wrappers = document.querySelectorAll("#kt_edit_config_fields [data-show-if]");
+    wrappers.forEach(wrapper => {
+        const condition = wrapper.dataset.showIf;
+        const [fieldName, expectedValues] = condition.split(":");
+        const values = expectedValues.split(",");
+        
+        const field = document.querySelector(`#kt_edit_config_fields [data-field="${fieldName}"]`);
+        if (field) {
+            let currentValue = field.type === "checkbox" ? field.checked.toString() : field.value;
+            wrapper.style.display = values.includes(currentValue) ? "block" : "none";
+        }
+    });
 }
 
 // Construir JSON do function schema (edição)
@@ -1012,6 +1101,8 @@ function buildEditConfig() {
     const config = {};
     let hasConfig = false;
     
+    const idFields = ['department_id', 'agent_id', 'funnel_id', 'stage_id', 'funnel_stage_id'];
+    
     document.querySelectorAll("#kt_edit_config_fields .config-field").forEach(field => {
         const fieldName = field.dataset.field;
         
@@ -1025,8 +1116,8 @@ function buildEditConfig() {
         const value = field.value.trim();
         
         if (value) {
-            if (field.type === "number") {
-                config[fieldName] = value ? parseFloat(value) : null;
+            if (field.type === "number" || idFields.includes(fieldName)) {
+                config[fieldName] = parseInt(value) || null;
             } else if (field.tagName === "TEXTAREA" && (fieldName === "headers" || fieldName === "custom_headers")) {
                 try {
                     config[fieldName] = JSON.parse(value);
@@ -1037,6 +1128,8 @@ function buildEditConfig() {
                 config[fieldName] = value;
             }
             hasConfig = true;
+        } else if (idFields.includes(fieldName)) {
+            config[fieldName] = null;
         }
     });
     
@@ -1089,23 +1182,21 @@ function populateEditFields() {
         if (config && Object.keys(config).length > 0) {
             setTimeout(() => {
                 console.log("Preenchendo campos de config...");
+                // Preencher selects/inputs primeiro (para que showIf funcione)
                 Object.keys(config).forEach(key => {
                     const field = document.querySelector(`#kt_edit_config_fields .config-field[data-field="${key}"]`);
-                    console.log(`Campo ${key}:`, field, "Valor:", config[key]);
                     if (field) {
-                        // Tratar checkbox separadamente
                         if (field.type === "checkbox") {
                             field.checked = !!config[key];
                         } else if (field.tagName === "TEXTAREA" && typeof config[key] === "object") {
                             field.value = JSON.stringify(config[key], null, 2);
                         } else if (field.tagName === "TEXTAREA" && typeof config[key] === "string") {
-                            // Se já é string, usar direto
                             field.value = config[key];
                         } else {
                             field.value = config[key] || "";
                         }
-                    } else {
-                        console.warn(`Campo não encontrado: ${key}`);
+                        // Disparar change para atualizar campos condicionais (showIf)
+                        field.dispatchEvent(new Event('change'));
                     }
                 });
             }, 200);

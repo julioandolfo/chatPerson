@@ -2422,36 +2422,45 @@ PROMPT;
             
             Conversation::update($conversationId, $updateData);
             
-            // Atualizar status da conversa de IA
+            // Desativar IA da conversa
             $aiConversation = \App\Models\AIConversation::whereFirst('conversation_id', '=', $conversationId);
             if ($aiConversation) {
-                \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated', $assignedAgentId);
+                if ($removeAIAfter) {
+                    \App\Models\AIConversation::updateStatus($aiConversation['id'], 'removed', $assignedAgentId);
+                    \App\Models\AIAgent::updateConversationsCount($aiConversation['ai_agent_id']);
+                } else {
+                    \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated', $assignedAgentId);
+                }
             }
             
-            // Remover IA da conversa se configurado
-            if ($removeAIAfter) {
-                ConversationAIService::removeAIAgent($conversationId);
-            }
-            
-            // Adicionar nota interna
-            if ($notes || $reason) {
-                Activity::create([
-                    'conversation_id' => $conversationId,
-                    'user_id' => null,
-                    'activity_type' => 'ai_escalation',
-                    'content' => json_encode([
-                        'reason' => $reason,
-                        'notes' => $notes,
-                        'assigned_to' => $assignedAgentName,
-                        'escalation_type' => $escalationType
-                    ]),
-                    'is_internal' => true
-                ]);
+            // Adicionar nota interna (não-crítico)
+            try {
+                if ($notes || $reason) {
+                    Activity::create([
+                        'conversation_id' => $conversationId,
+                        'user_id' => null,
+                        'activity_type' => 'ai_escalation',
+                        'content' => json_encode([
+                            'reason' => $reason,
+                            'notes' => $notes,
+                            'assigned_to' => $assignedAgentName,
+                            'escalation_type' => $escalationType
+                        ]),
+                        'is_internal' => true
+                    ]);
+                }
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error("Escalation: erro ao criar nota interna: " . $e->getMessage());
             }
             
             // Notificar agente humano
             if ($sendNotification && $assignedAgentId) {
-                // TODO: Implementar notificação via WebSocket
+                try {
+                    $updatedConversation = Conversation::findWithRelations($conversationId);
+                    \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $updatedConversation);
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("Escalation: erro ao notificar: " . $e->getMessage());
+                }
                 \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "Notificação enviada para agente: {$assignedAgentName}");
             }
             

@@ -2311,6 +2311,7 @@ PROMPT;
             $removeAIAfter = $config['remove_ai_after'] ?? true;
             $sendNotification = $config['send_notification'] ?? true;
             $escalationMessage = $config['escalation_message'] ?? null;
+            $fallbackAction = $config['fallback_action'] ?? 'queue';
             
             // Razão e notas passadas pela IA
             $reason = $arguments['reason'] ?? 'Solicitado pela IA';
@@ -2362,50 +2363,121 @@ PROMPT;
                     $agentsInDept = Department::getAgents($departmentId);
                     Logger::aiTools("[ESCALATION] Agentes no setor {$departmentId}: " . count($agentsInDept ?: []));
                     
-                    if (empty($agentsInDept)) {
-                        return ['error' => 'Nenhum agente encontrado no setor'];
-                    }
-                    
-                    // Filtrar por disponibilidade se necessário
-                    if ($considerAvailability) {
-                        $agentsInDept = array_filter($agentsInDept, fn($a) => $a['status'] === 'active');
-                    }
+                    $deptFailed = false;
                     
                     if (empty($agentsInDept)) {
-                        Logger::aiTools("[ESCALATION] ❌ Nenhum agente disponível no setor {$departmentId}");
-                        return ['error' => 'Nenhum agente disponível no setor'];
+                        Logger::aiTools("[ESCALATION] ⚠️ Nenhum agente no setor {$departmentId}");
+                        $deptFailed = true;
                     }
                     
-                    // Escolher agente (round robin simplificado - pegar com menos conversas)
-                    $selectedAgent = null;
-                    $minConversations = PHP_INT_MAX;
-                    
-                    foreach ($agentsInDept as $agent) {
-                        $row = Database::fetch(
-                            "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
-                            [$agent['id']]
-                        );
-                        $count = (int) ($row['total'] ?? 0);
-                        
-                        if ($considerLimits) {
-                            $maxConversations = $agent['max_conversations'] ?? 50;
-                            if ($count >= $maxConversations) continue;
+                    if (!$deptFailed) {
+                        // Filtrar por disponibilidade se necessário
+                        if ($considerAvailability) {
+                            $agentsInDept = array_filter($agentsInDept, fn($a) => $a['status'] === 'active');
                         }
                         
-                        if ($count < $minConversations) {
-                            $minConversations = $count;
-                            $selectedAgent = $agent;
+                        if (empty($agentsInDept)) {
+                            Logger::aiTools("[ESCALATION] ⚠️ Nenhum agente disponível no setor {$departmentId}");
+                            $deptFailed = true;
                         }
                     }
                     
-                    if (!$selectedAgent) {
-                        Logger::aiTools("[ESCALATION] ❌ Todos agentes do setor {$departmentId} no limite");
-                        return ['error' => 'Todos os agentes do setor estão no limite'];
+                    if (!$deptFailed) {
+                        $selectedAgent = null;
+                        $minConversations = PHP_INT_MAX;
+                        
+                        foreach ($agentsInDept as $agent) {
+                            $row = Database::fetch(
+                                "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
+                                [$agent['id']]
+                            );
+                            $count = (int) ($row['total'] ?? 0);
+                            
+                            if ($considerLimits) {
+                                $maxConversations = $agent['max_conversations'] ?? 50;
+                                if ($count >= $maxConversations) continue;
+                            }
+                            
+                            if ($count < $minConversations) {
+                                $minConversations = $count;
+                                $selectedAgent = $agent;
+                            }
+                        }
+                        
+                        if (!$selectedAgent) {
+                            Logger::aiTools("[ESCALATION] ⚠️ Todos agentes do setor {$departmentId} no limite");
+                            $deptFailed = true;
+                        } else {
+                            $assignedAgentId = $selectedAgent['id'];
+                            $assignedAgentName = $selectedAgent['name'];
+                            Logger::aiTools("[ESCALATION] ✅ Agente do setor: {$assignedAgentName} (ID={$assignedAgentId})");
+                        }
                     }
                     
-                    $assignedAgentId = $selectedAgent['id'];
-                    $assignedAgentName = $selectedAgent['name'];
-                    Logger::aiTools("[ESCALATION] ✅ Agente do setor: {$assignedAgentName} (ID={$assignedAgentId})");
+                    // Fallback quando nenhum agente do setor está disponível
+                    if ($deptFailed) {
+                        Logger::aiTools("[ESCALATION] Aplicando fallback_action={$fallbackAction}");
+                        
+                        switch ($fallbackAction) {
+                            case 'any_agent_same_dept':
+                                // Re-buscar agentes do setor ignorando limites e disponibilidade
+                                $allAgentsInDept = Department::getAgents($departmentId);
+                                if (!empty($allAgentsInDept)) {
+                                    $selectedAgent = null;
+                                    $minConversations = PHP_INT_MAX;
+                                    foreach ($allAgentsInDept as $agent) {
+                                        $row = Database::fetch(
+                                            "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
+                                            [$agent['id']]
+                                        );
+                                        $count = (int) ($row['total'] ?? 0);
+                                        if ($count < $minConversations) {
+                                            $minConversations = $count;
+                                            $selectedAgent = $agent;
+                                        }
+                                    }
+                                    if ($selectedAgent) {
+                                        $assignedAgentId = $selectedAgent['id'];
+                                        $assignedAgentName = $selectedAgent['name'];
+                                        Logger::aiTools("[ESCALATION] ✅ Fallback same_dept (ignorando limites): {$assignedAgentName} (ID={$assignedAgentId})");
+                                    } else {
+                                        $assignedAgentId = null;
+                                        $assignedAgentName = null;
+                                        Logger::aiTools("[ESCALATION] ⚠️ Fallback same_dept: setor vazio, conversa vai para fila");
+                                    }
+                                } else {
+                                    $assignedAgentId = null;
+                                    $assignedAgentName = null;
+                                    Logger::aiTools("[ESCALATION] ⚠️ Fallback same_dept: nenhum agente no setor, conversa vai para fila");
+                                }
+                                break;
+                                
+                            case 'any_agent':
+                                $assignedAgentId = \App\Services\ConversationSettingsService::autoAssignConversation(
+                                    $conversationId,
+                                    null,
+                                    $conversation['funnel_id'] ?? null,
+                                    $conversation['funnel_stage_id'] ?? null
+                                );
+                                if ($assignedAgentId && $assignedAgentId > 0) {
+                                    $agent = User::find($assignedAgentId);
+                                    $assignedAgentName = $agent['name'] ?? 'Agente';
+                                    Logger::aiTools("[ESCALATION] ✅ Fallback any_agent: {$assignedAgentName} (ID={$assignedAgentId})");
+                                } else {
+                                    $assignedAgentId = null;
+                                    $assignedAgentName = null;
+                                    Logger::aiTools("[ESCALATION] ⚠️ Fallback any_agent: sem agente, conversa vai para fila");
+                                }
+                                break;
+                                
+                            case 'queue':
+                            default:
+                                $assignedAgentId = null;
+                                $assignedAgentName = null;
+                                Logger::aiTools("[ESCALATION] Fallback queue: conversa vai para fila aberta");
+                                break;
+                        }
+                    }
                     break;
                     
                 case 'custom':

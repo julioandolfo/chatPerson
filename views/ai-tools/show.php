@@ -666,6 +666,13 @@ const toolTypeConfigs = {
               showIf: "escalation_type:department", help: "Respeita o limite de conversas do agente" },
             { name: "force_assign", label: "Forçar atribuição (ignora regras)", type: "checkbox", required: false, default: false,
               showIf: "escalation_type:agent", help: "Atribui mesmo se o agente estiver offline ou no limite" },
+            { name: "fallback_action", label: "Se não encontrar agente no setor", type: "select", required: false,
+              showIf: "escalation_type:department",
+              options: [
+                { value: "queue", label: "Manter em fila" },
+                { value: "any_agent", label: "Atribuir a qualquer agente (qualquer setor)" },
+                { value: "any_agent_same_dept", label: "Atribuir a qualquer agente (mesmo setor, ignorar limites)" }
+              ], default: "queue", help: "O que fazer quando nenhum agente do setor está disponível" },
             { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,
               help: "Remove o agente de IA da conversa após escalar" },
             { name: "send_notification", label: "Notificar agente humano", type: "checkbox", required: false, default: true },
@@ -713,7 +720,8 @@ const toolTypeConfigs = {
               showIf: "escalation_type:custom,department",
               options: [
                 { value: "queue", label: "Manter em fila" },
-                { value: "any_agent", label: "Atribuir a qualquer agente" },
+                { value: "any_agent", label: "Atribuir a qualquer agente (qualquer setor)" },
+                { value: "any_agent_same_dept", label: "Atribuir a qualquer agente (mesmo setor, ignorar limites)" },
                 { value: "move_stage", label: "Mover para etapa" }
               ], default: "queue" },
             { name: "remove_ai_after", label: "Remover IA após escalação", type: "checkbox", required: false, default: true,

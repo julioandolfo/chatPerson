@@ -2422,22 +2422,25 @@ PROMPT;
                     
                     Logger::aiTools("[ESCALATION] autoAssignConversation retornou: " . var_export($assignedAgentId, true));
                     
-                    if (!$assignedAgentId || $assignedAgentId < 0) {
-                        Logger::aiTools("[ESCALATION] ❌ Auto-assign falhou (retornou " . var_export($assignedAgentId, true) . ")");
-                        return ['error' => 'Não foi possível atribuir a um agente automaticamente'];
+                    if ($assignedAgentId && $assignedAgentId > 0) {
+                        $agent = User::find($assignedAgentId);
+                        $assignedAgentName = $agent['name'] ?? 'Agente';
+                        Logger::aiTools("[ESCALATION] ✅ Auto-assign: {$assignedAgentName} (ID={$assignedAgentId})");
+                    } else {
+                        // Sem agente disponível: deixar na fila sem atribuição
+                        $assignedAgentId = null;
+                        $assignedAgentName = null;
+                        Logger::aiTools("[ESCALATION] ⚠️ Sem agente disponível, conversa será deixada na fila aberta");
                     }
-                    
-                    $agent = User::find($assignedAgentId);
-                    $assignedAgentName = $agent['name'] ?? 'Agente';
-                    Logger::aiTools("[ESCALATION] ✅ Auto-assign: {$assignedAgentName} (ID={$assignedAgentId})");
                     break;
             }
             
-            // Atribuir conversa ao agente
-            $updateData = [
-                'agent_id' => $assignedAgentId,
-                'status' => 'open'
-            ];
+            // Atualizar conversa
+            $updateData = ['status' => 'open'];
+            
+            if ($assignedAgentId) {
+                $updateData['agent_id'] = $assignedAgentId;
+            }
             
             // Atualizar prioridade se configurado
             if (!empty($config['priority'])) {
@@ -2445,6 +2448,7 @@ PROMPT;
             }
             
             Conversation::update($conversationId, $updateData);
+            Logger::aiTools("[ESCALATION] Conversa atualizada: " . json_encode($updateData));
             
             // Desativar IA da conversa
             $aiConversation = \App\Models\AIConversation::whereFirst('conversation_id', '=', $conversationId);
@@ -2452,8 +2456,10 @@ PROMPT;
                 if ($removeAIAfter) {
                     \App\Models\AIConversation::updateStatus($aiConversation['id'], 'removed', $assignedAgentId);
                     \App\Models\AIAgent::updateConversationsCount($aiConversation['ai_agent_id']);
+                    Logger::aiTools("[ESCALATION] IA removida da conversa");
                 } else {
                     \App\Models\AIConversation::updateStatus($aiConversation['id'], 'escalated', $assignedAgentId);
+                    Logger::aiTools("[ESCALATION] IA marcada como escalated");
                 }
             }
             
@@ -2467,34 +2473,37 @@ PROMPT;
                         'content' => json_encode([
                             'reason' => $reason,
                             'notes' => $notes,
-                            'assigned_to' => $assignedAgentName,
+                            'assigned_to' => $assignedAgentName ?? 'Fila de atendimento',
                             'escalation_type' => $escalationType
                         ]),
                         'is_internal' => true
                     ]);
                 }
             } catch (\Exception $e) {
-                \App\Helpers\Logger::error("Escalation: erro ao criar nota interna: " . $e->getMessage());
+                Logger::aiTools("[ESCALATION] Erro ao criar nota interna (não-crítico): " . $e->getMessage());
             }
             
-            // Notificar agente humano
-            if ($sendNotification && $assignedAgentId) {
-                try {
-                    $updatedConversation = Conversation::findWithRelations($conversationId);
-                    \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $updatedConversation);
-                } catch (\Exception $e) {
-                    \App\Helpers\Logger::error("Escalation: erro ao notificar: " . $e->getMessage());
-                }
-                \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "Notificação enviada para agente: {$assignedAgentName}");
+            // Notificar via WebSocket
+            try {
+                $updatedConversation = Conversation::findWithRelations($conversationId);
+                \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, $updatedConversation);
+            } catch (\Exception $e) {
+                Logger::aiTools("[ESCALATION] Erro ao notificar WebSocket (não-crítico): " . $e->getMessage());
             }
             
-            \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "✅ Escalado para: {$assignedAgentName} (ID: {$assignedAgentId})");
+            // Montar mensagem de sucesso
+            $successMessage = $assignedAgentId
+                ? "Conversa transferida para {$assignedAgentName}. O cliente será atendido em breve."
+                : "Conversa transferida para a fila de atendimento humano. Um agente irá atender em breve.";
+            
+            \App\Helpers\ConversationDebug::log($conversationId, 'ESCALATION', "✅ " . $successMessage);
+            Logger::aiTools("[ESCALATION] ✅ SUCESSO: {$successMessage}");
             
             return [
                 'success' => true,
-                'message' => "Conversa transferida para {$assignedAgentName}",
+                'message' => $successMessage,
                 'assigned_agent_id' => $assignedAgentId,
-                'assigned_agent_name' => $assignedAgentName,
+                'assigned_agent_name' => $assignedAgentName ?? 'Fila de atendimento',
                 'escalation_type' => $escalationType,
                 'reason' => $reason,
                 // Se tiver mensagem de escalação, retornar como resposta direta

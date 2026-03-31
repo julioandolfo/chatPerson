@@ -2381,10 +2381,11 @@ PROMPT;
                     $minConversations = PHP_INT_MAX;
                     
                     foreach ($agentsInDept as $agent) {
-                        $count = Database::fetchColumn(
-                            "SELECT COUNT(*) FROM conversations WHERE agent_id = ? AND status = 'open'",
+                        $row = Database::fetch(
+                            "SELECT COUNT(*) as total FROM conversations WHERE agent_id = ? AND status = 'open'",
                             [$agent['id']]
                         );
+                        $count = (int) ($row['total'] ?? 0);
                         
                         if ($considerLimits) {
                             $maxConversations = $agent['max_conversations'] ?? 50;

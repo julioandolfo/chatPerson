@@ -32,7 +32,10 @@ class AIToolService
 
         // Normalizar function_schema antes de salvar
         $data['function_schema'] = self::normalizeFunctionSchema($data['function_schema']);
-        
+
+        // Sincronizar function.name com o slug da tool
+        $data['function_schema'] = self::syncFunctionName($data['function_schema'], $data['slug']);
+
         // Serializar JSON fields
         $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         if (isset($data['config']) && is_array($data['config'])) {
@@ -76,6 +79,13 @@ class AIToolService
         // Normalizar function_schema antes de salvar
         if (isset($data['function_schema']) && is_array($data['function_schema'])) {
             $data['function_schema'] = self::normalizeFunctionSchema($data['function_schema']);
+
+            // Sincronizar function.name com o slug da tool
+            $slug = $data['slug'] ?? $tool['slug'] ?? null;
+            if ($slug) {
+                $data['function_schema'] = self::syncFunctionName($data['function_schema'], $slug);
+            }
+
             $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         }
         if (isset($data['config']) && is_array($data['config'])) {
@@ -139,6 +149,19 @@ class AIToolService
      * Normalizar function schema para formato correto da OpenAI
      * Corrige problemas como properties: [] ao invés de properties: {}
      */
+    /**
+     * Sincroniza o function.name do schema com o slug da tool
+     */
+    private static function syncFunctionName(array $schema, string $slug): array
+    {
+        if (isset($schema['function']['name'])) {
+            $schema['function']['name'] = $slug;
+        } elseif (isset($schema['name'])) {
+            $schema['name'] = $slug;
+        }
+        return $schema;
+    }
+
     private static function normalizeFunctionSchema(array $schema): array
     {
         // Se é o formato wrapper {type: function, function: {...}}

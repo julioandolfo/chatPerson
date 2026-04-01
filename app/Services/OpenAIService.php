@@ -630,8 +630,15 @@ class OpenAIService
 
         $agentTools = AIAgent::getTools($agentId);
         $agentToolRowByToolId = [];
+        $agentToolByFunctionName = [];
         foreach ($agentTools as $row) {
             $agentToolRowByToolId[(int)($row['id'] ?? 0)] = $row;
+            // Indexar também pelo nome da function no schema para busca direta
+            $schema = is_string($row['function_schema'] ?? null) ? json_decode($row['function_schema'], true) : ($row['function_schema'] ?? []);
+            $funcName = $schema['function']['name'] ?? $schema['name'] ?? null;
+            if ($funcName) {
+                $agentToolByFunctionName[$funcName] = $row;
+            }
         }
 
         foreach ($toolCalls as $call) {
@@ -650,11 +657,23 @@ class OpenAIService
             }
 
             try {
-                // Buscar tool pelo nome da function
-                $tool = AITool::findBySlug($functionName);
-                \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool encontrada: " . ($tool ? "ID={$tool['id']}, name='{$tool['name']}', slug='{$tool['slug']}', tipo={$tool['tool_type']}" : "NÃO ENCONTRADA para functionName='{$functionName}'"));
-                
-                if (!$tool || !$tool['enabled']) {
+                // Priorizar busca nas tools do próprio agente (por function name no schema)
+                $tool = $agentToolByFunctionName[$functionName] ?? null;
+                $assignedRow = null;
+
+                if ($tool) {
+                    $assignedRow = $agentToolRowByToolId[(int)$tool['id']] ?? null;
+                    \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool encontrada nas tools do agente: ID={$tool['id']}, name='{$tool['name']}', slug='{$tool['slug']}', tipo={$tool['tool_type']}");
+                } else {
+                    // Fallback: buscar globalmente pelo slug/function name
+                    $tool = AITool::findBySlug($functionName);
+                    \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool buscada globalmente: " . ($tool ? "ID={$tool['id']}, name='{$tool['name']}', slug='{$tool['slug']}', tipo={$tool['tool_type']}" : "NÃO ENCONTRADA para functionName='{$functionName}'"));
+                    if ($tool) {
+                        $assignedRow = $agentToolRowByToolId[(int)$tool['id']] ?? null;
+                    }
+                }
+
+                if (!$tool || !($tool['enabled'] ?? false)) {
                     \App\Helpers\Logger::aiTools("[TOOL EXECUTION ERROR] Tool não encontrada ou inativa: {$functionName}");
                     \App\Helpers\ConversationDebug::toolResponse($conversationId, $functionName, 'Tool não encontrada ou inativa', false);
                     $results[] = [
@@ -665,8 +684,7 @@ class OpenAIService
                     continue;
                 }
 
-                // Verificar se tool está atribuída ao agente e obter config específica do vínculo (ai_agent_tools)
-                $assignedRow = $agentToolRowByToolId[(int)$tool['id']] ?? null;
+                // Verificar se tool está atribuída ao agente
                 $toolAssigned = $assignedRow !== null;
 
                 \App\Helpers\Logger::aiTools("[TOOL EXECUTION] Tool atribuída ao agente: " . ($toolAssigned ? "SIM" : "NÃO"));

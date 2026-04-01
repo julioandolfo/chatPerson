@@ -1832,12 +1832,39 @@ class ConversationService
         }
         
         // ✅ NOVO: Se agente HUMANO enviou mensagem, PARAR todas as automações ativas (chatbot, IA, etc)
-        if ($senderType === 'agent' && $senderId > 0) {
+        if ($senderType === 'agent' && $senderId > 0 && $aiAgentId === null) {
             \App\Helpers\Logger::automation("🛑 Agente humano (ID: {$senderId}) enviou mensagem - PARANDO automações ativas...");
             self::stopActiveAutomations($conversationId);
-            
+
             if (!empty($conversation['inactivity_alert_at'])) {
                 Conversation::update($conversationId, ['inactivity_alert_at' => null]);
+            }
+
+            // Remover agente de IA ativo e atribuir conversa ao agente humano
+            $hadActiveAI = false;
+            try {
+                $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+                if ($aiConversation && $aiConversation['status'] === 'active') {
+                    $hadActiveAI = true;
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Removendo IA ativa (aiConv={$aiConversation['id']}) e atribuindo ao agente humano (ID={$senderId})");
+                    ConversationAIService::removeAIAgent($conversationId, [
+                        'assign_to_human' => true,
+                        'human_agent_id' => $senderId,
+                        'reason' => 'Agente humano assumiu a conversa'
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \App\Helpers\Logger::error("Erro ao remover IA ao agente humano enviar mensagem: " . $e->getMessage());
+            }
+
+            // Atribuir conversa ao agente que enviou (se não tinha IA ativa e conversa não está atribuída a ele)
+            if (!$hadActiveAI && (empty($conversation['agent_id']) || (int)$conversation['agent_id'] !== $senderId)) {
+                try {
+                    self::assignToAgent($conversationId, $senderId, true);
+                    \App\Helpers\Logger::info("ConversationService::sendMessage - Conversa atribuída ao agente {$senderId} que enviou mensagem");
+                } catch (\Throwable $e) {
+                    \App\Helpers\Logger::error("Erro ao atribuir conversa ao agente: " . $e->getMessage());
+                }
             }
         }
 

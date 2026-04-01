@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -l \"getMessagesWithSenderDetails\\\\|getByConversation\\\\|getNewMessagesSince\" c:/laragon/www/chat/app/Services/*.php)"
+    ]
+  }
+}

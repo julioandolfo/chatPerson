@@ -1732,15 +1732,37 @@ class KanbanAgentService
             $bodyText .= "\n*Params:* " . implode(', ', $templateParams);
         }
 
-        \App\Helpers\Database::execute(
-            "INSERT INTO messages (conversation_id, content, sender_type, message_type, channel, created_at) VALUES (?, ?, 'agent', 'template', ?, NOW())",
-            [$conversation['id'], $bodyText, $conversation['channel'] ?? 'whatsapp']
-        );
+        try {
+            $msgId = \App\Models\Message::createMessage([
+                'conversation_id' => $conversation['id'],
+                'content' => $bodyText,
+                'sender_type' => 'agent',
+                'sender_id' => 0,
+                'message_type' => 'template',
+                'status' => 'sent',
+            ]);
 
-        \App\Helpers\Database::execute(
-            "UPDATE conversations SET updated_at = NOW() WHERE id = ?",
-            [$conversation['id']]
-        );
+            \App\Helpers\Database::execute(
+                "UPDATE conversations SET updated_at = NOW() WHERE id = ?",
+                [$conversation['id']]
+            );
+
+            // Notificar via WebSocket para aparecer em tempo real no chat
+            try {
+                $newMsg = \App\Models\Message::find($msgId);
+                if ($newMsg) {
+                    $newMsg['sender_name'] = 'Automação Kanban';
+                    $newMsg['sender_avatar'] = null;
+                    $newMsg['type'] = 'message';
+                    $newMsg['direction'] = 'outgoing';
+                    \App\Helpers\WebSocket::notifyNewMessage($conversation['id'], $newMsg);
+                }
+            } catch (\Throwable $wsEx) {
+                // WebSocket não é crítico
+            }
+        } catch (\Throwable $e) {
+            Logger::error("KanbanAgent::actionSendWhatsAppTemplate - Erro ao salvar msg na conversa: " . $e->getMessage());
+        }
 
         Logger::info("KanbanAgent::actionSendWhatsAppTemplate - Template enviado com sucesso para {$phone}");
 

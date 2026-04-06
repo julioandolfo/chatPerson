@@ -37,7 +37,12 @@ class RAGService
 
             // Gerar embedding da query
             $queryEmbedding = EmbeddingService::generate($query);
-            
+
+            if ($queryEmbedding === null) {
+                Logger::warning("RAGService::searchRelevantContext - Falha ao gerar embedding para query (agente={$agentId})");
+                return [];
+            }
+
             // Buscar conhecimentos similares
             $results = AIKnowledgeBase::findSimilar($agentId, $queryEmbedding, $limit, $threshold);
             

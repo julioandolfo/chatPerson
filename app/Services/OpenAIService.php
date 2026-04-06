@@ -156,7 +156,17 @@ class OpenAIService
 
             // Classificar com IA se a mensagem precisa de tools antes de incluí-las
             if (!empty($functions)) {
-                $needsTools = self::classifyToolIntent($message, $toolDescriptions, $apiKey, $conversationId);
+                // Tools de decisão/ação contextual devem estar sempre disponíveis
+                // (a IA precisa decidir com base no contexto da conversa, não na mensagem isolada)
+                $contextualToolTypes = ['funnel_stage', 'funnel_stage_smart', 'human_escalation'];
+                $hasContextualTools = !empty(array_intersect($contextualToolTypes, array_keys($toolTypesAttached)));
+
+                if ($hasContextualTools) {
+                    $needsTools = true;
+                    \App\Helpers\Logger::aiTools("[CLASSIFY] conv={$conversationId} => TOOLS (bypass: agente possui tools contextuais)");
+                } else {
+                    $needsTools = self::classifyToolIntent($message, $toolDescriptions, $apiKey, $conversationId);
+                }
 
                 if ($needsTools) {
                     $payload['tools'] = array_map(function($func) {

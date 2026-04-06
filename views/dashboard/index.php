@@ -2467,6 +2467,118 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
 </div>
 <?php endif; ?>
 
+<!-- Analytics de Clientes por Vendedor (Admin) -->
+<?php if (!empty($conversionRanking) && \App\Helpers\Permission::can('conversations.view.all')): ?>
+<div class="row g-5 g-xl-10 mb-5 mb-xl-10">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold fs-3 mb-1">
+                        <i class="ki-duotone ki-people fs-2 text-info me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                        Analytics de Clientes por Vendedor
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Novos clientes, recompras, retenção e clientes ativos/inativos</span>
+                </h3>
+                <div class="card-toolbar">
+                    <button class="btn btn-sm btn-light-primary" onclick="loadVendorAnalytics()" id="btn-load-vendor-analytics">
+                        <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
+                        Carregar Analytics
+                    </button>
+                </div>
+            </div>
+            <div class="card-body py-3" id="dashboard-vendor-analytics-body">
+                <div class="text-muted fs-7 text-center py-5">Clique em "Carregar Analytics" para ver os dados detalhados de clientes por vendedor.</div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function loadVendorAnalytics() {
+    const body = document.getElementById('dashboard-vendor-analytics-body');
+    const btn = document.getElementById('btn-load-vendor-analytics');
+    if (!body) return;
+
+    body.innerHTML = '<div class="text-center py-10"><span class="spinner-border text-primary"></span><div class="text-muted mt-3">Carregando analytics de clientes...</div></div>';
+    if (btn) btn.disabled = true;
+
+    const analyticsUrl = <?= json_encode(\App\Helpers\Url::to('/api/agent-conversion/all-vendors-analytics')) ?>;
+    const u = new URL(analyticsUrl, window.location.origin);
+    u.searchParams.set('date_from', <?= json_encode($dateFrom) ?>);
+    u.searchParams.set('date_to', <?= json_encode(date('Y-m-d', strtotime($dateTo))) ?>);
+
+    fetch(u.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(j => {
+            if (btn) btn.disabled = false;
+            if (!j.success) throw new Error(j.message || 'Erro');
+            const vendors = j.data || [];
+            if (vendors.length === 0) {
+                body.innerHTML = '<div class="text-muted fs-7 text-center py-5">Nenhum vendedor com dados no período.</div>';
+                return;
+            }
+
+            const fmtCur = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const esc = s => { const x = document.createElement('div'); x.textContent = s == null ? '' : String(s); return x.innerHTML; };
+
+            let html = '<div class="table-responsive"><table class="table table-row-dashed table-row-gray-300 align-middle gs-0 gy-4">';
+            html += '<thead><tr class="fw-bold text-muted fs-7">';
+            html += '<th class="min-w-150px">Vendedor</th>';
+            html += '<th class="text-center">Clientes</th>';
+            html += '<th class="text-center"><span class="text-success">1ª Compra</span></th>';
+            html += '<th class="text-center"><span class="text-primary">Recompraram</span></th>';
+            html += '<th class="text-center"><span class="text-warning">Recorrentes</span></th>';
+            html += '<th class="text-center"><span class="text-success">Ativos</span></th>';
+            html += '<th class="text-center"><span class="text-danger">Inativos</span></th>';
+            html += '<th class="text-center">Retenção</th>';
+            html += '<th class="text-end">Receita</th>';
+            html += '<th class="text-end">Detalhes</th>';
+            html += '</tr></thead><tbody>';
+
+            vendors.forEach(function(v) {
+                const cs = v.client_summary || {};
+                const cr = v.client_retention || {};
+                html += '<tr>';
+                html += '<td><a href="/agent-performance/agent?id=' + v.agent_id + '" class="text-gray-800 text-hover-primary fw-bold">' + esc(v.agent_name) + '</a></td>';
+                html += '<td class="text-center fw-bold">' + (cs.total_clients || 0) + '</td>';
+                html += '<td class="text-center"><span class="badge badge-light-success">' + (cs.first_time_buyers || 0) + '</span><div class="fs-9 text-muted">' + (cs.first_time_pct || 0) + '%</div></td>';
+                html += '<td class="text-center"><span class="badge badge-light-primary">' + (cs.repeat_buyers || 0) + '</span><div class="fs-9 text-muted">' + (cs.repeat_pct || 0) + '%</div></td>';
+                html += '<td class="text-center"><span class="badge badge-light-warning">' + (cs.recurring_in_period || 0) + '</span></td>';
+                html += '<td class="text-center"><span class="badge badge-light-success">' + (cr.active || 0) + '</span></td>';
+                html += '<td class="text-center"><span class="badge badge-light-danger">' + (cr.inactive || 0) + '</span></td>';
+                html += '<td class="text-center">';
+                if (cr.total_all_time > 0) {
+                    html += '<div class="progress h-6px w-100px mx-auto" title="' + (cr.active_pct||0) + '% ativos">';
+                    html += '<div class="progress-bar bg-success" style="width:' + (cr.active_pct||0) + '%"></div>';
+                    html += '</div>';
+                    html += '<div class="fs-9 text-muted mt-1">' + (cr.active_pct||0) + '% ativos</div>';
+                } else {
+                    html += '-';
+                }
+                html += '</td>';
+                html += '<td class="text-end fw-bold text-success">' + fmtCur(cs.total_revenue) + '</td>';
+                html += '<td class="text-end"><a href="/agent-performance/agent?id=' + v.agent_id + '" class="btn btn-sm btn-light-primary">Ver</a></td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            body.innerHTML = html;
+        })
+        .catch(function (e) {
+            if (btn) btn.disabled = false;
+            const msg = (e && e.message) ? String(e.message) : 'Erro ao carregar';
+            body.innerHTML = '<div class="alert alert-warning">' + msg.replace(/</g, '&lt;') + '</div>';
+        });
+}
+</script>
+<?php endif; ?>
+
 <?php if (!empty($goalsOverview)): ?>
 <?php
 $uniqueTeams = [];

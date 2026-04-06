@@ -536,7 +536,11 @@ function formatTimeDisplay($seconds, $showUnit = true) {
                     </span>
                     <span class="text-muted mt-1 fw-semibold fs-7">Vendas e conversões via WooCommerce</span>
                 </h3>
-                <div class="card-toolbar">
+                <div class="card-toolbar d-flex gap-2">
+                    <a href="<?= Url::to('/vendor-broadcast', ['agent_id' => $agent['id'] ?? '']) ?>" class="btn btn-sm btn-light-success">
+                        <i class="ki-duotone ki-send fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                        Disparar Template
+                    </a>
                     <span class="badge badge-light-primary fs-8">Clique nos totais abaixo para ver origem (1ª conversa vs retorno)</span>
                 </div>
             </div>
@@ -730,6 +734,174 @@ function formatTimeDisplay($seconds, $showUnit = true) {
         ev.preventDefault();
         window.openWcMetricBreakdown(id, name);
     });
+})();
+</script>
+<?php endif; ?>
+
+<!-- Analytics de Clientes e Produtos (carregado via AJAX) -->
+<?php if (!empty($conversionMetrics['seller_id'])): ?>
+<div class="row g-5 mb-7" id="vendor-analytics-section">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header border-0 pt-5">
+                <h3 class="card-title align-items-start flex-column">
+                    <span class="card-label fw-bold text-gray-900">
+                        <i class="ki-duotone ki-people fs-2 text-info me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                            <span class="path4"></span>
+                            <span class="path5"></span>
+                        </i>
+                        Analytics de Clientes &amp; Produtos
+                    </span>
+                    <span class="text-muted mt-1 fw-semibold fs-7">Detalhamento de clientes, retenção e produtos vendidos</span>
+                </h3>
+            </div>
+            <div class="card-body py-3" id="vendor-analytics-body">
+                <div class="text-center py-10">
+                    <span class="spinner-border text-primary"></span>
+                    <div class="text-muted mt-3">Carregando analytics...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    const analyticsUrl = <?= json_encode(\App\Helpers\Url::to('/api/agent-conversion/vendor-analytics')) ?>;
+    const agentId = <?= (int)($agent['id'] ?? 0) ?>;
+    const df = document.getElementById('date_from_agent') ? document.getElementById('date_from_agent').value : '';
+    const dt = document.getElementById('date_to_agent') ? document.getElementById('date_to_agent').value : '';
+
+    if (!agentId) return;
+
+    const u = new URL(analyticsUrl, window.location.origin);
+    u.searchParams.set('agent_id', agentId);
+    u.searchParams.set('date_from', df);
+    u.searchParams.set('date_to', dt);
+
+    fetch(u.toString(), { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.json())
+        .then(j => {
+            if (!j.success) throw new Error(j.message || 'Erro');
+            const d = j.data;
+            const cs = d.client_summary || {};
+            const cr = d.client_retention || {};
+            const tc = d.top_clients || [];
+            const tp = d.top_products || [];
+
+            const fmtCur = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            const esc = s => { const x = document.createElement('div'); x.textContent = s == null ? '' : String(s); return x.innerHTML; };
+
+            let html = '';
+
+            // Resumo de Clientes - KPIs
+            html += '<div class="row g-5 mb-5">';
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-gray-300 border-dashed rounded p-4 text-center">';
+            html += '<div class="fs-2x fw-bold text-gray-800">' + (cs.total_clients || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">Clientes no Período</div></div></div>';
+
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-gray-300 border-dashed rounded p-4 text-center">';
+            html += '<div class="fs-2x fw-bold text-success">' + (cs.first_time_buyers || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">1ª Compra</div>';
+            html += '<div class="fs-8 text-muted">' + (cs.first_time_pct || 0) + '% do total</div></div></div>';
+
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-gray-300 border-dashed rounded p-4 text-center">';
+            html += '<div class="fs-2x fw-bold text-primary">' + (cs.repeat_buyers || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">Recompraram</div>';
+            html += '<div class="fs-8 text-muted">' + (cs.repeat_pct || 0) + '% do total</div></div></div>';
+
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-gray-300 border-dashed rounded p-4 text-center">';
+            html += '<div class="fs-2x fw-bold text-warning">' + (cs.recurring_in_period || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">Recorrentes</div>';
+            html += '<div class="fs-8 text-muted">2+ pedidos no período</div></div></div>';
+
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-success border-dashed rounded p-4 text-center bg-light-success">';
+            html += '<div class="fs-2x fw-bold text-success">' + (cr.active || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">Clientes Ativos</div>';
+            html += '<div class="fs-8 text-muted">Compraram no último ano</div></div></div>';
+
+            html += '<div class="col-md-4 col-lg-2"><div class="border border-danger border-dashed rounded p-4 text-center bg-light-danger">';
+            html += '<div class="fs-2x fw-bold text-danger">' + (cr.inactive || 0) + '</div>';
+            html += '<div class="fw-semibold text-muted">Clientes Inativos</div>';
+            html += '<div class="fs-8 text-muted">Sem compra há 1+ ano</div></div></div>';
+            html += '</div>';
+
+            // Barra de retenção
+            if (cr.total_all_time > 0) {
+                html += '<div class="mb-5">';
+                html += '<div class="d-flex justify-content-between mb-2"><span class="fw-semibold text-gray-700">Retenção de Clientes (histórico)</span>';
+                html += '<span class="text-muted fs-7">' + cr.total_all_time + ' clientes total</span></div>';
+                html += '<div class="progress h-20px">';
+                html += '<div class="progress-bar bg-success" style="width:' + (cr.active_pct || 0) + '%" title="Ativos">' + (cr.active_pct || 0) + '% Ativos</div>';
+                html += '<div class="progress-bar bg-danger" style="width:' + (cr.inactive_pct || 0) + '%" title="Inativos">' + (cr.inactive_pct || 0) + '% Inativos</div>';
+                html += '</div></div>';
+            }
+
+            // Top Clientes e Produtos lado a lado
+            html += '<div class="row g-5">';
+
+            // Top Clientes
+            html += '<div class="col-lg-6">';
+            html += '<h5 class="fw-bold text-gray-800 mb-3"><i class="ki-duotone ki-profile-user fs-3 text-primary me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>Top Clientes</h5>';
+            if (tc.length > 0) {
+                html += '<div class="table-responsive"><table class="table table-row-dashed table-row-gray-300 gs-0 gy-3">';
+                html += '<thead><tr class="fw-bold text-muted fs-7"><th>Cliente</th><th class="text-center">Pedidos</th><th class="text-end">Gasto</th><th class="text-center">Status</th></tr></thead><tbody>';
+                tc.forEach(function(c) {
+                    const name = esc(c.full_name || 'Sem nome');
+                    const statusBadge = c.is_active
+                        ? '<span class="badge badge-light-success fs-9">Ativo</span>'
+                        : '<span class="badge badge-light-danger fs-9">Inativo</span>';
+                    const recurBadge = c.is_recurring
+                        ? ' <span class="badge badge-light-primary fs-9">Recorrente</span>'
+                        : '';
+                    html += '<tr>';
+                    html += '<td><div class="fw-semibold text-gray-800">' + name + '</div>';
+                    if (c.contact_phone) html += '<div class="fs-8 text-muted">' + esc(c.contact_phone) + '</div>';
+                    html += '</td>';
+                    html += '<td class="text-center">' + (c.order_count || 0) + '<div class="fs-9 text-muted">' + (c.total_orders_all_time || 0) + ' total</div></td>';
+                    html += '<td class="text-end fw-bold text-success">' + fmtCur(c.total_spent) + '</td>';
+                    html += '<td class="text-center">' + statusBadge + recurBadge + '</td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            } else {
+                html += '<div class="text-muted fs-7">Nenhum cliente no período.</div>';
+            }
+            html += '</div>';
+
+            // Top Produtos
+            html += '<div class="col-lg-6">';
+            html += '<h5 class="fw-bold text-gray-800 mb-3"><i class="ki-duotone ki-package fs-3 text-warning me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>Top Produtos</h5>';
+            if (tp.length > 0) {
+                html += '<div class="table-responsive"><table class="table table-row-dashed table-row-gray-300 gs-0 gy-3">';
+                html += '<thead><tr class="fw-bold text-muted fs-7"><th>Produto</th><th class="text-center">Qtd</th><th class="text-center">Pedidos</th><th class="text-end">Receita</th></tr></thead><tbody>';
+                tp.forEach(function(p) {
+                    html += '<tr>';
+                    html += '<td><div class="fw-semibold text-gray-800">' + esc(p.name) + '</div>';
+                    if (p.sku) html += '<div class="fs-8 text-muted">SKU: ' + esc(p.sku) + '</div>';
+                    html += '</td>';
+                    html += '<td class="text-center fw-bold">' + (p.quantity_sold || 0) + '</td>';
+                    html += '<td class="text-center">' + (p.order_count || 0) + '</td>';
+                    html += '<td class="text-end fw-bold text-success">' + fmtCur(p.total_revenue) + '</td>';
+                    html += '</tr>';
+                });
+                html += '</tbody></table></div>';
+            } else {
+                html += '<div class="text-muted fs-7">Nenhum produto vendido no período.</div>';
+            }
+            html += '</div>';
+
+            html += '</div>';
+
+            document.getElementById('vendor-analytics-body').innerHTML = html;
+        })
+        .catch(function (e) {
+            const msg = (e && e.message) ? String(e.message) : 'Erro ao carregar';
+            document.getElementById('vendor-analytics-body').innerHTML =
+                '<div class="alert alert-warning">' + msg.replace(/</g, '&lt;') + '</div>';
+        });
 })();
 </script>
 <?php endif; ?>

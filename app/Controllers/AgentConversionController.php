@@ -10,6 +10,7 @@ use App\Helpers\Response;
 use App\Helpers\Request;
 use App\Helpers\Permission;
 use App\Services\AgentConversionService;
+use App\Services\VendorClientAnalyticsService;
 use App\Models\User;
 
 class AgentConversionController
@@ -142,6 +143,59 @@ class AgentConversionController
         }
     }
     
+    /**
+     * API: Analytics de clientes e produtos do vendedor (JSON)
+     */
+    public function vendorAnalytics(): void
+    {
+        $agentId = (int)Request::get('agent_id');
+        $currentUserId = (int)(\App\Helpers\Auth::user()['id'] ?? 0);
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
+        $dateTo = Request::get('date_to', date('Y-m-d'));
+
+        $canViewAll = Permission::can('conversion.view')
+            || Permission::can('agent_performance.view.all')
+            || Permission::can('conversations.view.all');
+        if ($agentId !== $currentUserId && !$canViewAll) {
+            Response::json(['success' => false, 'message' => 'Sem permissão'], 403);
+            return;
+        }
+
+        if ($agentId < 1) {
+            Response::json(['success' => false, 'message' => 'agent_id inválido'], 400);
+            return;
+        }
+
+        try {
+            $data = VendorClientAnalyticsService::getVendorAnalytics($agentId, $dateFrom, $dateTo);
+            $agent = User::find($agentId);
+            $data['agent_name'] = $agent['name'] ?? '';
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            error_log('vendorAnalytics: ' . $e->getMessage());
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * API: Resumo de analytics de todos os vendedores (admin)
+     */
+    public function allVendorsAnalytics(): void
+    {
+        Permission::abortIfCannot('conversations.view.all');
+
+        $dateFrom = Request::get('date_from', date('Y-m-01'));
+        $dateTo = Request::get('date_to', date('Y-m-d'));
+
+        try {
+            $data = VendorClientAnalyticsService::getAllVendorsClientSummary($dateFrom, $dateTo);
+            Response::json(['success' => true, 'data' => $data]);
+        } catch (\Exception $e) {
+            error_log('allVendorsAnalytics: ' . $e->getMessage());
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * API: Testar meta_key do vendedor no WooCommerce
      */

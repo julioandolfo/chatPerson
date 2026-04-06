@@ -47,6 +47,7 @@ use App\Controllers\CampaignController;
 use App\Controllers\ContactListController;
 use App\Controllers\DripSequenceController;
 use App\Controllers\MockupController;
+use App\Controllers\VendorBroadcastController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -646,8 +647,18 @@ Router::get('/agent-conversion/agent', [AgentConversionController::class, 'show'
 Router::get('/api/agent-conversion/metrics', [AgentConversionController::class, 'getMetrics'], ['Authentication']);
 Router::get('/api/agent-conversion/metric-breakdown', [AgentConversionController::class, 'metricBreakdown'], ['Authentication']);
 Router::post('/api/agent-conversion/sync', [AgentConversionController::class, 'syncOrders'], ['Authentication']);
+Router::get('/api/agent-conversion/vendor-analytics', [AgentConversionController::class, 'vendorAnalytics'], ['Authentication']);
+Router::get('/api/agent-conversion/all-vendors-analytics', [AgentConversionController::class, 'allVendorsAnalytics'], ['Authentication']);
 Router::post('/api/woocommerce/test-meta-key', [WooCommerceController::class, 'testSellerMetaKey'], ['Authentication']);
 Router::post('/api/woocommerce/sync-orders', [WooCommerceController::class, 'syncOrders'], ['Authentication', 'Permission:conversion.view']);
+
+// Disparos de Vendedor (Templates NotificaMe)
+Router::get('/vendor-broadcast', [VendorBroadcastController::class, 'index'], ['Authentication']);
+Router::get('/api/vendor-broadcast/templates', [VendorBroadcastController::class, 'templates'], ['Authentication']);
+Router::get('/api/vendor-broadcast/clients', [VendorBroadcastController::class, 'clients'], ['Authentication']);
+Router::post('/api/vendor-broadcast/send', [VendorBroadcastController::class, 'send'], ['Authentication']);
+Router::get('/api/vendor-broadcast/details', [VendorBroadcastController::class, 'details'], ['Authentication']);
+Router::get('/api/vendor-broadcast/limit', [VendorBroadcastController::class, 'limit'], ['Authentication']);
 
 // Rotas de Tags
 // IMPORTANTE: Rotas específicas DEVEM vir ANTES de rotas com parâmetros dinâmicos

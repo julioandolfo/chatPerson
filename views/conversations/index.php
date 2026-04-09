@@ -8931,6 +8931,12 @@ function startMediaRatePolling(conversationId) {
     mediaRatePollTimer = setInterval(() => refreshMediaRateBadge(conversationId), 30000);
 }
 
+// Iniciar polling automaticamente se já há conversa aberta no load (refresh)
+document.addEventListener('DOMContentLoaded', function() {
+    const cid = window.currentConversationId || currentConversationId;
+    if (cid) startMediaRatePolling(cid);
+});
+
 function selectConversation(id) {
     // Atualizar conversa selecionada globalmente e resetar estado local
     resetConversationState(id);

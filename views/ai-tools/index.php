@@ -726,9 +726,22 @@ const autoSchemaTypes = {
 const toolTypeConfigs = {
     woocommerce: {
         fields: [
+            { name: "wc_operation", label: "Operação da Loja", type: "select", required: true,
+              options: [
+                { value: "buscar_pedido_woocommerce",          label: "Buscar 1 pedido por número/ID" },
+                { value: "buscar_pedidos_woocommerce",         label: "Listar pedidos (cliente, status, datas, IDs)" },
+                { value: "buscar_produto_woocommerce",         label: "Buscar produto (REST API: preço, estoque, atributos, custom fields)" },
+                { value: "buscar_pagina_produto_woocommerce",  label: "Ler página HTML do produto (ressalvas, regras, prazos do front)" },
+                { value: "criar_pedido_woocommerce",           label: "Criar pedido" },
+                { value: "atualizar_status_pedido",            label: "Atualizar status de pedido" }
+              ],
+              help: "Escolha a operação. O Function Schema (nome, descrição e parâmetros) será preenchido automaticamente — não precisa adicionar parâmetros manualmente." },
             { name: "url", label: "URL da Loja WooCommerce", type: "url", required: true, placeholder: "https://loja.exemplo.com" },
             { name: "consumer_key", label: "Consumer Key", type: "text", required: true },
-            { name: "consumer_secret", label: "Consumer Secret", type: "password", required: true }
+            { name: "consumer_secret", label: "Consumer Secret", type: "password", required: true },
+            { name: "meta_whitelist", label: "Custom fields ocultos (prefixo _) a incluir", type: "text", required: false,
+              placeholder: "_prazo_producao,_data_entrega_prevista,_transportadora",
+              help: "Lista separada por vírgula. Por padrão, meta keys com prefixo _ (internas do WC/plugins) são escondidas. Adicione aqui as que você quer enviar ao agente." }
         ]
     },
     database: {

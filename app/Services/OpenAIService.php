@@ -32,6 +32,15 @@ class OpenAIService
     const RETRY_DELAY = 1; // segundos
 
     /**
+     * Whitelist de meta keys "ocultas" do WooCommerce (prefixo `_`) que devem ser
+     * incluídas no contexto enviado ao LLM. Definido por requisição em
+     * executeWooCommerceTool a partir de config.meta_whitelist.
+     *
+     * @var array<string>
+     */
+    private static array $wcMetaWhitelist = [];
+
+    /**
      * Log auxiliar para debug de intents (mesmo arquivo de intents da AutomationService)
      */
     private static function logIntentDebug(string $message): void
@@ -336,12 +345,31 @@ class OpenAIService
                 Logger::warning("OpenAIService::processMessage - Erro ao detectar feedback: " . $feedbackError->getMessage());
             }
 
-            // Extrair e salvar memórias automaticamente (após algumas mensagens)
+            // Extrair e salvar memórias automaticamente
+            // Estratégia híbrida:
+            //   1) Baseline: a cada 5 mensagens (a partir da 3ª) — controla custo
+            //   2) Trigger imediato: se a mensagem do usuário contém sinais de fato persistente
+            //      (CPF, CNPJ, email, telefone, "meu nome é", alergia, preferência, etc.)
+            //   3) Trigger imediato: se foi executada uma tool "memorável"
+            //      (escalar, criar pedido, atualizar status, mudança de funil, tag)
             try {
                 if (\App\Helpers\PostgreSQL::isAvailable()) {
-                    // Extrair memórias apenas após 3+ mensagens na conversa
                     $messageCount = count(Message::where('conversation_id', '=', $conversationId));
-                    if ($messageCount >= 3 && $messageCount % 5 === 0) { // A cada 5 mensagens
+                    $baselineTrigger = ($messageCount >= 3 && $messageCount % 5 === 0);
+
+                    $signalTrigger = self::messageHasMemorableSignals($message);
+
+                    $executedToolNames = [];
+                    if (!empty($toolCalls)) {
+                        foreach ($toolCalls as $tc) {
+                            $name = $tc['function']['name'] ?? null;
+                            if ($name) { $executedToolNames[] = $name; }
+                        }
+                    }
+                    $toolTrigger = self::executedToolsAreMemorable($executedToolNames);
+
+                    if ($baselineTrigger || $signalTrigger || $toolTrigger) {
+                        \App\Helpers\Logger::aiTools("[MEMORY] conv={$conversationId} extract trigger: baseline=" . ($baselineTrigger ? '1' : '0') . " signal=" . ($signalTrigger ? '1' : '0') . " tool=" . ($toolTrigger ? '1' : '0'));
                         AgentMemoryService::extractAndSave($agentId, $conversationId);
                     }
                 }
@@ -481,13 +509,29 @@ class OpenAIService
 
         // Adicionar contexto RAG (Knowledge Base + Memórias) se disponível
         $agentId = $agent['id'] ?? 0;
-        if ($agentId && \App\Helpers\PostgreSQL::isAvailable()) {
+        $pgAvailable = \App\Helpers\PostgreSQL::isAvailable();
+
+        if ($agentId && $pgAvailable) {
             try {
-                $ragContext = RAGService::getFullContext($agentId, $userMessage, $conversationId);
+                // Opções de RAG configuráveis por agente (settings JSON)
+                $agentSettings = is_string($agent['settings'] ?? '')
+                    ? (json_decode($agent['settings'], true) ?: [])
+                    : ($agent['settings'] ?? []);
+
+                $ragOptions = [];
+                if (isset($agentSettings['rag_threshold']) && is_numeric($agentSettings['rag_threshold'])) {
+                    $ragOptions['threshold'] = (float)$agentSettings['rag_threshold'];
+                }
+                if (isset($agentSettings['rag_limit']) && is_numeric($agentSettings['rag_limit'])) {
+                    $ragOptions['limit'] = (int)$agentSettings['rag_limit'];
+                }
+
+                $ragContext = RAGService::getFullContext($agentId, $userMessage, $conversationId, $ragOptions);
                 if (!empty($ragContext)) {
                     $systemPrompt .= $ragContext;
                     \App\Helpers\ConversationDebug::aiAgent($conversationId, "Contexto RAG adicionado ao prompt", [
-                        'context_length' => strlen($ragContext)
+                        'context_length' => strlen($ragContext),
+                        'rag_options' => $ragOptions
                     ]);
                 }
             } catch (\Exception $e) {
@@ -495,6 +539,12 @@ class OpenAIService
                 \App\Helpers\ConversationDebug::error($conversationId, 'RAG', 'Erro ao buscar contexto RAG: ' . $e->getMessage());
                 Logger::warning("OpenAIService::buildMessages - Erro ao buscar contexto RAG: " . $e->getMessage());
             }
+        } elseif ($agentId && !$pgAvailable) {
+            // Degradação: PG indisponível → memória/RAG offline.
+            // Loga + adiciona aviso interno no prompt para o LLM ser mais conservador.
+            Logger::warning("OpenAIService::buildMessages - PostgreSQL indisponível, RAG/memórias desativados (agente={$agentId} conv={$conversationId})");
+            \App\Helpers\ConversationDebug::error($conversationId, 'RAG', 'PostgreSQL indisponível — RAG e memórias desativados nesta resposta');
+            $systemPrompt .= "\n\n[AVISO INTERNO AO ASSISTENTE: a base de conhecimento e o sistema de memórias estão temporariamente indisponíveis. Responda apenas com base na conversa atual e nas informações que você tem certeza. Se o cliente perguntar algo que normalmente exigiria consultar a base de conhecimento, peça desculpas e diga que vai verificar e retornar em breve, ou escale para um humano. Não invente informações.]";
         }
 
         $messages[] = [
@@ -821,6 +871,70 @@ class OpenAIService
     }
 
     /**
+     * Detecta sinais de fato persistente na mensagem do usuário (gatilho de memória).
+     * Heurística barata e sem chamadas externas — só regex.
+     */
+    private static function messageHasMemorableSignals(string $message): bool
+    {
+        $msg = trim($message);
+        if ($msg === '' || mb_strlen($msg) < 6) {
+            return false;
+        }
+
+        // Documentos / contatos brasileiros
+        $patterns = [
+            '/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/',                     // CPF
+            '/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/',             // CNPJ
+            '/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i',               // email
+            '/\b\d{5}-?\d{3}\b/',                                     // CEP
+            '/\b\(?\d{2}\)?[\s-]?9?\d{4}-?\d{4}\b/',                  // telefone BR
+        ];
+        foreach ($patterns as $p) {
+            if (preg_match($p, $msg)) { return true; }
+        }
+
+        // Frases que tipicamente declaram fatos/preferências persistentes
+        $phrases = [
+            'meu nome é', 'me chamo', 'sou o ', 'sou a ',
+            'minha empresa', 'trabalho na', 'trabalho no', 'cargo de',
+            'tenho alergia', 'sou alérgic', 'não posso consumir', 'restrição',
+            'prefiro', 'gosto de', 'não gosto', 'odeio',
+            'meu endereço', 'moro em', 'moro no', 'moro na',
+            'meu cpf', 'meu cnpj', 'meu email', 'meu e-mail', 'meu telefone', 'meu whatsapp',
+            'data de nascimento', 'aniversário',
+            'horário de funcionamento', 'horário comercial',
+            'pode me chamar de',
+        ];
+        $lower = mb_strtolower($msg);
+        foreach ($phrases as $needle) {
+            if (str_contains($lower, $needle)) { return true; }
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifica se alguma das tools executadas representa um momento "memorável"
+     * (mudança de estado relevante que vale persistir antes do ciclo padrão).
+     */
+    private static function executedToolsAreMemorable(array $executedToolNames): bool
+    {
+        if (empty($executedToolNames)) { return false; }
+        $memorable = [
+            'escalar_para_humano',
+            'criar_pedido_woocommerce',
+            'atualizar_status_pedido',
+            'adicionar_tag',
+            'funnel_stage',
+            'funnel_stage_smart',
+        ];
+        foreach ($executedToolNames as $name) {
+            if (in_array($name, $memorable, true)) { return true; }
+        }
+        return false;
+    }
+
+    /**
      * Classificação por IA: a mensagem do usuário requer uso de ferramentas externas?
      * Usa gpt-4o-mini com ~100 tokens — rápido e barato (~0,01 centavo por chamada).
      * Em caso de falha, libera tools por segurança.
@@ -903,6 +1017,10 @@ PROMPT;
         }
         if (str_starts_with($n, 'buscar_pedido')) {
             return 'buscar_pedido_woocommerce';
+        }
+        // Importante: pagina_produto antes de produto (este é prefixo)
+        if (str_starts_with($n, 'buscar_pagina_produto') || str_starts_with($n, 'pagina_produto')) {
+            return 'buscar_pagina_produto_woocommerce';
         }
         if (str_starts_with($n, 'buscar_produto')) {
             return 'buscar_produto_woocommerce';
@@ -1478,6 +1596,16 @@ PROMPT;
             return ['error' => 'Configurações do WooCommerce não completas (URL, Consumer Key, Consumer Secret)'];
         }
 
+        // Whitelist de meta keys "ocultas" (prefixo _) que devem ser incluídas no contexto.
+        // Configurável globalmente na tool ou por agente em ai_agent_tools.config.
+        // Aceita array de strings ou string CSV.
+        $metaWhitelist = $config['meta_whitelist'] ?? [];
+        if (is_string($metaWhitelist)) {
+            $metaWhitelist = array_filter(array_map('trim', explode(',', $metaWhitelist)));
+        }
+        if (!is_array($metaWhitelist)) { $metaWhitelist = []; }
+        self::$wcMetaWhitelist = array_values($metaWhitelist);
+
         $makeWCRequest = function(string $endpoint, string $method = 'GET', array $data = []) use ($wcUrl, $consumerKey, $consumerSecret): array {
             $url = rtrim($wcUrl, '/') . '/wp-json/wc/v3/' . ltrim($endpoint, '/');
             $ch = curl_init($url);
@@ -1570,6 +1698,53 @@ PROMPT;
                 case 'listar_pedidos_cliente_woocommerce':
                     $q = [];
 
+                    // ─── Caminho rápido: include = lista de IDs específicos ───
+                    // Quando o cliente menciona um ou mais números de pedido, a IA passa
+                    // include=[64517,64025]. Buscamos cada um por GET /orders/{id} e
+                    // aplicamos ownership check individualmente — assim distinguimos
+                    // "não existe" de "existe mas não é deste contato".
+                    $includeIds = $arguments['include'] ?? null;
+                    if (is_string($includeIds)) {
+                        $includeIds = array_filter(array_map('trim', explode(',', $includeIds)));
+                    }
+                    if (is_array($includeIds) && !empty($includeIds)) {
+                        $rawOrders     = [];
+                        $notFoundIds   = [];
+                        $filteredOutIds = [];
+                        foreach ($includeIds as $oid) {
+                            $oid = (int)$oid;
+                            if ($oid <= 0) { continue; }
+                            $r = $makeWCRequest("orders/{$oid}");
+                            if (empty($r['success']) || !is_array($r['data'] ?? null)) {
+                                $notFoundIds[] = $oid;
+                                continue;
+                            }
+                            if (!$orderBelongsToContact($r['data'])) {
+                                $filteredOutIds[] = $oid;
+                                continue;
+                            }
+                            $rawOrders[] = $r['data'];
+                        }
+
+                        $response = [
+                            'success'     => true,
+                            'orders'      => array_map([self::class, 'sanitizeWCOrder'], $rawOrders),
+                            'total_found' => count($rawOrders),
+                            'searched_ids' => array_map('intval', $includeIds),
+                        ];
+                        if (!empty($notFoundIds)) {
+                            $response['not_found_ids'] = $notFoundIds;
+                        }
+                        if (!empty($filteredOutIds)) {
+                            $response['filtered_out_count'] = count($filteredOutIds);
+                            $response['warning'] = count($filteredOutIds) . ' pedido(s) foram localizados na loja, mas não puderam ser associados ao contato desta conversa. Peça ao cliente para confirmar o email ou telefone usado na compra. Se ele confirmar outra identificação, ofereça escalar para um humano. NÃO afirme ao cliente que o pedido não existe.';
+                        }
+                        if (empty($rawOrders) && empty($notFoundIds) && empty($filteredOutIds)) {
+                            $response['message'] = 'Nenhum ID válido fornecido em include.';
+                        }
+                        return $response;
+                    }
+
                     // Customer ID explícito
                     $customer = $arguments['customer'] ?? $arguments['customer_id'] ?? null;
                     if ($customer !== null && $customer !== '') {
@@ -1602,25 +1777,37 @@ PROMPT;
 
                     $result = $makeWCRequest('orders?' . http_build_query($q));
                     $rawOrders = is_array($result['data'] ?? null) ? $result['data'] : [];
+                    $totalRaw  = count($rawOrders);
 
                     // Filtrar apenas pedidos que pertencem ao contato
                     $filteredOrders = array_values(array_filter($rawOrders, $orderBelongsToContact));
+                    $filteredOutCount = $totalRaw - count($filteredOrders);
 
                     if (empty($filteredOrders)) {
-                        return [
+                        $resp = [
                             'success' => true,
                             'orders'  => [],
                             'message' => 'Nenhum pedido encontrado para este cliente.',
                             'filter_used' => $q['search'] ?? $q['customer'] ?? null,
                         ];
+                        if ($filteredOutCount > 0) {
+                            $resp['filtered_out_count'] = $filteredOutCount;
+                            $resp['warning'] = $filteredOutCount . ' pedido(s) foram localizados na loja, mas não puderam ser associados ao contato desta conversa. Peça ao cliente para confirmar o email ou telefone usado na compra. NÃO afirme ao cliente que o pedido não existe.';
+                        }
+                        return $resp;
                     }
 
-                    return [
+                    $resp = [
                         'success'      => true,
                         'orders'       => array_map([self::class, 'sanitizeWCOrder'], $filteredOrders),
                         'total_found'  => count($filteredOrders),
                         'filter_used'  => $q['search'] ?? $q['customer'] ?? null,
                     ];
+                    if ($filteredOutCount > 0) {
+                        $resp['filtered_out_count'] = $filteredOutCount;
+                        $resp['warning'] = $filteredOutCount . ' pedido(s) adicionais foram localizados na loja, mas não puderam ser associados a este contato (possivelmente comprados com outro email/telefone). Se o cliente perguntar sobre eles, peça confirmação dos dados de contato usados na compra.';
+                    }
+                    return $resp;
 
                 // ══════════════ PRODUTO ══════════════
                 case 'buscar_produto_woocommerce':
@@ -1641,6 +1828,44 @@ PROMPT;
                     } else {
                         return ['error' => 'Forneça product_id, sku ou termo de busca do produto.'];
                     }
+
+                // ══════════════ PÁGINA HTML DO PRODUTO ══════════════
+                // Busca o conteúdo renderizado da página pública do produto.
+                // Útil quando a loja exibe ressalvas, regras de quantidade, prazo, fretes
+                // ou dados que ficam só no front (não estão no REST API).
+                case 'buscar_pagina_produto_woocommerce':
+                    $productId = $arguments['product_id'] ?? null;
+                    $url       = $arguments['url'] ?? null;
+
+                    // Resolver URL via API se só veio o ID
+                    if (!$url && $productId) {
+                        $r = $makeWCRequest("products/{$productId}");
+                        if (!empty($r['success']) && is_array($r['data'] ?? null)) {
+                            $url = $r['data']['permalink'] ?? null;
+                        }
+                    }
+                    if (!$url) {
+                        return ['error' => 'Forneça product_id (preferencial) ou uma url completa do produto.'];
+                    }
+
+                    // Restringir ao mesmo domínio da loja para não virar SSRF
+                    $storeHost = parse_url($wcUrl, PHP_URL_HOST);
+                    $targetHost = parse_url($url, PHP_URL_HOST);
+                    if (!$storeHost || !$targetHost || strcasecmp($storeHost, $targetHost) !== 0) {
+                        return ['error' => 'URL fora do domínio da loja configurada — bloqueado por segurança.'];
+                    }
+
+                    $page = self::fetchWCProductPage($url);
+                    if (isset($page['error'])) {
+                        return $page;
+                    }
+                    return [
+                        'success'   => true,
+                        'url'       => $url,
+                        'title'     => $page['title'] ?? null,
+                        'content'   => $page['content'] ?? '',
+                        'truncated' => $page['truncated'] ?? false,
+                    ];
 
                 // ══════════════ CRIAR PEDIDO ══════════════
                 case 'criar_pedido_woocommerce':
@@ -1687,7 +1912,150 @@ PROMPT;
     }
 
     /**
+     * Faz fetch da página HTML pública de um produto WooCommerce e extrai o
+     * conteúdo textual relevante (sem scripts, styles, nav, footer, etc.).
+     *
+     * Devolve [title, content, truncated] ou [error].
+     */
+    private static function fetchWCProductPage(string $url): array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS      => 3,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_USERAGENT      => 'Mozilla/5.0 (compatible; ChatAIBot/1.0; +https://chat.local)',
+            CURLOPT_HTTPHEADER     => [
+                'Accept: text/html,application/xhtml+xml',
+                'Accept-Language: pt-BR,pt;q=0.9,en;q=0.5',
+            ],
+        ]);
+        $html = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
+
+        if ($err) {
+            return ['error' => 'Falha ao buscar página do produto: ' . $err];
+        }
+        if ($httpCode < 200 || $httpCode >= 300 || !is_string($html) || $html === '') {
+            return ['error' => "Falha ao buscar página do produto (HTTP {$httpCode})"];
+        }
+
+        // Extrair <title>
+        $title = null;
+        if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $html, $m)) {
+            $title = trim(html_entity_decode(strip_tags($m[1]), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+        }
+
+        // Tentar isolar o bloco principal (.summary, .product, main, article)
+        // — se achar, usa só ele para reduzir ruído de menu/footer.
+        $main = null;
+        $patterns = [
+            '/<div[^>]*class="[^"]*\b(summary|product|woocommerce-product-details)\b[^"]*"[^>]*>(.*?)<\/div>\s*<\/div>/is',
+            '/<main\b[^>]*>(.*?)<\/main>/is',
+            '/<article\b[^>]*>(.*?)<\/article>/is',
+        ];
+        foreach ($patterns as $p) {
+            if (preg_match($p, $html, $mm)) {
+                $main = $mm[count($mm) - 1];
+                if (mb_strlen(strip_tags($main)) > 200) { break; }
+                $main = null;
+            }
+        }
+        $work = $main ?: $html;
+
+        // Remover blocos não-textuais
+        $work = preg_replace('/<script\b[^>]*>.*?<\/script>/is', ' ', $work);
+        $work = preg_replace('/<style\b[^>]*>.*?<\/style>/is', ' ', $work);
+        $work = preg_replace('/<noscript\b[^>]*>.*?<\/noscript>/is', ' ', $work);
+        $work = preg_replace('/<nav\b[^>]*>.*?<\/nav>/is', ' ', $work);
+        $work = preg_replace('/<header\b[^>]*>.*?<\/header>/is', ' ', $work);
+        $work = preg_replace('/<footer\b[^>]*>.*?<\/footer>/is', ' ', $work);
+        $work = preg_replace('/<form\b[^>]*>.*?<\/form>/is', ' ', $work);
+        $work = preg_replace('/<!--.*?-->/s', ' ', $work);
+
+        // Strip de tags e normalização de espaços
+        $text = strip_tags($work);
+        $text = html_entity_decode($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = preg_replace('/[ \t\x{00A0}]+/u', ' ', $text);
+        $text = preg_replace('/\s*\n\s*/', "\n", $text);
+        $text = preg_replace('/\n{3,}/', "\n\n", $text);
+        $text = trim($text);
+
+        // Truncar para não estourar contexto do LLM
+        $maxLen = 4000;
+        $truncated = false;
+        if (mb_strlen($text) > $maxLen) {
+            $text = mb_substr($text, 0, $maxLen) . '…';
+            $truncated = true;
+        }
+
+        return [
+            'title'     => $title,
+            'content'   => $text,
+            'truncated' => $truncated,
+        ];
+    }
+
+    /**
+     * Extrai meta_data do WooCommerce em formato chave→valor amigável para o LLM.
+     *
+     * - Pula chaves "ocultas" (prefixo `_`) por padrão — convenção do WC para meta interno.
+     * - Converte valores não-escalares em JSON resumido.
+     * - Trunca strings longas para evitar estouro de contexto.
+     * - Limita o número total de campos.
+     */
+    private static function extractWCMeta($metaData, bool $includeHidden = false, int $maxFields = 40, int $maxValueLen = 500): array
+    {
+        if (!is_array($metaData)) {
+            return [];
+        }
+        $out = [];
+        $count = 0;
+        foreach ($metaData as $m) {
+            if ($count >= $maxFields) { break; }
+            if (!is_array($m)) { continue; }
+            $key = $m['key'] ?? null;
+            if (!is_string($key) || $key === '') { continue; }
+            // Pular meta interno do WC/plugins (prefixo _) salvo se:
+            //   a) flag $includeHidden estiver ligada, ou
+            //   b) a key estiver na whitelist configurada (config.meta_whitelist)
+            if (!$includeHidden && str_starts_with($key, '_')) {
+                if (!in_array($key, self::$wcMetaWhitelist, true)) {
+                    continue;
+                }
+            }
+
+            $val = $m['display_value'] ?? $m['value'] ?? null;
+            if (is_array($val) || is_object($val)) {
+                $val = json_encode($val, JSON_UNESCAPED_UNICODE);
+            } elseif (is_bool($val)) {
+                $val = $val ? 'true' : 'false';
+            } elseif ($val === null) {
+                continue;
+            } else {
+                $val = (string)$val;
+            }
+            // Strip HTML que alguns plugins gravam em display_value
+            $val = trim(strip_tags($val));
+            if ($val === '') { continue; }
+            if (mb_strlen($val) > $maxValueLen) {
+                $val = mb_substr($val, 0, $maxValueLen) . '…';
+            }
+            $out[$key] = $val;
+            $count++;
+        }
+        return $out;
+    }
+
+    /**
      * Limpa resposta de pedido WooCommerce: só campos úteis para o agente, sem dados sensíveis.
+     * Inclui meta_data (custom fields) tanto no pedido quanto nos line items — onde plugins
+     * costumam gravar prazo de produção, data prevista de entrega, observações etc.
      */
     private static function sanitizeWCOrder($order): array
     {
@@ -1704,7 +2072,10 @@ PROMPT;
                 'price'        => $li['price'] ?? 0,
                 'total'        => $li['total'] ?? '0',
                 'product_id'   => $li['product_id'] ?? null,
+                'variation_id' => $li['variation_id'] ?? null,
                 'image_url'    => $li['image']['src'] ?? null,
+                // Custom fields do item (ex.: opções de personalização, variações extras)
+                'meta'         => self::extractWCMeta($li['meta_data'] ?? [], false, 20, 300),
             ];
         }
 
@@ -1744,30 +2115,88 @@ PROMPT;
             'tracking'            => !empty($tracking) ? $tracking : null,
             'needs_payment'       => $order['needs_payment'] ?? false,
             'payment_url'         => ($order['needs_payment'] ?? false) ? ($order['payment_url'] ?? null) : null,
+            // Custom fields do pedido (ex.: prazo de produção, data prevista de entrega,
+            // transportadora, código de rastreio de plugins, observações internas, etc.)
+            'meta'                => self::extractWCMeta($order['meta_data'] ?? [], false, 40, 500),
         ];
     }
 
     /**
      * Limpa resposta de produto WooCommerce.
+     * Inclui descrição completa, atributos, dimensões, variações e meta_data (custom fields)
+     * — onde plugins gravam informações como prazo de produção, ficha técnica, etc.
      */
     private static function sanitizeWCProduct($product): array
     {
         if (!is_array($product)) {
             return [];
         }
+
+        // Atributos (cor, tamanho, material, etc.)
+        $attributes = [];
+        foreach ($product['attributes'] ?? [] as $attr) {
+            if (!is_array($attr)) { continue; }
+            $name = $attr['name'] ?? null;
+            $options = $attr['options'] ?? [];
+            if ($name && !empty($options)) {
+                $attributes[$name] = is_array($options) ? implode(', ', $options) : (string)$options;
+            }
+        }
+
+        // Dimensões físicas
+        $dimensions = null;
+        if (!empty($product['dimensions']) && is_array($product['dimensions'])) {
+            $d = $product['dimensions'];
+            if (!empty($d['length']) || !empty($d['width']) || !empty($d['height'])) {
+                $dimensions = [
+                    'length' => $d['length'] ?? null,
+                    'width'  => $d['width'] ?? null,
+                    'height' => $d['height'] ?? null,
+                ];
+            }
+        }
+
+        // Imagens (até 5)
+        $images = [];
+        foreach (array_slice($product['images'] ?? [], 0, 5) as $img) {
+            if (!empty($img['src'])) { $images[] = $img['src']; }
+        }
+
+        // Descrição longa: strip HTML e truncar
+        $longDesc = strip_tags($product['description'] ?? '');
+        $longDesc = trim(preg_replace('/\s+/', ' ', $longDesc));
+        if (mb_strlen($longDesc) > 1500) {
+            $longDesc = mb_substr($longDesc, 0, 1500) . '…';
+        }
+
         return [
             'id'              => $product['id'] ?? null,
             'name'            => $product['name'] ?? '',
+            'type'            => $product['type'] ?? 'simple',
             'sku'             => $product['sku'] ?? '',
             'price'           => $product['price'] ?? '',
             'regular_price'   => $product['regular_price'] ?? '',
             'sale_price'      => $product['sale_price'] ?? '',
+            'on_sale'         => $product['on_sale'] ?? false,
             'stock_status'    => $product['stock_status'] ?? '',
             'stock_quantity'  => $product['stock_quantity'] ?? null,
-            'short_description' => strip_tags($product['short_description'] ?? ''),
+            'manage_stock'    => $product['manage_stock'] ?? false,
+            'weight'          => $product['weight'] ?? null,
+            'dimensions'      => $dimensions,
+            'short_description' => trim(strip_tags($product['short_description'] ?? '')),
+            'description'     => $longDesc,
             'permalink'       => $product['permalink'] ?? '',
-            'image_url'       => $product['images'][0]['src'] ?? null,
+            'image_url'       => $images[0] ?? null,
+            'images'          => $images,
             'categories'      => array_map(fn($c) => $c['name'] ?? '', $product['categories'] ?? []),
+            'tags'            => array_map(fn($t) => $t['name'] ?? '', $product['tags'] ?? []),
+            'attributes'      => $attributes,
+            'variations'      => $product['variations'] ?? [],
+            'total_sales'     => $product['total_sales'] ?? null,
+            'average_rating'  => $product['average_rating'] ?? null,
+            'rating_count'    => $product['rating_count'] ?? null,
+            // Custom fields (ACF, Yoast, plugins de prazo de entrega, ficha técnica, etc.)
+            'meta'            => self::extractWCMeta($product['meta_data'] ?? [], false, 40, 500),
         ];
     }
 

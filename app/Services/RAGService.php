@@ -241,13 +241,26 @@ class RAGService
      * @param int $conversationId ID da conversa (opcional)
      * @return string Contexto completo formatado
      */
-    public static function getFullContext(int $agentId, string $query, ?int $conversationId = null): string
+    public static function getFullContext(int $agentId, string $query, ?int $conversationId = null, array $options = []): string
     {
         $context = [];
-        
+
+        // Opções tunáveis por agente (com fallback para os defaults da classe)
+        $threshold = isset($options['threshold']) ? (float)$options['threshold'] : self::DEFAULT_THRESHOLD;
+        $limit     = isset($options['limit'])     ? (int)$options['limit']     : self::DEFAULT_LIMIT;
+
+        // Sanidade
+        if ($threshold < 0)   { $threshold = 0; }
+        if ($threshold > 1)   { $threshold = 1; }
+        if ($limit < 1)       { $limit = 1; }
+        if ($limit > 20)      { $limit = 20; }
+
         // Buscar conhecimento relevante
-        $knowledge = self::searchRelevantContext($agentId, $query);
+        $knowledge = self::searchRelevantContext($agentId, $query, $limit, $threshold);
         if (!empty($knowledge)) {
+            // Logar similaridades para tunagem futura do threshold
+            $sims = array_map(fn($k) => $k['similarity'] ?? null, $knowledge);
+            Logger::info("RAGService::getFullContext - agente={$agentId} threshold={$threshold} limit={$limit} retornou " . count($knowledge) . " chunks (similarities=" . json_encode($sims) . ")");
             $context[] = self::formatContextForPrompt($knowledge);
         }
         

@@ -36,6 +36,12 @@ class AIToolService
         // Sincronizar function.name com o slug da tool
         $data['function_schema'] = self::syncFunctionName($data['function_schema'], $data['slug']);
 
+        // Validar schema contra a spec do OpenAI Function Calling
+        $schemaErrors = self::validateFunctionSchema($data['function_schema']);
+        if (!empty($schemaErrors)) {
+            throw new \InvalidArgumentException('Schema inválido para OpenAI Function Calling: ' . implode('; ', $schemaErrors));
+        }
+
         // Serializar JSON fields
         $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         if (isset($data['config']) && is_array($data['config'])) {
@@ -86,9 +92,15 @@ class AIToolService
                 $data['function_schema'] = self::syncFunctionName($data['function_schema'], $slug);
             }
 
+            // Validar schema contra a spec do OpenAI Function Calling
+            $schemaErrors = self::validateFunctionSchema($data['function_schema']);
+            if (!empty($schemaErrors)) {
+                throw new \InvalidArgumentException('Schema inválido para OpenAI Function Calling: ' . implode('; ', $schemaErrors));
+            }
+
             $data['function_schema'] = json_encode($data['function_schema'], JSON_UNESCAPED_UNICODE);
         }
-        if (isset($data['config']) && is_array($data['config'])) {
+        if (isset($data['config']) && \is_array($data['config'])) {
             $data['config'] = json_encode($data['config'], JSON_UNESCAPED_UNICODE);
         }
 
@@ -199,6 +211,120 @@ class AIToolService
         }
         
         return $schema;
+    }
+
+    /**
+     * Valida o function_schema contra a spec do OpenAI Function Calling.
+     * Retorna array de mensagens de erro (vazio = ok).
+     *
+     * Regras cobertas:
+     *  - function.name presente, ^[a-zA-Z0-9_-]{1,64}$
+     *  - function.description presente e não vazia
+     *  - parameters.type === 'object'
+     *  - properties é objeto/dicionário (não array indexado)
+     *  - required[] é array e só referencia keys existentes em properties
+     *  - cada propriedade tem 'type' válido e idealmente 'description'
+     */
+    public static function validateFunctionSchema(array $schema): array
+    {
+        $errors = [];
+
+        // Aceita formato wrapper {type:'function', function:{...}} ou direto
+        $func = $schema['function'] ?? $schema;
+
+        // 1) name
+        $name = $func['name'] ?? null;
+        if (!\is_string($name) || $name === '') {
+            $errors[] = 'function.name é obrigatório';
+        } elseif (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $name)) {
+            $errors[] = "function.name '{$name}' inválido (use apenas a-z, A-Z, 0-9, _ ou -, máx 64 chars)";
+        }
+
+        // 2) description
+        $desc = $func['description'] ?? null;
+        if (!\is_string($desc) || trim($desc) === '') {
+            $errors[] = 'function.description é obrigatória e não pode estar vazia (o LLM usa para escolher a tool)';
+        }
+
+        // 3) parameters
+        if (isset($func['parameters'])) {
+            $params = $func['parameters'];
+
+            // parameters pode vir como stdClass (JSON {}) — converter
+            if ($params instanceof \stdClass) {
+                $params = (array) $params;
+            }
+
+            if (!\is_array($params)) {
+                $errors[] = 'function.parameters deve ser um objeto';
+            } else {
+                $type = $params['type'] ?? null;
+                if ($type !== 'object') {
+                    $errors[] = "function.parameters.type deve ser 'object' (recebido: " . var_export($type, true) . ')';
+                }
+
+                $properties = $params['properties'] ?? null;
+                if ($properties instanceof \stdClass) {
+                    $properties = (array) $properties;
+                }
+
+                // properties pode estar vazio (tool sem parâmetros) — ok
+                if ($properties !== null && !\is_array($properties)) {
+                    $errors[] = 'function.parameters.properties deve ser um objeto';
+                }
+
+                $validTypes = ['string','number','integer','boolean','array','object','null'];
+                if (\is_array($properties)) {
+                    // Detectar array indexado (lista) onde deveria ser objeto
+                    if (!empty($properties) && array_keys($properties) === range(0, count($properties) - 1)) {
+                        $errors[] = 'function.parameters.properties deve ser um objeto (chave→def), não uma lista indexada';
+                    } else {
+                        foreach ($properties as $propName => $propDef) {
+                            if (!\is_string($propName) || $propName === '') {
+                                $errors[] = 'cada propriedade em parameters.properties precisa de uma chave string não-vazia';
+                                continue;
+                            }
+                            if ($propDef instanceof \stdClass) {
+                                $propDef = (array) $propDef;
+                            }
+                            if (!\is_array($propDef)) {
+                                $errors[] = "propriedade '{$propName}' deve ser um objeto";
+                                continue;
+                            }
+                            $pType = $propDef['type'] ?? null;
+                            if ($pType === null) {
+                                $errors[] = "propriedade '{$propName}' não tem 'type'";
+                            } elseif (\is_string($pType) && !\in_array($pType, $validTypes, true)) {
+                                $errors[] = "propriedade '{$propName}' tem type inválido '{$pType}' (use: " . implode(', ', $validTypes) . ')';
+                            }
+                            if (!isset($propDef['description']) || !\is_string($propDef['description']) || trim($propDef['description']) === '') {
+                                $errors[] = "propriedade '{$propName}' deveria ter 'description' (ajuda o LLM a preencher corretamente)";
+                            }
+                        }
+                    }
+                }
+
+                // required[]
+                if (isset($params['required'])) {
+                    if (!\is_array($params['required'])) {
+                        $errors[] = 'function.parameters.required deve ser um array';
+                    } else {
+                        $propKeys = \is_array($properties) ? array_keys($properties) : [];
+                        foreach ($params['required'] as $req) {
+                            if (!\is_string($req)) {
+                                $errors[] = 'function.parameters.required deve conter apenas strings';
+                                continue;
+                            }
+                            if (!\in_array($req, $propKeys, true)) {
+                                $errors[] = "required referencia '{$req}' que não existe em properties";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $errors;
     }
 
     /**

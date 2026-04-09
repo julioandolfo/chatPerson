@@ -1436,7 +1436,7 @@ class NotificameService
                 AutomationService::executeForNewConversation($conversation['id']);
                 self::logInfo("Notificame webhook: Automação de nova conversa executada");
             }
-            
+
             // Disparar trigger de message.received
             if (isset($messageId)) {
                 self::logInfo("Notificame webhook: Disparando automação de nova mensagem - MessageID={$messageId}");
@@ -1447,7 +1447,48 @@ class NotificameService
             self::logError("Notificame webhook: Erro ao executar automações: " . $e->getMessage());
             self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
         }
-        
+
+        // ✅ Disparar buffer de IA se a conversa estiver com agente de IA ativo.
+        // O webhook chama Message::create direto (sem ConversationService::sendMessage),
+        // então o buffer de IA precisa ser invocado aqui — caso contrário a IA só responde
+        // a primeira mensagem (que dispara a automação que atribui a IA) e fica em silêncio
+        // em todas as mensagens subsequentes.
+        try {
+            $aiConversation = \App\Models\AIConversation::getByConversationId($conversation['id']);
+            if ($aiConversation && ($aiConversation['status'] ?? '') === 'active' && !empty($aiConversation['ai_agent_id'])) {
+                $aiAgentId = (int)$aiConversation['ai_agent_id'];
+
+                // Usar conteúdo da mensagem (já com transcrição se foi áudio processado)
+                $aiContent = '';
+                $latestMessage = Message::find($messageId);
+                if ($latestMessage) {
+                    $aiContent = trim($latestMessage['content'] ?? '');
+                }
+                if ($aiContent === '') {
+                    $aiContent = trim($messageData['content'] ?? '');
+                }
+
+                // Se ainda vazio (mensagem só com mídia sem legenda), descrever brevemente o anexo
+                // pra IA saber que algo foi enviado e poder reagir.
+                if ($aiContent === '' && !empty($attachments)) {
+                    $att = $attachments[0];
+                    $tipo = $att['type'] ?? 'anexo';
+                    $aiContent = "[Cliente enviou {$tipo}]";
+                }
+
+                if ($aiContent !== '') {
+                    self::logInfo("Notificame webhook: 🤖 Conversa tem IA ativa (agent={$aiAgentId}), bufferizando mensagem (len=" . strlen($aiContent) . ")");
+                    \App\Services\AIAgentService::bufferMessage($conversation['id'], $aiAgentId, $aiContent);
+                    self::logInfo("Notificame webhook: ✅ Mensagem bufferizada para processamento da IA");
+                } else {
+                    self::logInfo("Notificame webhook: IA ativa mas conteúdo vazio (sem texto e sem anexo) — pulando buffer");
+                }
+            }
+        } catch (\Exception $e) {
+            self::logError("Notificame webhook: Erro ao bufferizar mensagem para IA: " . $e->getMessage());
+            self::logError("Notificame webhook: Trace: " . $e->getTraceAsString());
+        }
+
         self::logInfo("Notificame webhook processado com sucesso!");
         self::logInfo("========== Notificame Webhook FIM (Sucesso) ==========");
     }

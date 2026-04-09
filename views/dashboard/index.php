@@ -2489,12 +2489,12 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                 <div class="card-toolbar">
                     <button class="btn btn-sm btn-light-primary" onclick="loadVendorAnalytics()" id="btn-load-vendor-analytics">
                         <i class="ki-duotone ki-arrows-circle fs-4"><span class="path1"></span><span class="path2"></span></i>
-                        Carregar Analytics
+                        Recarregar
                     </button>
                 </div>
             </div>
             <div class="card-body py-3" id="dashboard-vendor-analytics-body">
-                <div class="text-muted fs-7 text-center py-5">Clique em "Carregar Analytics" para ver os dados detalhados de clientes por vendedor.</div>
+                <div class="text-center py-10"><span class="spinner-border text-primary"></span><div class="text-muted mt-3">Carregando analytics de clientes...</div></div>
             </div>
         </div>
     </div>
@@ -2576,6 +2576,7 @@ function loadVendorAnalytics() {
             body.innerHTML = '<div class="alert alert-warning">' + msg.replace(/</g, '&lt;') + '</div>';
         });
 }
+document.addEventListener('DOMContentLoaded', loadVendorAnalytics);
 </script>
 <?php endif; ?>
 

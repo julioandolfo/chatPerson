@@ -760,22 +760,69 @@ if (!file_exists($logFile)) {
     @chmod($logFile, 0666);
 }
 
-// Ler logs
+// Ler logs (streaming reverso a partir do final do arquivo para não estourar memória)
 $logs = [];
 if (file_exists($logFile)) {
-    $allLines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    $logs = array_slice(array_reverse($allLines), 0, $maxLines);
+    $logs = tailLogFile($logFile, $maxLines, $filter, $level);
 } else {
     $logs = ['Arquivo de log não encontrado: ' . $logFile];
 }
 
-// Aplicar filtros
-if (!empty($filter) || !empty($level)) {
-    $logs = array_filter($logs, function($line) use ($filter, $level) {
-        $matchFilter = empty($filter) || stripos($line, $filter) !== false;
-        $matchLevel = empty($level) || stripos($line, "[$level]") !== false;
-        return $matchFilter && $matchLevel;
-    });
+/**
+ * Lê as últimas N linhas de um arquivo de log de forma eficiente em memória,
+ * aplicando filtros opcionais. Lê chunks do final do arquivo, evitando carregar
+ * o arquivo inteiro na RAM (o que estourava o memory_limit em logs grandes).
+ *
+ * Quando há filtro, lê mais chunks até encontrar $maxLines que correspondam,
+ * ou até atingir um teto de segurança.
+ */
+function tailLogFile(string $file, int $maxLines, string $filter = '', string $level = ''): array
+{
+    $fp = @fopen($file, 'rb');
+    if (!$fp) return [];
+
+    fseek($fp, 0, SEEK_END);
+    $fileSize = ftell($fp);
+    if ($fileSize === 0) { fclose($fp); return []; }
+
+    $chunkSize = 64 * 1024; // 64 KB por leitura
+    $maxBytesScan = 16 * 1024 * 1024; // teto: ler no máximo 16 MB do final
+    $buffer = '';
+    $pos = $fileSize;
+    $matched = [];
+    $hasFilter = !empty($filter) || !empty($level);
+
+    while ($pos > 0 && count($matched) < $maxLines && ($fileSize - $pos) < $maxBytesScan) {
+        $readSize = min($chunkSize, $pos);
+        $pos -= $readSize;
+        fseek($fp, $pos);
+        $chunk = fread($fp, $readSize);
+        $buffer = $chunk . $buffer;
+
+        // Quebrar em linhas; manter possível linha parcial no início para o próximo chunk
+        $lines = explode("\n", $buffer);
+        if ($pos > 0) {
+            $buffer = array_shift($lines); // pode estar incompleta, guarda
+        } else {
+            $buffer = '';
+        }
+
+        // Processar de trás pra frente (mais novas primeiro)
+        for ($i = count($lines) - 1; $i >= 0; $i--) {
+            $line = rtrim($lines[$i], "\r");
+            if ($line === '') continue;
+            if ($hasFilter) {
+                $matchFilter = empty($filter) || stripos($line, $filter) !== false;
+                $matchLevel = empty($level) || stripos($line, "[$level]") !== false;
+                if (!$matchFilter || !$matchLevel) continue;
+            }
+            $matched[] = $line;
+            if (count($matched) >= $maxLines) break;
+        }
+    }
+
+    fclose($fp);
+    return $matched;
 }
 
 // Estatísticas

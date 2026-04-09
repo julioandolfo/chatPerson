@@ -12877,19 +12877,26 @@ function escapeHtml(text) {
 
 function formatTime(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    // Servidor envia "YYYY-MM-DD HH:mm:ss" em horário de São Paulo (UTC-3) sem marcador de TZ
+    let date;
+    if (typeof dateString === 'string' && dateString.indexOf('T') === -1 && dateString.indexOf(' ') !== -1) {
+        date = new Date(dateString.replace(' ', 'T') + '-03:00');
+    } else {
+        date = new Date(dateString);
+    }
+    if (isNaN(date.getTime())) return '';
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 1) return 'Agora';
     if (diffMins < 60) return `${diffMins}min`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
-    
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
 }
 
 // =============================================
@@ -14765,18 +14772,29 @@ function addMessageToChat(message) {
     return messageDiv;
 }
 
+function parseServerDate(dateString) {
+    if (!dateString) return null;
+    // Servidor envia "YYYY-MM-DD HH:mm:ss" em horário de São Paulo (UTC-3) sem marcador de TZ
+    // Convertemos para ISO 8601 com offset explícito para o browser interpretar corretamente
+    if (typeof dateString === 'string' && dateString.indexOf('T') === -1 && dateString.indexOf(' ') !== -1) {
+        return new Date(dateString.replace(' ', 'T') + '-03:00');
+    }
+    return new Date(dateString);
+}
+
 function formatTime(dateString) {
     if (!dateString) return '';
-    const date = new Date(dateString);
+    const date = parseServerDate(dateString);
+    if (!date || isNaN(date.getTime())) return '';
     const now = new Date();
     const diff = now - date;
-    
+
     if (diff < 60000) {
         return 'Agora';
     } else if (diff < 3600000) {
         return Math.floor(diff / 60000) + 'min';
     } else {
-        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
     }
 }
 

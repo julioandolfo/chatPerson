@@ -505,12 +505,13 @@ class OpenAIService
         }
 
         // Buscar histórico de mensagens da conversa (últimas 20 para contexto, condensadas)
+        // Inclui attachments para suporte a Vision (imagens) e transcrição de áudio.
         $conversationId = $context['conversation']['id'] ?? 0;
         $conversationMessages = [];
         if ($conversationId) {
-            $sql = "SELECT sender_type, content FROM messages 
-                    WHERE conversation_id = ? 
-                    ORDER BY id DESC 
+            $sql = "SELECT sender_type, content, attachments FROM messages
+                    WHERE conversation_id = ?
+                    ORDER BY id DESC
                     LIMIT 20";
             $conversationMessages = Database::fetchAll($sql, [$conversationId]);
             $conversationMessages = array_reverse($conversationMessages); // ordem cronológica
@@ -584,25 +585,195 @@ class OpenAIService
             'content' => $systemPrompt
         ];
 
-        // Adicionar mensagens do histórico bruto recente (curta janela: últimas 12)
-        $recentWindow = array_slice($conversationMessages, -12);
-        foreach ($recentWindow as $msg) {
-            $role = $msg['sender_type'] === 'contact' ? 'user' : 'assistant';
-            $content = trim($msg['content'] ?? '');
-            if ($content === '') continue;
-            $messages[] = [
-                'role' => $role,
-                'content' => $content
-            ];
-        }
-
-        // Adicionar mensagem atual do usuário
-        $messages[] = [
-            'role' => 'user',
-            'content' => $userMessage
+        // Settings de mídia (Vision/áudio) lidos do agente
+        $agentSettingsForMedia = is_string($agent['settings'] ?? '')
+            ? (json_decode($agent['settings'], true) ?: [])
+            : ($agent['settings'] ?? []);
+        $modelForMedia = (string)($agent['model'] ?? 'gpt-4');
+        $mediaOpts = [
+            'vision_enabled' => !empty($agentSettingsForMedia['vision_enabled']),
+            'vision_detail'  => $agentSettingsForMedia['vision_detail'] ?? 'low',
+            'vision_window'  => max(1, min(20, (int)($agentSettingsForMedia['vision_window'] ?? 5))),
+            'model'          => $modelForMedia,
         ];
 
+        // Adicionar mensagens do histórico bruto recente (curta janela: últimas 12)
+        $recentWindow = array_slice($conversationMessages, -12);
+        $totalRecent  = count($recentWindow);
+        foreach ($recentWindow as $idx => $msg) {
+            $role = $msg['sender_type'] === 'contact' ? 'user' : 'assistant';
+            $content = trim($msg['content'] ?? '');
+            $attachments = self::decodeAttachments($msg['attachments'] ?? null);
+
+            // Apenas mensagens do contato podem trazer mídia para o LLM (Vision/transcrição).
+            // Vision só aplica nas últimas N mensagens (mediaOpts.vision_window) — controle de custo.
+            $isWithinVisionWindow = ($totalRecent - $idx) <= $mediaOpts['vision_window'];
+
+            if ($role === 'user' && !empty($attachments)) {
+                $built = self::buildUserMessageContent($content, $attachments, $mediaOpts, $isWithinVisionWindow);
+                if ($built === null) { continue; }
+                $messages[] = ['role' => 'user', 'content' => $built];
+                continue;
+            }
+
+            if ($content === '') { continue; }
+            $messages[] = ['role' => $role, 'content' => $content];
+        }
+
+        // Adicionar mensagem atual do usuário — se a última mensagem do contato no DB
+        // tiver attachments e o conteúdo bater, reaproveita os attachments dela.
+        $currentAttachments = [];
+        if (!empty($recentWindow)) {
+            $last = end($recentWindow);
+            if (($last['sender_type'] ?? '') === 'contact' && trim($last['content'] ?? '') === trim($userMessage)) {
+                $currentAttachments = self::decodeAttachments($last['attachments'] ?? null);
+            }
+        }
+
+        if (!empty($currentAttachments)) {
+            $built = self::buildUserMessageContent($userMessage, $currentAttachments, $mediaOpts, true);
+            $messages[] = ['role' => 'user', 'content' => $built ?? $userMessage];
+        } else {
+            $messages[] = ['role' => 'user', 'content' => $userMessage];
+        }
+
         return $messages;
+    }
+
+    /**
+     * Decodifica o campo attachments de uma mensagem (que pode vir como string JSON ou array).
+     * Retorna sempre array (vazio se não houver).
+     */
+    private static function decodeAttachments($raw): array
+    {
+        if (empty($raw)) { return []; }
+        if (is_string($raw)) {
+            $decoded = json_decode($raw, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+        return is_array($raw) ? $raw : [];
+    }
+
+    /**
+     * Modelos OpenAI que suportam Vision (entrada de imagens).
+     * Mantém uma lista conservadora; padrão "gpt-4o" cobre o caso comum.
+     */
+    private static function modelSupportsVision(string $model): bool
+    {
+        $m = strtolower(trim($model));
+        if ($m === '') { return false; }
+        // Famílias com Vision nativa
+        $visionFamilies = ['gpt-4o', 'gpt-4-turbo', 'gpt-4-vision', 'o1', 'o3', 'gpt-5', 'chatgpt-4o'];
+        foreach ($visionFamilies as $f) {
+            if (str_starts_with($m, $f)) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * Constrói o `content` de uma mensagem do usuário considerando attachments.
+     *
+     * - Imagens: se vision_enabled e modelo suporta Vision e estiver dentro da janela,
+     *   devolve formato multipart [{type:text}, {type:image_url}, ...].
+     *   Senão, anexa texto "[cliente enviou uma imagem...]" como fallback.
+     * - Áudios: se houver transcription.text, anexa o texto transcrito; senão,
+     *   marca "[cliente enviou um áudio - sem transcrição]".
+     * - Vídeos/documentos: marca o tipo no texto para o agente saber que existe.
+     *
+     * Retorna string (texto puro) OU array multipart (com imagens), ou null se vazio.
+     *
+     * @return string|array|null
+     */
+    private static function buildUserMessageContent(string $text, array $attachments, array $opts, bool $allowVision)
+    {
+        $textParts = [];
+        $imageParts = [];
+
+        $cleanText = trim($text);
+        if ($cleanText !== '') {
+            $textParts[] = $cleanText;
+        }
+
+        $visionOk = $allowVision
+            && !empty($opts['vision_enabled'])
+            && self::modelSupportsVision((string)($opts['model'] ?? ''));
+
+        $detail = in_array($opts['vision_detail'] ?? 'low', ['low','high','auto'], true)
+            ? $opts['vision_detail']
+            : 'low';
+
+        $maxImagesPerMessage = 4;
+        $imagesAdded = 0;
+
+        foreach ($attachments as $att) {
+            if (!is_array($att)) { continue; }
+            $type = strtolower((string)($att['type'] ?? ''));
+            $mime = strtolower((string)($att['mime_type'] ?? $att['mimetype'] ?? ''));
+            $url  = $att['url'] ?? null;
+
+            // Imagem
+            $isImage = ($type === 'image') || str_starts_with($mime, 'image/');
+            if ($isImage) {
+                if ($visionOk && $url && $imagesAdded < $maxImagesPerMessage) {
+                    $imageParts[] = [
+                        'type' => 'image_url',
+                        'image_url' => [
+                            'url'    => $url,
+                            'detail' => $detail,
+                        ],
+                    ];
+                    $imagesAdded++;
+                } else {
+                    $why = !$visionOk
+                        ? 'leitura de imagens desabilitada para este agente'
+                        : 'sem URL pública disponível';
+                    $textParts[] = "[O cliente enviou uma imagem ({$why}). Peça que descreva o que precisa ou escale para um humano se for crítico.]";
+                }
+                continue;
+            }
+
+            // Áudio
+            $isAudio = ($type === 'audio') || str_starts_with($mime, 'audio/');
+            if ($isAudio) {
+                $transcription = $att['transcription']['text'] ?? null;
+                if (is_string($transcription) && trim($transcription) !== '') {
+                    $textParts[] = "[Áudio transcrito do cliente]: " . trim($transcription);
+                } else {
+                    $textParts[] = "[O cliente enviou um áudio mas a transcrição não está disponível. Peça que digite a mensagem ou escale para um humano.]";
+                }
+                continue;
+            }
+
+            // Vídeo
+            $isVideo = ($type === 'video') || str_starts_with($mime, 'video/');
+            if ($isVideo) {
+                $textParts[] = "[O cliente enviou um vídeo. Peça uma descrição do conteúdo ou escale se for relevante.]";
+                continue;
+            }
+
+            // Documento / outros
+            $filename = $att['filename'] ?? 'arquivo';
+            $textParts[] = "[O cliente enviou um arquivo: {$filename} ({$mime}). Peça uma descrição ou escale para análise humana.]";
+        }
+
+        if (empty($textParts) && empty($imageParts)) {
+            return null;
+        }
+
+        // Sem imagens → string simples (mais barato que array multipart)
+        if (empty($imageParts)) {
+            return implode("\n\n", $textParts);
+        }
+
+        // Com imagens → array multipart no formato esperado pela OpenAI
+        $parts = [];
+        if (!empty($textParts)) {
+            $parts[] = ['type' => 'text', 'text' => implode("\n\n", $textParts)];
+        }
+        foreach ($imageParts as $ip) {
+            $parts[] = $ip;
+        }
+        return $parts;
     }
 
     /**

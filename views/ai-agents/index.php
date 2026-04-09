@@ -245,7 +245,35 @@ ob_start();
                             Agente ativo
                         </label>
                     </div>
-                    
+
+                    <!--begin::Leitura de Imagens (Vision) - Criar-->
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <input type="hidden" name="vision_enabled" value="0" />
+                            <input type="checkbox" name="vision_enabled" value="1" class="form-check-input me-2" />
+                            <span class="fw-semibold">Ler imagens enviadas pelo cliente (Vision)</span>
+                        </label>
+                        <div class="form-text text-info">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Requer modelo com suporte a Vision (gpt-4o, gpt-4o-mini, gpt-4-turbo).
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Detalhe da imagem</label>
+                                <select name="vision_detail" class="form-select form-select-solid">
+                                    <option value="low">Baixo (recomendado)</option>
+                                    <option value="auto">Automático</option>
+                                    <option value="high">Alto</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Janela de imagens (últimas N msgs)</label>
+                                <input type="number" name="vision_window" class="form-control form-control-solid" min="1" max="20" value="5" />
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Leitura de Imagens (Vision) - Criar-->
+
                     <!--begin::Seleção de Tools-->
                     <div class="fv-row mb-7">
                         <label class="fw-semibold fs-6 mb-4">Tools Disponíveis</label>
@@ -451,6 +479,36 @@ ob_start();
                         </div>
                     </div>
                     <!--end::Preferir Tools-->
+
+                    <!--begin::Leitura de Imagens (Vision)-->
+                    <div class="fv-row mb-7">
+                        <label class="d-flex align-items-center">
+                            <!-- hidden garante que o campo sempre vai no POST mesmo com checkbox desmarcado -->
+                            <input type="hidden" name="vision_enabled" value="0" />
+                            <input type="checkbox" name="vision_enabled" id="edit_vision_enabled" value="1" class="form-check-input me-2" />
+                            <span class="fw-semibold">Ler imagens enviadas pelo cliente (Vision)</span>
+                        </label>
+                        <div class="form-text text-info">
+                            <i class="ki-duotone ki-information-5 fs-7 me-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            Quando ativado, o agente envia imagens recebidas do cliente para o modelo (GPT-4o, GPT-4o-mini ou GPT-4-turbo) descrever e usar como contexto. Modelos sem suporte a Vision ignoram a imagem.
+                        </div>
+                        <div class="row g-3 mt-2">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Detalhe da imagem</label>
+                                <select name="vision_detail" id="edit_vision_detail" class="form-select form-select-solid">
+                                    <option value="low">Baixo (~85 tokens, mais barato — recomendado)</option>
+                                    <option value="auto">Automático (deixa a OpenAI decidir)</option>
+                                    <option value="high">Alto (até ~1.105 tokens, mais caro)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Janela de imagens (últimas N msgs)</label>
+                                <input type="number" name="vision_window" id="edit_vision_window" class="form-control form-control-solid" min="1" max="20" value="5" />
+                                <div class="form-text fs-8">Imagens fora dessa janela são citadas em texto, mas não reenviadas ao modelo (controle de custo).</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Leitura de Imagens (Vision)-->
                     
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
@@ -615,6 +673,15 @@ function editAgent(id) {
             document.getElementById("edit_response_delay_min").value = settings.response_delay_min || 0;
             document.getElementById("edit_response_delay_max").value = settings.response_delay_max || 0;
             document.getElementById("edit_context_timer_seconds").value = settings.context_timer_seconds || 5;
+            if (document.getElementById("edit_vision_enabled")) {
+                document.getElementById("edit_vision_enabled").checked = !!settings.vision_enabled;
+            }
+            if (document.getElementById("edit_vision_detail")) {
+                document.getElementById("edit_vision_detail").value = settings.vision_detail || "low";
+            }
+            if (document.getElementById("edit_vision_window")) {
+                document.getElementById("edit_vision_window").value = settings.vision_window || 5;
+            }
             if (document.getElementById("edit_prefer_tools")) {
                 document.getElementById("edit_prefer_tools").checked = settings.prefer_tools || false;
             }

@@ -70,7 +70,29 @@ class AIAgentService
             $settings['context_timer_seconds'] = (int)$data['context_timer_seconds'];
             unset($data['context_timer_seconds']);
         }
-        
+
+        // prefer_tools (checkbox)
+        if (array_key_exists('prefer_tools', $data)) {
+            $settings['prefer_tools'] = filter_var($data['prefer_tools'], FILTER_VALIDATE_BOOLEAN);
+            unset($data['prefer_tools']);
+        }
+
+        // Vision: leitura de imagens enviadas pelo cliente
+        if (array_key_exists('vision_enabled', $data)) {
+            $settings['vision_enabled'] = filter_var($data['vision_enabled'], FILTER_VALIDATE_BOOLEAN);
+            unset($data['vision_enabled']);
+        }
+        if (isset($data['vision_detail'])) {
+            $detail = strtolower(trim((string)$data['vision_detail']));
+            $settings['vision_detail'] = in_array($detail, ['low','high','auto'], true) ? $detail : 'low';
+            unset($data['vision_detail']);
+        }
+        if (isset($data['vision_window'])) {
+            $w = (int)$data['vision_window'];
+            $settings['vision_window'] = max(1, min(20, $w ?: 5));
+            unset($data['vision_window']);
+        }
+
         if (!empty($settings)) {
             $data['settings'] = json_encode($settings, JSON_UNESCAPED_UNICODE);
         }
@@ -152,7 +174,34 @@ class AIAgentService
             $existingSettings['response_delay_max'] = (int)$data['response_delay_max'];
             unset($data['response_delay_max']);
         }
-        
+
+        if (isset($data['context_timer_seconds'])) {
+            $existingSettings['context_timer_seconds'] = (int)$data['context_timer_seconds'];
+            unset($data['context_timer_seconds']);
+        }
+
+        // prefer_tools (checkbox — pode não vir no POST se desmarcado)
+        if (array_key_exists('prefer_tools', $data)) {
+            $existingSettings['prefer_tools'] = filter_var($data['prefer_tools'], FILTER_VALIDATE_BOOLEAN);
+            unset($data['prefer_tools']);
+        }
+
+        // Vision: leitura de imagens enviadas pelo cliente
+        if (array_key_exists('vision_enabled', $data)) {
+            $existingSettings['vision_enabled'] = filter_var($data['vision_enabled'], FILTER_VALIDATE_BOOLEAN);
+            unset($data['vision_enabled']);
+        }
+        if (isset($data['vision_detail'])) {
+            $detail = strtolower(trim((string)$data['vision_detail']));
+            $existingSettings['vision_detail'] = in_array($detail, ['low','high','auto'], true) ? $detail : 'low';
+            unset($data['vision_detail']);
+        }
+        if (isset($data['vision_window'])) {
+            $w = (int)$data['vision_window'];
+            $existingSettings['vision_window'] = max(1, min(20, $w ?: 5));
+            unset($data['vision_window']);
+        }
+
         if (!empty($existingSettings)) {
             $data['settings'] = json_encode($existingSettings, JSON_UNESCAPED_UNICODE);
         }

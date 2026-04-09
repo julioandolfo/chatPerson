@@ -719,6 +719,78 @@ const autoSchemaTypes = {
                 }
             }
         }
+    },
+    // WooCommerce: schema construído dinamicamente a partir das operações marcadas
+    // (ver buildFunctionSchema). Aqui apenas escondemos o bloco manual de schema.
+    woocommerce: {
+        message: "Marque as operações da loja em \"Configurações Específicas\" abaixo. O function schema (lista de funções para a IA) será gerado automaticamente — uma function por operação marcada.",
+        defaultSchema: null
+    }
+};
+
+// Schemas pré-definidos por operação WooCommerce.
+const WC_OPERATION_SCHEMAS = {
+    buscar_pedido_woocommerce: {
+        name: "buscar_pedido_woocommerce",
+        description: "Busca UM pedido específico pelo número/ID na loja WooCommerce. Use SEMPRE que o cliente informar um número de pedido concreto (ex.: 'pedido 64517', '#12345'). Não invente número.",
+        properties: { order_id: { type: "integer", description: "Número/ID do pedido informado pelo cliente" } },
+        required: ["order_id"]
+    },
+    buscar_pedidos_woocommerce: {
+        name: "buscar_pedidos_woocommerce",
+        description: "Lista pedidos do cliente da conversa atual ou filtra por critérios. Use quando o cliente pedir 'meus pedidos', 'últimas compras', ou quando informar VÁRIOS números de pedido (passe-os em include). Para um único número, prefira buscar_pedido_woocommerce.",
+        properties: {
+            include:   { type: "array", items: { type: "integer" }, description: "Lista de IDs de pedidos específicos a buscar (use quando o cliente mencionar 1 ou mais números)" },
+            status:    { type: "string", description: "Filtrar por status: pending, processing, on-hold, completed, cancelled, refunded, failed" },
+            after:     { type: "string", description: "Pedidos a partir desta data ISO 8601" },
+            before:    { type: "string", description: "Pedidos até esta data ISO 8601" },
+            search:    { type: "string", description: "Termo livre de busca (nome, email, telefone)" },
+            per_page:  { type: "integer", description: "Quantos pedidos por página (1 a 10, padrão 5)" },
+            page:      { type: "integer", description: "Página de resultados (padrão 1)" }
+        },
+        required: []
+    },
+    buscar_produto_woocommerce: {
+        name: "buscar_produto_woocommerce",
+        description: "Busca informações de produto via REST API: preço, estoque, atributos, dimensões, descrição, custom fields. Use quando o cliente perguntar sobre preço, disponibilidade, características de um produto.",
+        properties: {
+            product_id: { type: "integer", description: "ID exato do produto (preferencial se conhecido)" },
+            sku:        { type: "string",  description: "SKU do produto" },
+            search:     { type: "string",  description: "Termo de busca textual no nome/descrição" },
+            limit:      { type: "integer", description: "Máximo de resultados (1 a 20, padrão 5)" }
+        },
+        required: []
+    },
+    buscar_pagina_produto_woocommerce: {
+        name: "buscar_pagina_produto_woocommerce",
+        description: "Busca o conteúdo da página pública (HTML) de um produto da loja. Use quando o cliente perguntar algo específico que provavelmente está na página do produto e não no REST API: ressalvas, regras de quantidade mínima, prazos de produção, condições especiais, ficha técnica detalhada. Sempre prefira esta tool quando a buscar_produto_woocommerce não trouxer a resposta.",
+        properties: {
+            product_id: { type: "integer", description: "ID do produto (preferencial — a URL é resolvida automaticamente via API)" },
+            url:        { type: "string",  description: "URL completa do produto, alternativa ao product_id (deve ser do mesmo domínio da loja)" }
+        },
+        required: []
+    },
+    criar_pedido_woocommerce: {
+        name: "criar_pedido_woocommerce",
+        description: "Cria um novo pedido na loja WooCommerce. Use somente quando o cliente confirmar explicitamente que quer fazer o pedido e você já tiver os itens, dados de cobrança e entrega.",
+        properties: {
+            line_items:           { type: "array",  description: "Itens do pedido. Cada item: {product_id, quantity, variation_id?}" },
+            payment_method:       { type: "string", description: "Slug do método de pagamento (ex.: bacs, pix, cartao)" },
+            payment_method_title: { type: "string", description: "Título legível do método de pagamento" },
+            status:               { type: "string", description: "Status inicial (padrão: pending)" },
+            billing:              { type: "object", description: "Dados de cobrança" },
+            shipping:             { type: "object", description: "Dados de entrega" }
+        },
+        required: ["line_items"]
+    },
+    atualizar_status_pedido: {
+        name: "atualizar_status_pedido",
+        description: "Atualiza o status de um pedido existente. Use somente após validação explícita do cliente. Status válidos: pending, processing, on-hold, completed, cancelled, refunded, failed.",
+        properties: {
+            order_id: { type: "integer", description: "ID do pedido a atualizar" },
+            status:   { type: "string",  description: "Novo status do pedido" }
+        },
+        required: ["order_id", "status"]
     }
 };
 
@@ -1104,6 +1176,25 @@ function updateConfigFields() {
                 ${field.help ? `<div class="form-text text-muted">${field.help}</div>` : ""}
             `;
             fieldDiv.innerHTML = inputHtml;
+        } else if (field.type === "wc_operations_multi") {
+            // Lista de checkboxes — cada operação marcada vira uma function liberada para a IA.
+            // Não tem .config-field: o valor não vai para `config`, vai para function_schema via buildWCOperationsSchema.
+            let optsHtml = "";
+            (field.options || []).forEach(opt => {
+                const id = `wc_op_${opt.value}`;
+                optsHtml += `
+                    <label class="d-flex align-items-start mb-3 p-3 border border-gray-300 rounded bg-white" style="cursor:pointer;">
+                        <input type="checkbox" class="form-check-input mt-1 me-3 wc-op-checkbox" value="${opt.value}" id="${id}" />
+                        <div class="flex-grow-1">
+                            <div class="fw-bold fs-7 text-gray-800">${opt.label}</div>
+                            ${opt.hint ? `<div class="text-muted fs-8 mt-1">${opt.hint}</div>` : ""}
+                        </div>
+                    </label>
+                `;
+            });
+            fieldDiv.innerHTML = labelHtml +
+                `<div class="wc-operations-list">${optsHtml}</div>` +
+                (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
             inputHtml += `<option value="">Selecione...</option>`;
@@ -1260,10 +1351,39 @@ async function loadFunnelStages(funnelId, stageSelectId = "config_stage_id") {
     }
 }
 
+// Lê as operações WooCommerce marcadas e devolve uma LISTA de schemas (multi-função)
+function buildWCOperationsSchema() {
+    const checked = Array.from(
+        document.querySelectorAll('#kt_config_fields .wc-op-checkbox:checked')
+    ).map(el => el.value);
+    if (checked.length === 0) return null;
+    return checked.map(opKey => {
+        const op = WC_OPERATION_SCHEMAS[opKey];
+        if (!op) return null;
+        return {
+            type: "function",
+            function: {
+                name: op.name,
+                description: op.description,
+                parameters: {
+                    type: "object",
+                    properties: op.properties || {},
+                    required: op.required || []
+                }
+            }
+        };
+    }).filter(Boolean);
+}
+
 // Construir JSON do function schema
 function buildFunctionSchema() {
     const toolType = document.getElementById("kt_tool_type").value;
-    
+
+    // WooCommerce: gerar lista de funções a partir das operações marcadas
+    if (toolType === "woocommerce") {
+        return buildWCOperationsSchema();
+    }
+
     // Se é um tipo com schema automático, usar o schema padrão
     if (autoSchemaTypes[toolType]) {
         console.log("Usando schema automático para tipo:", toolType);
@@ -1655,13 +1775,18 @@ document.addEventListener("DOMContentLoaded", function() {
             
             // Construir JSONs
             const functionSchema = buildFunctionSchema();
-            if (!functionSchema) {
+            if (!functionSchema || (Array.isArray(functionSchema) && functionSchema.length === 0)) {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro: Preencha o nome e descrição da função.");
+                const tt = document.getElementById("kt_tool_type").value;
+                if (tt === "woocommerce") {
+                    alert("Erro: marque ao menos uma operação em \"Operações da Loja Liberadas\".");
+                } else {
+                    alert("Erro: Preencha o nome e descrição da função.");
+                }
                 return;
             }
-            
+
             const config = buildConfig();
             
             // Preencher campos hidden

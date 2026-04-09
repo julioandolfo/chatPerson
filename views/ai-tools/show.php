@@ -1889,10 +1889,15 @@ document.addEventListener("DOMContentLoaded", function() {
             
             // Construir JSONs
             const functionSchema = buildEditFunctionSchema();
-            if (!functionSchema) {
+            if (!functionSchema || (Array.isArray(functionSchema) && functionSchema.length === 0)) {
                 submitBtn.removeAttribute("data-kt-indicator");
                 submitBtn.disabled = false;
-                alert("Erro: Preencha o nome e descrição da função.");
+                const tt = document.getElementById("kt_edit_tool_type").value;
+                if (tt === "woocommerce") {
+                    alert("Erro: marque ao menos uma operação em \"Operações da Loja Liberadas\".");
+                } else {
+                    alert("Erro: Preencha o nome e descrição da função.");
+                }
                 return;
             }
             

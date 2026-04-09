@@ -239,6 +239,11 @@ try {
     cronRunJob('ChatbotTimeoutJob', function() {
         ChatbotTimeoutJob::run();
     }, 15);
+
+    // ✅ Reprocessar fila de rate limit de mídia (executar sempre)
+    cronRunJob('MediaRateRetryJob', function() {
+        \App\Jobs\MediaRateRetryJob::run();
+    }, 15);
     
     // ========== JOBS IMPORTANTES (a cada 2-3 minutos) ==========
     

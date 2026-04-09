@@ -147,6 +147,40 @@ class ConversationService
     /**
      * Process integration send in background (re-reads message/conversation from DB)
      */
+    /**
+     * Constrói mensagem amigável para o status queued_rate_limit
+     */
+    public static function buildRateLimitMessage(array $check): string
+    {
+        if (($check['scope'] ?? '') === 'auto_pause') {
+            $retry = $check['retry_after_seconds'] ?? 0;
+            return "⏸️ Envio pausado automaticamente (Meta detectou throttle). Liberação em " . self::humanRetry($retry);
+        }
+        $scopeLabels = [
+            'account' => 'do número WhatsApp',
+            'conversation' => 'desta conversa',
+            'user' => 'do agente',
+        ];
+        $scope = $scopeLabels[$check['scope'] ?? ''] ?? 'do envio';
+        $retry = $check['retry_after_seconds'] ?? 0;
+        return sprintf(
+            "⏱️ Limite %s atingido (%d/%d %s). Reenvio em %s",
+            $scope,
+            $check['current'] ?? 0,
+            $check['limit'] ?? 0,
+            ($check['window'] ?? '') === 'hour' ? 'na hora' : 'no minuto',
+            self::humanRetry($retry)
+        );
+    }
+
+    private static function humanRetry(int $seconds): string
+    {
+        if ($seconds <= 60) return "{$seconds}s";
+        $m = (int)floor($seconds / 60);
+        $s = $seconds % 60;
+        return $s > 0 ? "{$m}min {$s}s" : "{$m}min";
+    }
+
     public static function processIntegrationSend(int $messageId): void
     {
         \App\Helpers\Logger::info("[INTEGRATION-BG] Iniciando envio em background: messageId={$messageId}");
@@ -193,7 +227,41 @@ class ConversationService
             if ($messageType === 'note') return;
             if ($senderType !== 'agent') return;
             if (!$integrationAccountId && !($conversation['channel'] === 'whatsapp' && $whatsappAccountId)) return;
-            
+
+            // ✅ Rate limit de mídia (Evolution/Quepasa)
+            $providerForRate = null;
+            if ($integrationAccountId) {
+                $integ = \App\Models\IntegrationAccount::find($integrationAccountId);
+                $providerForRate = $integ['provider'] ?? null;
+            } elseif ($whatsappAccountId) {
+                $providerForRate = 'quepasa';
+            }
+            $rateAccountId = $integrationAccountId ?: $whatsappAccountId;
+            if (
+                $rateAccountId
+                && \App\Services\MediaRateLimitService::appliesToProvider($providerForRate)
+                && \App\Services\MediaRateLimitService::isMediaType($messageType)
+            ) {
+                $rateCheck = \App\Services\MediaRateLimitService::check(
+                    (int)$rateAccountId,
+                    (int)$conversationId,
+                    (int)($message['sender_id'] ?? 0)
+                );
+                if (!$rateCheck['allowed']) {
+                    $reason = self::buildRateLimitMessage($rateCheck);
+                    Message::update($messageId, [
+                        'status' => 'queued_rate_limit',
+                        'error_message' => $reason
+                    ]);
+                    \App\Helpers\Logger::info("[INTEGRATION-BG] ⏱️ Rate limit msg={$messageId}: {$reason}");
+                    try {
+                        $updated = Message::find($messageId);
+                        \App\Helpers\WebSocket::notifyConversationUpdated($conversationId, ['message' => $updated]);
+                    } catch (\Throwable $e) { /* não-crítico */ }
+                    return;
+                }
+            }
+
             $contact = \App\Models\Contact::find($conversation['contact_id']);
             if (!$contact || (empty($contact['phone']) && empty($contact['identifier']) && empty($contact['email']))) {
                 \App\Helpers\Logger::error("[INTEGRATION-BG] Contato sem destinatário para msg {$messageId}");
@@ -251,6 +319,23 @@ class ConversationService
                     'status' => 'sent'
                 ]);
                 \App\Helpers\Logger::info("[INTEGRATION-BG] ✅ Enviado: msg={$messageId}, external_id=" . ($sendResult['message_id'] ?? 'NULL'));
+
+                // ✅ Registrar no rate limit log
+                if (
+                    isset($rateAccountId, $providerForRate)
+                    && $rateAccountId
+                    && \App\Services\MediaRateLimitService::appliesToProvider($providerForRate)
+                    && \App\Services\MediaRateLimitService::isMediaType($messageType)
+                ) {
+                    \App\Services\MediaRateLimitService::record(
+                        (int)$rateAccountId,
+                        (int)$conversationId,
+                        (int)($message['sender_id'] ?? 0),
+                        $messageId,
+                        $messageType,
+                        (string)$providerForRate
+                    );
+                }
                 
                 // Enviar anexos adicionais (2+) como mensagens separadas
                 if (!empty($attachmentsData) && count($attachmentsData) > 1) {
@@ -295,16 +380,37 @@ class ConversationService
             } elseif ($sendResult && ($sendResult['status'] ?? '') === 'queued') {
                 Message::update($messageId, ['status' => 'queued']);
             } else {
+                $errMsg = $sendResult['error'] ?? 'Falha no envio';
                 Message::update($messageId, [
                     'status' => 'error',
-                    'error_message' => $sendResult['error'] ?? 'Falha no envio'
+                    'error_message' => $errMsg
                 ]);
                 \App\Helpers\Logger::error("[INTEGRATION-BG] ❌ Falha: msg={$messageId}");
+
+                // ✅ Auto-throttle: detectar 502/Bad Gateway e contar como falha
+                if (
+                    isset($rateAccountId, $providerForRate)
+                    && $rateAccountId
+                    && \App\Services\MediaRateLimitService::appliesToProvider($providerForRate)
+                    && \App\Services\MediaRateLimitService::isMediaType($messageType)
+                    && (stripos($errMsg, '502') !== false || stripos($errMsg, 'Bad Gateway') !== false || stripos($errMsg, 'timeout') !== false)
+                ) {
+                    \App\Services\MediaRateLimitService::recordFailure((int)$rateAccountId, "Erro 502/timeout em msg {$messageId}");
+                }
             }
         } catch (\Exception $e) {
             \App\Helpers\Logger::error("[INTEGRATION-BG] EXCEPTION msg={$messageId}: " . $e->getMessage());
             try {
                 Message::update($messageId, ['status' => 'error', 'error_message' => $e->getMessage()]);
+                if (
+                    isset($rateAccountId, $providerForRate)
+                    && $rateAccountId
+                    && \App\Services\MediaRateLimitService::appliesToProvider($providerForRate)
+                    && \App\Services\MediaRateLimitService::isMediaType($messageType)
+                    && (stripos($e->getMessage(), '502') !== false || stripos($e->getMessage(), 'Bad Gateway') !== false || stripos($e->getMessage(), 'timeout') !== false)
+                ) {
+                    \App\Services\MediaRateLimitService::recordFailure((int)$rateAccountId, "Exception 502/timeout em msg {$messageId}");
+                }
             } catch (\Exception $e2) {}
         }
     }

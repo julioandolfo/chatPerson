@@ -4858,5 +4858,53 @@ class ConversationController
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
+
+    /**
+     * Retorna estatísticas de rate limit de mídia para a conversa atual.
+     * GET /conversations/{id}/media-rate-stats
+     */
+    public function getMediaRateStats(int $id): void
+    {
+        try {
+            $userId = \App\Helpers\Auth::id();
+            $conversation = \App\Models\Conversation::find($id);
+            if (!$conversation) {
+                Response::json(['success' => false, 'message' => 'Conversa não encontrada'], 404);
+                return;
+            }
+
+            // Resolver conta + provider
+            $accountId = (int)($conversation['integration_account_id'] ?? 0);
+            $provider = null;
+            if ($accountId) {
+                $integ = \App\Models\IntegrationAccount::find($accountId);
+                $provider = $integ['provider'] ?? null;
+            } elseif (!empty($conversation['whatsapp_account_id'])) {
+                $accountId = (int)$conversation['whatsapp_account_id'];
+                $provider = 'quepasa';
+            }
+
+            if (!$accountId || !\App\Services\MediaRateLimitService::appliesToProvider($provider)) {
+                // Não aplica rate limit para esse provider (Notificame, etc) — UI esconde o badge
+                Response::json([
+                    'success' => true,
+                    'applies' => false,
+                    'provider' => $provider,
+                ]);
+                return;
+            }
+
+            $stats = \App\Services\MediaRateLimitService::getStats($accountId, $id, (int)$userId);
+
+            Response::json([
+                'success' => true,
+                'applies' => true,
+                'provider' => $provider,
+                'stats' => $stats,
+            ]);
+        } catch (\Throwable $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
 }
 

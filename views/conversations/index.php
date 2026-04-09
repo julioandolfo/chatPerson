@@ -494,8 +494,30 @@ function renderMessageStatus($msg) {
     $readAt = $msg['read_at'] ?? null;
     $deliveredAt = $msg['delivered_at'] ?? null;
     $errorMessage = $msg['error_message'] ?? null;
-    
-    // Se houver erro
+
+    // ⏱️ Em fila de rate limit (Evolution/Quepasa)
+    if ($status === 'queued_rate_limit') {
+        $reasonText = htmlspecialchars($errorMessage ?? 'Aguardando liberação do limite de envio de mídia');
+        return '<div class="message-error-container">
+            <span class="message-status" style="color: #f59e0b;" title="' . $reasonText . '">
+                <i class="ki-duotone ki-time fs-6">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <span class="message-status-label">Em fila — limite de mídia</span>
+            </span>
+            <div class="message-error-alert mt-2" style="background:#fef3c7;border-color:#fbbf24;color:#92400e;">
+                <i class="ki-duotone ki-information-3 fs-5 me-2">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                    <span class="path3"></span>
+                </i>
+                <span>' . $reasonText . '</span>
+            </div>
+        </div>';
+    }
+
+    // Se houver erro (e NÃO é rate limit)
     if ($status === 'failed' || !empty($errorMessage)) {
         $errorText = htmlspecialchars($errorMessage ?? 'Erro ao enviar');
         
@@ -4215,12 +4237,13 @@ function getChannelInfo(channel) {
                 </div>
                 
                 <div class="chat-input-toolbar">
-                    <button class="btn btn-sm btn-icon btn-light-primary" title="Anexar arquivo" onclick="attachFile()">
+                    <button class="btn btn-sm btn-icon btn-light-primary" id="attachFileBtn" title="Anexar arquivo" onclick="attachFile()">
                         <i class="ki-duotone ki-paper-clip fs-3">
                             <span class="path1"></span>
                             <span class="path2"></span>
                         </i>
                     </button>
+                    <span id="mediaRateBadge" class="badge badge-light fs-8 d-none align-items-center gap-1 ms-1" style="cursor: help;" title="Limites de envio de mídia"></span>
                     <button type="button" class="btn btn-sm btn-light-secondary d-none" id="cancelRecordingBtn" title="Cancelar gravação" onclick="cancelRecording()">
                         <i class="ki-duotone ki-cross-circle fs-3"><span class="path1"></span><span class="path2"></span></i>
                     </button>
@@ -8838,10 +8861,81 @@ function updateConversationListPreview(conversationId, lastMessage) {
     }
 }
 
+// ===== Rate limit de mídia (Evolution/Quepasa) =====
+let mediaRateState = { applies: false, blocked: false, retryAt: 0 };
+let mediaRatePollTimer = null;
+
+async function refreshMediaRateBadge(conversationId) {
+    const badge = document.getElementById('mediaRateBadge');
+    const attachBtn = document.getElementById('attachFileBtn');
+    if (!badge || !conversationId) return;
+    try {
+        const resp = await fetch(`<?= \App\Helpers\Url::to('/conversations') ?>/${conversationId}/media-rate-stats`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+        });
+        const data = await resp.json();
+        if (!data.success || !data.applies) {
+            badge.classList.add('d-none');
+            mediaRateState = { applies: false, blocked: false, retryAt: 0 };
+            if (attachBtn) { attachBtn.disabled = false; attachBtn.title = 'Anexar arquivo'; }
+            return;
+        }
+        const s = data.stats;
+        const limits = s.limits;
+        // Pegar o pior caso (maior % ocupado) entre conversa, conta minuto, conta hora, user
+        const ratios = [];
+        if (s.conversation) {
+            ratios.push({ key: 'conv_min', cur: s.conversation.minute, lim: limits.conversation_per_minute, label: 'conversa/min' });
+            ratios.push({ key: 'conv_hr', cur: s.conversation.hour, lim: limits.conversation_per_hour, label: 'conversa/h' });
+        }
+        ratios.push({ key: 'acc_min', cur: s.account.minute, lim: limits.account_per_minute, label: 'número/min' });
+        ratios.push({ key: 'acc_hr', cur: s.account.hour, lim: limits.account_per_hour, label: 'número/h' });
+        if (s.user) ratios.push({ key: 'user_min', cur: s.user.minute, lim: limits.user_per_minute, label: 'agente/min' });
+
+        let worst = ratios[0];
+        ratios.forEach(r => { if ((r.cur / r.lim) > (worst.cur / worst.lim)) worst = r; });
+        const pct = worst.lim > 0 ? (worst.cur / worst.lim) : 0;
+
+        let cls = 'badge-light-success';
+        if (pct >= 0.9) cls = 'badge-light-danger';
+        else if (pct >= 0.6) cls = 'badge-light-warning';
+
+        // Pausa automática
+        if (s.paused) {
+            cls = 'badge-light-danger';
+            badge.className = `badge ${cls} fs-8 d-inline-flex align-items-center gap-1 ms-1`;
+            badge.innerHTML = `⏸️ Pausado: ${s.pause_reason || 'auto-throttle'}`;
+            badge.title = `Envio de mídia pausado até ${s.paused_until}`;
+            mediaRateState = { applies: true, blocked: true, retryAt: new Date(s.paused_until).getTime() };
+            if (attachBtn) { attachBtn.disabled = true; attachBtn.title = badge.title; }
+            return;
+        }
+
+        badge.className = `badge ${cls} fs-8 d-inline-flex align-items-center gap-1 ms-1`;
+        badge.innerHTML = `📷 ${worst.cur}/${worst.lim} <span class="text-muted">(${worst.label})</span>`;
+        badge.title = `Mídias: conversa ${s.conversation ? s.conversation.minute + '/' + limits.conversation_per_minute : '-'} no minuto · número ${s.account.minute}/${limits.account_per_minute} no minuto · ${s.account.hour}/${limits.account_per_hour} na hora`;
+        mediaRateState = { applies: true, blocked: pct >= 1, retryAt: 0 };
+        if (attachBtn) {
+            attachBtn.disabled = pct >= 1;
+            attachBtn.title = pct >= 1 ? 'Limite de mídia atingido — aguarde liberação' : 'Anexar arquivo';
+        }
+    } catch (e) {
+        // não-crítico, mantém estado anterior
+    }
+}
+
+function startMediaRatePolling(conversationId) {
+    if (mediaRatePollTimer) { clearInterval(mediaRatePollTimer); mediaRatePollTimer = null; }
+    if (!conversationId) return;
+    refreshMediaRateBadge(conversationId);
+    mediaRatePollTimer = setInterval(() => refreshMediaRateBadge(conversationId), 30000);
+}
+
 function selectConversation(id) {
     // Atualizar conversa selecionada globalmente e resetar estado local
     resetConversationState(id);
     window.currentConversationId = currentConversationId;
+    startMediaRatePolling(id);
     
     // Atualizar URL IMEDIATAMENTE (antes do AJAX) para que um eventual reload nao perca a conversa
     const currentParams = new URLSearchParams(window.location.search);
@@ -14103,10 +14197,17 @@ function addMessageToChat(message) {
         'type': message.type,
         'message_type': message.message_type
     });
-    
+
     const isIncoming = message.direction === 'incoming';
     console.log(`Serí renderizada como: ${isIncoming ? '⬅️ INCOMING (esquerda)' : '➡️ OUTGOING (direita)'}`);
     console.groupEnd();
+
+    // Atualizar badge de rate limit quando uma mensagem outgoing de mídia for renderizada
+    if (!isIncoming && ['image','audio','video','document','voice','sticker'].includes((message.message_type || '').toLowerCase())) {
+        if (window.currentConversationId && typeof refreshMediaRateBadge === 'function') {
+            setTimeout(() => refreshMediaRateBadge(window.currentConversationId), 500);
+        }
+    }
     
     const chatMessages = document.getElementById('chatMessages');
     if (!chatMessages) return null;
@@ -14250,7 +14351,29 @@ function addMessageToChat(message) {
             if (status === 'sending') {
                 return '';
             }
-            
+
+            // ⏱️ Em fila de rate limit (Evolution/Quepasa)
+            if (status === 'queued_rate_limit') {
+                const reasonText = escapeHtml(errorMessage || 'Aguardando liberação do limite de envio de mídia');
+                return `<div class="message-error-container">
+                    <span class="message-status" style="color: #f59e0b;" title="${reasonText}">
+                        <i class="ki-duotone ki-time fs-6">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                        </i>
+                        <span class="message-status-label">Em fila — limite de mídia</span>
+                    </span>
+                    <div class="message-error-alert mt-2" style="background:#fef3c7;border-color:#fbbf24;color:#92400e;">
+                        <i class="ki-duotone ki-information-3 fs-5 me-2">
+                            <span class="path1"></span>
+                            <span class="path2"></span>
+                            <span class="path3"></span>
+                        </i>
+                        ${reasonText}
+                    </div>
+                </div>`;
+            }
+
             // Se houver erro
             if (status === 'failed' || errorMessage) {
                 const errorText = escapeHtml(errorMessage || 'Erro ao enviar');

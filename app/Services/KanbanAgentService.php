@@ -1726,10 +1726,15 @@ class KanbanAgentService
             $templateLanguage
         );
 
-        // Salvar mensagem na conversa para rastreabilidade
-        $bodyText = "📋 *Template:* {$templateName}";
-        if (!empty($templateParams)) {
-            $bodyText .= "\n*Params:* " . implode(', ', $templateParams);
+        // Renderizar conteúdo real do template (header/body/footer/buttons) com substituição
+        // de variáveis {{1}}, {{2}}... — assim a mensagem que aparece no chat reflete o que o
+        // cliente recebeu, em vez de mostrar apenas o nome técnico do template.
+        $bodyText = self::renderNotificameTemplateBody($accountId, $templateName, $templateParams);
+        if (empty($bodyText)) {
+            $bodyText = "📋 *Template:* {$templateName}";
+            if (!empty($templateParams)) {
+                $bodyText .= "\n*Params:* " . implode(', ', $templateParams);
+            }
         }
 
         try {
@@ -1772,6 +1777,128 @@ class KanbanAgentService
             'phone' => $phone,
             'result' => $result
         ];
+    }
+
+    /**
+     * Renderiza o conteúdo visível de um template NotificaMe (header, body, footer, buttons)
+     * com as variáveis {{1}}, {{2}}... substituídas pelos params fornecidos.
+     *
+     * Usa um cache estático em memória + cache em disco curto pra evitar bater na API a cada
+     * envio do kanban (que pode disparar centenas de templates por minuto).
+     */
+    private static function renderNotificameTemplateBody(int $accountId, string $templateName, array $params): string
+    {
+        try {
+            $template = self::findNotificameTemplate($accountId, $templateName);
+            if (!$template) {
+                Logger::info("KanbanAgent::renderNotificameTemplateBody - Template '{$templateName}' não encontrado na conta #{$accountId}");
+                return '';
+            }
+
+            $components = $template['components'] ?? [];
+            if (!is_array($components)) {
+                return '';
+            }
+
+            $headerText = '';
+            $bodyText = '';
+            $footerText = '';
+            $buttonsText = '';
+
+            foreach ($components as $comp) {
+                $type = strtoupper($comp['type'] ?? '');
+                if ($type === 'HEADER') {
+                    $format = strtoupper($comp['format'] ?? 'TEXT');
+                    if ($format === 'TEXT' && !empty($comp['text'])) {
+                        $headerText = (string)$comp['text'];
+                    }
+                } elseif ($type === 'BODY') {
+                    $bodyText = (string)($comp['text'] ?? '');
+                } elseif ($type === 'FOOTER') {
+                    $footerText = (string)($comp['text'] ?? '');
+                } elseif ($type === 'BUTTONS') {
+                    foreach (($comp['buttons'] ?? []) as $btn) {
+                        $btnType = strtoupper($btn['type'] ?? 'QUICK_REPLY');
+                        $btnLabel = $btn['text'] ?? ($btn['url'] ?? '');
+                        $emoji = $btnType === 'URL' ? '🔗' : ($btnType === 'PHONE_NUMBER' ? '📞' : '🔘');
+                        $buttonsText .= "\n{$emoji} {$btnLabel}";
+                    }
+                }
+            }
+
+            // Substituir {{1}}, {{2}}... pelos parâmetros (no header e no body)
+            $applyParams = function (string $text) use ($params): string {
+                foreach ($params as $i => $value) {
+                    $text = str_replace('{{' . ((int)$i + 1) . '}}', (string)$value, $text);
+                }
+                return $text;
+            };
+
+            $headerText = $applyParams($headerText);
+            $bodyText = $applyParams($bodyText);
+
+            $output = '';
+            if ($headerText !== '') {
+                $output .= "*{$headerText}*\n\n";
+            }
+            $output .= $bodyText;
+            if ($footerText !== '') {
+                $output .= "\n\n_{$footerText}_";
+            }
+            if ($buttonsText !== '') {
+                $output .= "\n" . $buttonsText;
+            }
+
+            return trim($output);
+        } catch (\Throwable $e) {
+            Logger::error("KanbanAgent::renderNotificameTemplateBody - Erro: " . $e->getMessage());
+            return '';
+        }
+    }
+
+    /**
+     * Busca um template NotificaMe pelo nome, com cache em memória e em disco (5 min).
+     */
+    private static function findNotificameTemplate(int $accountId, string $templateName): ?array
+    {
+        static $memCache = [];
+        $cacheKey = $accountId . ':' . $templateName;
+        if (isset($memCache[$cacheKey])) {
+            return $memCache[$cacheKey];
+        }
+
+        // Cache em disco — evita listar templates na API toda hora
+        $cacheDir = __DIR__ . '/../../storage/cache';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0775, true);
+        }
+        $cacheFile = $cacheDir . '/notificame_templates_' . $accountId . '.json';
+        $templates = null;
+
+        if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 300) {
+            $cached = json_decode(@file_get_contents($cacheFile), true);
+            if (is_array($cached)) {
+                $templates = $cached;
+            }
+        }
+
+        if ($templates === null) {
+            $templates = \App\Services\NotificameService::listTemplates($accountId);
+            if (is_array($templates) && !empty($templates)) {
+                @file_put_contents($cacheFile, json_encode($templates, JSON_UNESCAPED_UNICODE));
+            }
+        }
+
+        if (!is_array($templates)) return null;
+
+        foreach ($templates as $tpl) {
+            if (($tpl['name'] ?? '') === $templateName) {
+                $memCache[$cacheKey] = $tpl;
+                return $tpl;
+            }
+        }
+
+        return null;
     }
 
     /**

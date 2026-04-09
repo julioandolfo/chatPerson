@@ -1193,11 +1193,6 @@ function updateEditConfigFields() {
     }
     
     console.log("Campos de config renderizados com sucesso");
-
-    // Se for tool WooCommerce, ligar o auto-fill do schema ao select de operação
-    if (toolType === "woocommerce") {
-        bindWCOperationAutoFill();
-    }
 }
 
 // Configurar campos condicionais (showIf) na edição

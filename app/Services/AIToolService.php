@@ -166,6 +166,10 @@ class AIToolService
      */
     private static function syncFunctionName(array $schema, string $slug): array
     {
+        // Multi-função: cada item já tem seu próprio nome — não sobrescrever.
+        if (!empty($schema) && array_keys($schema) === range(0, count($schema) - 1)) {
+            return $schema;
+        }
         if (isset($schema['function']['name'])) {
             $schema['function']['name'] = $slug;
         } elseif (isset($schema['name'])) {
@@ -176,6 +180,16 @@ class AIToolService
 
     private static function normalizeFunctionSchema(array $schema): array
     {
+        // Multi-função: lista de schemas — normaliza cada item recursivamente
+        if (!empty($schema) && array_keys($schema) === range(0, count($schema) - 1)) {
+            foreach ($schema as $i => $sub) {
+                if (\is_array($sub)) {
+                    $schema[$i] = self::normalizeFunctionSchema($sub);
+                }
+            }
+            return $schema;
+        }
+
         // Se é o formato wrapper {type: function, function: {...}}
         if (isset($schema['function'])) {
             $func = &$schema['function'];
@@ -227,6 +241,22 @@ class AIToolService
      */
     public static function validateFunctionSchema(array $schema): array
     {
+        // Suporte a multi-função: se vier uma lista, valida cada item.
+        if (!empty($schema) && array_keys($schema) === range(0, count($schema) - 1)) {
+            $allErrors = [];
+            foreach ($schema as $i => $sub) {
+                if (!\is_array($sub)) {
+                    $allErrors[] = "schema #{$i}: deve ser um objeto";
+                    continue;
+                }
+                $subErrors = self::validateFunctionSchema($sub);
+                foreach ($subErrors as $e) {
+                    $allErrors[] = "schema #{$i}: {$e}";
+                }
+            }
+            return $allErrors;
+        }
+
         $errors = [];
 
         // Aceita formato wrapper {type:'function', function:{...}} ou direto

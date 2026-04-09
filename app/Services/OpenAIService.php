@@ -41,6 +41,37 @@ class OpenAIService
     private static array $wcMetaWhitelist = [];
 
     /**
+     * Normaliza um function_schema vindo do banco para uma LISTA de schemas individuais.
+     *
+     * Aceita 3 formatos:
+     *   1) Schema único formato wrapper:    {type:'function', function:{name,...}}
+     *   2) Schema único formato direto:     {name, description, parameters}
+     *   3) Lista de schemas (multi-função): [{...}, {...}]  ← novo
+     *
+     * Retorna sempre array<int, array> — cada elemento já no formato wrapper esperado pela OpenAI.
+     */
+    private static function expandFunctionSchemas($raw): array
+    {
+        if (empty($raw) || !is_array($raw)) {
+            return [];
+        }
+        // Lista (chaves numéricas começando em 0)
+        $isList = array_keys($raw) === range(0, count($raw) - 1);
+        $items = $isList ? $raw : [$raw];
+
+        $out = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || empty($item)) { continue; }
+            // Normalizar para wrapper {type:function, function:{...}}
+            if (!isset($item['function']) && (isset($item['name']) || isset($item['parameters']))) {
+                $item = ['type' => 'function', 'function' => $item];
+            }
+            $out[] = self::normalizeToolSchema($item);
+        }
+        return $out;
+    }
+
+    /**
      * Log auxiliar para debug de intents (mesmo arquivo de intents da AutomationService)
      */
     private static function logIntentDebug(string $message): void
@@ -114,13 +145,15 @@ class OpenAIService
             $functions = [];
             $toolDescriptions = []; // Para incluir no prompt
             foreach ($tools as $tool) {
-                $functionSchema = is_string($tool['function_schema']) 
-                    ? json_decode($tool['function_schema'], true) 
+                $rawSchema = is_string($tool['function_schema'])
+                    ? json_decode($tool['function_schema'], true)
                     : ($tool['function_schema'] ?? []);
-                
-                if (!empty($functionSchema)) {
-                    // Corrigir schema se properties for array vazio (deveria ser objeto)
-                    $functionSchema = self::normalizeToolSchema($functionSchema);
+
+                // Suporte a multi-função: uma tool pode ter várias funções no schema
+                $schemas = self::expandFunctionSchemas($rawSchema);
+                if (empty($schemas)) { continue; }
+
+                foreach ($schemas as $functionSchema) {
                     if (($tool['tool_type'] ?? '') === 'woocommerce') {
                         $wcHint = ' Invocar somente quando o cliente pediu dados ou ação sobre pedido, produto, entrega ou loja; não usar em saudações (oi/olá) nem conversa genérica.';
                         if (isset($functionSchema['function']['description']) && is_string($functionSchema['function']['description'])) {
@@ -130,8 +163,7 @@ class OpenAIService
                         }
                     }
                     $functions[] = $functionSchema;
-                    
-                    // Extrair nome e descrição da tool para o prompt
+
                     $funcData = $functionSchema['function'] ?? $functionSchema;
                     $toolName = $funcData['name'] ?? 'unknown';
                     $toolDesc = $funcData['description'] ?? 'Sem descrição';
@@ -693,11 +725,16 @@ class OpenAIService
         $agentToolByFunctionName = [];
         foreach ($agentTools as $row) {
             $agentToolRowByToolId[(int)($row['id'] ?? 0)] = $row;
-            // Indexar também pelo nome da function no schema para busca direta
-            $schema = is_string($row['function_schema'] ?? null) ? json_decode($row['function_schema'], true) : ($row['function_schema'] ?? []);
-            $funcName = $schema['function']['name'] ?? $schema['name'] ?? null;
-            if ($funcName) {
-                $agentToolByFunctionName[$funcName] = $row;
+            // Indexar pelo nome de cada function declarada no schema (multi-função suportada).
+            $rawSchema = is_string($row['function_schema'] ?? null)
+                ? json_decode($row['function_schema'], true)
+                : ($row['function_schema'] ?? []);
+            $schemas = self::expandFunctionSchemas($rawSchema);
+            foreach ($schemas as $s) {
+                $funcName = $s['function']['name'] ?? $s['name'] ?? null;
+                if ($funcName) {
+                    $agentToolByFunctionName[$funcName] = $row;
+                }
             }
         }
 
@@ -766,6 +803,9 @@ class OpenAIService
                     $tool['config'] ?? null,
                     $assignedRow['agent_tool_config'] ?? null
                 );
+                // Nome da função efetivamente invocada pela IA (importante para tools multi-função
+                // que mapeiam várias operações no mesmo registro de tool, ex.: WooCommerce).
+                $toolForExec['__invoked_function_name'] = $functionName;
 
                 // Executar tool
                 $result = self::executeTool($toolForExec, $functionArguments, $conversationId, $context);
@@ -853,14 +893,29 @@ class OpenAIService
      */
     private static function getToolInvocationFunctionName(array $tool): string
     {
+        // 1) Se a chamada veio com o nome real invocado pela IA (caso multi-função), usar.
+        $invoked = $tool['__invoked_function_name'] ?? null;
+        if (is_string($invoked) && trim($invoked) !== '') {
+            return trim($invoked);
+        }
+
         $schema = $tool['function_schema'] ?? null;
         if (is_string($schema)) {
             $schema = json_decode($schema, true) ?: [];
         }
         if (is_array($schema)) {
+            // Schema único
             $n = $schema['function']['name'] ?? $schema['name'] ?? '';
             if (is_string($n) && trim($n) !== '') {
                 return trim($n);
+            }
+            // Lista de schemas — sem invoked name conhecido, devolve o primeiro
+            if (isset($schema[0]) && is_array($schema[0])) {
+                $first = $schema[0];
+                $n2 = $first['function']['name'] ?? $first['name'] ?? '';
+                if (is_string($n2) && trim($n2) !== '') {
+                    return trim($n2);
+                }
             }
         }
         $slug = trim((string)($tool['slug'] ?? ''));

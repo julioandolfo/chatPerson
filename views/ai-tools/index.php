@@ -726,16 +726,16 @@ const autoSchemaTypes = {
 const toolTypeConfigs = {
     woocommerce: {
         fields: [
-            { name: "wc_operation", label: "Operação da Loja", type: "select", required: true,
+            { name: "wc_operations", label: "Operações da Loja Liberadas", type: "wc_operations_multi", required: true,
               options: [
-                { value: "buscar_pedido_woocommerce",          label: "Buscar 1 pedido por número/ID" },
-                { value: "buscar_pedidos_woocommerce",         label: "Listar pedidos (cliente, status, datas, IDs)" },
-                { value: "buscar_produto_woocommerce",         label: "Buscar produto (REST API: preço, estoque, atributos, custom fields)" },
-                { value: "buscar_pagina_produto_woocommerce",  label: "Ler página HTML do produto (ressalvas, regras, prazos do front)" },
-                { value: "criar_pedido_woocommerce",           label: "Criar pedido" },
-                { value: "atualizar_status_pedido",            label: "Atualizar status de pedido" }
+                { value: "buscar_pedido_woocommerce",          label: "Buscar 1 pedido por número/ID",                                       hint: "Cliente informa um número específico" },
+                { value: "buscar_pedidos_woocommerce",         label: "Listar pedidos do cliente (com filtros e múltiplos IDs)",            hint: "Histórico, status, datas, vários IDs" },
+                { value: "buscar_produto_woocommerce",         label: "Buscar produto via API (preço, estoque, atributos, custom fields)", hint: "Dado estruturado, mais barato" },
+                { value: "buscar_pagina_produto_woocommerce",  label: "Ler página HTML do produto (ressalvas, regras, prazos do front)",   hint: "Quando o dado só existe no front" },
+                { value: "criar_pedido_woocommerce",           label: "Criar novo pedido",                                                   hint: "⚠️ Ação destrutiva — só em fluxos de venda" },
+                { value: "atualizar_status_pedido",            label: "Atualizar status de pedido",                                          hint: "⚠️ Ação destrutiva — só em pós-venda" }
               ],
-              help: "Escolha a operação. O Function Schema (nome, descrição e parâmetros) será preenchido automaticamente — não precisa adicionar parâmetros manualmente." },
+              help: "Marque as operações que este agente pode usar. Cada operação vira uma function que a IA pode chamar quando precisar." },
             { name: "url", label: "URL da Loja WooCommerce", type: "url", required: true, placeholder: "https://loja.exemplo.com" },
             { name: "consumer_key", label: "Consumer Key", type: "text", required: true },
             { name: "consumer_secret", label: "Consumer Secret", type: "password", required: true },

@@ -596,6 +596,12 @@ const autoSchemaTypes = {
                 parameters: { type: "object", properties: { data_hora: { type: "string", description: "Data/hora do follow-up" }, mensagem: { type: "string", description: "Mensagem" } }, required: ["data_hora", "mensagem"] }
             }
         }
+    },
+    // WooCommerce: schema é construído dinamicamente a partir das operações marcadas
+    // (ver buildEditFunctionSchema). Aqui apenas escondemos o bloco manual de schema.
+    woocommerce: {
+        message: "Marque as operações da loja em \"Configurações Específicas\" abaixo. O function schema (lista de funções para a IA) será gerado automaticamente — uma function por operação marcada.",
+        defaultSchema: null // gerado em buildEditFunctionSchema
     }
 };
 
@@ -672,16 +678,16 @@ const WC_OPERATION_SCHEMAS = {
 const toolTypeConfigs = {
     woocommerce: {
         fields: [
-            { name: "wc_operation", label: "Operação da Loja", type: "select", required: true,
+            { name: "wc_operations", label: "Operações da Loja Liberadas", type: "wc_operations_multi", required: true,
               options: [
-                { value: "buscar_pedido_woocommerce",          label: "Buscar 1 pedido por número/ID" },
-                { value: "buscar_pedidos_woocommerce",         label: "Listar pedidos (cliente, status, datas, IDs)" },
-                { value: "buscar_produto_woocommerce",         label: "Buscar produto (REST API: preço, estoque, atributos, custom fields)" },
-                { value: "buscar_pagina_produto_woocommerce",  label: "Ler página HTML do produto (ressalvas, regras, prazos do front)" },
-                { value: "criar_pedido_woocommerce",           label: "Criar pedido" },
-                { value: "atualizar_status_pedido",            label: "Atualizar status de pedido" }
+                { value: "buscar_pedido_woocommerce",          label: "Buscar 1 pedido por número/ID",                                       hint: "Cliente informa um número específico" },
+                { value: "buscar_pedidos_woocommerce",         label: "Listar pedidos do cliente (com filtros e múltiplos IDs)",            hint: "Histórico, status, datas, vários IDs" },
+                { value: "buscar_produto_woocommerce",         label: "Buscar produto via API (preço, estoque, atributos, custom fields)", hint: "Dado estruturado, mais barato" },
+                { value: "buscar_pagina_produto_woocommerce",  label: "Ler página HTML do produto (ressalvas, regras, prazos do front)",   hint: "Quando o dado só existe no front" },
+                { value: "criar_pedido_woocommerce",           label: "Criar novo pedido",                                                   hint: "⚠️ Ação destrutiva — só em fluxos de venda" },
+                { value: "atualizar_status_pedido",            label: "Atualizar status de pedido",                                          hint: "⚠️ Ação destrutiva — só em pós-venda" }
               ],
-              help: "Escolha a operação. O Function Schema (nome, descrição e parâmetros) será preenchido automaticamente — não precisa adicionar parâmetros manualmente." },
+              help: "Marque as operações que este agente pode usar. Cada operação vira uma function que a IA pode chamar quando precisar." },
             { name: "url", label: "URL da Loja WooCommerce", type: "url", required: true, placeholder: "https://loja.exemplo.com" },
             { name: "consumer_key", label: "Consumer Key", type: "text", required: true },
             { name: "consumer_secret", label: "Consumer Secret", type: "password", required: true },
@@ -1069,6 +1075,25 @@ function updateEditConfigFields() {
                 ${field.help ? `<div class="form-text text-muted">${field.help}</div>` : ""}
             `;
             fieldDiv.innerHTML = inputHtml;
+        } else if (field.type === "wc_operations_multi") {
+            // Lista de checkboxes — cada um vira uma function liberada para a IA.
+            // O valor não vai para o `config` (não tem .config-field), vai para o function_schema via buildWCOperationsSchema.
+            let optsHtml = "";
+            (field.options || []).forEach(opt => {
+                const id = `edit_wc_op_${opt.value}`;
+                optsHtml += `
+                    <label class="d-flex align-items-start mb-3 p-3 border border-gray-300 rounded bg-white" style="cursor:pointer;">
+                        <input type="checkbox" class="form-check-input mt-1 me-3 wc-op-checkbox" value="${opt.value}" id="${id}" />
+                        <div class="flex-grow-1">
+                            <div class="fw-bold fs-7 text-gray-800">${opt.label}</div>
+                            ${opt.hint ? `<div class="text-muted fs-8 mt-1">${opt.hint}</div>` : ""}
+                        </div>
+                    </label>
+                `;
+            });
+            fieldDiv.innerHTML = labelHtml +
+                `<div class="wc-operations-list">${optsHtml}</div>` +
+                (field.help ? `<div class="form-text text-muted">${field.help}</div>` : "");
         } else if (field.type === "select") {
             inputHtml = `<select class="form-control form-control-solid config-field" data-field="${field.name}" ${field.required ? "required" : ""}>`;
             inputHtml += `<option value="">Selecione...</option>`;
@@ -1199,56 +1224,42 @@ function updateEditConditionalVisibility() {
     });
 }
 
-// Aplica o schema pré-definido de uma operação WooCommerce nos campos do form.
-// Substitui completamente os parâmetros existentes — o usuário não precisa adicionar nada manualmente.
-function applyWCOperationSchema(operationKey) {
-    const op = WC_OPERATION_SCHEMAS[operationKey];
-    if (!op) return;
+// Lê as operações WooCommerce marcadas no form e devolve um array
+// no formato esperado pela OpenAI (lista de schemas, multi-função).
+function buildWCOperationsSchema() {
+    const checked = Array.from(
+        document.querySelectorAll('#kt_edit_config_fields .wc-op-checkbox:checked')
+    ).map(el => el.value);
 
-    const nameInput = document.getElementById("kt_edit_function_name");
-    const descInput = document.getElementById("kt_edit_function_description");
-    if (nameInput) nameInput.value = op.name;
-    if (descInput) descInput.value = op.description;
+    if (checked.length === 0) return null;
 
-    // Limpar parâmetros atuais
-    const container = document.getElementById("kt_edit_function_parameters");
-    if (container) {
-        container.innerHTML = "";
-        editParameterCounter = 0;
-
-        const required = op.required || [];
-        Object.keys(op.properties || {}).forEach(propName => {
-            const prop = op.properties[propName];
-            addEditFunctionParameter();
-            const last = container.lastElementChild;
-            if (last && last.classList.contains("card")) {
-                last.querySelector(".param-name").value        = propName;
-                last.querySelector(".param-type").value        = prop.type || "string";
-                last.querySelector(".param-description").value = prop.description || "";
-                last.querySelector(".param-required").checked  = required.includes(propName);
+    return checked.map(opKey => {
+        const op = WC_OPERATION_SCHEMAS[opKey];
+        if (!op) return null;
+        return {
+            type: "function",
+            function: {
+                name: op.name,
+                description: op.description,
+                parameters: {
+                    type: "object",
+                    properties: op.properties || {},
+                    required: op.required || []
+                }
             }
-        });
-
-        if (Object.keys(op.properties || {}).length === 0) {
-            container.innerHTML = '<div class="text-muted fs-7 mb-3 text-center py-4 bg-white rounded">Esta operação não exige parâmetros.</div>';
-        }
-    }
-}
-
-// Liga o select wc_operation ao auto-fill (chamado após renderizar os config fields).
-function bindWCOperationAutoFill() {
-    const sel = document.querySelector('#kt_edit_config_fields .config-field[data-field="wc_operation"]');
-    if (!sel || sel.dataset.wcBound === "1") return;
-    sel.dataset.wcBound = "1";
-    sel.addEventListener("change", function () {
-        if (this.value) applyWCOperationSchema(this.value);
-    });
+        };
+    }).filter(Boolean);
 }
 
 // Construir JSON do function schema (edição)
 function buildEditFunctionSchema() {
     const toolType = document.getElementById("kt_edit_tool_type").value;
-    
+
+    // WooCommerce: gerar lista de funções a partir das operações marcadas
+    if (toolType === "woocommerce") {
+        return buildWCOperationsSchema();
+    }
+
     // Se é um tipo com schema automático, usar o schema padrão
     if (autoSchemaTypes[toolType]) {
         console.log("Usando schema automático para tipo:", toolType);
@@ -1392,7 +1403,20 @@ function populateEditFields() {
     if (toolType) {
         // Renderizar campos de configuração
         updateEditConfigFields();
-        
+
+        // WooCommerce: marcar checkboxes das operações a partir do function_schema salvo.
+        // O schema pode vir como lista (multi-função, novo formato) ou objeto único (legado).
+        if (toolType === "woocommerce" && functionSchema) {
+            const schemas = Array.isArray(functionSchema) ? functionSchema : [functionSchema];
+            const opNames = schemas.map(s => (s && s.function && s.function.name) || s.name).filter(Boolean);
+            // Espera o DOM dos checkboxes existir
+            setTimeout(() => {
+                document.querySelectorAll('#kt_edit_config_fields .wc-op-checkbox').forEach(cb => {
+                    cb.checked = opNames.includes(cb.value);
+                });
+            }, 0);
+        }
+
         // Preencher valores de config após renderizar os campos
         if (config && Object.keys(config).length > 0) {
             setTimeout(async () => {

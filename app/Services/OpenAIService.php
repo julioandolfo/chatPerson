@@ -1911,13 +1911,27 @@ PROMPT;
                     }
                     $result = $makeWCRequest("orders/{$orderId}");
                     if (!$result['success']) {
-                        return ['error' => 'Pedido #' . $orderId . ' não encontrado.', 'http_code' => $result['http_code']];
+                        // Distinção explícita: não encontrado vs. erro técnico
+                        return [
+                            'success'   => true,
+                            'found'     => false,
+                            'order_id'  => (int)$orderId,
+                            'message'   => 'Nenhum pedido com este número foi localizado na loja. Confirme o número com o cliente antes de afirmar que não existe.',
+                            'http_code' => $result['http_code'] ?? null,
+                        ];
                     }
                     $raw = $result['data'];
                     if (!$orderBelongsToContact($raw)) {
-                        return ['error' => 'Este pedido não pertence ao contato desta conversa. Por segurança, não é possível exibir dados de outro cliente.'];
+                        // O pedido EXISTE — não diga que não existe. Pede confirmação de dados.
+                        return [
+                            'success'             => true,
+                            'found'               => true,
+                            'order_id'            => (int)$orderId,
+                            'filtered_out'        => true,
+                            'warning'             => 'O pedido #' . (int)$orderId . ' foi localizado na loja, mas os dados de cobrança não batem com este contato. NÃO afirme ao cliente que o pedido não existe. Peça para ele confirmar o email ou telefone usados na compra — se houver divergência justificada (comprou com dados de outra pessoa/empresa), ofereça escalar para um humano validar.',
+                        ];
                     }
-                    return ['success' => true, 'order' => self::sanitizeWCOrder($raw)];
+                    return ['success' => true, 'found' => true, 'order' => self::sanitizeWCOrder($raw)];
 
                 // ══════════════ LISTAR PEDIDOS (exige referência) ══════════════
                 case 'buscar_pedidos_woocommerce':

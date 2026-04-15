@@ -2380,7 +2380,7 @@ $attendanceTotals = $agentAttendanceMetrics['totals'] ?? [];
                             <a href="/agent-conversion/agent?id=<?= $seller['agent_id'] ?>" class="text-gray-800 text-hover-primary fw-bold fs-6">
                                 <?= htmlspecialchars($seller['agent_name']) ?>
                             </a>
-                            <div class="text-muted fs-7"><?= $seller['total_conversations'] ?> conversas → <?= $seller['total_orders'] ?> vendas</div>
+                            <div class="text-muted fs-7"><?= $seller['interactive_conversations'] ?? 0 ?> conversas interativas → <?= $seller['total_orders'] ?> vendas</div>
                         </div>
                         <div class="text-end">
                             <span class="fw-bold text-primary fs-4">

@@ -4503,6 +4503,34 @@ class WhatsAppService
             } else {
                 Logger::quepasa("processWebhook - ⚠️ Webhook sem external_id. Não é possível verificar duplicatas.");
             }
+
+            // ✅ Dedup extra por CONTEÚDO+CONVERSA+JANELA para mensagens do cliente.
+            // Evolution pode re-entregar a mesma mensagem com external_id diferente
+            // quando não recebe ACK rápido. Sem isso, o buffer do agente agenda
+            // um segundo processamento com a mesma frase e a IA responde 2x.
+            // Só aplica para texto não-vazio (anexo ou localização sempre passa).
+            if (!empty(trim($message ?? '')) && empty($attachments) && empty($location)) {
+                try {
+                    $msgTrim = trim($message);
+                    $existingSameContent = \App\Helpers\Database::fetch(
+                        "SELECT id, external_id, created_at FROM messages
+                         WHERE conversation_id = ?
+                         AND sender_type = 'contact'
+                         AND TRIM(content) = ?
+                         AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                         ORDER BY id DESC
+                         LIMIT 1",
+                        [$conversation['id'], $msgTrim]
+                    );
+                    if ($existingSameContent) {
+                        Logger::quepasa("processWebhook - ⚠️ Duplicata de CONTEÚDO (contact) detectada na janela de 60s. existingId={$existingSameContent['id']}, existingExtId=" . ($existingSameContent['external_id'] ?? 'NULL') . ", novoExtId=" . ($externalId ?? 'NULL') . ". Ignorando re-entrega do Evolution.");
+                        return;
+                    }
+                } catch (\Exception $dedupEx) {
+                    // Falha no dedup não deve bloquear a mensagem — logar e seguir
+                    Logger::quepasa("processWebhook - ⚠️ Erro no dedup por conteúdo (ignorando): " . $dedupEx->getMessage());
+                }
+            }
             
             // Criar mensagem usando ConversationService (com todas as integrações)
             Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments) . ", timestamp=" . date('Y-m-d H:i:s', $timestamp));

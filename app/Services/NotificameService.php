@@ -1337,16 +1337,33 @@ class NotificameService
                 self::logInfo("========== Notificame Webhook FIM (Duplicata ignorada) ==========");
                 return;
             }
-            
-            // Verificar também por conteúdo recente (proteção contra race condition com webhook WhatsApp)
+        }
+
+        // Dedup por CONTEÚDO+CONVERSA+JANELA independente de ter external_id ou não.
+        // Notificame pode reentregar o mesmo webhook com external_id diferente quando não
+        // recebe ACK rápido (processamento da IA leva 10-20s). A janela anterior era de 10s
+        // e só rodava quando havia external_id — ambos estavam insuficientes.
+        // Agora: 60s de janela, sempre ativo para texto não-vazio sem anexo.
+        if (!empty(trim($messageData['content'] ?? '')) && empty($attachments)) {
+            $contentTrim = trim($messageData['content']);
             $recentDuplicate = \App\Helpers\Database::fetch(
-                "SELECT id FROM messages WHERE conversation_id = ? AND sender_id = ? AND content = ? AND created_at >= DATE_SUB(NOW(), INTERVAL 10 SECOND) LIMIT 1",
-                [$conversation['id'], $contact['id'], $messageData['content']]
+                "SELECT id, external_id FROM messages
+                 WHERE conversation_id = ?
+                 AND sender_id = ?
+                 AND sender_type = 'contact'
+                 AND TRIM(content) = ?
+                 AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                 ORDER BY id DESC
+                 LIMIT 1",
+                [$conversation['id'], $contact['id'], $contentTrim]
             );
             if ($recentDuplicate) {
-                // Mensagem já existe (criada por outro webhook sem external_id). Apenas setar external_id.
-                Message::update($recentDuplicate['id'], ['external_id' => $externalId]);
-                self::logInfo("Notificame webhook: ⚠️ Mensagem recente duplicada encontrada (id={$recentDuplicate['id']}). Atualizado external_id e ignorando criação.");
+                // Se a mensagem existente ainda não tem external_id, atualiza com o novo
+                if (!empty($externalId) && empty($recentDuplicate['external_id'])) {
+                    Message::update($recentDuplicate['id'], ['external_id' => $externalId]);
+                    self::logInfo("Notificame webhook: external_id atualizado na msg existente ID={$recentDuplicate['id']}");
+                }
+                self::logInfo("Notificame webhook: ⚠️ Duplicata de CONTEÚDO (contact) detectada na janela de 60s. existingId={$recentDuplicate['id']}, existingExtId=" . ($recentDuplicate['external_id'] ?? 'NULL') . ", novoExtId=" . ($externalId ?? 'NULL') . ". Ignorando re-entrega.");
                 self::logInfo("========== Notificame Webhook FIM (Duplicata por conteúdo) ==========");
                 return;
             }

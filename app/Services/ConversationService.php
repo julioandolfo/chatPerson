@@ -2044,6 +2044,39 @@ class ConversationService
             }
         } elseif ($senderType === 'agent' && ($integrationAccountId || ($conversation['channel'] === 'whatsapp' && $whatsappAccountId))) {
             \App\Helpers\Logger::info("ConversationService::sendMessage - Condições para WhatsApp atendidas, processando envio");
+
+            // ✅ Anti-loop: se a MESMA mensagem outgoing foi enviada a este contato nos últimos 60s,
+            // NÃO reenvia ao provider — só registra como "duplicate_skipped". Caso real: conv 9403 em
+            // 2026-04-22, 40+ tentativas do mesmo template em 75s quando QuepasaAPI retornou 502.
+            if (!empty(trim($content ?? '')) && empty($attachmentsData)) {
+                try {
+                    $contentTrim = trim($content);
+                    $recentDuplicate = \App\Helpers\Database::fetch(
+                        "SELECT id, status FROM messages
+                         WHERE conversation_id = ?
+                         AND sender_type = 'agent'
+                         AND TRIM(content) = ?
+                         AND id <> ?
+                         AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                         ORDER BY id DESC
+                         LIMIT 1",
+                        [$conversationId, $contentTrim, $messageId ?? 0]
+                    );
+                    if ($recentDuplicate) {
+                        \App\Helpers\Logger::warning("ConversationService::sendMessage - ⚠️ Mensagem outgoing DUPLICADA na janela de 60s (conv={$conversationId}, existingId={$recentDuplicate['id']}). Pulando reenvio ao provider para evitar loop.");
+                        if (isset($messageId)) {
+                            \App\Models\Message::update($messageId, [
+                                'status' => 'sent',
+                                'error_message' => 'Eco/duplicata de mensagem enviada há pouco — envio ao provider pulado.'
+                            ]);
+                        }
+                        return $messageId; // sai sem chamar o provider
+                    }
+                } catch (\Exception $dedupEx) {
+                    \App\Helpers\Logger::warning("ConversationService::sendMessage - dedup outgoing falhou (seguindo adiante): " . $dedupEx->getMessage());
+                }
+            }
+
             try {
                 // Obter contato para pegar o telefone/identifier
                 $contact = \App\Models\Contact::find($conversation['contact_id']);

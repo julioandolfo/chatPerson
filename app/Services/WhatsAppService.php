@@ -3466,49 +3466,40 @@ class WhatsAppService
                     return;
                 }
                 
-                Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Criando mensagem OUTGOING: conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
-                
+                Logger::quepasa("processWebhook - ✅ Mensagem não duplicada. Gravando eco OUTGOING direto no DB (sem reenviar ao provider): conversation_id={$conversation['id']}, sender_type=agent, sender_id={$userId}");
+
+                // IMPORTANTE: eco de webhook = mensagem JÁ foi enviada pelo provider.
+                // Gravamos direto com Message::createMessage. Chamar ConversationService::sendMessage
+                // aqui faria o sistema tentar enviar DE NOVO ao provider (ver linha ConversationService
+                // linha 2045), gerando loop quando o provider está instável (HTTP 502) e re-entrega o
+                // webhook em retry. Caso real: conv 9403 em 2026-04-22, 40+ tentativas em 75s.
                 try {
-                    // ✅ CORREÇÃO: skipAutomations=true para NÃO disparar automações em eco de webhook
-                    $messageId = \App\Services\ConversationService::sendMessage(
-                        $conversation['id'],
-                        $message ?: '',
-                        'agent', // sender_type = agent (outgoing)
-                        $userId, // sender_id = usuário atual ou padrão
-                        $attachments,
-                        null,  // messageType
-                        null,  // quotedMessageId
-                        null,  // aiAgentId
-                        null,  // messageTimestamp
-                        true   // skipAutomations = true (eco de mensagem enviada via API/sistema)
-                    );
-                    
-                    Logger::quepasa("processWebhook - Mensagem OUTGOING criada com sucesso (automações PULADAS): messageId={$messageId}");
-                } catch (\Exception $e) {
-                    Logger::quepasa("Erro ao criar mensagem outgoing via ConversationService: " . $e->getMessage());
-                    // Fallback: criar mensagem diretamente
                     $messageData = [
-                        'conversation_id' => $conversation['id'],
-                        'sender_type' => 'agent',
-                        'sender_id' => $userId,
-                        'content' => $message ?: '',
-                        'message_type' => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
-                        'external_id' => $messageId,
+                        'conversation_id'   => $conversation['id'],
+                        'sender_type'       => 'agent',
+                        'sender_id'         => $userId,
+                        'content'           => $message ?: '',
+                        'message_type'      => !empty($attachments) ? ($attachments[0]['type'] ?? $messageType ?? 'text') : ($messageType ?? 'text'),
+                        'external_id'       => $webhookMsgId ?? null,
+                        'status'            => 'sent',
                         'quoted_message_id' => $quotedMessageId ?? null,
-                        'quoted_text' => $quotedMessageText ?? null,
-                        'quoted_sender_name' => $quotedSenderName ?? null
+                        'quoted_text'       => $quotedMessageText ?? null,
+                        'quoted_sender_name'=> $quotedSenderName ?? null,
                     ];
-                    
+
                     if ($location) {
                         $messageData['content'] = json_encode($location);
                         $messageData['message_type'] = 'location';
                     }
-                    
+
                     if (!empty($attachments)) {
                         $messageData['attachments'] = $attachments;
                     }
-                    
+
                     $messageId = \App\Models\Message::createMessage($messageData);
+                    Logger::quepasa("processWebhook - Eco OUTGOING gravado no DB: messageId={$messageId}, external_id=" . ($webhookMsgId ?? 'NULL'));
+                } catch (\Exception $e) {
+                    Logger::quepasa("processWebhook - ERRO ao gravar eco OUTGOING: " . $e->getMessage());
                 }
                 
                 Logger::quepasa("processWebhook - Mensagem ENVIADA processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");

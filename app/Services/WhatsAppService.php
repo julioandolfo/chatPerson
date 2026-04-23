@@ -2407,7 +2407,18 @@ class WhatsAppService
     public static function processWebhook(array $payload): void
     {
         \App\Helpers\Logger::info("═══ WhatsAppService::processWebhook INÍCIO ═══ Keys: " . implode(', ', array_keys($payload)));
-        
+
+        // ✅ GUARD: webhooks com edited=true não são mensagens novas — são edições/re-entregas
+        // de mensagens antigas (Quepasa pode re-emitir histórico quando reinicia ou sincroniza).
+        // Caso real 2026-04-23 10:42:32: 15+ vCards antigos re-entregues em um mesmo milissegundo,
+        // cada um gerou conversa nova e disparou a automação de boas-vindas (spam interno).
+        if (!empty($payload['edited'])) {
+            $editedId = $payload['id'] ?? ($payload['message']['id'] ?? 'unknown');
+            Logger::quepasa("processWebhook - ⏭️ IGNORANDO webhook com edited=true (re-entrega/edição de mensagem antiga): id={$editedId}, type=" . ($payload['type'] ?? 'N/A') . ", chat=" . ($payload['chat']['phone'] ?? 'N/A'));
+            \App\Helpers\Logger::info("WhatsAppService::processWebhook - Webhook ignorado por edited=true: id={$editedId}");
+            return;
+        }
+
         try {
             // Identificar conta pelo trackid, chatid, wid ou phone
             $trackid = $payload['trackid'] ?? null;

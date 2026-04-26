@@ -823,6 +823,7 @@ Router::post('/api/campaigns/{id}/continuous-mode', [CampaignController::class, 
 Router::get('/api/campaigns/{id}/stats', [CampaignController::class, 'stats'], ['Authentication']);
 Router::get('/api/campaigns/{id}/variant-stats', [CampaignController::class, 'variantStats'], ['Authentication']);
 Router::post('/api/campaigns/preview-ai-message', [CampaignController::class, 'previewAIMessage'], ['Authentication']);
+Router::post('/api/campaigns/preview-segment', [CampaignController::class, 'previewSegment'], ['Authentication']);
 Router::get('/api/contact-lists', [ContactListController::class, 'listAPI'], ['Authentication']);
 Router::get('/api/contact-lists/{id}/contacts', [ContactListController::class, 'contacts'], ['Authentication']);
 Router::get('/api/contacts/search', [ContactListController::class, 'searchContacts'], ['Authentication']);

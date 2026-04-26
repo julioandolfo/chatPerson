@@ -150,40 +150,144 @@ $pageTitle = 'Nova Campanha';
                                 <!-- Step 2: Público-Alvo -->
                                 <div data-kt-stepper-element="content">
                                     <div class="w-100">
-                                        <div class="mb-10">
-                                            <label class="form-label required">Selecione a Lista de Contatos</label>
-                                            <select class="form-select form-select-lg" name="contact_list_id" required>
-                                                <option value="">Selecione...</option>
-                                                <?php foreach ($lists as $list): ?>
-                                                <option value="<?php echo $list['id']; ?>">
-                                                    <?php echo htmlspecialchars($list['name']); ?> (<?php echo $list['total_contacts']; ?> contatos)
-                                                </option>
-                                                <?php endforeach; ?>
-                                            </select>
-                                            <div class="form-text">
-                                                <a href="/contact-lists/create" target="_blank">Criar nova lista</a> se necessário
-                                            </div>
-                                        </div>
 
-                                        <div class="separator separator-dashed my-5"></div>
+                                        <!-- Toggle: lista vs. segmento dinâmico -->
+                                        <ul class="nav nav-tabs nav-line-tabs nav-stretch fs-6 border-0 mb-7" id="target_tabs">
+                                            <li class="nav-item">
+                                                <a class="nav-link active" data-bs-toggle="tab" href="#target_list_tab" id="tab_list_btn">
+                                                    <i class="ki-duotone ki-people fs-4 me-2"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                                    Lista de Contatos
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link" data-bs-toggle="tab" href="#target_filter_tab" id="tab_filter_btn">
+                                                    <i class="ki-duotone ki-filter-search fs-4 me-2"><span class="path1"></span><span class="path2"></span></i>
+                                                    Segmento Dinâmico
+                                                    <span class="badge badge-light-primary fs-9 ms-2">Funis &amp; Etapas</span>
+                                                </a>
+                                            </li>
+                                        </ul>
 
-                                        <div class="d-flex align-items-start gap-4 p-5 bg-light-primary rounded border border-dashed border-primary">
-                                            <div class="form-check form-switch mt-1">
-                                                <input class="form-check-input" type="checkbox" id="continuous_mode" name="continuous_mode" value="1">
-                                            </div>
-                                            <div>
-                                                <label class="fw-bold text-gray-800 cursor-pointer" for="continuous_mode">
-                                                    <i class="ki-duotone ki-arrows-circle fs-4 text-primary me-1">
-                                                        <span class="path1"></span><span class="path2"></span>
-                                                    </i>
-                                                    Modo Contínuo
-                                                </label>
-                                                <div class="text-gray-600 fs-7 mt-1">
-                                                    A campanha <strong>não encerra</strong> quando todos os contatos forem enviados.
-                                                    A cada ciclo do scheduler, ela verifica se há <strong>novos contatos</strong> na lista (adicionados via sincronização diária) e os inclui automaticamente.
-                                                    Ideal para listas alimentadas por fontes externas (Google Maps, etc.).
+                                        <input type="hidden" name="target_type" id="target_type_hidden" value="list" />
+
+                                        <div class="tab-content">
+
+                                            <!-- TAB 1: Lista estática (comportamento atual) -->
+                                            <div class="tab-pane fade show active" id="target_list_tab" role="tabpanel">
+                                                <div class="mb-10">
+                                                    <label class="form-label required">Selecione a Lista de Contatos</label>
+                                                    <select class="form-select form-select-lg" name="contact_list_id" id="contact_list_id_select">
+                                                        <option value="">Selecione...</option>
+                                                        <?php foreach ($lists as $list): ?>
+                                                        <option value="<?php echo $list['id']; ?>">
+                                                            <?php echo htmlspecialchars($list['name']); ?> (<?php echo $list['total_contacts']; ?> contatos)
+                                                        </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <div class="form-text">
+                                                        <a href="/contact-lists/create" target="_blank">Criar nova lista</a> se necessário
+                                                    </div>
+                                                </div>
+
+                                                <div class="separator separator-dashed my-5"></div>
+
+                                                <div class="d-flex align-items-start gap-4 p-5 bg-light-primary rounded border border-dashed border-primary">
+                                                    <div class="form-check form-switch mt-1">
+                                                        <input class="form-check-input" type="checkbox" id="continuous_mode" name="continuous_mode" value="1">
+                                                    </div>
+                                                    <div>
+                                                        <label class="fw-bold text-gray-800 cursor-pointer" for="continuous_mode">
+                                                            <i class="ki-duotone ki-arrows-circle fs-4 text-primary me-1">
+                                                                <span class="path1"></span><span class="path2"></span>
+                                                            </i>
+                                                            Modo Contínuo
+                                                        </label>
+                                                        <div class="text-gray-600 fs-7 mt-1">
+                                                            A campanha <strong>não encerra</strong> quando todos os contatos forem enviados.
+                                                            A cada ciclo do scheduler, ela verifica se há <strong>novos contatos</strong> na lista (adicionados via sincronização diária) e os inclui automaticamente.
+                                                            Ideal para listas alimentadas por fontes externas (Google Maps, etc.).
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
+
+                                            <!-- TAB 2: Segmento dinâmico por funis/etapas -->
+                                            <div class="tab-pane fade" id="target_filter_tab" role="tabpanel">
+
+                                                <div class="alert alert-info d-flex align-items-start mb-7">
+                                                    <i class="ki-duotone ki-information-5 fs-2x me-3 mt-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                                                    <div>
+                                                        <div class="fw-bold mb-1">Segmento dinâmico por histórico de funis</div>
+                                                        <div class="fs-7">
+                                                            Construa o público-alvo combinando regras: leads que <strong>passaram</strong> por etapas X
+                                                            e <strong>não passaram</strong> por etapas Y, com filtros de data, tags e canais.
+                                                            O sistema resolve as regras no momento de iniciar a campanha.
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Lógica entre regras -->
+                                                <div class="mb-5">
+                                                    <label class="form-label">Combinar regras com</label>
+                                                    <div class="btn-group" role="group">
+                                                        <input type="radio" class="btn-check" name="seg_logic" id="seg_logic_and" value="AND" checked>
+                                                        <label class="btn btn-sm btn-outline btn-outline-primary" for="seg_logic_and">E (todas as regras)</label>
+                                                        <input type="radio" class="btn-check" name="seg_logic" id="seg_logic_or" value="OR">
+                                                        <label class="btn btn-sm btn-outline btn-outline-primary" for="seg_logic_or">OU (qualquer regra)</label>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Botões para adicionar regras -->
+                                                <div class="d-flex flex-wrap gap-2 mb-5">
+                                                    <button type="button" class="btn btn-sm btn-light-success" data-seg-add="passed_through">
+                                                        <i class="ki-duotone ki-check-circle fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                        Passou pela etapa
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-light-danger" data-seg-add="not_passed_through">
+                                                        <i class="ki-duotone ki-cross-circle fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                        NÃO passou pela etapa
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-light-primary" data-seg-add="currently_in_stage">
+                                                        <i class="ki-duotone ki-pin fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                        Está atualmente na etapa
+                                                    </button>
+                                                    <button type="button" class="btn btn-sm btn-light-info" data-seg-add="created_between">
+                                                        <i class="ki-duotone ki-calendar fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                        Criado em período
+                                                    </button>
+                                                </div>
+
+                                                <!-- Lista de regras -->
+                                                <div id="seg_rules_list" class="mb-5"></div>
+
+                                                <div id="seg_rules_empty" class="text-center text-muted p-7 border border-dashed rounded">
+                                                    <i class="ki-duotone ki-filter fs-3x text-muted mb-3"><span class="path1"></span><span class="path2"></span></i>
+                                                    <div class="fs-6">Nenhuma regra adicionada. Use os botões acima.</div>
+                                                </div>
+
+                                                <!-- Preview de alcance -->
+                                                <div class="separator separator-dashed my-5"></div>
+
+                                                <div class="d-flex align-items-center justify-content-between mb-3">
+                                                    <div>
+                                                        <div class="fw-bold">Alcance estimado</div>
+                                                        <div class="text-muted fs-7">Calcule quantos contatos casam com as regras antes de criar a campanha</div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-primary btn-sm" id="seg_preview_btn">
+                                                        <i class="ki-duotone ki-magnifier fs-4 me-1"><span class="path1"></span><span class="path2"></span></i>
+                                                        Calcular alcance
+                                                    </button>
+                                                </div>
+
+                                                <div id="seg_preview_result" class="d-none p-5 bg-light-success rounded">
+                                                    <div class="fs-2 fw-bold text-success mb-2"><span id="seg_preview_total">0</span> contato(s)</div>
+                                                    <div class="text-muted fs-7 mb-3">Amostra dos primeiros encontrados:</div>
+                                                    <div id="seg_preview_sample" class="d-flex flex-wrap gap-2"></div>
+                                                </div>
+
+                                                <div id="seg_preview_error" class="d-none alert alert-warning mt-3"></div>
+                                            </div>
+
                                         </div>
                                     </div>
                                 </div>
@@ -1428,7 +1532,15 @@ function updateReviewSummary() {
                     <strong>Nome:</strong> ${formData.get('name')}
                 </div>
                 <div class="mb-3">
-                    <strong>Lista:</strong> ${document.querySelector('[name="contact_list_id"] option:checked')?.text || 'Não selecionada'}
+                    <strong>Público-alvo:</strong> ${(() => {
+                        const t = document.getElementById('target_type_hidden')?.value || 'list';
+                        if (t === 'filter') {
+                            const cfg = SegBuilder.toFilterConfig();
+                            const n = cfg.rules.length;
+                            return `<span class="badge badge-light-primary">Segmento dinâmico</span> ${n} regra(s) — lógica ${cfg.logic}`;
+                        }
+                        return document.querySelector('[name="contact_list_id"] option:checked')?.text || 'Não selecionada';
+                    })()}
                 </div>
                 <div class="mb-3">
                     <strong>Contas WhatsApp:</strong> ${accounts.length} selecionada(s)
@@ -1503,14 +1615,326 @@ function updateReviewSummary() {
     document.getElementById('review-summary').innerHTML = html;
 }
 
+// =====================================================
+// SEGMENT BUILDER (target_type=filter)
+// =====================================================
+const SegBuilder = (function() {
+    let rules = [];
+    let nextId = 1;
+
+    function el(html) {
+        const div = document.createElement('div');
+        div.innerHTML = html.trim();
+        return div.firstElementChild;
+    }
+
+    function ruleTitleFor(type) {
+        return ({
+            'passed_through': 'Passou pela etapa',
+            'not_passed_through': 'NÃO passou pela etapa',
+            'currently_in_stage': 'Está atualmente na etapa',
+            'created_between': 'Contato criado em período',
+        })[type] || type;
+    }
+
+    function ruleBadgeFor(type) {
+        return ({
+            'passed_through': 'badge-light-success',
+            'not_passed_through': 'badge-light-danger',
+            'currently_in_stage': 'badge-light-primary',
+            'created_between': 'badge-light-info',
+        })[type] || 'badge-light';
+    }
+
+    function funnelOptions() {
+        let html = '<option value="">Qualquer funil</option>';
+        funnelsData.forEach(f => {
+            html += `<option value="${f.id}">${f.name}</option>`;
+        });
+        return html;
+    }
+
+    function stageOptionsForFunnel(funnelId) {
+        if (!funnelId) {
+            // Lista todas as etapas de todos os funis
+            const opts = [];
+            funnelsData.forEach(f => {
+                (f.stages || []).forEach(s => {
+                    opts.push(`<option value="${s.id}">${f.name} → ${s.name}</option>`);
+                });
+            });
+            return opts.join('');
+        }
+        const funnel = funnelsData.find(f => String(f.id) === String(funnelId));
+        if (!funnel || !funnel.stages) return '';
+        return funnel.stages.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    }
+
+    function renderStageRule(rule) {
+        const stagesHtml = stageOptionsForFunnel(rule.funnel_id);
+        return `
+            <div class="row g-3 mb-3">
+                <div class="col-md-5">
+                    <label class="form-label fs-8 text-muted">Funil (opcional)</label>
+                    <select class="form-select form-select-sm seg-funnel-select" data-rule-id="${rule._id}">
+                        ${funnelOptions()}
+                    </select>
+                </div>
+                <div class="col-md-7">
+                    <label class="form-label fs-8 text-muted">Etapas (uma ou mais)</label>
+                    <select class="form-select form-select-sm seg-stages-select" data-rule-id="${rule._id}" multiple size="4">
+                        ${stagesHtml}
+                    </select>
+                </div>
+            </div>
+            ${rule.type !== 'currently_in_stage' ? `
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fs-8 text-muted">A partir de</label>
+                    <input type="date" class="form-control form-control-sm seg-since" data-rule-id="${rule._id}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fs-8 text-muted">Até</label>
+                    <input type="date" class="form-control form-control-sm seg-until" data-rule-id="${rule._id}">
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input seg-anyof" data-rule-id="${rule._id}" type="checkbox" checked>
+                        <label class="form-check-label fs-8">Qualquer das etapas (OU)</label>
+                    </div>
+                </div>
+            </div>` : ''}
+        `;
+    }
+
+    function renderDateRule(rule) {
+        return `
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fs-8 text-muted">A partir de</label>
+                    <input type="date" class="form-control form-control-sm seg-since" data-rule-id="${rule._id}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fs-8 text-muted">Até</label>
+                    <input type="date" class="form-control form-control-sm seg-until" data-rule-id="${rule._id}">
+                </div>
+            </div>
+        `;
+    }
+
+    function renderRule(rule) {
+        const body = (rule.type === 'created_between') ? renderDateRule(rule) : renderStageRule(rule);
+        return el(`
+            <div class="card mb-3 seg-rule-card" data-rule-id="${rule._id}">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3">
+                        <span class="badge ${ruleBadgeFor(rule.type)} fs-7 fw-bold">
+                            <i class="ki-duotone ki-${rule.type === 'not_passed_through' ? 'cross-circle' : (rule.type === 'currently_in_stage' ? 'pin' : (rule.type === 'created_between' ? 'calendar' : 'check-circle'))} fs-5 me-1"><span class="path1"></span><span class="path2"></span></i>
+                            ${ruleTitleFor(rule.type)}
+                        </span>
+                        <button type="button" class="btn btn-sm btn-icon btn-light-danger" data-seg-remove="${rule._id}" title="Remover regra">
+                            <i class="ki-duotone ki-trash fs-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                        </button>
+                    </div>
+                    ${body}
+                </div>
+            </div>
+        `);
+    }
+
+    function refreshEmptyState() {
+        document.getElementById('seg_rules_empty').style.display = rules.length === 0 ? '' : 'none';
+    }
+
+    function addRule(type) {
+        const rule = { _id: nextId++, type, funnel_id: '', stage_ids: [], any_of: true, since: '', until: '' };
+        rules.push(rule);
+        const card = renderRule(rule);
+        document.getElementById('seg_rules_list').appendChild(card);
+        refreshEmptyState();
+    }
+
+    function removeRule(id) {
+        rules = rules.filter(r => String(r._id) !== String(id));
+        const card = document.querySelector(`.seg-rule-card[data-rule-id="${id}"]`);
+        if (card) card.remove();
+        refreshEmptyState();
+    }
+
+    function syncRuleFromDom(id) {
+        const rule = rules.find(r => String(r._id) === String(id));
+        if (!rule) return;
+        const root = document.querySelector(`.seg-rule-card[data-rule-id="${id}"]`);
+        if (!root) return;
+
+        const funnelSel = root.querySelector('.seg-funnel-select');
+        const stagesSel = root.querySelector('.seg-stages-select');
+        const anyOf = root.querySelector('.seg-anyof');
+        const since = root.querySelector('.seg-since');
+        const until = root.querySelector('.seg-until');
+
+        if (funnelSel) rule.funnel_id = funnelSel.value || '';
+        if (stagesSel) {
+            rule.stage_ids = Array.from(stagesSel.selectedOptions).map(o => parseInt(o.value, 10)).filter(Boolean);
+        }
+        if (anyOf) rule.any_of = anyOf.checked;
+        if (since) rule.since = since.value || '';
+        if (until) rule.until = until.value || '';
+    }
+
+    function reloadStagesForRule(id) {
+        const rule = rules.find(r => String(r._id) === String(id));
+        if (!rule) return;
+        const root = document.querySelector(`.seg-rule-card[data-rule-id="${id}"]`);
+        if (!root) return;
+        const funnelSel = root.querySelector('.seg-funnel-select');
+        const stagesSel = root.querySelector('.seg-stages-select');
+        if (!funnelSel || !stagesSel) return;
+        rule.funnel_id = funnelSel.value || '';
+        stagesSel.innerHTML = stageOptionsForFunnel(rule.funnel_id);
+        rule.stage_ids = [];
+    }
+
+    // Listeners delegados
+    document.addEventListener('click', function(e) {
+        const addBtn = e.target.closest('[data-seg-add]');
+        if (addBtn) {
+            addRule(addBtn.dataset.segAdd);
+            return;
+        }
+        const rmBtn = e.target.closest('[data-seg-remove]');
+        if (rmBtn) {
+            removeRule(rmBtn.dataset.segRemove);
+            return;
+        }
+    });
+
+    document.addEventListener('change', function(e) {
+        const id = e.target.dataset?.ruleId;
+        if (!id) return;
+        if (e.target.classList.contains('seg-funnel-select')) {
+            reloadStagesForRule(id);
+        } else {
+            syncRuleFromDom(id);
+        }
+    });
+
+    // Tab switch
+    document.addEventListener('DOMContentLoaded', function() {
+        const tabList = document.getElementById('tab_list_btn');
+        const tabFilter = document.getElementById('tab_filter_btn');
+        const hidden = document.getElementById('target_type_hidden');
+        const contactSel = document.getElementById('contact_list_id_select');
+
+        if (tabList) tabList.addEventListener('shown.bs.tab', () => {
+            hidden.value = 'list';
+            if (contactSel) contactSel.setAttribute('required', 'required');
+        });
+        if (tabFilter) tabFilter.addEventListener('shown.bs.tab', () => {
+            hidden.value = 'filter';
+            if (contactSel) contactSel.removeAttribute('required');
+        });
+    });
+
+    // Botão preview
+    document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('seg_preview_btn');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+            const config = SegBuilder.toFilterConfig();
+            if (!config.rules.length) {
+                toastr.warning('Adicione ao menos uma regra primeiro');
+                return;
+            }
+            btn.setAttribute('data-kt-indicator', 'on');
+            btn.disabled = true;
+            const errBox = document.getElementById('seg_preview_error');
+            const okBox = document.getElementById('seg_preview_result');
+            errBox.classList.add('d-none');
+            okBox.classList.add('d-none');
+
+            fetch('/api/campaigns/preview-segment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                body: JSON.stringify({ filter_config: config, sample_size: 10 })
+            })
+            .then(r => r.json())
+            .then(result => {
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+                if (!result.success) {
+                    errBox.textContent = result.error || 'Erro ao calcular alcance';
+                    errBox.classList.remove('d-none');
+                    return;
+                }
+                document.getElementById('seg_preview_total').textContent = result.total.toLocaleString('pt-BR');
+                const sampleEl = document.getElementById('seg_preview_sample');
+                sampleEl.innerHTML = '';
+                (result.sample || []).forEach(s => {
+                    const chip = document.createElement('span');
+                    chip.className = 'badge badge-light-primary';
+                    chip.textContent = (s.name || 'Sem nome') + ' · ' + (s.phone || s.email || '—');
+                    sampleEl.appendChild(chip);
+                });
+                if (!result.sample || result.sample.length === 0) {
+                    sampleEl.innerHTML = '<span class="text-muted fs-7">Nenhum contato encontrado</span>';
+                }
+                okBox.classList.remove('d-none');
+            })
+            .catch(err => {
+                btn.removeAttribute('data-kt-indicator');
+                btn.disabled = false;
+                errBox.textContent = 'Erro de conexão: ' + err.message;
+                errBox.classList.remove('d-none');
+            });
+        });
+    });
+
+    return {
+        toFilterConfig() {
+            // Sincronizar todos os DOM antes de serializar
+            rules.forEach(r => syncRuleFromDom(r._id));
+            const logicEl = document.querySelector('input[name="seg_logic"]:checked');
+            const logic = logicEl ? logicEl.value : 'AND';
+
+            const cleanRules = rules.map(r => {
+                const out = { type: r.type };
+                if (['passed_through', 'not_passed_through', 'currently_in_stage'].includes(r.type)) {
+                    if (r.funnel_id) out.funnel_id = parseInt(r.funnel_id, 10);
+                    out.stage_ids = (r.stage_ids || []).map(x => parseInt(x, 10)).filter(Boolean);
+                    if (r.type !== 'currently_in_stage') {
+                        out.any_of = r.any_of !== false;
+                        if (r.since) out.since = r.since;
+                        if (r.until) out.until = r.until;
+                    }
+                } else if (r.type === 'created_between') {
+                    if (r.since) out.since = r.since;
+                    if (r.until) out.until = r.until;
+                }
+                return out;
+            }).filter(r => {
+                if (['passed_through', 'not_passed_through', 'currently_in_stage'].includes(r.type)) {
+                    return r.stage_ids && r.stage_ids.length > 0;
+                }
+                if (r.type === 'created_between') return r.since || r.until;
+                return false;
+            });
+
+            return { logic, rules: cleanRules };
+        },
+        getRulesCount() { return rules.length; },
+        isActive() { return document.getElementById('target_type_hidden').value === 'filter'; }
+    };
+})();
+
 function submitCampaign() {
     const btn = document.querySelector('[data-kt-stepper-action="submit"]');
     btn.setAttribute('data-kt-indicator', 'on');
     btn.disabled = true;
-    
+
     const formData = new FormData(document.getElementById('campaign_form'));
     const data = {};
-    
+
     formData.forEach((value, key) => {
         if (key.includes('[]')) {
             const arrayKey = key.replace('[]', '');
@@ -1520,10 +1944,25 @@ function submitCampaign() {
             data[key] = value;
         }
     });
-    
+
     data.channel = 'whatsapp';
     data.continuous_mode = document.getElementById('continuous_mode')?.checked ? '1' : '0';
-    data.target_type = 'list';
+
+    // Target: lista vs. segmento dinâmico
+    const targetType = document.getElementById('target_type_hidden')?.value || 'list';
+    data.target_type = targetType;
+
+    if (targetType === 'filter') {
+        const filterConfig = SegBuilder.toFilterConfig();
+        if (!filterConfig.rules.length) {
+            btn.removeAttribute('data-kt-indicator');
+            btn.disabled = false;
+            toastr.error('Segmento dinâmico requer ao menos uma regra preenchida (com etapas selecionadas)');
+            return;
+        }
+        data.filter_config = filterConfig;
+        data.contact_list_id = '';
+    }
 
     // Template Notificame: coletar parâmetros
     if (data.use_template === '1' && data.template_name) {

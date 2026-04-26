@@ -12,6 +12,7 @@ use App\Models\CampaignMessage;
 use App\Models\CampaignVariant;
 use App\Models\Tag;
 use App\Services\CampaignNotificationService;
+use App\Services\ContactSegmentationService;
 use App\Helpers\Validator;
 use App\Helpers\Logger;
 
@@ -55,8 +56,17 @@ class CampaignService
         }
 
         // Validar target (lista ou filtro)
-        if ($data['target_type'] === 'list' && empty($data['contact_list_id'])) {
+        $targetType = $data['target_type'] ?? 'list';
+        if ($targetType === 'list' && empty($data['contact_list_id'])) {
             throw new \InvalidArgumentException('É necessário selecionar uma lista');
+        }
+        if ($targetType === 'filter') {
+            $rules = $data['filter_config']['rules'] ?? null;
+            if (!is_array($rules) || empty($rules)) {
+                throw new \InvalidArgumentException('Segmento dinâmico requer ao menos uma regra de filtro');
+            }
+            // Não exige contact_list_id quando é filtro
+            $data['contact_list_id'] = null;
         }
 
         // Serializar arrays para JSON
@@ -306,11 +316,30 @@ class CampaignService
             if (empty($campaign['contact_list_id'])) {
                 throw new \Exception('Lista de contatos não definida');
             }
-            
+
             $contacts = ContactList::getContacts($campaign['contact_list_id']);
         } elseif ($campaign['target_type'] === 'filter') {
-            // TODO: Implementar filtros dinâmicos
-            throw new \Exception('Filtros dinâmicos ainda não implementados');
+            $filterConfig = $campaign['filter_config'] ?? null;
+            if (is_string($filterConfig)) {
+                $filterConfig = json_decode($filterConfig, true) ?: [];
+            }
+            if (!is_array($filterConfig) || empty($filterConfig['rules'])) {
+                throw new \Exception('Segmento dinâmico sem regras configuradas');
+            }
+
+            $contactIds = ContactSegmentationService::resolve($filterConfig);
+            if (!empty($contactIds)) {
+                // Recupera contatos completos preservando o formato esperado
+                // (mesmas colunas que ContactList::getContacts retorna +
+                // custom_variables/added_at vazios para compatibilidade)
+                $placeholders = implode(',', array_fill(0, count($contactIds), '?'));
+                $contacts = \App\Helpers\Database::fetchAll(
+                    "SELECT c.*, NULL AS custom_variables, NOW() AS added_at
+                     FROM contacts c
+                     WHERE c.id IN ({$placeholders})",
+                    $contactIds
+                );
+            }
         }
 
         if (empty($contacts)) {

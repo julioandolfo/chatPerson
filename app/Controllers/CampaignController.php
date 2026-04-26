@@ -1343,4 +1343,54 @@ class CampaignController
             ], 500);
         }
     }
+
+    /**
+     * Preview de segmentação dinâmica
+     *
+     * Recebe um filter_config (JSON) e devolve {total, sample}
+     * para a UI confirmar quantos contatos serão alvo da campanha
+     * antes de salvar.
+     */
+    public function previewSegment(): void
+    {
+        Permission::abortIfCannot('campaigns.create');
+
+        try {
+            $data = Request::all();
+            $filterConfig = $data['filter_config'] ?? [];
+
+            if (is_string($filterConfig)) {
+                $decoded = json_decode($filterConfig, true);
+                $filterConfig = is_array($decoded) ? $decoded : [];
+            }
+
+            if (!is_array($filterConfig) || empty($filterConfig['rules'])) {
+                Response::json([
+                    'success' => false,
+                    'error' => 'Adicione ao menos uma regra para pré-visualizar o segmento'
+                ], 400);
+                return;
+            }
+
+            $sampleSize = (int)($data['sample_size'] ?? 10);
+            $sampleSize = max(0, min(50, $sampleSize));
+
+            $preview = \App\Services\ContactSegmentationService::preview($filterConfig, $sampleSize);
+
+            Response::json([
+                'success' => true,
+                'total' => $preview['total'],
+                'sample' => $preview['sample'],
+            ]);
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::error(
+                "CampaignController::previewSegment - Erro: " . $e->getMessage()
+                . " | File: " . $e->getFile() . ":" . $e->getLine()
+            );
+            Response::json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 }

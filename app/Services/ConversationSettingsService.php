@@ -640,31 +640,61 @@ class ConversationSettingsService
         
         // ✅ PRIORIDADE 2: Se não tem agente do contato, usar distribuição configurada
         $settings = self::getSettings();
-        
+
         if (!$settings['distribution']['enable_auto_assignment']) {
+            \App\Helpers\Logger::aiAgent("autoAssign: distribuição automática DESABILITADA", [
+                'conversation_id' => $conversationId,
+                'department_id' => $departmentId,
+                'funnel_id' => $funnelId,
+                'stage_id' => $stageId,
+            ]);
             return null;
         }
-        
+
         $method = $settings['distribution']['method'];
         $includeAI = $settings['distribution']['assign_to_ai_agent'] ?? false;
-        
+
         switch ($method) {
             case 'round_robin':
-                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                $result = self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                break;
             case 'by_load':
-                return self::assignByLoad($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                $result = self::assignByLoad($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                break;
             case 'by_pending_response':
                 // Distribuição por respostas pendentes - NÃO verifica disponibilidade online
-                return self::assignByPendingResponse($departmentId, $funnelId, $stageId, $includeAI, true, $excludeAgentId);
+                $result = self::assignByPendingResponse($departmentId, $funnelId, $stageId, $includeAI, true, $excludeAgentId);
+                break;
             case 'by_specialty':
-                return self::assignBySpecialty($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
+                $result = self::assignBySpecialty($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
+                break;
             case 'by_performance':
-                return self::assignByPerformance($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                $result = self::assignByPerformance($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                break;
             case 'percentage':
-                return self::assignByPercentage($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
+                $result = self::assignByPercentage($departmentId, $funnelId, $stageId, $includeAI, $excludeAgentId);
+                break;
             default:
-                return self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                $result = self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, true, true, $excludeAgentId);
+                break;
         }
+
+        \App\Helpers\Logger::aiAgent("autoAssign: método aplicado", [
+            'conversation_id' => $conversationId,
+            'method' => $method,
+            'include_ai' => $includeAI,
+            'department_id' => $departmentId,
+            'funnel_id' => $funnelId,
+            'stage_id' => $stageId,
+            'exclude_agent_id' => $excludeAgentId,
+            'result' => $result === null
+                ? 'NONE'
+                : ($result < 0
+                    ? ('AI agent #' . abs($result))
+                    : ('HUMAN agent #' . $result)),
+        ]);
+
+        return $result;
     }
 
     /**

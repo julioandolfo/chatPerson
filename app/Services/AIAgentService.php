@@ -320,9 +320,17 @@ class AIAgentService
      */
     public static function processConversation(int $conversationId, int $agentId): void
     {
+        \App\Helpers\Logger::aiAgent("processConversation iniciado", [
+            'conversation_id' => $conversationId,
+            'agent_id' => $agentId,
+        ]);
+
         try {
             $conversation = \App\Models\Conversation::findWithRelations($conversationId);
             if (!$conversation) {
+                \App\Helpers\Logger::aiAgent("processConversation ABORTADO — conversa não encontrada", [
+                    'conversation_id' => $conversationId,
+                ]);
                 throw new \Exception('Conversa não encontrada');
             }
 
@@ -335,16 +343,27 @@ class AIAgentService
             if (!empty($contactMessages)) {
                 // Processar última mensagem do contato
                 $lastMessage = end($contactMessages);
+                \App\Helpers\Logger::aiAgent("processConversation: processando última mensagem do contato", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'message_id' => $lastMessage['id'] ?? null,
+                    'message_preview' => mb_substr((string)($lastMessage['content'] ?? ''), 0, 200),
+                    'total_contact_messages' => count($contactMessages),
+                ]);
                 self::processMessage($conversationId, $agentId, $lastMessage['content']);
             } else {
                 // Se não há mensagens, enviar mensagem de boas-vindas se configurado
                 $agent = AIAgent::find($agentId);
                 if ($agent && !empty($agent['settings'])) {
-                    $settings = is_string($agent['settings']) 
-                        ? json_decode($agent['settings'], true) 
+                    $settings = is_string($agent['settings'])
+                        ? json_decode($agent['settings'], true)
                         : $agent['settings'];
-                    
+
                     if (isset($settings['welcome_message']) && !empty($settings['welcome_message'])) {
+                        \App\Helpers\Logger::aiAgent("processConversation: enviando welcome_message", [
+                            'conversation_id' => $conversationId,
+                            'agent_id' => $agentId,
+                        ]);
                         \App\Services\ConversationService::sendMessage(
                             $conversationId,
                             $settings['welcome_message'],
@@ -352,11 +371,22 @@ class AIAgentService
                             null,
                             []
                         );
+                    } else {
+                        \App\Helpers\Logger::aiAgent("processConversation: sem mensagens do contato e sem welcome_message — nada a fazer", [
+                            'conversation_id' => $conversationId,
+                            'agent_id' => $agentId,
+                        ]);
                     }
                 }
             }
         } catch (\Exception $e) {
             error_log("Erro ao processar conversa com agente de IA: " . $e->getMessage());
+            \App\Helpers\Logger::aiAgent("processConversation FALHOU", [
+                'conversation_id' => $conversationId,
+                'agent_id' => $agentId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+            ]);
             throw $e;
         }
     }
@@ -421,7 +451,18 @@ class AIAgentService
             if ($minDelay > 0 && $maxDelay >= $minDelay) {
                 $delay = rand($minDelay, $maxDelay);
                 \App\Helpers\ConversationDebug::log($conversationId, 'delay', "Delay humanizado: {$delay}s (min: {$minDelay}, max: {$maxDelay})");
+                \App\Helpers\Logger::aiAgent("Delay humanizado iniciado", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'delay_seconds' => $delay,
+                    'range' => [$minDelay, $maxDelay],
+                ]);
                 sleep($delay);
+                \App\Helpers\Logger::aiAgent("Delay humanizado concluído — enviando resposta", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'delay_seconds' => $delay,
+                ]);
             }
 
             // ✅ NOVO: Verificar se cliente pediu áudio explicitamente

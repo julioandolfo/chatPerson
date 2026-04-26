@@ -90,6 +90,24 @@ class Logger
     }
 
     /**
+     * Log específico para orquestração do agente de IA
+     * (roteamento, seleção de agente, prompt, tokens, decisões de delay/escalação)
+     *
+     * Use para registrar tudo que acontece em uma conversa que envolve IA,
+     * separadamente da execução de tools (que vai em ai_tools.log).
+     *
+     * @param string $message Mensagem principal
+     * @param array  $context Dados estruturados (serão anexados como JSON)
+     */
+    public static function aiAgent(string $message, array $context = []): void
+    {
+        $contextStr = !empty($context)
+            ? ' | ' . json_encode($context, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            : '';
+        self::log("[AI_AGENT] {$message}{$contextStr}", 'ai_agent.log');
+    }
+
+    /**
      * Log específico para Meta (Instagram + WhatsApp)
      */
     public static function meta(string $level, string $message, array $context = []): void

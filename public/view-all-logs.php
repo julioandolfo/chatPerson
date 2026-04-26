@@ -733,6 +733,7 @@ $logFileMap = [
     'auto_close' => __DIR__ . '/../logs/auto_close.log',
     'templates' => __DIR__ . '/../logs/app.log',
     'ai_tools' => __DIR__ . '/../logs/ai_tools.log',
+    'ai_agent' => __DIR__ . '/../logs/ai_agent.log',
     'ai_debug' => __DIR__ . '/../logs/conversation-debug.log',
     'campaigns' => __DIR__ . '/../logs/campaigns.log',
 ];
@@ -1228,6 +1229,7 @@ function colorizeLog($log) {
             <a href="?tab=auto_close" class="tab <?= $activeTab === 'auto_close' ? 'active' : '' ?>" style="<?= $activeTab === 'auto_close' ? '' : 'border-color:#f44747;color:#f48771;' ?>">⏰ Auto Close</a>
             <a href="?tab=templates" class="tab <?= $activeTab === 'templates' ? 'active' : '' ?>" style="<?= $activeTab === 'templates' ? '' : 'border-color:#25D366;color:#25D366;' ?>">📋 Templates WhatsApp</a>
             <a href="?tab=ai_tools" class="tab <?= $activeTab === 'ai_tools' ? 'active' : '' ?>" style="<?= $activeTab === 'ai_tools' ? '' : 'border-color:#a855f7;color:#c084fc;' ?>">🧠 AI Tools</a>
+            <a href="?tab=ai_agent" class="tab <?= $activeTab === 'ai_agent' ? 'active' : '' ?>" style="<?= $activeTab === 'ai_agent' ? '' : 'border-color:#ec4899;color:#f472b6;' ?>">🤖 AI Agent</a>
             <a href="?tab=ai_debug" class="tab <?= $activeTab === 'ai_debug' ? 'active' : '' ?>" style="<?= $activeTab === 'ai_debug' ? '' : 'border-color:#06b6d4;color:#22d3ee;' ?>">🔬 AI Debug Conversa</a>
             <a href="?tab=campaigns" class="tab <?= $activeTab === 'campaigns' ? 'active' : '' ?>" style="<?= $activeTab === 'campaigns' ? '' : 'border-color:#f59e0b;color:#fbbf24;' ?>">📢 Campanhas</a>
         </div>

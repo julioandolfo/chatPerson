@@ -187,6 +187,23 @@ class OpenAIService
             // Construir mensagens do histórico (passando tools para incluir no prompt)
             $messages = self::buildMessages($agent, $message, $context, $toolDescriptions, array_keys($toolTypesAttached));
 
+            // ── Log estruturado do prompt montado ──
+            $systemMsg = $messages[0]['content'] ?? '';
+            $systemPromptLen = is_string($systemMsg) ? strlen($systemMsg) : 0;
+            $approxTokens = (int)round($systemPromptLen / 4); // estimativa rápida (~4 chars/token)
+            \App\Helpers\Logger::aiAgent("Prompt montado para OpenAI", [
+                'conversation_id' => $conversationId,
+                'agent_id' => $agentId,
+                'agent_name' => $agent['name'] ?? null,
+                'model' => $agent['model'] ?? 'gpt-4',
+                'messages_count' => count($messages),
+                'system_prompt_len_chars' => $systemPromptLen,
+                'system_prompt_approx_tokens' => $approxTokens,
+                'tools_attached' => array_keys($toolTypesAttached),
+                'tools_total' => count($functions),
+                'system_prompt_preview' => is_string($systemMsg) ? mb_substr($systemMsg, 0, 1500) : '[non-string]',
+            ]);
+
             // Preparar payload
             $payload = [
                 'model' => $agent['model'] ?? 'gpt-4',
@@ -267,12 +284,17 @@ class OpenAIService
                 // Se há resposta direta, usar sem reenviar para OpenAI
                 if ($directResponse !== null) {
                     $content = $directResponse;
+                    Logger::aiAgent("Tool retornou raw_response (sem 2ª chamada OpenAI)", [
+                        'conversation_id' => $conversationId,
+                        'agent_id' => $agentId,
+                        'response_preview' => mb_substr((string)$directResponse, 0, 300),
+                    ]);
                     // Não contabilizar tokens adicionais da OpenAI
                 } else {
                     // Fluxo normal: reenviar para OpenAI com resultados
                 // Adicionar mensagem do assistente com tool calls
                 $messages[] = $assistantMessage;
-                
+
                 // Adicionar resultados das tools
                 foreach ($functionResults as $result) {
                     $messages[] = [
@@ -284,16 +306,26 @@ class OpenAIService
 
                 // Reenviar para OpenAI com resultados
                 $payload['messages'] = $messages;
+                $secondCallStart = microtime(true);
                 $response = self::makeRequest($apiKey, $payload);
-                
+                $secondCallMs = (int)round((microtime(true) - $secondCallStart) * 1000);
+
                 $assistantMessage = $response['choices'][0]['message'] ?? null;
                 $content = $assistantMessage['content'] ?? '';
-                
+
                 // Adicionar tokens adicionais
                 $usage = $response['usage'] ?? [];
                 $tokensUsed += $usage['total_tokens'] ?? 0;
                 $tokensPrompt += $usage['prompt_tokens'] ?? 0;
                 $tokensCompletion += $usage['completion_tokens'] ?? 0;
+
+                Logger::aiAgent("2ª chamada OpenAI (após tools) concluída", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'duration_ms' => $secondCallMs,
+                    'additional_tokens' => $usage['total_tokens'] ?? 0,
+                    'response_preview' => is_string($content) ? mb_substr($content, 0, 300) : '[non-string]',
+                ]);
                 }
             }
 
@@ -306,6 +338,32 @@ class OpenAIService
 
             // Registrar ou atualizar log de conversa
             $executionTime = (microtime(true) - $startTime) * 1000; // ms
+
+            // ── Log de tokens, custo e duração ──
+            Logger::aiTools(sprintf(
+                "[TOKENS] conv=%d agent=%d model=%s prompt=%d completion=%d total=%d cost=$%.6f time=%dms tool_calls=%d",
+                $conversationId,
+                $agentId,
+                $agent['model'] ?? 'gpt-4',
+                $tokensPrompt,
+                $tokensCompletion,
+                $tokensUsed,
+                $cost,
+                (int)$executionTime,
+                !empty($toolCalls) ? count($toolCalls) : 0
+            ));
+            Logger::aiAgent("Resposta da OpenAI processada", [
+                'conversation_id' => $conversationId,
+                'agent_id' => $agentId,
+                'model' => $agent['model'] ?? 'gpt-4',
+                'tokens_prompt' => $tokensPrompt,
+                'tokens_completion' => $tokensCompletion,
+                'tokens_total' => $tokensUsed,
+                'cost_usd' => $cost,
+                'execution_time_ms' => (int)$executionTime,
+                'tool_calls_count' => !empty($toolCalls) ? count($toolCalls) : 0,
+                'response_preview' => is_string($content) ? mb_substr($content, 0, 300) : '[non-string]',
+            ]);
             
             $aiConversation = AIConversation::whereFirst('conversation_id', '=', $conversationId);
             if ($aiConversation) {
@@ -362,19 +420,30 @@ class OpenAIService
             try {
                 $lastMessage = Message::whereFirst('conversation_id', '=', $conversationId);
                 $messageId = $lastMessage['id'] ?? null;
-                
+
                 if ($messageId && \App\Helpers\PostgreSQL::isAvailable()) {
-                    FeedbackDetectionService::detectAndRegister(
+                    $feedbackResult = FeedbackDetectionService::detectAndRegister(
                         $agentId,
                         $conversationId,
                         $messageId,
                         $message,
                         $content
                     );
+                    Logger::aiAgent("Detecção automática de feedback executada", [
+                        'conversation_id' => $conversationId,
+                        'agent_id' => $agentId,
+                        'message_id' => $messageId,
+                        'result' => is_array($feedbackResult) ? $feedbackResult : ($feedbackResult ? 'detected' : 'no_feedback'),
+                    ]);
                 }
             } catch (\Exception $feedbackError) {
                 // Não interromper fluxo se detecção de feedback falhar
                 Logger::warning("OpenAIService::processMessage - Erro ao detectar feedback: " . $feedbackError->getMessage());
+                Logger::aiAgent("Detecção de feedback FALHOU", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'error' => $feedbackError->getMessage(),
+                ]);
             }
 
             // Extrair e salvar memórias automaticamente
@@ -402,12 +471,26 @@ class OpenAIService
 
                     if ($baselineTrigger || $signalTrigger || $toolTrigger) {
                         \App\Helpers\Logger::aiTools("[MEMORY] conv={$conversationId} extract trigger: baseline=" . ($baselineTrigger ? '1' : '0') . " signal=" . ($signalTrigger ? '1' : '0') . " tool=" . ($toolTrigger ? '1' : '0'));
+                        Logger::aiAgent("Extração de memórias acionada", [
+                            'conversation_id' => $conversationId,
+                            'agent_id' => $agentId,
+                            'message_count' => $messageCount,
+                            'trigger_baseline' => $baselineTrigger,
+                            'trigger_signal' => $signalTrigger,
+                            'trigger_tool' => $toolTrigger,
+                            'executed_tools' => $executedToolNames,
+                        ]);
                         AgentMemoryService::extractAndSave($agentId, $conversationId);
                     }
                 }
             } catch (\Exception $memoryError) {
                 // Não interromper fluxo se extração de memória falhar
                 Logger::warning("OpenAIService::processMessage - Erro ao extrair memórias: " . $memoryError->getMessage());
+                Logger::aiAgent("Extração de memórias FALHOU", [
+                    'conversation_id' => $conversationId,
+                    'agent_id' => $agentId,
+                    'error' => $memoryError->getMessage(),
+                ]);
             }
 
             return [
@@ -425,6 +508,14 @@ class OpenAIService
             error_log($errorMsg);
             Logger::aiTools("[PROCESS ERROR] {$errorMsg}");
             Logger::error($errorMsg);
+            Logger::aiAgent("processMessage FALHOU", [
+                'conversation_id' => $conversationId,
+                'agent_id' => $agentId,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'elapsed_ms' => $elapsed,
+                'trace_preview' => substr($e->getTraceAsString(), 0, 800),
+            ]);
             \App\Helpers\ConversationDebug::error($conversationId, 'OpenAI::processMessage', $e->getMessage(), [
                 'trace' => substr($e->getTraceAsString(), 0, 1000),
                 'elapsed_ms' => $elapsed
@@ -1207,12 +1298,27 @@ PROMPT;
                 'elapsed_ms' => $classElapsed
             ]);
 
+            \App\Helpers\Logger::aiAgent("Classificação de intent concluída", [
+                'conversation_id' => $conversationId,
+                'message_preview' => mb_substr($message, 0, 120),
+                'classification' => $answer,
+                'needs_tools' => $needsTools,
+                'elapsed_ms' => $classElapsed,
+                'tools_offered' => count($toolDescriptions),
+            ]);
+
             return $needsTools;
 
         } catch (\Exception $e) {
             $classElapsed = round((microtime(true) - $classStart) * 1000);
             \App\Helpers\Logger::aiTools("[CLASSIFY ERROR] conv={$conversationId} ({$classElapsed}ms): " . $e->getMessage());
             \App\Helpers\Logger::warning("classifyToolIntent falhou, liberando tools por segurança: " . $e->getMessage());
+            \App\Helpers\Logger::aiAgent("Classificação de intent FALHOU — liberando tools por segurança", [
+                'conversation_id' => $conversationId,
+                'message_preview' => mb_substr($message, 0, 120),
+                'error' => $e->getMessage(),
+                'elapsed_ms' => $classElapsed,
+            ]);
             return true;
         }
     }

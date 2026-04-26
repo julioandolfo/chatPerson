@@ -650,9 +650,26 @@ class ConversationService
                     }
                 } catch (\Exception $e) {
                     error_log("Erro ao atribuir automaticamente: " . $e->getMessage());
+                    Logger::aiAgent("Erro na atribuição automática", [
+                        'contact_id' => $data['contact_id'] ?? null,
+                        'channel' => $data['channel'] ?? null,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
         }
+
+        // Log da decisão de roteamento (IA vs humano vs nenhum)
+        Logger::aiAgent("Roteamento de nova conversa", [
+            'contact_id' => $data['contact_id'] ?? null,
+            'channel' => $data['channel'] ?? null,
+            'department_id' => $data['department_id'] ?? null,
+            'funnel_id' => $data['funnel_id'] ?? null,
+            'stage_id' => $data['stage_id'] ?? null,
+            'decision' => $aiAgentId ? 'AI' : ($agentId ? 'HUMAN' : 'UNASSIGNED'),
+            'ai_agent_id' => $aiAgentId,
+            'human_agent_id' => $agentId,
+        ]);
         
         // NOTA: NÃO definir "agente do contato" aqui na criação da conversa.
         // O agente do contato só é definido quando a conversa for atribuída via assignToAgent()

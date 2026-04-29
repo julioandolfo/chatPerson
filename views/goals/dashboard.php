@@ -17,7 +17,7 @@ ob_start();
             <div class="card-body d-flex flex-column justify-content-between">
                 <div class="d-flex flex-column mb-7">
                     <span class="text-gray-600 fw-bold fs-6">Total de Metas</span>
-                    <span class="text-gray-800 fw-bolder fs-2x"><?= $summary['total_goals'] ?></span>
+                    <span class="text-gray-800 fw-bolder fs-2x"><?= $summary['total_goals'] ?? 0 ?></span>
                 </div>
                 <div class="m-0">
                     <i class="bi bi-flag-fill text-primary fs-3x"></i>
@@ -59,7 +59,7 @@ ob_start();
             <div class="card-body d-flex flex-column justify-content-between">
                 <div class="d-flex flex-column mb-7">
                     <span class="text-gray-600 fw-bold fs-6">Em Risco</span>
-                    <span class="text-danger fw-bolder fs-2x"><?= $summary['at_risk'] ?></span>
+                    <span class="text-danger fw-bolder fs-2x"><?= $summary['em_risco'] ?? 0 ?></span>
                 </div>
                 <div class="m-0">
                     <i class="bi bi-exclamation-triangle-fill text-danger fs-3x"></i>

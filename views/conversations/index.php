@@ -1017,6 +1017,28 @@ body.dark-mode .set-as-submenu,
     white-space: nowrap;
 }
 
+.conversation-item.awaiting-reply:not(.inactivity-alert) {
+    border-left: 3px solid rgba(245, 158, 11, 0.55);
+}
+
+.conversation-item.awaiting-reply:not(.inactivity-alert):hover {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.conversation-item.awaiting-reply:not(.inactivity-alert).active {
+    border-left: 3px solid rgba(245, 158, 11, 0.85);
+}
+
+.conversation-item .awaiting-reply-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(245, 158, 11, 0.15);
+    color: #d97706;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
 .conv-autoclose-bar {
     position: absolute;
     bottom: 0;
@@ -3422,8 +3444,11 @@ function getChannelInfo(channel) {
                     $lastContactAt = $conv['last_contact_message_at'] ?? '';
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
                     $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
+                    $awaitingReply = ($conv['status'] ?? 'open') === 'open'
+                        && !empty($lastContactAt)
+                        && (empty($lastAgentAt) || strtotime($lastContactAt) > strtotime($lastAgentAt));
                     ?>
-                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= !empty($conv['inactivity_alert_at']) ? 'inactivity-alert' : '' ?>" 
+                    <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= !empty($conv['inactivity_alert_at']) ? 'inactivity-alert' : '' ?> <?= $awaitingReply ? 'awaiting-reply' : '' ?>"
                          data-conversation-id="<?= $conv['id'] ?>"
                          data-inactivity-alert="<?= !empty($conv['inactivity_alert_at']) ? htmlspecialchars($conv['inactivity_alert_at']) : '' ?>"
                          data-status="<?= htmlspecialchars($conv['status'] ?? 'open') ?>"
@@ -3468,6 +3493,8 @@ function getChannelInfo(channel) {
                                                             $alertDays = max(1, (int)((time() - strtotime($conv['inactivity_alert_at'])) / 86400));
                                                             ?>
                                                             <span class="inactivity-alert-badge" title="Conversa inativa - agente não respondeu">Inativo</span>
+                                                        <?php elseif ($awaitingReply): ?>
+                                                            <span class="awaiting-reply-badge" title="Aguardando resposta do agente">Aguardando</span>
                                                         <?php endif; ?>
                                                         <?php
                                                         $nameRaw = $conv['contact_name'] ?? 'Sem nome';
@@ -8522,6 +8549,42 @@ function applySlaVisualState(conversationItem, conv) {
     return;
 }
 
+// Aplicar/remover indicador "Aguardando resposta" (cliente falou e ninguém respondeu)
+function applyAwaitingReplyState(conversationItem, conv) {
+    if (!conversationItem) return;
+    const status = conv.status || conversationItem.dataset.status || 'open';
+    const lastContact = conv.last_contact_message_at || conversationItem.dataset.lastContactMessageAt || '';
+    const lastAgent = conv.last_agent_message_at || conversationItem.dataset.lastAgentMessageAt || '';
+    const hasInactivityAlert = conversationItem.classList.contains('inactivity-alert');
+    const awaiting = status === 'open'
+        && !!lastContact
+        && (!lastAgent || (Date.parse(lastContact) || 0) > (Date.parse(lastAgent) || 0));
+
+    conversationItem.classList.toggle('awaiting-reply', awaiting);
+
+    // Badge fica em .conversation-item-name; aparece apenas quando NÃO há badge "Inativo"
+    const nameEl = conversationItem.querySelector('.conversation-item-name');
+    if (!nameEl) return;
+    let badge = nameEl.querySelector('.awaiting-reply-badge');
+    const shouldShowBadge = awaiting && !hasInactivityAlert;
+    if (shouldShowBadge) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'awaiting-reply-badge';
+            badge.title = 'Aguardando resposta do agente';
+            badge.textContent = 'Aguardando';
+            // Inserir antes do texto do nome (mesma posição usada pelos outros badges)
+            const inactivityBadge = nameEl.querySelector('.inactivity-alert-badge');
+            const refNode = inactivityBadge
+                ? inactivityBadge.nextSibling
+                : nameEl.firstChild;
+            nameEl.insertBefore(badge, refNode);
+        }
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
 function sortConversationList() {
     try {
         const list = document.querySelector('.conversations-list-items');
@@ -8639,6 +8702,9 @@ function applyConversationUpdate(conv) {
 
     // Atualizar estado visual de SLA (borda verde quando última msg é do agente)
     applySlaVisualState(conversationItem, conv);
+
+    // Atualizar indicador "Aguardando resposta"
+    applyAwaitingReplyState(conversationItem, conv);
 
     // ⚠️ IMPORTANTE: Respeitar conversas marcadas manualmente como não lidas
     const isManuallyMarkedAsUnread = window.manuallyMarkedAsUnread && window.manuallyMarkedAsUnread.has(conv.id);
@@ -20613,7 +20679,10 @@ function refreshConversationBadges() {
                     }
                     // Reaplicar estado visual de SLA (borda verde quando última msg é do agente)
                     applySlaVisualState(conversationItem, conv);
-                    
+
+                    // Atualizar indicador "Aguardando resposta"
+                    applyAwaitingReplyState(conversationItem, conv);
+
                     // Atualizar meta e resortear
                     updateConversationMeta(conversationItem, conv);
                     // Garantir dropdown de açÁes após updates
@@ -23145,9 +23214,15 @@ function renderConversationItemHtml(conv, selectedConversationId) {
 
     const hasInactivityAlert = conv.inactivity_alert_at && conv.inactivity_alert_at !== '';
     const inactivityBadge = hasInactivityAlert ? '<span class="inactivity-alert-badge" title="Conversa inativa - agente não respondeu">Inativo</span>' : '';
+    const awaitingReply = (conv.status || 'open') === 'open'
+        && !!lastContactAt
+        && (!lastAgentAt || (Date.parse(lastContactAt) || 0) > (Date.parse(lastAgentAt) || 0));
+    const awaitingBadge = (!hasInactivityAlert && awaitingReply)
+        ? '<span class="awaiting-reply-badge" title="Aguardando resposta do agente">Aguardando</span>'
+        : '';
 
     return `
-        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''} ${hasInactivityAlert ? 'inactivity-alert' : ''}" 
+        <div class="conversation-item ${isActive ? 'active' : ''} ${pinned ? 'pinned' : ''} ${hasInactivityAlert ? 'inactivity-alert' : ''} ${awaitingReply ? 'awaiting-reply' : ''}"
              data-conversation-id="${conv.id}"
              data-inactivity-alert="${escapeHtml(conv.inactivity_alert_at || '')}"
              data-status="${escapeHtml(conv.status || 'open')}"
@@ -23169,6 +23244,7 @@ function renderConversationItemHtml(conv, selectedConversationId) {
                             ${pinned ? '<i class="ki-duotone ki-pin fs-7 text-warning" title="Fixada"><span class="path1"></span><span class="path2"></span></i>' : ''}
                             ${conv.is_spam ? '<span class="badge badge-sm badge-danger" title="Marcada como spam">SPAM</span>' : ''}
                             ${inactivityBadge}
+                            ${awaitingBadge}
                             ${escapeHtml(name)}
                         </div>
                         <div class="conversation-item-time d-flex align-items-center gap-2">

@@ -79,7 +79,7 @@ class Conversation extends Model
             $params[] = $filters['channel'];
         }
         
-        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+        $sql .= " ORDER BY COALESCE(c.pinned, 0) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         
         return Database::fetchAll($sql, $params);
     }
@@ -480,14 +480,14 @@ class Conversation extends Model
             $orderDir = !empty($filters['order_dir']) && strtoupper($filters['order_dir']) === 'ASC' ? 'ASC' : 'DESC';
             
             if ($orderBy === 'pinned') {
-                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
             } elseif ($orderBy === 'last_message') {
-                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, last_message_at {$orderDir}, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, last_message_at {$orderDir}, c.id DESC";
             } else {
-                $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.{$orderBy} {$orderDir}, c.id DESC";
+                $sql .= " ORDER BY c.pinned DESC, c.{$orderBy} {$orderDir}, c.id DESC";
             }
         } else {
-            $sql .= " ORDER BY c.pinned DESC, (c.inactivity_alert_at IS NOT NULL) DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
+            $sql .= " ORDER BY c.pinned DESC, c.pinned_at DESC, last_message_at DESC, c.updated_at DESC, c.id DESC";
         }
         
         // Paginação

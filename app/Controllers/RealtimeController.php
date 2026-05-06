@@ -172,7 +172,14 @@ class RealtimeController
                             
                             // Determinar type baseado em message_type
                             $messageType = $msg['message_type'] ?? 'text';
-                            $type = ($messageType === 'note') ? 'note' : 'message';
+                            if ($messageType === 'note') {
+                                $type = 'note';
+                            } elseif ($messageType === 'system' || $senderType === 'system') {
+                                // Logs de automação / eventos do sistema
+                                $type = 'system';
+                            } else {
+                                $type = 'message';
+                            }
                             
                             // Log para debug
                             \App\Helpers\Logger::info("📨 Polling: Nova mensagem - convId={$convId}, msgId={$msg['id']}, sender_type={$senderType}, direction={$direction}", 'conversas.log');

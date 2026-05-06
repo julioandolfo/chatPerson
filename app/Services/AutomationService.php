@@ -52,6 +52,33 @@ class AutomationService
         $line = '[' . date('Y-m-d H:i:s') . "] {$message}\n";
         @file_put_contents($logFile, $line, FILE_APPEND);
     }
+
+    /**
+     * Inserir um log da automação na própria conversa (mensagem de sistema).
+     * Aparece no histórico da conversa para depuração de fluxos sem precisar
+     * abrir o arquivo de log do servidor.
+     *
+     * Sempre seguro: nunca lança exceção (não pode quebrar a execução do fluxo).
+     */
+    public static function logToConversation(int $conversationId, string $message): void
+    {
+        if ($conversationId <= 0 || $message === '') {
+            return;
+        }
+        try {
+            \App\Models\Message::create([
+                'conversation_id' => $conversationId,
+                'sender_id'       => null,
+                'sender_type'     => 'system',
+                'content'         => '🤖 ' . $message,
+                'message_type'    => 'system',
+                'status'          => 'sent',
+            ]);
+        } catch (\Throwable $e) {
+            // Nunca propagar - log na conversa é best-effort
+            \App\Helpers\Logger::automation("logToConversation - falha ao gravar: " . $e->getMessage());
+        }
+    }
     /**
      * Criar automação
      */
@@ -994,10 +1021,21 @@ class AutomationService
     private static function executeNode(array $node, int $conversationId, array $allNodes, ?int $executionId = null): void
     {
         \App\Helpers\Logger::automation("  → executeNode: ID {$node['id']}, Tipo: {$node['node_type']}");
-        
+
+        // Log na própria conversa (uma linha por nó executado, para depuração visual do fluxo)
+        $nodeTypeLabel = self::nodeTypeLabel($node['node_type'] ?? 'desconhecido');
+        self::logToConversation(
+            $conversationId,
+            "Executando nó: {$nodeTypeLabel} (ID {$node['id']}, tipo {$node['node_type']})."
+        );
+
         // Checar se automação permaneceu ativa durante o fluxo
         if (self::$currentAutomationId && !self::isAutomationActive(self::$currentAutomationId)) {
             \App\Helpers\Logger::automation("  ⚠️ Automação " . self::$currentAutomationId . " está inativa. Encerrando fluxo.");
+            self::logToConversation(
+                $conversationId,
+                "⚠️ Automação " . self::$currentAutomationId . " ficou inativa durante o fluxo — execução encerrada."
+            );
             if ($executionId) {
                 \App\Models\AutomationExecution::updateStatus($executionId, 'cancelled', 'automation_inactive');
             }
@@ -1005,7 +1043,7 @@ class AutomationService
         }
 
         $nodeData = $node['node_data'] ?? [];
-        
+
         // Atualizar log com nó atual
         if ($executionId) {
             \App\Models\AutomationExecution::updateStatus($executionId, 'running', null, $node['id']);
@@ -1094,11 +1132,42 @@ class AutomationService
                     self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
                 } else {
                     \App\Helpers\Logger::automation("    ❌ ERRO: Nó {$connection['target_node_id']} não encontrado na lista de nós da automação!");
+                    self::logToConversation(
+                        $conversationId,
+                        "❌ Nó {$node['id']} ({$node['node_type']}) tinha conexão para o nó {$connection['target_node_id']}, mas ele não foi encontrado na automação."
+                    );
                 }
             }
         } else {
             \App\Helpers\Logger::automation("  ⏹️ Nó {$node['id']} ({$node['node_type']}) não tem conexões - fim deste ramo do fluxo");
+            self::logToConversation(
+                $conversationId,
+                "Nó {$nodeTypeLabel} (ID {$node['id']}) não tem conexões de saída — fim deste ramo do fluxo."
+            );
         }
+    }
+
+    /**
+     * Tradução curta do tipo do nó para logs visíveis na conversa.
+     */
+    private static function nodeTypeLabel(string $nodeType): string
+    {
+        $map = [
+            'trigger'                  => 'Gatilho',
+            'action_send_message'      => 'Enviar mensagem',
+            'action_assign_agent'      => 'Atribuir agente',
+            'action_assign_advanced'   => 'Atribuição avançada',
+            'action_assign_ai_agent'   => 'Atribuir agente de IA',
+            'action_move_stage'        => 'Mover de etapa',
+            'action_set_tag'           => 'Definir tag',
+            'action_close_conversation'=> 'Encerrar conversa',
+            'action_chatbot'           => 'Chatbot',
+            'keyword_router'           => 'Roteador de palavras-chave',
+            'condition'                => 'Condição',
+            'condition_business_hours' => 'Horário de atendimento',
+            'delay'                    => 'Delay',
+        ];
+        return $map[$nodeType] ?? $nodeType;
     }
 
     /**
@@ -1516,6 +1585,7 @@ class AutomationService
     private static function executeAssignAIAgent(array $nodeData, int $conversationId, ?int $executionId = null): bool
     {
         \App\Helpers\Logger::automation("executeAssignAIAgent - INÍCIO. Conversa {$conversationId}");
+        self::logToConversation($conversationId, "Atribuir IA: iniciando execução do nó.");
 
         // Dados do form
         $aiAgentId         = !empty($nodeData['ai_agent_id']) ? (int)$nodeData['ai_agent_id'] : null;
@@ -1544,11 +1614,25 @@ class AutomationService
                 if ($first) {
                     $aiAgentId = (int)$first;
                     \App\Helpers\Logger::automation("executeAssignAIAgent - usando primeiro agente disponível ID {$aiAgentId}");
+                    self::logToConversation($conversationId, "Atribuir IA: nenhum agente fixo no nó — usando primeiro disponível (ID {$aiAgentId}).");
                 } else {
                     \App\Helpers\Logger::automation("executeAssignAIAgent - Nenhum agente de IA disponível.");
+                    self::logToConversation(
+                        $conversationId,
+                        "Atribuir IA: ❌ nenhum agente de IA disponível para atribuir. Nó não foi aplicado."
+                    );
                     return false;
                 }
             }
+
+            $aiAgentName = null;
+            try {
+                $aiAgent = \App\Models\AIAgent::find($aiAgentId);
+                $aiAgentName = $aiAgent['name'] ?? null;
+            } catch (\Throwable $e) {
+                // ignorar
+            }
+            $agentLabel = $aiAgentName ? "\"{$aiAgentName}\" (ID {$aiAgentId})" : "ID {$aiAgentId}";
 
             // Atribuir IA à conversa
             \App\Services\ConversationAIService::addAIAgent($conversationId, [
@@ -1559,6 +1643,13 @@ class AutomationService
             ]);
 
             \App\Helpers\Logger::automation("executeAssignAIAgent - IA atribuída com sucesso (ID {$aiAgentId}).");
+            self::logToConversation(
+                $conversationId,
+                "Atribuir IA: agente {$agentLabel} atribuído com sucesso. "
+                . "process_immediately=" . ($processImmediately ? 'sim' : 'não')
+                . ", assume_conversation=" . ($assumeConversation ? 'sim' : 'não')
+                . ", only_if_unassigned=" . ($onlyIfUnassigned ? 'sim' : 'não') . "."
+            );
 
             // Atualizar metadata para ramificação por intent
             $conversation = Conversation::find($conversationId);
@@ -1581,9 +1672,38 @@ class AutomationService
             ]);
 
             \App\Helpers\Logger::automation("executeAssignAIAgent - Metadata atualizada (branching " . ($aiBranchingEnabled ? 'ON' : 'OFF') . ").");
+
+            if ($aiBranchingEnabled) {
+                $intentNames = [];
+                if (is_array($aiIntents)) {
+                    foreach ($aiIntents as $intent) {
+                        if (is_array($intent) && !empty($intent['name'])) {
+                            $intentNames[] = $intent['name'];
+                        } elseif (is_string($intent) && $intent !== '') {
+                            $intentNames[] = $intent;
+                        }
+                    }
+                }
+                $intentsText = empty($intentNames) ? '(nenhum)' : implode(', ', $intentNames);
+                self::logToConversation(
+                    $conversationId,
+                    "Atribuir IA: ramificação por intent ATIVA (intents: {$intentsText}, max_interações={$aiMaxInteractions}). "
+                    . "Fluxo da automação PAUSADO aguardando detecção de intent."
+                );
+            } else {
+                self::logToConversation(
+                    $conversationId,
+                    "Atribuir IA: ramificação por intent desativada — fluxo da automação seguirá para os próximos nós conectados."
+                );
+            }
+
             return (bool)$aiBranchingEnabled;
         } catch (\Exception $e) {
             \App\Helpers\Logger::automation("executeAssignAIAgent - ERRO: " . $e->getMessage());
+            self::logToConversation(
+                $conversationId,
+                "Atribuir IA: ❌ ERRO ao atribuir agente — " . $e->getMessage()
+            );
             throw $e;
         }
     }
@@ -3057,17 +3177,37 @@ class AutomationService
                 WHERE conversation_id = ? AND sender_type = 'contact'
                 ORDER BY created_at DESC LIMIT 1";
         $lastMsg = \App\Helpers\Database::fetch($sql, [$conversationId]);
-        $messageContent = strtolower(trim($lastMsg['content'] ?? ''));
+        $rawContent = $lastMsg['content'] ?? '';
+        $messageContent = strtolower(trim($rawContent));
 
         \App\Helpers\Logger::automation("  🔀 keyword_router - Mensagem: '{$messageContent}', Rotas: " . count($routes));
 
+        // Resumo das rotas configuradas para inserir como log de conversa
+        $routesSummary = [];
+        foreach ($routes as $idx => $route) {
+            $kws = trim((string)($route['keywords'] ?? ''));
+            $routesSummary[] = "rota_{$idx}=[{$kws}]";
+        }
+        $routesText = empty($routesSummary) ? '(sem rotas configuradas)' : implode(' | ', $routesSummary);
+        $previewMsg = $rawContent === '' ? '(vazia)' : mb_substr($rawContent, 0, 200);
+        self::logToConversation(
+            $conversationId,
+            "Roteador de palavras-chave: avaliando última mensagem do contato.\n"
+            . "Mensagem: \"{$previewMsg}\"\n"
+            . "Rotas configuradas: {$routesText}"
+        );
+
         $matchedConnectionType = 'fallback';
+        $matchedKeyword = null;
+        $matchedRouteIdx = null;
 
         foreach ($routes as $idx => $route) {
             $keywords = array_map('trim', explode(',', strtolower($route['keywords'] ?? '')));
             foreach ($keywords as $keyword) {
                 if ($keyword !== '' && stripos($messageContent, $keyword) !== false) {
                     $matchedConnectionType = 'route_' . $idx;
+                    $matchedKeyword = $keyword;
+                    $matchedRouteIdx = $idx;
                     \App\Helpers\Logger::automation("  🔀 keyword_router - Match na rota {$idx} (keyword: '{$keyword}')");
                     break 2;
                 }
@@ -3076,20 +3216,47 @@ class AutomationService
 
         if ($matchedConnectionType === 'fallback') {
             \App\Helpers\Logger::automation("  🔀 keyword_router - Nenhuma rota correspondeu, usando fallback");
+            self::logToConversation(
+                $conversationId,
+                "Roteador de palavras-chave: nenhuma keyword bateu → seguindo pela saída \"fallback\"."
+            );
+        } else {
+            self::logToConversation(
+                $conversationId,
+                "Roteador de palavras-chave: match na rota {$matchedRouteIdx} (keyword: \"{$matchedKeyword}\") → seguindo pela saída \"{$matchedConnectionType}\"."
+            );
         }
 
         // Seguir para o nó da rota correspondente
+        $followed = false;
         if (!empty($nodeData['connections'])) {
             foreach ($nodeData['connections'] as $connection) {
                 $connType = $connection['connection_type'] ?? null;
                 if ($connType === $matchedConnectionType) {
                     $nextNode = self::findNodeById($connection['target_node_id'], $allNodes);
                     if ($nextNode) {
+                        $followed = true;
+                        self::logToConversation(
+                            $conversationId,
+                            "Roteador de palavras-chave: avançando para o nó \"{$nextNode['node_type']}\" (ID {$nextNode['id']})."
+                        );
                         self::executeNode($nextNode, $conversationId, $allNodes, $executionId);
+                    } else {
+                        self::logToConversation(
+                            $conversationId,
+                            "Roteador de palavras-chave: conexão \"{$matchedConnectionType}\" aponta para o nó {$connection['target_node_id']}, mas ele não foi encontrado na automação."
+                        );
                     }
                     break;
                 }
             }
+        }
+
+        if (!$followed) {
+            self::logToConversation(
+                $conversationId,
+                "Roteador de palavras-chave: não há conexão configurada para a saída \"{$matchedConnectionType}\" — fluxo encerrado neste ponto."
+            );
         }
     }
 

@@ -2593,12 +2593,16 @@ class ConversationController
             // Adicionar campos type e direction para cada mensagem
             foreach ($messages as &$msg) {
                 // Determinar type baseado em message_type
-                if (($msg['message_type'] ?? 'text') === 'note') {
+                $messageType = $msg['message_type'] ?? 'text';
+                if ($messageType === 'note') {
                     $msg['type'] = 'note';
+                } elseif ($messageType === 'system' || ($msg['sender_type'] ?? '') === 'system') {
+                    // Mensagens de sistema (logs de automação, eventos automáticos)
+                    $msg['type'] = 'system';
                 } else {
                     $msg['type'] = 'message';
                 }
-                
+
                 // Determinar direction baseado em sender_type
                 // Mensagens de agentes são sempre outgoing (enviadas pelo sistema/agente)
                 // Mensagens de contatos são sempre incoming (recebidas)

@@ -667,31 +667,19 @@ class FunnelService
         $createdMetrics = \App\Helpers\Database::fetch($sql, [$stage['funnel_id'], $dateFrom, $dateTo]);
         
         // Conversas que passaram pelo estágio no período
+        // Subquery com as regras de qualificação (mín. mensagens / ignora últimas N).
+        // O alias da subquery é "response_times" e expõe avg_response_minutes
+        // (renomeada a partir de response_time_minutes).
+        $rtSub = \App\Services\SLAResponseTimeHelper::buildPerConversationAvgSubquery('response_times');
+
         // Tempo médio = tempo médio de resposta do agente às mensagens do cliente neste estágio
         $sql = "SELECT COUNT(DISTINCT c.id) as total,
                        COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved,
                        COUNT(DISTINCT CASE WHEN c.status = 'closed' THEN c.id END) as closed,
-                       AVG(response_times.avg_response_minutes) as avg_response_minutes
+                       AVG(response_times.response_time_minutes) as avg_response_minutes
                 FROM conversations c
-                LEFT JOIN (
-                    SELECT 
-                        m1.conversation_id,
-                        AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as avg_response_minutes
-                    FROM messages m1
-                    INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                        AND m2.sender_type = 'agent'
-                        AND m2.created_at > m1.created_at
-                        AND m2.created_at = (
-                            SELECT MIN(m3.created_at)
-                            FROM messages m3
-                            WHERE m3.conversation_id = m1.conversation_id
-                            AND m3.sender_type = 'agent'
-                            AND m3.created_at > m1.created_at
-                        )
-                    WHERE m1.sender_type = 'contact'
-                    GROUP BY m1.conversation_id
-                ) response_times ON response_times.conversation_id = c.id
-                WHERE c.funnel_stage_id = ? 
+                LEFT JOIN {$rtSub} ON response_times.conversation_id = c.id
+                WHERE c.funnel_stage_id = ?
                 AND (
                     (c.created_at >= ? AND c.created_at <= ?) OR
                     (c.updated_at >= ? AND c.updated_at <= ?) OR
@@ -730,32 +718,16 @@ class FunnelService
         ]);
         
         // Métricas de agentes no período - tempo médio de resposta
-        $sqlAgents = "SELECT 
+        // Reusa o mesmo subquery com regras (mín. mensagens / ignora últimas N).
+        $sqlAgents = "SELECT
                         c.agent_id,
                         u.name as agent_name,
                         COUNT(DISTINCT c.id) as conversations_count,
                         COUNT(DISTINCT CASE WHEN c.status = 'resolved' THEN c.id END) as resolved_count,
-                        AVG(response_times.avg_response_minutes) as avg_response_minutes
+                        AVG(response_times.response_time_minutes) as avg_response_minutes
                       FROM conversations c
                       LEFT JOIN users u ON u.id = c.agent_id
-                      LEFT JOIN (
-                          SELECT 
-                              m1.conversation_id,
-                              AVG(TIMESTAMPDIFF(MINUTE, m1.created_at, m2.created_at)) as avg_response_minutes
-                          FROM messages m1
-                          INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
-                              AND m2.sender_type = 'agent'
-                              AND m2.created_at > m1.created_at
-                              AND m2.created_at = (
-                                  SELECT MIN(m3.created_at)
-                                  FROM messages m3
-                                  WHERE m3.conversation_id = m1.conversation_id
-                                  AND m3.sender_type = 'agent'
-                                  AND m3.created_at > m1.created_at
-                              )
-                          WHERE m1.sender_type = 'contact'
-                          GROUP BY m1.conversation_id
-                      ) response_times ON response_times.conversation_id = c.id
+                      LEFT JOIN {$rtSub} ON response_times.conversation_id = c.id
                       WHERE c.funnel_stage_id = ?
                       AND (c.created_at >= ? OR c.updated_at >= ?)
                       AND (c.created_at <= ? OR c.updated_at <= ?)

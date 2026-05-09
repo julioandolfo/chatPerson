@@ -680,12 +680,12 @@ class DashboardService
             
             foreach ($conversations as $conv) {
                 $convId = (int)$conv['id'];
-                
+
                 // Verificar se cliente respondeu ao bot
                 if (!self::hasClientRespondedToBot($convId)) {
                     continue;
                 }
-                
+
                 // Buscar mensagens
                 $messages = \App\Helpers\Database::fetchAll(
                     "SELECT sender_type, created_at
@@ -694,23 +694,30 @@ class DashboardService
                      ORDER BY created_at ASC",
                     [$convId]
                 );
-                
+
+                // Regras de qualificação: mín. de mensagens trocadas e
+                // descartar as N mensagens finais (agradecimentos/despedidas).
+                $messages = SLAResponseTimeHelper::filterEligibleMessages($messages);
+                if (empty($messages)) {
+                    continue;
+                }
+
                 $lastAgentTime = null;
                 $pendingContactTime = null;
-                
+
                 foreach ($messages as $msg) {
                     if ($msg['sender_type'] === 'agent') {
                         if ($pendingContactTime) {
                             $start = new \DateTime($pendingContactTime);
                             $end = new \DateTime($msg['created_at']);
-                            
+
                             if ($useWorkingHours) {
                                 $minutes = self::calculateSLAMinutes($start, $end, true);
                                 $seconds = $minutes * 60;
                             } else {
                                 $seconds = $end->getTimestamp() - $start->getTimestamp();
                             }
-                            
+
                             if ($seconds > 0 && $seconds < 604800) {
                                 $totalSeconds += $seconds;
                                 $count++;
@@ -718,13 +725,13 @@ class DashboardService
                             $pendingContactTime = null;
                         }
                         $lastAgentTime = $msg['created_at'];
-                        
+
                     } elseif ($msg['sender_type'] === 'contact' && $lastAgentTime) {
                         // Verificar delay
                         $lastAgent = new \DateTime($lastAgentTime);
                         $contact = new \DateTime($msg['created_at']);
                         $diffMinutes = ($contact->getTimestamp() - $lastAgent->getTimestamp()) / 60;
-                        
+
                         if ($diffMinutes >= $delayMinutes && !$pendingContactTime) {
                             $pendingContactTime = $msg['created_at'];
                         }
@@ -1352,10 +1359,15 @@ class DashboardService
             }
 
             // CALCULAR SLA ONGOING
+            // Regras adicionais: só considera conversas com mín. de mensagens
+            // trocadas e descarta as N últimas (agradecimentos/despedidas).
+            // NÃO se aplica ao bloco de primeira resposta acima.
+            $eligibleMessages = SLAResponseTimeHelper::filterEligibleMessages($messages);
+
             $lastAgentMessage = null;
             $pendingContactMessage = null;
 
-            foreach ($messages as $msg) {
+            foreach ($eligibleMessages as $msg) {
                 if ($msg['sender_type'] === 'agent' && (int)$msg['sender_id'] === $agentId) {
                     // Agente respondeu
                     if ($pendingContactMessage) {

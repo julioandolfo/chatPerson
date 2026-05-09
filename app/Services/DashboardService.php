@@ -571,17 +571,28 @@ class DashboardService
         $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
         
         // Buscar conversas com primeira resposta
-        $sql = "SELECT 
+        // ⚠️ Importante: o "first_agent" precisa ser a primeira mensagem do
+        // agente APÓS a primeira mensagem do contato. Se uma automação envia
+        // saudação ANTES do contato falar, a antiga MIN(agent) caía antes do
+        // first_contact, gerava diferença negativa e a conversa era descartada
+        // pelo filtro "$seconds > 0" — o que zerava o card "Tempo 1ª Resposta".
+        $sql = "SELECT
                     c.id,
-                    (SELECT MIN(m1.created_at) FROM messages m1 
-                     WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact') as first_contact,
-                    (SELECT MIN(m2.created_at) FROM messages m2 
-                     WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent') as first_agent
+                    fc.first_contact,
+                    (SELECT MIN(m2.created_at) FROM messages m2
+                     WHERE m2.conversation_id = c.id
+                       AND m2.sender_type = 'agent'
+                       AND m2.created_at > fc.first_contact) AS first_agent
                 FROM conversations c
+                INNER JOIN (
+                    SELECT conversation_id, MIN(created_at) AS first_contact
+                    FROM messages
+                    WHERE sender_type = 'contact'
+                    GROUP BY conversation_id
+                ) fc ON fc.conversation_id = c.id
                 WHERE c.created_at >= ?
                 AND c.created_at <= ?
-                AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')
-                AND EXISTS (SELECT 1 FROM messages m4 WHERE m4.conversation_id = c.id AND m4.sender_type = 'contact')";
+                AND EXISTS (SELECT 1 FROM messages m3 WHERE m3.conversation_id = c.id AND m3.sender_type = 'agent')";
         
         $params = [$dateFrom, $dateTo];
         
@@ -759,18 +770,28 @@ class DashboardService
         $settings = ConversationSettingsService::getSettings();
         $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
         
-        $sql = "SELECT 
+        // first_human = primeira mensagem do agente humano APÓS a primeira
+        // mensagem do contato. Veja comentário em getAverageFirstResponseTime.
+        $sql = "SELECT
                     c.id,
-                    (SELECT MIN(m1.created_at) FROM messages m1 
-                     WHERE m1.conversation_id = c.id AND m1.sender_type = 'contact') as first_contact,
-                    (SELECT MIN(m2.created_at) FROM messages m2 
-                     WHERE m2.conversation_id = c.id AND m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL) as first_human
+                    fc.first_contact,
+                    (SELECT MIN(m2.created_at) FROM messages m2
+                     WHERE m2.conversation_id = c.id
+                       AND m2.sender_type = 'agent'
+                       AND m2.ai_agent_id IS NULL
+                       AND m2.created_at > fc.first_contact) AS first_human
                 FROM conversations c
+                INNER JOIN (
+                    SELECT conversation_id, MIN(created_at) AS first_contact
+                    FROM messages
+                    WHERE sender_type = 'contact'
+                    GROUP BY conversation_id
+                ) fc ON fc.conversation_id = c.id
                 WHERE c.created_at >= ?
                 AND c.created_at <= ?
                 AND EXISTS (
-                    SELECT 1 FROM messages m3 
-                    WHERE m3.conversation_id = c.id 
+                    SELECT 1 FROM messages m3
+                    WHERE m3.conversation_id = c.id
                     AND m3.sender_type = 'agent'
                     AND m3.ai_agent_id IS NULL
                 )";
@@ -2263,19 +2284,35 @@ class DashboardService
                 $messagesSent = (int)($messagesSentResult['total'] ?? 0);
                 
                 // 5. Tempo médio de resposta (em segundos)
-                // Calcula o tempo entre mensagem do cliente e resposta do agente
-                $sqlAvgResponseTime = "SELECT 
+                // Calcula o tempo entre mensagem do cliente e resposta do agente.
+                // Aplica as regras do SLA "ongoing":
+                //   - Conversa precisa ter no mínimo MIN_TOTAL_MESSAGES mensagens.
+                //   - As EXCLUDE_LAST_N mensagens cronológicas mais recentes são
+                //     ignoradas (agradecimentos/despedidas inflam a média).
+                $minTotal     = SLAResponseTimeHelper::MIN_TOTAL_MESSAGES;
+                $excludeLastN = SLAResponseTimeHelper::EXCLUDE_LAST_N;
+                $sqlAvgResponseTime = "SELECT
                         AVG(response_time_seconds) as avg_seconds,
                         COUNT(*) as response_count
                     FROM (
-                        SELECT 
+                        SELECT
                             TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                        FROM messages m1
-                        INNER JOIN messages m2 ON m2.conversation_id = m1.conversation_id
+                        FROM (
+                            SELECT id, conversation_id, sender_type, sender_id, ai_agent_id, created_at,
+                                   ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc,
+                                   COUNT(*)  OVER (PARTITION BY conversation_id) AS total_msgs
+                            FROM messages
+                        ) m1
+                        INNER JOIN (
+                            SELECT id, conversation_id, sender_type, sender_id, ai_agent_id, created_at,
+                                   ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc
+                            FROM messages
+                        ) m2 ON m2.conversation_id = m1.conversation_id
                             AND m2.sender_type = 'agent'
                             AND m2.sender_id = ?
                             AND m2.ai_agent_id IS NULL
                             AND m2.created_at > m1.created_at
+                            AND m2.rn_desc > {$excludeLastN}
                             AND m2.created_at = (
                                 SELECT MIN(m3.created_at)
                                 FROM messages m3
@@ -2288,6 +2325,8 @@ class DashboardService
                         WHERE m1.sender_type = 'contact'
                         AND m1.created_at >= ?
                         AND m1.created_at <= ?
+                        AND m1.total_msgs >= {$minTotal}
+                        AND m1.rn_desc > {$excludeLastN}
                         HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0 AND response_time_seconds < 86400
                     ) as response_times";
                 

@@ -2181,6 +2181,111 @@ class DashboardService
      * - Tempo médio de resposta
      * - Métricas adicionais de desempenho
      */
+    /**
+     * Calcula tempo médio de resposta corrente por agente humano usando a
+     * MESMA iteração do card "HUMANOS - Resposta Média"
+     * (getAverageResponseTimeHuman). A diferença é que aqui cada par
+     * contato↔agente é atribuído ao agente humano que efetivamente
+     * respondeu (m2.sender_id), em vez de virar uma média global.
+     *
+     * Garante que a coluna "Tempo Médio" da tabela "Desempenho de
+     * Atendimento" bate matematicamente com o card global, porque os
+     * pares somados são exatamente os mesmos.
+     *
+     * @return array<int, array{total_seconds: int|float, count: int}>
+     */
+    private static function computeOngoingResponseStatsPerAgent(string $dateFrom, string $dateTo): array
+    {
+        $settings        = ConversationSettingsService::getSettings();
+        $useWorkingHours = $settings['sla']['working_hours_enabled'] ?? false;
+        $delayEnabled    = $settings['sla']['message_delay_enabled'] ?? true;
+        $delayMinutes    = (int)($settings['sla']['message_delay_minutes'] ?? 1);
+        if (!$delayEnabled) {
+            $delayMinutes = 0;
+        }
+
+        // Mesma seleção de conversas que o card global: criadas no período
+        // e que tenham pelo menos uma mensagem de agente humano.
+        $sql = "SELECT DISTINCT c.id
+                FROM conversations c
+                WHERE c.created_at >= ?
+                AND c.created_at <= ?
+                AND EXISTS (
+                    SELECT 1 FROM messages m
+                    WHERE m.conversation_id = c.id
+                    AND m.sender_type = 'agent'
+                    AND m.ai_agent_id IS NULL
+                )
+                LIMIT 500";
+        $conversations = \App\Helpers\Database::fetchAll($sql, [$dateFrom, $dateTo]);
+
+        $agentStats = []; // [agentId => ['total_seconds' => float, 'count' => int]]
+
+        foreach ($conversations as $conv) {
+            $convId = (int)$conv['id'];
+
+            // Igual ao card global: ignora conversas em que o cliente nunca
+            // respondeu o bot.
+            if (!self::hasClientRespondedToBot($convId)) {
+                continue;
+            }
+
+            $messages = \App\Helpers\Database::fetchAll(
+                "SELECT sender_type, sender_id, ai_agent_id, created_at
+                 FROM messages
+                 WHERE conversation_id = ?
+                 ORDER BY created_at ASC",
+                [$convId]
+            );
+
+            // Regras de qualificação (mín. mensagens / ignora últimas N).
+            $messages = SLAResponseTimeHelper::filterEligibleMessages($messages);
+            if (empty($messages)) {
+                continue;
+            }
+
+            $lastHumanAgentTime = null;
+            $pendingContactTime = null;
+
+            foreach ($messages as $msg) {
+                if ($msg['sender_type'] === 'agent' && empty($msg['ai_agent_id'])) {
+                    if ($pendingContactTime) {
+                        $start = new \DateTime($pendingContactTime);
+                        $end   = new \DateTime($msg['created_at']);
+
+                        if ($useWorkingHours) {
+                            $minutes = self::calculateSLAMinutes($start, $end, true);
+                        } else {
+                            $minutes = ($end->getTimestamp() - $start->getTimestamp()) / 60;
+                        }
+
+                        if ($minutes > 0 && $minutes < 10080) { // < 1 semana
+                            $aId = (int)$msg['sender_id'];
+                            if (!isset($agentStats[$aId])) {
+                                $agentStats[$aId] = ['total_seconds' => 0.0, 'count' => 0];
+                            }
+                            $agentStats[$aId]['total_seconds'] += $minutes * 60;
+                            $agentStats[$aId]['count']++;
+                        }
+                        $pendingContactTime = null;
+                    }
+                    $lastHumanAgentTime = $msg['created_at'];
+
+                } elseif ($msg['sender_type'] === 'contact' && $lastHumanAgentTime) {
+                    $lastHuman   = new \DateTime($lastHumanAgentTime);
+                    $contact     = new \DateTime($msg['created_at']);
+                    $diffMinutes = ($contact->getTimestamp() - $lastHuman->getTimestamp()) / 60;
+
+                    if ($diffMinutes >= $delayMinutes && !$pendingContactTime) {
+                        $pendingContactTime = $msg['created_at'];
+                    }
+                }
+            }
+        }
+
+        return $agentStats;
+    }
+
     public static function getAgentAttendanceMetrics(?string $dateFrom = null, ?string $dateTo = null): array
     {
         $dateFrom = $dateFrom ?? date('Y-m-01');
@@ -2206,19 +2311,13 @@ class DashboardService
             
             $agents = \App\Helpers\Database::fetchAll($sqlAgents);
 
-            // Carrega 1 vez as configurações de SLA usadas no cálculo do
-            // tempo médio de resposta. O delay mínimo (em segundos) faz a
-            // mesma triagem que o loop PHP do card "Tempo de Resposta (Geral)":
-            // mensagens do contato que chegam antes desse delay após a
-            // resposta anterior do agente são consideradas "follow-up" e
-            // não geram um novo par contato↔agente.
-            $slaSettings  = ConversationSettingsService::getSettings()['sla'] ?? [];
-            $delayEnabled = $slaSettings['message_delay_enabled'] ?? true;
-            $delayMinutes = (int)($slaSettings['message_delay_minutes'] ?? 1);
-            if (!$delayEnabled) {
-                $delayMinutes = 0;
-            }
-            $delaySeconds = $delayMinutes * 60;
+            // Pré-calcula tempo médio de resposta por agente usando EXATAMENTE
+            // a mesma iteração PHP do card "HUMANOS - Resposta Média" do topo
+            // do dashboard (getAverageResponseTimeHuman). Atribui cada par
+            // contato↔agente ao agente humano que efetivamente respondeu.
+            // Garante que o número da coluna "Tempo Médio" da tabela bate
+            // matematicamente com o card global.
+            $agentResponseStats = self::computeOngoingResponseStatsPerAgent($dateFrom, $dateTo);
 
             $result = [];
             $totals = [
@@ -2298,83 +2397,14 @@ class DashboardService
                 $messagesSent = (int)($messagesSentResult['total'] ?? 0);
                 
                 // 5. Tempo médio de resposta (em segundos)
-                //
-                // Esta métrica precisa bater com o card "Tempo de Resposta
-                // (Geral)" / "Tempo de Atendimento - HUMANOS" do topo do
-                // dashboard. Aqueles cards iteram em PHP e geram apenas UM
-                // par contato↔agente por rodada (a primeira mensagem do
-                // contato após a resposta anterior do agente). Quando o
-                // cliente manda 5 mensagens em sequência antes do agente
-                // responder, vale só 1 par — não 5.
-                //
-                // O SQL antigo pareava cada mensagem do contato com a
-                // próxima resposta do agente, inflando a média em conversas
-                // de WhatsApp (onde clientes mandam várias mensagens curtas
-                // seguidas). Para alinhar com o PHP usamos LAG():
-                //
-                //   - prev_sender = 'agent': m1 só é contado se a mensagem
-                //     imediatamente anterior na conversa for de um agente
-                //     (ou seja, m1 é o primeiro contato da rodada e não há
-                //     pares "intra-streak"). Mensagem que abre a conversa
-                //     também é descartada (como no PHP, que só registra
-                //     pares depois de já ter visto um agente).
-                //   - delay mínimo: o gap entre prev_created_at (resposta
-                //     anterior do agente) e m1 precisa atingir o limiar
-                //     configurado em SLA → message_delay_minutes.
-                //
-                // Regras de qualificação (mín. mensagens / ignora últimas N)
-                // continuam aplicadas via ROW_NUMBER + COUNT OVER.
-                $minTotal     = SLAResponseTimeHelper::MIN_TOTAL_MESSAGES;
-                $excludeLastN = SLAResponseTimeHelper::EXCLUDE_LAST_N;
-                $sqlAvgResponseTime = "SELECT
-                        AVG(response_time_seconds) as avg_seconds,
-                        COUNT(*) as response_count
-                    FROM (
-                        SELECT
-                            TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
-                        FROM (
-                            SELECT id, conversation_id, sender_type, sender_id, ai_agent_id, created_at,
-                                   LAG(sender_type) OVER (PARTITION BY conversation_id ORDER BY created_at) AS prev_sender,
-                                   LAG(created_at)  OVER (PARTITION BY conversation_id ORDER BY created_at) AS prev_created_at,
-                                   ROW_NUMBER()     OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc,
-                                   COUNT(*)         OVER (PARTITION BY conversation_id) AS total_msgs
-                            FROM messages
-                        ) m1
-                        INNER JOIN (
-                            SELECT id, conversation_id, sender_type, sender_id, ai_agent_id, created_at,
-                                   ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc
-                            FROM messages
-                        ) m2 ON m2.conversation_id = m1.conversation_id
-                            AND m2.sender_type = 'agent'
-                            AND m2.sender_id = ?
-                            AND m2.ai_agent_id IS NULL
-                            AND m2.created_at > m1.created_at
-                            AND m2.rn_desc > {$excludeLastN}
-                            AND m2.created_at = (
-                                SELECT MIN(m3.created_at)
-                                FROM messages m3
-                                WHERE m3.conversation_id = m1.conversation_id
-                                AND m3.sender_type = 'agent'
-                                AND m3.sender_id = ?
-                                AND m3.ai_agent_id IS NULL
-                                AND m3.created_at > m1.created_at
-                            )
-                        WHERE m1.sender_type = 'contact'
-                        AND m1.prev_sender = 'agent'
-                        AND TIMESTAMPDIFF(SECOND, m1.prev_created_at, m1.created_at) >= ?
-                        AND m1.created_at >= ?
-                        AND m1.created_at <= ?
-                        AND m1.total_msgs >= {$minTotal}
-                        AND m1.rn_desc > {$excludeLastN}
-                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0 AND response_time_seconds < 604800
-                    ) as response_times";
-
-                $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponseTime, [
-                    $agentId, $agentId, $delaySeconds, $dateFrom, $dateTo
-                ]);
-                
-                $avgResponseSeconds = (float)($avgResponseResult['avg_seconds'] ?? 0);
-                $responseCount = (int)($avgResponseResult['response_count'] ?? 0);
+                // Lê do dicionário pré-calculado em
+                // computeOngoingResponseStatsPerAgent — mesma iteração PHP
+                // do card global "HUMANOS - Resposta Média".
+                $stats = $agentResponseStats[$agentId] ?? ['total_seconds' => 0, 'count' => 0];
+                $responseCount = (int)$stats['count'];
+                $avgResponseSeconds = $responseCount > 0
+                    ? (float)$stats['total_seconds'] / $responseCount
+                    : 0.0;
                 
                 // 6. Tempo médio de primeira resposta
                 $sqlFirstResponse = "SELECT 

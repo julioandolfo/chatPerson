@@ -2205,7 +2205,21 @@ class DashboardService
                           ORDER BY name ASC";
             
             $agents = \App\Helpers\Database::fetchAll($sqlAgents);
-            
+
+            // Carrega 1 vez as configurações de SLA usadas no cálculo do
+            // tempo médio de resposta. O delay mínimo (em segundos) faz a
+            // mesma triagem que o loop PHP do card "Tempo de Resposta (Geral)":
+            // mensagens do contato que chegam antes desse delay após a
+            // resposta anterior do agente são consideradas "follow-up" e
+            // não geram um novo par contato↔agente.
+            $slaSettings  = ConversationSettingsService::getSettings()['sla'] ?? [];
+            $delayEnabled = $slaSettings['message_delay_enabled'] ?? true;
+            $delayMinutes = (int)($slaSettings['message_delay_minutes'] ?? 1);
+            if (!$delayEnabled) {
+                $delayMinutes = 0;
+            }
+            $delaySeconds = $delayMinutes * 60;
+
             $result = [];
             $totals = [
                 'new_conversations' => 0,
@@ -2284,11 +2298,32 @@ class DashboardService
                 $messagesSent = (int)($messagesSentResult['total'] ?? 0);
                 
                 // 5. Tempo médio de resposta (em segundos)
-                // Calcula o tempo entre mensagem do cliente e resposta do agente.
-                // Aplica as regras do SLA "ongoing":
-                //   - Conversa precisa ter no mínimo MIN_TOTAL_MESSAGES mensagens.
-                //   - As EXCLUDE_LAST_N mensagens cronológicas mais recentes são
-                //     ignoradas (agradecimentos/despedidas inflam a média).
+                //
+                // Esta métrica precisa bater com o card "Tempo de Resposta
+                // (Geral)" / "Tempo de Atendimento - HUMANOS" do topo do
+                // dashboard. Aqueles cards iteram em PHP e geram apenas UM
+                // par contato↔agente por rodada (a primeira mensagem do
+                // contato após a resposta anterior do agente). Quando o
+                // cliente manda 5 mensagens em sequência antes do agente
+                // responder, vale só 1 par — não 5.
+                //
+                // O SQL antigo pareava cada mensagem do contato com a
+                // próxima resposta do agente, inflando a média em conversas
+                // de WhatsApp (onde clientes mandam várias mensagens curtas
+                // seguidas). Para alinhar com o PHP usamos LAG():
+                //
+                //   - prev_sender = 'agent': m1 só é contado se a mensagem
+                //     imediatamente anterior na conversa for de um agente
+                //     (ou seja, m1 é o primeiro contato da rodada e não há
+                //     pares "intra-streak"). Mensagem que abre a conversa
+                //     também é descartada (como no PHP, que só registra
+                //     pares depois de já ter visto um agente).
+                //   - delay mínimo: o gap entre prev_created_at (resposta
+                //     anterior do agente) e m1 precisa atingir o limiar
+                //     configurado em SLA → message_delay_minutes.
+                //
+                // Regras de qualificação (mín. mensagens / ignora últimas N)
+                // continuam aplicadas via ROW_NUMBER + COUNT OVER.
                 $minTotal     = SLAResponseTimeHelper::MIN_TOTAL_MESSAGES;
                 $excludeLastN = SLAResponseTimeHelper::EXCLUDE_LAST_N;
                 $sqlAvgResponseTime = "SELECT
@@ -2299,8 +2334,10 @@ class DashboardService
                             TIMESTAMPDIFF(SECOND, m1.created_at, m2.created_at) as response_time_seconds
                         FROM (
                             SELECT id, conversation_id, sender_type, sender_id, ai_agent_id, created_at,
-                                   ROW_NUMBER() OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc,
-                                   COUNT(*)  OVER (PARTITION BY conversation_id) AS total_msgs
+                                   LAG(sender_type) OVER (PARTITION BY conversation_id ORDER BY created_at) AS prev_sender,
+                                   LAG(created_at)  OVER (PARTITION BY conversation_id ORDER BY created_at) AS prev_created_at,
+                                   ROW_NUMBER()     OVER (PARTITION BY conversation_id ORDER BY created_at DESC) AS rn_desc,
+                                   COUNT(*)         OVER (PARTITION BY conversation_id) AS total_msgs
                             FROM messages
                         ) m1
                         INNER JOIN (
@@ -2323,15 +2360,17 @@ class DashboardService
                                 AND m3.created_at > m1.created_at
                             )
                         WHERE m1.sender_type = 'contact'
+                        AND m1.prev_sender = 'agent'
+                        AND TIMESTAMPDIFF(SECOND, m1.prev_created_at, m1.created_at) >= ?
                         AND m1.created_at >= ?
                         AND m1.created_at <= ?
                         AND m1.total_msgs >= {$minTotal}
                         AND m1.rn_desc > {$excludeLastN}
-                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0 AND response_time_seconds < 86400
+                        HAVING response_time_seconds IS NOT NULL AND response_time_seconds > 0 AND response_time_seconds < 604800
                     ) as response_times";
-                
+
                 $avgResponseResult = \App\Helpers\Database::fetch($sqlAvgResponseTime, [
-                    $agentId, $agentId, $dateFrom, $dateTo
+                    $agentId, $agentId, $delaySeconds, $dateFrom, $dateTo
                 ]);
                 
                 $avgResponseSeconds = (float)($avgResponseResult['avg_seconds'] ?? 0);

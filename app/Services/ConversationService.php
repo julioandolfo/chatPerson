@@ -1561,7 +1561,30 @@ class ConversationService
         // Obter conversa antes de fechar para atualizar contagem do agente
         $conversation = Conversation::find($conversationId);
         $agentId = $conversation['agent_id'] ?? null;
-        
+
+        // Registrar (sem bloquear) quando a conversa é fechada com o cliente aguardando resposta,
+        // ou seja, a última mensagem foi do contato e nenhum agente respondeu depois.
+        try {
+            $lastMessage = \App\Models\Message::getLastMessage($conversationId);
+            if ($lastMessage && ($lastMessage['sender_type'] ?? null) === 'contact') {
+                $closedBy = \App\Helpers\Auth::id();
+                \App\Helpers\Logger::log(
+                    sprintf(
+                        'FECHADA_COM_CLIENTE_AGUARDANDO conversation_id=%d agent_id=%s closed_by=%s contact_id=%s last_message_id=%s last_message_at=%s',
+                        $conversationId,
+                        $agentId ?? 'null',
+                        $closedBy ?? 'null',
+                        $conversation['contact_id'] ?? 'null',
+                        $lastMessage['id'] ?? 'null',
+                        $lastMessage['created_at'] ?? 'null'
+                    ),
+                    'conversas-fechadas-aguardando.log'
+                );
+            }
+        } catch (\Exception $e) {
+            error_log("Erro ao registrar fechamento com cliente aguardando: " . $e->getMessage());
+        }
+
         // ✅ MOVER PARA ETAPA "Fechadas / Resolvidas" do funil correspondente
         $updateData = [
             'status' => 'closed',

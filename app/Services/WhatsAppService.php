@@ -4029,7 +4029,7 @@ class WhatsAppService
                 // Obter período de graça das configurações (padrão: 10 minutos)
                 // Se passou mais tempo que o período de graça, trata como NOVA conversa (aplica regras completas)
                 // Se passou menos, apenas REABRE mantendo configurações anteriores
-                $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 10);
+                $gracePeriodMinutes = (int)\App\Models\Setting::get('conversation_reopen_grace_period_minutes', 240);
                 Logger::quepasa("⚙️  Período de graça: {$gracePeriodMinutes} minutos");
                 
                 // Calcular tempo desde última atualização

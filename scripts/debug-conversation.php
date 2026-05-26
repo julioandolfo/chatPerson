@@ -16,6 +16,7 @@ require_once dirname(__DIR__) . '/config/bootstrap.php';
 use App\Helpers\Database;
 use App\Models\Conversation;
 use App\Models\Setting;
+use App\Services\ConversationSettingsService;
 
 $convId = (int)($argv[1] ?? 0);
 if ($convId <= 0) {
@@ -67,11 +68,13 @@ if ($account) {
 hr("SETTINGS DE REABERTURA / AUTO-CLOSE");
 $grace = (int)Setting::get('conversation_reopen_grace_period_minutes', 10);
 printf("  %-40s : %s min\n", 'conversation_reopen_grace_period_minutes', $grace);
-foreach ([
-    'auto_close_enabled','auto_close_inactive_enabled','auto_close_inactive_days',
-    'auto_close_waiting_client_enabled','auto_close_waiting_client_days','auto_assign_on_reopen'
-] as $k) {
-    printf("  %-40s : %s\n", $k, val(Setting::get($k, '(default)')));
+try {
+    $convSettings = ConversationSettingsService::getSettings();
+    $autoClose = $convSettings['auto_close'] ?? [];
+    echo "  auto_close (fonte real - ConversationSettingsService):\n";
+    echo "    " . json_encode($autoClose, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n";
+} catch (\Throwable $e) {
+    echo "  (erro ao ler ConversationSettingsService: " . $e->getMessage() . ")\n";
 }
 
 // Todas as conversas do contato
@@ -135,6 +138,30 @@ foreach (array_reverse($msgs) as $m) {
         $m['id'], $m['sender_type'], $m['message_type'], $m['created_at'],
         str_replace(["\n","\r"], ' ', (string)$m['preview']));
 }
+
+// Historico de status (quem fechou/reabriu e quando)
+hr("HISTORICO DE STATUS / ACOES (tabela activities)");
+$acts = Database::fetchAll(
+    "SELECT a.id, a.activity_type, a.user_id, u.name AS user_name, a.description, a.created_at
+     FROM activities a
+     LEFT JOIN users u ON u.id = a.user_id
+     WHERE a.entity_type = 'conversation' AND a.entity_id = ?
+     ORDER BY a.id DESC LIMIT 25",
+    [$convId]
+);
+if (!$acts) {
+    echo "  (nenhuma activity registrada para esta conversa)\n";
+}
+foreach (array_reverse($acts) as $a) {
+    $actor = $a['user_id'] === null
+        ? 'SISTEMA/AUTOMACAO (user_id NULL)'
+        : ("user #{$a['user_id']} " . ($a['user_name'] ?? '?'));
+    printf("  %-20s %-26s por %-30s | %s\n",
+        $a['created_at'], $a['activity_type'], $actor,
+        str_replace(["\n","\r"], ' ', (string)($a['description'] ?? '')));
+}
+echo "  >> conversation_closed com user_id NULL = fechada por cron/automacao (AutoClose, AutomationService, IA).\n";
+echo "  >> conversation_closed com user_id de agente = fechada manualmente por esse agente.\n";
 
 // Onde caiu a ultima mensagem do cliente (todas as conversas do contato)
 hr("ULTIMAS MENSAGENS 'contact' EM TODAS AS CONVERSAS DO CONTATO");

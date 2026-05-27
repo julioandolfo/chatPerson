@@ -261,6 +261,7 @@ class Activity extends Model
         return [
             'conversation_assigned' => 'Conversa Atribuída',
             'conversation_closed' => 'Conversa Fechada',
+            'conversation_closed_waiting' => 'Conversa Fechada (Cliente Aguardando)',
             'conversation_reopened' => 'Conversa Reaberta',
             'conversation_created' => 'Conversa Criada',
             'message_sent' => 'Mensagem Enviada',

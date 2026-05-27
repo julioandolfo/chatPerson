@@ -1562,11 +1562,15 @@ class ConversationService
         $conversation = Conversation::find($conversationId);
         $agentId = $conversation['agent_id'] ?? null;
 
-        // Registrar (sem bloquear) quando a conversa é fechada com o cliente aguardando resposta,
+        // Detectar (sem bloquear) quando a conversa é fechada com o cliente aguardando resposta,
         // ou seja, a última mensagem foi do contato e nenhum agente respondeu depois.
+        $closedWithClientWaiting = false;
+        $lastWaitingMessage = null;
         try {
             $lastMessage = \App\Models\Message::getLastMessage($conversationId);
             if ($lastMessage && ($lastMessage['sender_type'] ?? null) === 'contact') {
+                $closedWithClientWaiting = true;
+                $lastWaitingMessage = $lastMessage;
                 $closedBy = \App\Helpers\Auth::id();
                 \App\Helpers\Logger::log(
                     sprintf(
@@ -1582,8 +1586,9 @@ class ConversationService
                 );
             }
         } catch (\Exception $e) {
-            error_log("Erro ao registrar fechamento com cliente aguardando: " . $e->getMessage());
+            error_log("Erro ao detectar fechamento com cliente aguardando: " . $e->getMessage());
         }
+
 
         // ✅ MOVER PARA ETAPA "Fechadas / Resolvidas" do funil correspondente
         $updateData = [
@@ -1662,11 +1667,20 @@ class ConversationService
             try {
                 if (class_exists('\App\Services\ActivityService')) {
                     \App\Services\ActivityService::logConversationClosed($conversationId, \App\Helpers\Auth::id());
+
+                    // Atividade extra (visível na timeline) quando fechou com cliente aguardando
+                    if ($closedWithClientWaiting) {
+                        \App\Services\ActivityService::logConversationClosedWaiting(
+                            $conversationId,
+                            \App\Helpers\Auth::id(),
+                            $lastWaitingMessage
+                        );
+                    }
                 }
             } catch (\Exception $e) {
                 error_log("Erro ao logar atividade: " . $e->getMessage());
             }
-            
+
             return $conversation;
         }
         return Conversation::findWithRelations($conversationId);

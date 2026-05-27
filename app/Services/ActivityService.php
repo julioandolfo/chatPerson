@@ -63,6 +63,34 @@ class ActivityService
     }
 
     /**
+     * Log de atividade de fechamento com o cliente aguardando resposta
+     * (última mensagem foi do contato e nenhum agente respondeu depois).
+     */
+    public static function logConversationClosedWaiting(int $conversationId, ?int $userId = null, ?array $lastMessage = null): void
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        $contact = $conversation ? \App\Models\Contact::find($conversation['contact_id']) : null;
+
+        $description = $contact
+            ? "Conversa fechada com {$contact['name']} aguardando resposta"
+            : "Conversa fechada com cliente aguardando resposta";
+
+        Activity::log(
+            'conversation_closed_waiting',
+            'conversation',
+            $conversationId,
+            $userId,
+            $description,
+            [
+                'contact_id' => $conversation['contact_id'] ?? null,
+                'contact_name' => $contact ? $contact['name'] : null,
+                'last_message_id' => $lastMessage['id'] ?? null,
+                'last_message_at' => $lastMessage['created_at'] ?? null
+            ]
+        );
+    }
+
+    /**
      * Log de atividade de reabertura de conversa
      */
     public static function logConversationReopened(int $conversationId, ?int $userId = null): void

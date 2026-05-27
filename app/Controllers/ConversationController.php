@@ -2365,6 +2365,17 @@ class ConversationController
                                 'user_name' => $activity['user_name'] ?? null
                             ];
                             break;
+                        case 'conversation_closed_waiting':
+                            $events[] = [
+                                'type' => 'closed_waiting',
+                                'date' => $activity['created_at'],
+                                'icon' => 'ki-timer',
+                                'color' => 'warning',
+                                'title' => 'Conversa fechada com cliente aguardando',
+                                'description' => null,
+                                'user_name' => $activity['user_name'] ?? null
+                            ];
+                            break;
                         case 'conversation_reopened':
                             $events[] = [
                                 'type' => 'reopened',

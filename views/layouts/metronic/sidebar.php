@@ -351,7 +351,7 @@
                                 <span class="menu-title">Minhas Conversões</span>
                             </a>
                         </div>
-                        <?php if (\App\Helpers\Permission::can('goals.view')): ?>
+                        <?php if (\App\Helpers\Permission::can('agent_performance.goals.view')): ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/goals/my', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/goals/my') ?>">
                                 <span class="menu-bullet">

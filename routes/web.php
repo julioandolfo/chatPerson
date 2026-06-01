@@ -632,7 +632,7 @@ Router::get('/goals', [\App\Controllers\GoalController::class, 'index'], ['Authe
 Router::get('/goals/create', [\App\Controllers\GoalController::class, 'create'], ['Authentication', 'Permission:goals.create']);
 Router::post('/goals/store', [\App\Controllers\GoalController::class, 'store'], ['Authentication', 'Permission:goals.create']);
 Router::get('/goals/dashboard', [\App\Controllers\GoalController::class, 'dashboard'], ['Authentication']);
-Router::get('/goals/my', [\App\Controllers\GoalController::class, 'myGoals'], ['Authentication', 'Permission:goals.view']);
+Router::get('/goals/my', [\App\Controllers\GoalController::class, 'myGoals'], ['Authentication', 'Permission:agent_performance.goals.view']);
 Router::get('/goals/show', [\App\Controllers\GoalController::class, 'show'], ['Authentication', 'Permission:goals.view']);
 Router::get('/goals/edit', [\App\Controllers\GoalController::class, 'edit'], ['Authentication', 'Permission:goals.edit']);
 Router::post('/goals/update', [\App\Controllers\GoalController::class, 'update'], ['Authentication', 'Permission:goals.edit']);

@@ -104,7 +104,7 @@ ob_start();
                     <div class="progress-bar bg-<?= $flagColor ?>" style="width: <?= min($percentage, 100) ?>%"></div>
                 </div>
                 
-                <?php if (!empty($progress['is_on_track']) || $progress['is_on_track'] === '0'): ?>
+                <?php if (isset($progress['is_on_track'])): ?>
                 <div class="mt-5">
                     <?php if ($progress['is_on_track']): ?>
                         <div class="alert alert-success d-flex align-items-center">

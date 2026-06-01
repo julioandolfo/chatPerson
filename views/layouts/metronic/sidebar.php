@@ -351,6 +351,16 @@
                                 <span class="menu-title">Minhas Conversões</span>
                             </a>
                         </div>
+                        <?php if (\App\Helpers\Permission::can('goals.view')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/goals/my', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/goals/my') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Minha Meta</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <?php if (\App\Helpers\Permission::can('agent_performance.best_practices')): ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/agent-performance/best-practices', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/best-practices') ?>">

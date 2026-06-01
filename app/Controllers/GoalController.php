@@ -393,8 +393,8 @@ class GoalController
      */
     public function myGoals(): void
     {
-        Permission::abortIfCannot('agent_performance.goals.view');
-
+        // Página da própria meta do usuário logado: escopo sempre limitado a Auth::id(),
+        // por isso não exige permissão específica (igual a "Minha Performance"/"Minhas Conversões").
         $userId = Auth::id();
         $period = Request::get('period') ?: null; // Y-m-d (início do período) ou null = atual
 

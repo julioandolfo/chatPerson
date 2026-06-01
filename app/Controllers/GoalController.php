@@ -393,7 +393,7 @@ class GoalController
      */
     public function myGoals(): void
     {
-        Permission::abortIfCannot('goals.view');
+        Permission::abortIfCannot('agent_performance.goals.view');
 
         $userId = Auth::id();
         $period = Request::get('period') ?: null; // Y-m-d (início do período) ou null = atual

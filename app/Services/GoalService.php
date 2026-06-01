@@ -1068,7 +1068,186 @@ class GoalService
 
         return $summary;
     }
-    
+
+    /**
+     * Metas do agente para a página dedicada "Minha Meta".
+     *
+     * Retorna um payload pronto para a view, com todos os valores derivados
+     * (progresso, projeção, próximo tier, bônus estimado, condições) já calculados,
+     * além dos períodos disponíveis para o filtro de metas anteriores.
+     *
+     * @param int $userId
+     * @param string|null $refDate Data de referência (Y-m-d). Null = período atual (hoje).
+     * @return array{goals:array, stats:array, periods:array, reference_date:string, is_current_period:bool, bonus_summary:array}
+     */
+    public static function getMyGoalsForReference(int $userId, ?string $refDate = null): array
+    {
+        // Todas as metas do agente (todos os períodos, ativas)
+        $goalsByLevel = Goal::getAgentGoals($userId, false);
+        $allGoals = self::flattenGoals($goalsByLevel);
+
+        $today = date('Y-m-d');
+
+        // Períodos distintos disponíveis para o filtro
+        $periods = [];
+        foreach ($allGoals as $g) {
+            $key = $g['start_date'] . '|' . $g['end_date'];
+            if (!isset($periods[$key])) {
+                $periods[$key] = [
+                    'value' => $g['start_date'],
+                    'start_date' => $g['start_date'],
+                    'end_date' => $g['end_date'],
+                    'is_current' => ($g['start_date'] <= $today && $g['end_date'] >= $today),
+                    'label' => date('d/m/Y', strtotime($g['start_date'])) . ' → ' . date('d/m/Y', strtotime($g['end_date'])),
+                ];
+            }
+        }
+        $periods = array_values($periods);
+        usort($periods, fn($a, $b) => strcmp($b['start_date'], $a['start_date']));
+
+        // Data de referência: padrão = hoje (período atual)
+        $ref = $refDate ?: $today;
+
+        // Metas que cobrem a data de referência
+        $filtered = array_values(array_filter($allGoals, function ($g) use ($ref) {
+            return $g['start_date'] <= $ref && $g['end_date'] >= $ref;
+        }));
+
+        $goals = [];
+        $stats = [
+            'total' => 0,
+            'achieved' => 0,
+            'in_progress' => 0,
+            'at_risk' => 0,
+            'total_bonus' => 0.0,
+            'ote_total' => 0.0,
+        ];
+
+        foreach ($filtered as $goal) {
+            $goalId = (int)$goal['id'];
+            $currentValue = self::calculateCurrentValueForAgent($goal, $userId);
+            $targetValue = (float)($goal['target_value'] ?? 0);
+            $percentage = $targetValue > 0 ? ($currentValue / $targetValue) * 100 : 0;
+            $flagStatus = self::determineFlagStatus($percentage, $goal);
+
+            $tiers = GoalBonusTier::getByGoal($goalId);
+            usort($tiers, fn($a, $b) => $a['threshold_percentage'] <=> $b['threshold_percentage']);
+            $conditions = GoalBonusCondition::getByGoal($goalId);
+
+            $bonusPreview = GoalBonusTier::calculateBonus(
+                $goalId,
+                (float)$percentage,
+                $userId,
+                $goal['start_date'],
+                $goal['end_date']
+            );
+
+            // Mapear is_met das condições a partir do resultado do preview
+            $condMet = [];
+            foreach (($bonusPreview['goal_condition_result']['details'] ?? []) as $d) {
+                $condMet[(int)($d['condition_id'] ?? 0)] = [
+                    'met' => !empty($d['met']),
+                    'current_value' => $d['current_value'] ?? null,
+                ];
+            }
+            foreach ($conditions as &$c) {
+                $info = $condMet[(int)$c['id']] ?? null;
+                $c['is_met'] = $info['met'] ?? false;
+                $c['current_metric_value'] = $info['current_value'] ?? null;
+            }
+            unset($c);
+
+            // Projeção baseada em dias decorridos
+            $startTs = strtotime($goal['start_date']);
+            $endTs = strtotime($goal['end_date'] . ' 23:59:59');
+            $cappedNow = min(time(), $endTs);
+            $totalDays = max(1, ($endTs - $startTs) / 86400);
+            $elapsedDays = max(1, ($cappedNow - $startTs) / 86400);
+            $remainingDays = max(0, ($endTs - time()) / 86400);
+            $dailyAverage = $elapsedDays > 0 ? $currentValue / $elapsedDays : 0;
+            $projectedValue = $dailyAverage * $totalDays;
+            $projectedPercentage = $targetValue > 0 ? min(200, ($projectedValue / $targetValue) * 100) : 0;
+            $expectedPercentage = min(100, ($elapsedDays / $totalDays) * 100);
+            $isOnTrack = $percentage >= $expectedPercentage;
+            $remainingValue = max(0, $targetValue - $currentValue);
+            $dailyNeeded = $remainingDays >= 1 ? $remainingValue / $remainingDays : $remainingValue;
+
+            // Próximo tier de bônus
+            $nextTier = $bonusPreview['next_tier'] ?? null;
+            $nextTierGap = 0.0;
+            $nextTierValueGap = 0.0;
+            if ($nextTier) {
+                $nextTierGap = max(0, (float)$nextTier['threshold_percentage'] - $percentage);
+                $nextTierValueGap = max(0, ($targetValue * (float)$nextTier['threshold_percentage'] / 100) - $currentValue);
+            }
+
+            // Condições obrigatórias bloqueando o bônus
+            $blockedConditions = [];
+            foreach ($conditions as $c) {
+                if (!empty($c['is_required']) && empty($c['is_met'])) {
+                    $blockedConditions[] = $c;
+                }
+            }
+
+            $isEnded = $endTs < time();
+            if ($percentage >= 100) {
+                $statusKey = 'achieved';
+                $stats['achieved']++;
+            } elseif (!$isOnTrack || ($percentage < 50 && $remainingDays <= 7)) {
+                $statusKey = 'at_risk';
+                $stats['at_risk']++;
+            } else {
+                $statusKey = 'in_progress';
+                $stats['in_progress']++;
+            }
+
+            $goal['computed'] = [
+                'current_value' => $currentValue,
+                'target_value' => $targetValue,
+                'percentage' => round($percentage, 1),
+                'flag_status' => $flagStatus,
+                'flag_color' => Goal::getFlagColor($flagStatus),
+                'remaining_value' => $remainingValue,
+                'total_days' => (int)round($totalDays),
+                'elapsed_days' => (int)round($elapsedDays),
+                'remaining_days' => (int)round($remainingDays),
+                'daily_average' => $dailyAverage,
+                'daily_needed' => $dailyNeeded,
+                'projected_value' => $projectedValue,
+                'projected_percentage' => round($projectedPercentage, 1),
+                'expected_percentage' => round($expectedPercentage, 1),
+                'is_on_track' => $isOnTrack,
+                'is_ended' => $isEnded,
+                'status' => $statusKey,
+                'next_tier' => $nextTier,
+                'next_tier_gap' => round($nextTierGap, 1),
+                'next_tier_value_gap' => $nextTierValueGap,
+            ];
+            $goal['tiers'] = $tiers;
+            $goal['conditions'] = $conditions;
+            $goal['bonus_preview'] = $bonusPreview;
+            $goal['blocked_conditions'] = $blockedConditions;
+
+            $stats['total']++;
+            $stats['total_bonus'] += (float)($bonusPreview['total_bonus'] ?? 0);
+            $stats['ote_total'] += (float)($goal['ote_total'] ?? 0);
+
+            $goals[] = $goal;
+        }
+
+        // Maior progresso primeiro
+        usort($goals, fn($a, $b) => $b['computed']['percentage'] <=> $a['computed']['percentage']);
+
+        return [
+            'goals' => $goals,
+            'stats' => $stats,
+            'periods' => $periods,
+            'reference_date' => $ref,
+            'is_current_period' => ($refDate === null || $ref === $today),
+            'bonus_summary' => self::getBonusSummary($userId),
+        ];
+    }
+
     /**
      * Visão detalhada de metas para o dashboard principal
      */

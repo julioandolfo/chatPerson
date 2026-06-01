@@ -136,16 +136,9 @@ class AgentPerformanceController
             // Tabelas de coaching podem não existir
         }
         
-        // Metas e alertas do agente
-        $goalsSummary = [];
-        $goalAlerts = [];
-        try {
-            $goalsSummary = GoalService::getAgentGoalsDetailed($agentId);
-            $goalAlerts = GoalService::getGoalAlerts($agentId);
-        } catch (\Exception $e) {
-            // Sistema de metas pode não estar configurado
-        }
-        
+        // As metas detalhadas e alertas agora vivem na página dedicada "Minha Meta" (/goals/my)
+        // e foram removidas desta página para reduzir poluição visual e carga.
+
         // Estatísticas de ligações API4Com do agente
         $callStats = [];
         $callHistory = [];
@@ -173,8 +166,6 @@ class AgentPerformanceController
             'conversionMetrics' => $conversionMetrics,
             'slaSettings' => $slaSettings,
             'analyzedConversations' => $analyzedConversations,
-            'goalsSummary' => $goalsSummary,
-            'goalAlerts' => $goalAlerts,
             'callStats' => $callStats,
             'callHistory' => $callHistory
         ]);

@@ -388,6 +388,23 @@ class GoalController
     }
     
     /**
+     * Página dedicada "Minha Meta" — visão detalhada das metas do próprio agente,
+     * com progresso, projeção, bônus estimado e filtro de períodos anteriores.
+     */
+    public function myGoals(): void
+    {
+        Permission::abortIfCannot('goals.view');
+
+        $userId = Auth::id();
+        $period = Request::get('period') ?: null; // Y-m-d (início do período) ou null = atual
+
+        $data = GoalService::getMyGoalsForReference($userId, $period);
+        $data['selected_period'] = $period;
+
+        Response::view('goals/my', $data);
+    }
+
+    /**
      * API: Calcular progresso de uma meta
      */
     public function calculateProgress(): void

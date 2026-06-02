@@ -150,28 +150,27 @@ class AgentConversionService
             $dateTo = $dateTo . ' 23:59:59';
         }
         
+        // A primeira mensagem real (sender_id > 0) é selecionada de forma
+        // determinística (created_at, id) e classificada em UM único bucket.
+        // Isso evita que uma conversa seja contada como ativa E receptiva
+        // quando há mensagens de contato e agente com o mesmo created_at.
         $sql = "SELECT COUNT(DISTINCT c.id) as total
                 FROM conversations c
                 WHERE c.agent_id = ?
                 AND c.created_at >= ?
                 AND c.created_at <= ?
-                AND EXISTS (
-                    SELECT 1 FROM messages m 
-                    WHERE m.conversation_id = c.id 
-                    AND m.sender_type = 'agent' 
+                AND (
+                    SELECT m.sender_type FROM messages m
+                    WHERE m.conversation_id = c.id
                     AND m.sender_id > 0
-                    AND m.created_at = (
-                        SELECT MIN(m2.created_at) 
-                        FROM messages m2 
-                        WHERE m2.conversation_id = c.id
-                        AND m2.sender_id > 0
-                    )
-                )";
-        
+                    ORDER BY m.created_at ASC, m.id ASC
+                    LIMIT 1
+                ) = 'agent'";
+
         $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
         return (int)($result['total'] ?? 0);
     }
-    
+
     /**
      * Contar conversas iniciadas pelo cliente (cliente fez primeiro contato)
      * Verifica se a primeira mensagem da conversa foi do cliente/contato
@@ -183,28 +182,26 @@ class AgentConversionService
             $dateTo = $dateTo . ' 23:59:59';
         }
         
+        // Mesmo critério determinístico de "primeira mensagem real": a conversa
+        // só conta como receptiva quando a 1ª mensagem (sender_id > 0) é do contato.
+        // Combinado com getAgentInitiatedConversations, garante partição exclusiva.
         $sql = "SELECT COUNT(DISTINCT c.id) as total
                 FROM conversations c
                 WHERE c.agent_id = ?
                 AND c.created_at >= ?
                 AND c.created_at <= ?
-                AND EXISTS (
-                    SELECT 1 FROM messages m 
-                    WHERE m.conversation_id = c.id 
-                    AND m.sender_type = 'contact' 
+                AND (
+                    SELECT m.sender_type FROM messages m
+                    WHERE m.conversation_id = c.id
                     AND m.sender_id > 0
-                    AND m.created_at = (
-                        SELECT MIN(m2.created_at) 
-                        FROM messages m2 
-                        WHERE m2.conversation_id = c.id
-                        AND m2.sender_id > 0
-                    )
-                )";
-        
+                    ORDER BY m.created_at ASC, m.id ASC
+                    LIMIT 1
+                ) = 'contact'";
+
         $result = Database::fetch($sql, [$agentId, $dateFrom, $dateTo]);
         return (int)($result['total'] ?? 0);
     }
-    
+
     /**
      * Contar conversas interativas - onde o agente enviou mensagens no período
      * Independente de quando a conversa foi criada ou quem iniciou
@@ -398,34 +395,27 @@ class AgentConversionService
 
     private static function sqlFirstMessageFromContactExists(): string
     {
-        return "EXISTS (
-            SELECT 1 FROM messages m
+        // Determinístico (created_at, id): a 1ª mensagem real da conversa é do contato.
+        // Mantém o breakdown do modal alinhado com getClientInitiatedConversations
+        // e impede dupla classificação em caso de empate de created_at.
+        return "(SELECT m.sender_type FROM messages m
             WHERE m.conversation_id = c.id
-            AND m.sender_type = 'contact'
             AND m.sender_id > 0
-            AND m.created_at = (
-                SELECT MIN(m2.created_at)
-                FROM messages m2
-                WHERE m2.conversation_id = c.id
-                AND m2.sender_id > 0
-            )
-        )";
+            ORDER BY m.created_at ASC, m.id ASC
+            LIMIT 1
+        ) = 'contact'";
     }
 
     private static function sqlFirstMessageFromHumanAgentExists(): string
     {
-        return "EXISTS (
-            SELECT 1 FROM messages m
+        // Determinístico (created_at, id): a 1ª mensagem real da conversa é do agente.
+        // Mantém o breakdown do modal alinhado com getAgentInitiatedConversations.
+        return "(SELECT m.sender_type FROM messages m
             WHERE m.conversation_id = c.id
-            AND m.sender_type = 'agent'
             AND m.sender_id > 0
-            AND m.created_at = (
-                SELECT MIN(m2.created_at)
-                FROM messages m2
-                WHERE m2.conversation_id = c.id
-                AND m2.sender_id > 0
-            )
-        )";
+            ORDER BY m.created_at ASC, m.id ASC
+            LIMIT 1
+        ) = 'agent'";
     }
     
     /**

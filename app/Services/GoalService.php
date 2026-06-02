@@ -1031,9 +1031,15 @@ class GoalService
             }
         }
         
+        // Aliases em inglês para o dashboard principal (views/dashboard/index.php),
+        // mantendo as chaves em português usadas por views/goals/dashboard.php.
+        $summary['achieved'] = $summary['atingidas'];
+        $summary['in_progress'] = $summary['em_andamento'];
+        $summary['at_risk'] = $summary['em_risco'];
+
         // Adicionar resumo de bonificações
         $summary['bonus_summary'] = self::getBonusSummary($userId);
-        
+
         return $summary;
     }
 

@@ -301,6 +301,18 @@ Router::post('/users/update-availability', [UserController::class, 'updateAvaila
 
 // Rotas de Integrações
 Router::get('/integrations', [IntegrationController::class, 'index'], ['Authentication']);
+
+// ===== Canal de Email (IMAP/SMTP) =====
+Router::get('/email-integration', [\App\Controllers\EmailIntegrationController::class, 'index'], ['Authentication']);
+Router::post('/email-integration/accounts', [\App\Controllers\EmailIntegrationController::class, 'storeAccount'], ['Authentication']);
+Router::post('/email-integration/accounts/{id}', [\App\Controllers\EmailIntegrationController::class, 'updateAccount'], ['Authentication']);
+Router::post('/email-integration/accounts/{id}/delete', [\App\Controllers\EmailIntegrationController::class, 'deleteAccount'], ['Authentication']);
+Router::post('/email-integration/accounts/{id}/test', [\App\Controllers\EmailIntegrationController::class, 'testAccount'], ['Authentication']);
+Router::post('/email-integration/accounts/{id}/poll', [\App\Controllers\EmailIntegrationController::class, 'pollAccount'], ['Authentication']);
+Router::post('/email-integration/accounts/{id}/rules', [\App\Controllers\EmailIntegrationController::class, 'storeRule'], ['Authentication']);
+Router::post('/email-integration/rules/{id}', [\App\Controllers\EmailIntegrationController::class, 'updateRule'], ['Authentication']);
+Router::post('/email-integration/rules/{id}/delete', [\App\Controllers\EmailIntegrationController::class, 'deleteRule'], ['Authentication']);
+
 Router::get('/integrations/whatsapp', [IntegrationController::class, 'whatsapp'], ['Authentication']);
 Router::post('/integrations/whatsapp', [IntegrationController::class, 'createWhatsAppAccount'], ['Authentication']);
 Router::post('/integrations/whatsapp/{id}/settings', [IntegrationController::class, 'updateWhatsAppAccountSettings'], ['Authentication']); // Atualizar funil/etapa padrão

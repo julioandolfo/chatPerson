@@ -114,6 +114,33 @@ class ImapClient
     }
 
     /**
+     * Decodifica "encoded-words" MIME (RFC 2047), ex.: =?iso-8859-1?Q?Or=E7amento?=
+     * -> "Orçamento", convertendo para UTF-8. Idempotente para texto já limpo.
+     */
+    private static function decodeMimeHeader(string $value): string
+    {
+        $value = trim($value);
+        if ($value === '' || strpos($value, '=?') === false) {
+            return $value;
+        }
+
+        // iconv lida com B/Q e múltiplos encoded-words concatenados
+        if (function_exists('iconv_mime_decode')) {
+            $decoded = @iconv_mime_decode($value, ICONV_MIME_DECODE_CONTINUE_ON_ERROR, 'UTF-8');
+            if ($decoded !== false && $decoded !== '') {
+                return $decoded;
+            }
+        }
+        if (function_exists('mb_decode_mimeheader')) {
+            $decoded = @mb_decode_mimeheader($value);
+            if ($decoded !== '') {
+                return $decoded;
+            }
+        }
+        return $value;
+    }
+
+    /**
      * Normaliza uma mensagem do webklex para o array usado pela ingestão.
      */
     private static function normalize($message, int $uid): array
@@ -121,12 +148,12 @@ class ImapClient
         $fromArr = $message->getFrom() ?: [];
         $fromObj = is_array($fromArr) ? ($fromArr[0] ?? null) : null;
         $fromEmail = $fromObj->mail ?? '';
-        $fromName = $fromObj->personal ?? '';
+        $fromName = self::decodeMimeHeader((string)($fromObj->personal ?? ''));
 
         $messageId = trim(self::attr($message->getMessageId()), " <>");
         $inReplyTo = trim(self::attr($message->getInReplyTo()), " <>");
         $references = self::attr($message->getReferences());
-        $subject = self::attr($message->getSubject());
+        $subject = self::decodeMimeHeader(self::attr($message->getSubject()));
 
         $text = (string) $message->getTextBody();
         $html = (string) $message->getHTMLBody();

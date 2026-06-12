@@ -27,6 +27,62 @@ class EmailService
     /** Base pública para resolver caminho local de anexos enviados pelo agente. */
     private const PUBLIC_BASE = __DIR__ . '/../../public/';
 
+    /** Evita rodar o ensureSchema mais de uma vez por processo. */
+    private static bool $schemaChecked = false;
+
+    /**
+     * Garante que as tabelas do canal de email existam (idempotente).
+     * Auto-provisiona em ambientes onde a migration 150 ainda não rodou.
+     */
+    public static function ensureSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+        self::$schemaChecked = true;
+
+        try {
+            $db = \App\Helpers\Database::getInstance();
+            $db->exec("CREATE TABLE IF NOT EXISTS email_ingestion_rules (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                integration_account_id INT NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                priority INT NOT NULL DEFAULT 0,
+                match_type VARCHAR(10) NOT NULL DEFAULT 'any',
+                conditions JSON NULL,
+                actions JSON NULL,
+                stop_on_match TINYINT(1) NOT NULL DEFAULT 1,
+                is_active TINYINT(1) NOT NULL DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_account (integration_account_id),
+                INDEX idx_active (is_active),
+                INDEX idx_priority (priority)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+            $db->exec("CREATE TABLE IF NOT EXISTS email_ingestion_log (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                integration_account_id INT NOT NULL,
+                email_message_id VARCHAR(255) NULL,
+                email_uid INT NULL,
+                from_email VARCHAR(320) NULL,
+                subject VARCHAR(998) NULL,
+                decision VARCHAR(20) NOT NULL,
+                matched_rule_id INT NULL,
+                conversation_id INT NULL,
+                message_id INT NULL,
+                reason VARCHAR(255) NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_account_msgid (integration_account_id, email_message_id),
+                INDEX idx_account (integration_account_id),
+                INDEX idx_decision (decision),
+                INDEX idx_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::log('[EMAIL] ensureSchema: ' . $e->getMessage(), 'email.log');
+        }
+    }
+
     /**
      * Envio (outbound) — assinatura compatível com IntegrationService::sendMessage.
      * @return array ['success'=>bool,'external_id'=>?string,'message_id'=>?string]
@@ -127,6 +183,7 @@ class EmailService
      */
     public static function pollAccount(array $account): array
     {
+        self::ensureSchema();
         $cfg = self::config($account);
         $lastUid = (int)($cfg['last_uid'] ?? 0);
         $lookback = (int)($cfg['poll_lookback_days'] ?? 2);

@@ -26,6 +26,7 @@ class EmailIntegrationController
     public function index(): void
     {
         Permission::abortIfCannot('integrations.view');
+        EmailService::ensureSchema();
 
         $accounts = IntegrationAccount::getByProvider(EmailService::PROVIDER);
         // Decodifica config para exibição (sem expor senha)
@@ -153,6 +154,7 @@ class EmailIntegrationController
     public function storeRule(string $accountId): void
     {
         Permission::abortIfCannot('integrations.edit');
+        EmailService::ensureSchema();
         $accId = (int)$accountId;
         $account = IntegrationAccount::find($accId);
         if (!$account || ($account['provider'] ?? '') !== EmailService::PROVIDER) {

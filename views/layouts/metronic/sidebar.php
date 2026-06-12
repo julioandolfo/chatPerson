@@ -538,6 +538,14 @@
                         <?php endif; ?>
                         <?php if (\App\Helpers\Permission::can('integrations.view')): ?>
                         <div class="menu-item">
+                            <a class="menu-link <?= isActive('/email-integration', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/email-integration') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Email</span>
+                            </a>
+                        </div>
+                        <div class="menu-item">
                             <a class="menu-link <?= isActive('/integrations/meta', $currentUri) && !isActive('/integrations/whatsapp-coex', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/integrations/meta') ?>">
                                 <span class="menu-bullet">
                                     <span class="bullet bullet-dot"></span>

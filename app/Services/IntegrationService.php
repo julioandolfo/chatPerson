@@ -28,6 +28,9 @@ class IntegrationService
                 return new WhatsAppService();
             case 'evolution':
                 return new EvolutionService();
+            case 'imap':
+                // Canal de Email (IMAP/SMTP)
+                return new EmailService();
             default:
                 throw new \InvalidArgumentException("Provider não suportado: {$provider}");
         }

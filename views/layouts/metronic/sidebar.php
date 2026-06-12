@@ -731,6 +731,16 @@
                                   </a>
                               </div>
                               <?php endif; ?>
+                              <?php if (\App\Helpers\Permission::can('integrations.view')): ?>
+                              <div class="menu-item">
+                                  <a class="menu-link <?= isActive('/email-integration', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/email-integration') ?>">
+                                      <span class="menu-bullet">
+                                          <span class="bullet bullet-dot"></span>
+                                      </span>
+                                      <span class="menu-title">Canal de Email</span>
+                                  </a>
+                              </div>
+                              <?php endif; ?>
                           </div>
                           <!--end:Menu sub-->
                       </div>

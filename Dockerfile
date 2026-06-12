@@ -23,12 +23,13 @@ RUN apt-get update && apt-get install -y \
     libwebp-dev \
     libonig-dev \
     libxml2-dev \
+    libzip-dev \
     zip \
     curl \
     ffmpeg \
     libpq-dev \
  && docker-php-ext-configure gd --with-jpeg --with-freetype --with-webp \
- && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql gd \
+ && docker-php-ext-install pdo pdo_mysql pdo_pgsql pgsql gd zip \
  && a2enmod rewrite
 
 # Ajusta DocumentRoot para /public

@@ -12629,6 +12629,23 @@ function applyFilters() {
     refreshConversationList(params);
 }
 
+// ✅ Rede de segurança contra duplicação: remove nós com data-conversation-id
+// repetido, mantendo o primeiro. Cobre append sobreposto e inserções em tempo real.
+function dedupeConversationList() {
+    const list = document.querySelector('.conversations-list-items');
+    if (!list) return;
+    const seen = new Set();
+    list.querySelectorAll('[data-conversation-id]').forEach(el => {
+        const id = el.getAttribute('data-conversation-id');
+        if (!id) return;
+        if (seen.has(id)) {
+            el.remove();
+        } else {
+            seen.add(id);
+        }
+    });
+}
+
 function refreshConversationList(params = null, append = false) {
     console.debug('[TAGS_DEBUG] refreshConversationList start', params instanceof URLSearchParams ? Object.fromEntries(params.entries()) : params);
     const conversationsList = document.querySelector('.conversations-list-items');
@@ -12815,18 +12832,34 @@ function refreshConversationList(params = null, append = false) {
             }
         }
         
+        // ✅ DEDUP: remover conversas repetidas antes de renderizar
+        // 1) duplicatas dentro do próprio lote (por id)
+        const _seenIds = new Set();
+        let renderList = conversations.filter(c => {
+            const id = String(c.id);
+            if (_seenIds.has(id)) return false;
+            _seenIds.add(id);
+            return true;
+        });
+        // 2) no append, descartar as que já estão renderizadas na lista (overlap de paginação)
+        if (append) {
+            renderList = renderList.filter(c => !conversationsList.querySelector(`[data-conversation-id="${c.id}"]`));
+        }
+
         // Renderizar conversas usando função consolidada
         let html = '';
-        conversations.forEach(conv => {
+        renderList.forEach(conv => {
             html += renderConversationItemHtml(conv, selectedConversationId);
         });
-        
+
         // Renderização (suporta append para "Carregar mais")
         if (append) {
             conversationsList.insertAdjacentHTML('beforeend', html);
         } else {
             conversationsList.innerHTML = html;
         }
+        // 3) rede de segurança final: remover qualquer nó duplicado remanescente
+        dedupeConversationList();
         conversationsList.dataset.loaded = '1';
         conversationsList.dataset.rendering = '0';
         
@@ -20507,7 +20540,10 @@ function addConversationToList(conv) {
     
     // Adicionar ao topo da lista
     conversationsList.insertAdjacentHTML('afterbegin', conversationHtml);
-    
+
+    // ✅ Rede de segurança: garantir que não haja item duplicado após a inserção
+    dedupeConversationList();
+
     // Renderizar barra de auto-close para o novo item
     const newItem = conversationsList.querySelector(`[data-conversation-id="${conv.id}"]`);
     if (newItem) renderAutoCloseBar(newItem);

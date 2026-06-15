@@ -93,6 +93,16 @@ class AIAgentService
             unset($data['vision_window']);
         }
 
+        // Fallback de erro: atendente para quem encaminhar + mensagem ao cliente
+        if (array_key_exists('error_assign_agent_id', $data)) {
+            $settings['error_assign_agent_id'] = (int)$data['error_assign_agent_id'] ?: null;
+            unset($data['error_assign_agent_id']);
+        }
+        if (array_key_exists('error_message', $data)) {
+            $settings['error_message'] = trim((string)$data['error_message']);
+            unset($data['error_message']);
+        }
+
         if (!empty($settings)) {
             $data['settings'] = json_encode($settings, JSON_UNESCAPED_UNICODE);
         }
@@ -200,6 +210,16 @@ class AIAgentService
             $w = (int)$data['vision_window'];
             $existingSettings['vision_window'] = max(1, min(20, $w ?: 5));
             unset($data['vision_window']);
+        }
+
+        // Fallback de erro: atendente para quem encaminhar + mensagem ao cliente
+        if (array_key_exists('error_assign_agent_id', $data)) {
+            $existingSettings['error_assign_agent_id'] = (int)$data['error_assign_agent_id'] ?: null;
+            unset($data['error_assign_agent_id']);
+        }
+        if (array_key_exists('error_message', $data)) {
+            $existingSettings['error_message'] = trim((string)$data['error_message']);
+            unset($data['error_message']);
         }
 
         if (!empty($existingSettings)) {
@@ -698,15 +718,49 @@ class AIAgentService
                 'trace' => $e->getTraceAsString()
             ]);
             
-            // Enviar mensagem de erro ao usuário
+            // Configuração de fallback do agente (settings JSON):
+            // mensagem customizável + atendente para quem encaminhar.
+            $fallbackMsg = "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente ou entre em contato com um agente humano.";
+            $assignAgentId = null;
+            try {
+                $agentCfg = \App\Models\AIAgent::find($agentId);
+                $agentSettings = is_string($agentCfg['settings'] ?? null)
+                    ? (json_decode($agentCfg['settings'], true) ?: [])
+                    : ($agentCfg['settings'] ?? []);
+                if (!empty($agentSettings['error_message'])) {
+                    $fallbackMsg = (string)$agentSettings['error_message'];
+                }
+                if (!empty($agentSettings['error_assign_agent_id'])) {
+                    $assignAgentId = (int)$agentSettings['error_assign_agent_id'];
+                }
+            } catch (\Throwable $cfgEx) {
+                // mantém padrões
+            }
+
+            // Enviar mensagem de erro ao cliente
             \App\Services\ConversationService::sendMessage(
                 $conversationId,
-                "Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente ou entre em contato com um agente humano.",
+                $fallbackMsg,
                 'agent',
                 null,
                 []
             );
-            
+
+            // Encaminhar a conversa para um atendente humano (remover IA + atribuir)
+            if ($assignAgentId) {
+                try {
+                    \App\Services\ConversationAIService::removeAIAgent($conversationId, ['reason' => 'ai_error']);
+                } catch (\Throwable $rmEx) {
+                    \App\Helpers\Logger::error("AIAgentService::processMessage - falha ao remover IA no erro (conv={$conversationId}): " . $rmEx->getMessage());
+                }
+                try {
+                    \App\Services\ConversationService::assignToAgent($conversationId, $assignAgentId, true);
+                    \App\Helpers\Logger::info("AIAgentService::processMessage - Conversa {$conversationId} encaminhada ao atendente {$assignAgentId} após erro da IA");
+                } catch (\Throwable $asEx) {
+                    \App\Helpers\Logger::error("AIAgentService::processMessage - falha ao atribuir atendente {$assignAgentId} no erro (conv={$conversationId}): " . $asEx->getMessage());
+                }
+            }
+
             throw $e;
         }
     }

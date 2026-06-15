@@ -509,7 +509,31 @@ ob_start();
                         </div>
                     </div>
                     <!--end::Leitura de Imagens (Vision)-->
-                    
+
+                    <!--begin::Fallback de erro-->
+                    <div class="fv-row mb-7 p-4 border border-dashed rounded">
+                        <label class="fw-semibold fs-6 mb-1 d-block">Quando a IA falhar (fallback de erro)</label>
+                        <div class="form-text fs-8 mb-3">Se ocorrer um erro ao processar a mensagem, a conversa é encaminhada ao atendente escolhido e a mensagem abaixo é enviada ao cliente.</div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Encaminhar para o atendente</label>
+                                <select name="error_assign_agent_id" id="edit_error_assign_agent_id" class="form-select form-select-solid">
+                                    <option value="">(não encaminhar — apenas enviar mensagem)</option>
+                                    <?php foreach (($humanAgents ?? []) as $ha): ?>
+                                        <option value="<?= (int)$ha['id'] ?>"><?= htmlspecialchars($ha['name'] ?? ('#' . $ha['id'])) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-semibold fs-7 mb-1">Mensagem enviada ao cliente</label>
+                                <textarea name="error_message" id="edit_error_message" class="form-control form-control-solid" rows="3"
+                                    placeholder="Desculpe, ocorreu um erro ao processar sua mensagem. Por favor, tente novamente ou entre em contato com um agente humano."></textarea>
+                                <div class="form-text fs-8">Deixe em branco para usar a mensagem padrão.</div>
+                            </div>
+                        </div>
+                    </div>
+                    <!--end::Fallback de erro-->
+
                     <div class="fv-row mb-7">
                         <label class="d-flex align-items-center">
                             <input type="checkbox" name="enabled" id="edit_enabled" class="form-check-input me-2" />
@@ -685,7 +709,13 @@ function editAgent(id) {
             if (document.getElementById("edit_prefer_tools")) {
                 document.getElementById("edit_prefer_tools").checked = settings.prefer_tools || false;
             }
-            
+            if (document.getElementById("edit_error_assign_agent_id")) {
+                document.getElementById("edit_error_assign_agent_id").value = settings.error_assign_agent_id || "";
+            }
+            if (document.getElementById("edit_error_message")) {
+                document.getElementById("edit_error_message").value = settings.error_message || "";
+            }
+
             // Atualizar contador de caracteres do prompt
             updatePromptCharCount('edit');
             

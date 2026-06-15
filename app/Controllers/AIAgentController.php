@@ -37,17 +37,20 @@ class AIAgentController
         try {
             $agents = AIAgentService::list($filters);
             $allTools = AITool::getAllActive();
-            
+            $humanAgents = \App\Models\User::getActiveAgents();
+
             Response::view('ai-agents/index', [
                 'agents' => $agents,
                 'allTools' => $allTools,
-                'filters' => $filters
+                'filters' => $filters,
+                'humanAgents' => $humanAgents
             ]);
         } catch (\Exception $e) {
             Response::view('ai-agents/index', [
                 'agents' => [],
                 'allTools' => [],
                 'filters' => $filters,
+                'humanAgents' => [],
                 'error' => $e->getMessage()
             ]);
         }

@@ -68,7 +68,7 @@ class EmailRuleEngine
         $subject = (string)($email['subject'] ?? '');
         $body = (string)($email['text'] ?? '');
         if ($body === '' && !empty($email['html'])) {
-            $body = strip_tags($email['html']);
+            $body = \App\Services\Email\HtmlToText::convert((string)$email['html']);
         }
         $from = (string)($email['from_email'] ?? '');
 

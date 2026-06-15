@@ -158,6 +158,11 @@ class ImapClient
         $text = (string) $message->getTextBody();
         $html = (string) $message->getHTMLBody();
 
+        // Se não houver texto puro, derivar texto limpo do HTML (sem CSS/JS)
+        if (trim($text) === '' && trim($html) !== '') {
+            $text = HtmlToText::convert($html);
+        }
+
         $ts = time();
         try {
             $date = $message->getDate();

@@ -210,7 +210,7 @@ class EmailIngestService
     {
         $text = (string)($email['text'] ?? '');
         if ($text === '' && !empty($email['html'])) {
-            $text = trim(html_entity_decode(strip_tags($email['html']), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+            $text = \App\Services\Email\HtmlToText::convert((string)$email['html']);
         }
         if (!empty($cfg['strip_quoted'])) {
             $text = self::stripQuoted($text);

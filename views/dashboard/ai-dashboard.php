@@ -164,6 +164,42 @@ ob_start();
                             'icon' => 'ki-microphone',
                             'color' => 'success',
                             'emoji' => '🎤'
+                        ],
+                        'embedding' => [
+                            'title' => 'Embeddings (RAG)',
+                            'icon' => 'ki-abstract-26',
+                            'color' => 'primary',
+                            'emoji' => '🔎'
+                        ],
+                        'tts' => [
+                            'title' => 'Voz (TTS)',
+                            'icon' => 'ki-sound',
+                            'color' => 'info',
+                            'emoji' => '🔊'
+                        ],
+                        'agent_memory' => [
+                            'title' => 'Memória do Agente',
+                            'icon' => 'ki-brain',
+                            'color' => 'warning',
+                            'emoji' => '🧠'
+                        ],
+                        'mockup_generation' => [
+                            'title' => 'Visão + DALL·E',
+                            'icon' => 'ki-picture',
+                            'color' => 'danger',
+                            'emoji' => '🎨'
+                        ],
+                        'kanban_agent' => [
+                            'title' => 'Agentes Kanban',
+                            'icon' => 'ki-element-11',
+                            'color' => 'success',
+                            'emoji' => '📋'
+                        ],
+                        'ai_assistant' => [
+                            'title' => 'Assistente IA',
+                            'icon' => 'ki-message-text-2',
+                            'color' => 'info',
+                            'emoji' => '✨'
                         ]
                     ];
                     

@@ -89,7 +89,17 @@ class EmbeddingService
                 error_log("EmbeddingService: Dimensão incorreta: " . count($embedding));
                 return null;
             }
-            
+
+            // Registrar consumo de IA (tokens/custo)
+            $tokens = (int)($data['usage']['total_tokens'] ?? 0);
+            AIUsageLogger::record('embedding', [
+                'model' => self::MODEL,
+                'tokens_used' => $tokens,
+                'prompt_tokens' => $tokens,
+                'cost' => AIUsageLogger::estimateEmbeddingCost(self::MODEL, $tokens),
+                'metadata' => ['type' => 'single', 'chars' => strlen($text)],
+            ]);
+
             return $embedding;
             
         } catch (\Exception $e) {
@@ -173,7 +183,17 @@ class EmbeddingService
                     $embeddings[] = $item['embedding'];
                 }
             }
-            
+
+            // Registrar consumo de IA (tokens/custo)
+            $tokens = (int)($data['usage']['total_tokens'] ?? 0);
+            AIUsageLogger::record('embedding', [
+                'model' => self::MODEL,
+                'tokens_used' => $tokens,
+                'prompt_tokens' => $tokens,
+                'cost' => AIUsageLogger::estimateEmbeddingCost(self::MODEL, $tokens),
+                'metadata' => ['type' => 'batch', 'inputs' => count($cleanTexts)],
+            ]);
+
             return $embeddings;
             
         } catch (\Exception $e) {

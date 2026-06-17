@@ -114,6 +114,14 @@ class DALLEService
 
             $processingTime = round((microtime(true) - $startTime) * 1000);
 
+            // Registrar consumo de IA (visão GPT-4o + geração DALL·E 3)
+            AIUsageLogger::record('mockup_generation', [
+                'provider' => 'openai',
+                'model' => 'gpt-4o+dall-e-3',
+                'cost' => (float)($costs['total'] ?? 0),
+                'metadata' => ['gpt4_cost' => $costs['gpt4'] ?? 0, 'dalle_cost' => $costs['dalle'] ?? 0],
+            ]);
+
             return [
                 'success' => true,
                 'image_url' => $dalleResult['image_url'],

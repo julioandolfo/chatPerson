@@ -182,6 +182,18 @@ Retorne APENAS o JSON, sem texto adicional.";
         }
 
         $data = json_decode($response, true);
+
+        // Registrar consumo de IA (tokens/custo)
+        $promptTokens = (int)($data['usage']['prompt_tokens'] ?? 0);
+        $completionTokens = (int)($data['usage']['completion_tokens'] ?? 0);
+        AIUsageLogger::record('agent_memory', [
+            'model' => 'gpt-3.5-turbo',
+            'tokens_used' => (int)($data['usage']['total_tokens'] ?? ($promptTokens + $completionTokens)),
+            'prompt_tokens' => $promptTokens,
+            'completion_tokens' => $completionTokens,
+            'cost' => AIUsageLogger::estimateChatCost('gpt-3.5-turbo', $promptTokens, $completionTokens),
+        ]);
+
         return $data['choices'][0]['message']['content'] ?? '';
     }
 

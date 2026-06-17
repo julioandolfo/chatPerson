@@ -1076,28 +1076,76 @@ class DashboardService
         $coachingCostTotal = (float)($coachingCost['cost'] ?? 0);
         $coachingHints = (int)($coachingCost['hints'] ?? 0);
         
-        // 5. Audio Transcription (Transcrição de Áudio) - se a tabela existir
-        $audioTokens = 0;
-        $audioCostTotal = 0;
-        $audioTranscriptions = 0;
+        // 5. Demais consumos de IA rastreados na tabela unificada ai_usage_logs
+        //    (transcrição de áudio de mensagens, embeddings, TTS, extração de
+        //     memória, visão/DALL·E e agentes Kanban)
+        $usageByFeature = [];
         try {
-            $sqlAudioCost = "SELECT 
-                                COALESCE(SUM(at.tokens_used), 0) as tokens,
-                                COALESCE(SUM(at.cost), 0) as cost,
-                                COUNT(*) as transcriptions
-                             FROM audio_transcriptions at
-                             WHERE at.created_at >= ? AND at.created_at <= ?";
-            $audioCost = \App\Helpers\Database::fetch($sqlAudioCost, [$dateFrom, $dateTo]);
-            $audioTokens = (int)($audioCost['tokens'] ?? 0);
-            $audioCostTotal = (float)($audioCost['cost'] ?? 0);
-            $audioTranscriptions = (int)($audioCost['transcriptions'] ?? 0);
+            $usageRows = \App\Helpers\Database::fetchAll(
+                "SELECT feature,
+                        COALESCE(SUM(tokens_used), 0) as tokens,
+                        COALESCE(SUM(cost), 0) as cost,
+                        COUNT(*) as cnt
+                 FROM ai_usage_logs
+                 WHERE created_at >= ? AND created_at <= ?
+                 GROUP BY feature",
+                [$dateFrom, $dateTo]
+            );
+            foreach ($usageRows as $row) {
+                $usageByFeature[$row['feature']] = [
+                    'tokens' => (int)$row['tokens'],
+                    'cost' => (float)$row['cost'],
+                    'count' => (int)$row['cnt'],
+                ];
+            }
+        } catch (\Exception $e) {
+            // Tabela ainda não existe (migration não executada) - ignorar
+        }
+
+        $usageFeature = function (string $key) use ($usageByFeature) {
+            return $usageByFeature[$key] ?? ['tokens' => 0, 'cost' => 0, 'count' => 0];
+        };
+
+        $audioUsage = $usageFeature('audio_transcription');
+        $audioTokens = $audioUsage['tokens'];
+        $audioCostTotal = $audioUsage['cost'];
+        $audioTranscriptions = $audioUsage['count'];
+
+        $embeddingUsage = $usageFeature('embedding');
+        $ttsUsage = $usageFeature('tts');
+        $memoryUsage = $usageFeature('agent_memory');
+        $mockupUsage = $usageFeature('mockup_generation');
+        $kanbanUsage = $usageFeature('kanban_agent');
+
+        // Soma de TODOS os consumos da tabela unificada (inclui recursos futuros)
+        $usageTokensTotal = (int)array_sum(array_column($usageByFeature, 'tokens'));
+        $usageCostTotal = (float)array_sum(array_column($usageByFeature, 'cost'));
+
+        // 6. Assistente IA (ai_assistant_logs) - antes ficava fora do total
+        $assistantTokens = 0;
+        $assistantCostTotal = 0;
+        $assistantUses = 0;
+        try {
+            $assistantRow = \App\Helpers\Database::fetch(
+                "SELECT COALESCE(SUM(tokens_used), 0) as tokens,
+                        COALESCE(SUM(cost), 0) as cost,
+                        COUNT(*) as cnt
+                 FROM ai_assistant_logs
+                 WHERE created_at >= ? AND created_at <= ?",
+                [$dateFrom, $dateTo]
+            );
+            $assistantTokens = (int)($assistantRow['tokens'] ?? 0);
+            $assistantCostTotal = (float)($assistantRow['cost'] ?? 0);
+            $assistantUses = (int)($assistantRow['cnt'] ?? 0);
         } catch (\Exception $e) {
             // Tabela não existe ou erro - ignorar
         }
-        
-        // Total consolidado
-        $totalTokens = $aiConvTokens + $sentimentTokens + $perfTokens + $coachingTokens + $audioTokens;
-        $totalCost = $aiConvCostTotal + $sentimentCostTotal + $perfCostTotal + $coachingCostTotal + $audioCostTotal;
+
+        // Total consolidado (agora inclui TODOS os consumos de IA)
+        $totalTokens = $aiConvTokens + $sentimentTokens + $perfTokens + $coachingTokens
+                     + $usageTokensTotal + $assistantTokens;
+        $totalCost = $aiConvCostTotal + $sentimentCostTotal + $perfCostTotal + $coachingCostTotal
+                   + $usageCostTotal + $assistantCostTotal;
         
         // Conversas resolvidas pela IA (sem escalonar para humano)
         $sqlResolved = "SELECT COUNT(DISTINCT ac.conversation_id) as total
@@ -1170,6 +1218,36 @@ class DashboardService
                     'tokens' => $audioTokens,
                     'cost' => round($audioCostTotal, 4),
                     'count' => $audioTranscriptions
+                ],
+                'embedding' => [
+                    'tokens' => $embeddingUsage['tokens'],
+                    'cost' => round($embeddingUsage['cost'], 4),
+                    'count' => $embeddingUsage['count']
+                ],
+                'tts' => [
+                    'tokens' => $ttsUsage['tokens'],
+                    'cost' => round($ttsUsage['cost'], 4),
+                    'count' => $ttsUsage['count']
+                ],
+                'agent_memory' => [
+                    'tokens' => $memoryUsage['tokens'],
+                    'cost' => round($memoryUsage['cost'], 4),
+                    'count' => $memoryUsage['count']
+                ],
+                'mockup_generation' => [
+                    'tokens' => $mockupUsage['tokens'],
+                    'cost' => round($mockupUsage['cost'], 4),
+                    'count' => $mockupUsage['count']
+                ],
+                'kanban_agent' => [
+                    'tokens' => $kanbanUsage['tokens'],
+                    'cost' => round($kanbanUsage['cost'], 4),
+                    'count' => $kanbanUsage['count']
+                ],
+                'ai_assistant' => [
+                    'tokens' => $assistantTokens,
+                    'cost' => round($assistantCostTotal, 4),
+                    'count' => $assistantUses
                 ]
             ]
         ];

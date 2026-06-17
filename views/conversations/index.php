@@ -3163,6 +3163,22 @@ function getChannelInfo(channel) {
                 </span>
             <?php endif; ?>
         </h2>
+        <?php
+            $__queueUserId = \App\Helpers\Auth::id();
+            $__queueActive = $__queueUserId ? \App\Models\User::isQueueEnabled((int)$__queueUserId) : false;
+        ?>
+        <?php if ($__queueUserId): ?>
+            <span class="badge <?= $__queueActive ? 'badge-light-success' : 'badge-light-danger' ?> fs-7 d-inline-flex align-items-center"
+                  title="<?= $__queueActive
+                      ? 'Você está ATIVO na fila: recebe novas conversas pela distribuição automática (round-robin).'
+                      : 'Você está INATIVO na fila: novas conversas não são distribuídas para você (apenas retornos da sua carteira chegam). Peça a um administrador para reativar sua fila.' ?>">
+                <i class="ki-duotone <?= $__queueActive ? 'ki-check-circle' : 'ki-cross-circle' ?> fs-6 me-1">
+                    <span class="path1"></span>
+                    <span class="path2"></span>
+                </i>
+                <?= $__queueActive ? 'Ativo na fila de conversas' : 'Inativo na fila de conversas' ?>
+            </span>
+        <?php endif; ?>
     </div>
     <div class="d-flex align-items-center gap-4 flex-wrap" id="agent-metrics-container" style="margin-left: auto;">
         <div class="d-flex align-items-center gap-2">

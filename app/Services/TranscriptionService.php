@@ -195,6 +195,13 @@ class TranscriptionService
 
                 Logger::info("TranscriptionService::transcribe - ✅ Transcrição OK (len=" . strlen($text) . ", duration={$duration}s, cost=$" . number_format($cost, 4) . ", time=" . round($executionTime, 2) . "s)");
 
+                // Registrar consumo de IA (Whisper é cobrado por minuto, não por token)
+                AIUsageLogger::record('audio_transcription', [
+                    'model' => $options['model'] ?? 'whisper-1',
+                    'cost' => $cost,
+                    'metadata' => ['duration_seconds' => $duration],
+                ]);
+
                 return [
                     'success' => true,
                     'text' => $text,

@@ -926,12 +926,24 @@ class KanbanAgentService
         }
 
         $result = json_decode($response, true);
-        
+
         if (!isset($result['choices'][0]['message']['content'])) {
             self::logError("Resposta inválida da OpenAI: " . json_encode($result));
             throw new \Exception("Resposta inválida da API OpenAI");
         }
-        
+
+        // Registrar consumo de IA (tokens/custo)
+        $promptTokens = (int)($result['usage']['prompt_tokens'] ?? 0);
+        $completionTokens = (int)($result['usage']['completion_tokens'] ?? 0);
+        AIUsageLogger::record('kanban_agent', [
+            'model' => $model,
+            'tokens_used' => (int)($result['usage']['total_tokens'] ?? ($promptTokens + $completionTokens)),
+            'prompt_tokens' => $promptTokens,
+            'completion_tokens' => $completionTokens,
+            'cost' => AIUsageLogger::estimateChatCost($model, $promptTokens, $completionTokens),
+            'metadata' => ['agent_id' => $agent['id'] ?? null],
+        ]);
+
         return $result['choices'][0]['message']['content'] ?? '';
     }
     

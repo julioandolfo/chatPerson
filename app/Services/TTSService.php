@@ -87,6 +87,12 @@ class TTSService
         
         if ($result['success']) {
             Logger::info("TTSService::generateAudio - ✅ Sucesso com provider primário: {$primaryProvider}");
+            AIUsageLogger::record('tts', [
+                'provider' => $primaryProvider,
+                'model' => $mergedSettings['model'] ?? null,
+                'cost' => (float)($result['cost'] ?? 0),
+                'metadata' => ['chars' => strlen($text), 'duration' => $result['duration'] ?? null],
+            ]);
             return $result;
         }
 
@@ -130,6 +136,12 @@ class TTSService
             $fallbackResult['used_fallback'] = true;
             $fallbackResult['primary_provider'] = $primaryProvider;
             $fallbackResult['primary_error'] = $primaryError;
+            AIUsageLogger::record('tts', [
+                'provider' => $fallbackProvider,
+                'model' => $fallbackSettings['model'] ?? null,
+                'cost' => (float)($fallbackResult['cost'] ?? 0),
+                'metadata' => ['chars' => strlen($text), 'duration' => $fallbackResult['duration'] ?? null, 'used_fallback' => true],
+            ]);
             return $fallbackResult;
         }
         

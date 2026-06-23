@@ -47,13 +47,12 @@ class ManualGeneratorService
             $params[] = $agentId;
         }
 
-        $sql = "SELECT c.id, c.contact_id, ct.name AS contact_name,
-                       (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msg_count
+        $sql = "SELECT c.id, c.contact_id, ct.name AS contact_name
                 FROM conversations c
                 LEFT JOIN contacts ct ON ct.id = c.contact_id
                 WHERE {$where}
                   AND c.status IN ('resolved','closed')
-                HAVING msg_count >= 4
+                  AND (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) >= 4
                 ORDER BY c.created_at DESC
                 LIMIT {$limit}";
 
@@ -109,6 +108,7 @@ class ManualGeneratorService
 
     /**
      * Executar o job completo (MAP → REDUCE). Retorna o id do manual gerado.
+     * Garante estado terminal: qualquer exceção marca o job como 'failed'.
      */
     public static function runJob(int $jobId): int
     {
@@ -117,16 +117,40 @@ class ManualGeneratorService
             throw new \RuntimeException("Job {$jobId} não encontrado");
         }
 
-        // Trava atômica: só processa quem conseguir mudar de 'pending' para 'mapping'.
-        // Evita processamento duplicado (ex.: fpm + worker cron disputando o mesmo job).
+        // Trava atômica: processa quem conseguir mudar de 'pending' para 'mapping'.
+        // Também recupera jobs presos em estado intermediário há mais de 15 min
+        // (worker morto, fatal, etc.) — evita jobs travados para sempre.
         $claimed = Database::execute(
-            "UPDATE manual_jobs SET status='mapping' WHERE id=? AND status='pending'",
+            "UPDATE manual_jobs SET status='mapping'
+             WHERE id=? AND (
+                 status='pending'
+                 OR (status IN ('mapping','clustering','reducing') AND updated_at < (NOW() - INTERVAL 15 MINUTE))
+             )",
             [$jobId]
         );
         if ($claimed < 1) {
             throw new \RuntimeException("Job {$jobId} já está em processamento ou concluído.");
         }
 
+        try {
+            return self::process($jobId, $job);
+        } catch (\Throwable $e) {
+            // Estado terminal garantido em qualquer falha (resolve spinner infinito).
+            Database::execute(
+                "UPDATE manual_jobs SET status='failed', error_message=? WHERE id=?",
+                [mb_substr($e->getMessage(), 0, 1000), $jobId]
+            );
+            Logger::error("ManualGenerator job {$jobId} falhou: " . $e->getMessage());
+            throw $e;
+        }
+    }
+
+    /**
+     * Pipeline interno do job (MAP → CLUSTER → REDUCE). Lança em caso de erro;
+     * o estado 'failed' é definido por runJob().
+     */
+    private static function process(int $jobId, array $job): int
+    {
         $convs = self::selectConversations(
             $job['agent_id'] ? (int)$job['agent_id'] : null,
             $job['date_from'],
@@ -140,9 +164,7 @@ class ManualGeneratorService
         );
 
         if (empty($convs)) {
-            Database::execute("UPDATE manual_jobs SET status='failed', error_message=? WHERE id=?",
-                ['Nenhuma conversa elegível no período/filtro.', $jobId]);
-            throw new \RuntimeException('Nenhuma conversa elegível encontrada.');
+            throw new \RuntimeException('Nenhuma conversa elegível no período/filtro.');
         }
 
         // ---------- MAP ----------
@@ -153,37 +175,36 @@ class ManualGeneratorService
 
         foreach ($convs as $c) {
             $transcript = self::buildTranscript((int)$c['id'], $c['contact_name'] ?? null);
-            if ($transcript === '') { $processed++; continue; }
+            if ($transcript !== '') {
+                $result = self::mapConversation($transcript, $job['model_map']);
+                if ($result && !empty($result['extract'])) {
+                    $items[] = ['conversation_id' => (int)$c['id'], 'data' => $result['extract']];
+                    Database::insert(
+                        "INSERT INTO manual_extracts (job_id, conversation_id, extract_json, tokens, cost, created_at)
+                         VALUES (?, ?, ?, ?, ?, NOW())",
+                        [$jobId, (int)$c['id'], json_encode($result['extract'], JSON_UNESCAPED_UNICODE),
+                         $result['tokens'], round($result['cost'], 6)]
+                    );
+                    $totalTokens += $result['tokens'];
+                    $totalCost += $result['cost'];
 
-            $result = self::mapConversation($transcript, $job['model_map']);
-            if ($result && !empty($result['extract'])) {
-                $items[] = ['conversation_id' => (int)$c['id'], 'data' => $result['extract']];
-                Database::insert(
-                    "INSERT INTO manual_extracts (job_id, conversation_id, extract_json, tokens, cost, created_at)
-                     VALUES (?, ?, ?, ?, ?, NOW())",
-                    [$jobId, (int)$c['id'], json_encode($result['extract'], JSON_UNESCAPED_UNICODE),
-                     $result['tokens'], round($result['cost'], 6)]
-                );
-                $totalTokens += $result['tokens'];
-                $totalCost += $result['cost'];
-
-                AIUsageLogger::record('manual_generation', [
-                    'model' => $job['model_map'],
-                    'tokens_used' => $result['tokens'],
-                    'cost' => $result['cost'],
-                    'conversation_id' => (int)$c['id'],
-                    'metadata' => ['stage' => 'map', 'job_id' => $jobId],
-                ]);
+                    AIUsageLogger::record('manual_generation', [
+                        'model' => $job['model_map'],
+                        'tokens_used' => $result['tokens'],
+                        'cost' => $result['cost'],
+                        'conversation_id' => (int)$c['id'],
+                        'metadata' => ['stage' => 'map', 'job_id' => $jobId],
+                    ]);
+                }
             }
 
+            // Progresso sempre persistido (inclusive em transcript vazio).
             $processed++;
             Database::execute("UPDATE manual_jobs SET processed_conversations=? WHERE id=?", [$processed, $jobId]);
         }
 
         if (empty($items)) {
-            Database::execute("UPDATE manual_jobs SET status='failed', error_message=? WHERE id=?",
-                ['Não foi possível extrair conhecimento das conversas.', $jobId]);
-            throw new \RuntimeException('MAP não produziu extrações.');
+            throw new \RuntimeException('Não foi possível extrair conhecimento das conversas.');
         }
 
         // ---------- CLUSTER (dedupe por similaridade semântica) ----------
@@ -273,8 +294,9 @@ class ManualGeneratorService
         $text = preg_replace('/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/', '[CNPJ]', $text);
         // CPF
         $text = preg_replace('/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/', '[CPF]', $text);
-        // Telefone (BR, com ou sem DDI/DDD)
-        $text = preg_replace('/\b(?:\+?55\s?)?\(?\d{2}\)?[\s.-]?\d{4,5}[\s.-]?\d{4}\b/', '[TELEFONE]', $text);
+        // Telefone (BR, com ou sem DDI/DDD). Usa lookaround para consumir o '(' do DDD
+        // e não deixar parêntese solto (ex.: "(11) 98765-4321").
+        $text = preg_replace('/(?<!\d)(?:\+?55[\s.-]?)?\(?\d{2}\)?[\s.-]?\d{4,5}[\s.-]?\d{4}(?!\d)/', '[TELEFONE]', $text);
 
         return $text;
     }
@@ -382,7 +404,9 @@ class ManualGeneratorService
             if (!empty($d['norma_ou_criterio'])) $normas[]  = trim($d['norma_ou_criterio']);
             if (!empty($d['tom_linguagem']))    $tons[]     = trim($d['tom_linguagem']);
             if (!empty($d['categoria']))        $cats[]     = trim($d['categoria']);
-            if (isset($m['cid']))               $cids[]     = $m['cid'];
+            // ID da conversa: caminho com embedding usa 'cid'; caminho cru usa 'conversation_id'.
+            $cid = $m['cid'] ?? $m['conversation_id'] ?? null;
+            if ($cid !== null)                  $cids[]     = $cid;
         }
         return [
             'categoria' => self::topValue($cats),
@@ -442,7 +466,9 @@ class ManualGeneratorService
         ], 4000, 0.4, true);
 
         if (!$resp) {
-            return ['manual_markdown' => "## Falha ao gerar o manual\nTente novamente.", 'divergences' => [], 'tokens' => 0, 'cost' => 0];
+            // Lança para que runJob marque o job como 'failed' (em vez de gravar
+            // um manual placeholder e marcar 'done').
+            throw new \RuntimeException('Falha na síntese (REDUCE): OpenAI indisponível ou resposta inválida.');
         }
 
         $parsed = self::parseJson($resp['content']);

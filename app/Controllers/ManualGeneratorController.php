@@ -101,15 +101,20 @@ class ManualGeneratorController
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['success' => true, 'job_id' => $jobId, 'status' => 'pending']);
 
+        @set_time_limit(0);
+        @ignore_user_abort(true);
+
         if (function_exists('fastcgi_finish_request')) {
+            // php-fpm: libera a resposta e processa em background (com progresso ao vivo).
             fastcgi_finish_request();
-            @set_time_limit(0);
-            @ignore_user_abort(true);
-            try {
-                ManualGeneratorService::runJob($jobId);
-            } catch (\Throwable $e) {
-                \App\Helpers\Logger::error('Manual job ' . $jobId . ' falhou: ' . $e->getMessage());
-            }
+        }
+        // Em ambos os casos processa aqui. Sem fpm, o cliente recebe a resposta ao
+        // final do job (sem progresso ao vivo), mas o job NÃO fica preso em 'pending'
+        // mesmo sem o worker cron configurado.
+        try {
+            ManualGeneratorService::runJob($jobId);
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::error('Manual job ' . $jobId . ' falhou: ' . $e->getMessage());
         }
         return;
     }

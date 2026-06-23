@@ -198,7 +198,12 @@ function failProgress(msg) {
 }
 
 function pollStatus(jobId) {
+    const deadline = Date.now() + 20 * 60 * 1000; // teto de segurança: 20 min
     const tick = () => {
+        if (Date.now() > deadline) {
+            failProgress('Tempo limite excedido ao aguardar a geração. Verifique em "Manuais gerados" ou tente novamente.');
+            return;
+        }
         fetch('<?= Url::to('/manuals/status') ?>?job_id=' + jobId, {
             credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         })

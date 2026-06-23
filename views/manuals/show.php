@@ -16,35 +16,42 @@ $aiAgents = $aiAgents ?? [];
 /** Conversor mínimo de Markdown → HTML (headings, bold, listas, parágrafos). */
 function mdToHtml(string $md): string {
     $out = [];
-    $inList = false;
+    $listType = null; // null | 'ul' | 'ol'
+    $closeList = function () use (&$out, &$listType) {
+        if ($listType !== null) { $out[] = '</' . $listType . '>'; $listType = null; }
+    };
+    $openList = function (string $type) use (&$out, &$listType, $closeList) {
+        if ($listType !== $type) { $closeList(); $out[] = '<' . $type . ' class="mb-3">'; $listType = $type; }
+    };
+
     foreach (preg_split('/\r?\n/', $md) as $line) {
         $safe = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
         $safe = preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', $safe);
         $safe = preg_replace('/(?<!\*)\*(?!\*)(.+?)\*(?!\*)/', '<em>$1</em>', $safe);
 
         if (preg_match('/^\s*###\s+(.*)/', $line, $mm)) {
-            if ($inList) { $out[] = '</ul>'; $inList = false; }
+            $closeList();
             $out[] = '<h4 class="fw-bold mt-4 mb-2">' . htmlspecialchars($mm[1]) . '</h4>';
         } elseif (preg_match('/^\s*##\s+(.*)/', $line, $mm)) {
-            if ($inList) { $out[] = '</ul>'; $inList = false; }
+            $closeList();
             $out[] = '<h3 class="fw-bold mt-5 mb-3 text-primary">' . htmlspecialchars($mm[1]) . '</h3>';
         } elseif (preg_match('/^\s*#\s+(.*)/', $line, $mm)) {
-            if ($inList) { $out[] = '</ul>'; $inList = false; }
+            $closeList();
             $out[] = '<h2 class="fw-bolder mt-5 mb-3">' . htmlspecialchars($mm[1]) . '</h2>';
         } elseif (preg_match('/^\s*[-*]\s+(.*)/', $safe, $mm)) {
-            if (!$inList) { $out[] = '<ul class="mb-3">'; $inList = true; }
+            $openList('ul');
             $out[] = '<li>' . preg_replace('/^\s*[-*]\s+/', '', $mm[1]) . '</li>';
         } elseif (preg_match('/^\s*\d+\.\s+(.*)/', $safe, $mm)) {
-            if (!$inList) { $out[] = '<ul class="mb-3">'; $inList = true; }
+            $openList('ol');
             $out[] = '<li>' . $mm[1] . '</li>';
         } elseif (trim($line) === '') {
-            if ($inList) { $out[] = '</ul>'; $inList = false; }
+            $closeList();
         } else {
-            if ($inList) { $out[] = '</ul>'; $inList = false; }
+            $closeList();
             $out[] = '<p class="mb-2">' . $safe . '</p>';
         }
     }
-    if ($inList) { $out[] = '</ul>'; }
+    $closeList();
     return implode("\n", $out);
 }
 ?>

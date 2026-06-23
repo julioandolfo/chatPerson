@@ -22,8 +22,13 @@ $jobId = (int)($argv[1] ?? 0);
 if ($jobId) {
     $jobs = [['id' => $jobId]];
 } else {
+    // Pega pendentes e também jobs presos em estado intermediário há mais de 15 min
+    // (worker morto/fatal) — a trava atômica do runJob garante exclusão mútua.
     $jobs = Database::fetchAll(
-        "SELECT id FROM manual_jobs WHERE status = 'pending' ORDER BY id ASC LIMIT 5"
+        "SELECT id FROM manual_jobs
+         WHERE status = 'pending'
+            OR (status IN ('mapping','clustering','reducing') AND updated_at < (NOW() - INTERVAL 15 MINUTE))
+         ORDER BY id ASC LIMIT 5"
     );
 }
 

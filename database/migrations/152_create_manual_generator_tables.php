@@ -20,6 +20,7 @@ function up_create_manual_generator_tables() {
         date_from DATE NOT NULL,
         date_to DATE NOT NULL,
         conversation_limit INT DEFAULT 30,
+        max_sections INT DEFAULT 18 COMMENT 'Max. de cenarios que viram secao detalhada',
         status VARCHAR(20) DEFAULT 'pending' COMMENT 'pending|mapping|clustering|reducing|done|failed',
         total_conversations INT DEFAULT 0,
         processed_conversations INT DEFAULT 0,

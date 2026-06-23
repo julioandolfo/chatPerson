@@ -52,6 +52,7 @@ class ManualGeneratorService
             date_from DATE NOT NULL,
             date_to DATE NOT NULL,
             conversation_limit INT DEFAULT 30,
+            max_sections INT DEFAULT 18,
             status VARCHAR(20) DEFAULT 'pending',
             total_conversations INT DEFAULT 0,
             processed_conversations INT DEFAULT 0,
@@ -95,6 +96,14 @@ class ManualGeneratorService
             INDEX idx_status (status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
+        // Backfill resiliente: adiciona max_sections em instalações cuja tabela
+        // foi criada antes desta coluna existir (erro de coluna duplicada é ignorado).
+        try {
+            $db->exec("ALTER TABLE manual_jobs ADD COLUMN max_sections INT DEFAULT 18");
+        } catch (\Throwable $e) {
+            // Coluna já existe — ok.
+        }
+
         self::$tablesEnsured = true;
     }
 
@@ -133,17 +142,31 @@ class ManualGeneratorService
     /** Modelos permitidos para a síntese (REDUCE). O primeiro é o padrão. */
     public const REDUCE_MODELS = ['gpt-4o', 'gpt-4o-mini'];
 
+    /** Nº de cenários (seções detalhadas) — padrão e teto rígido. */
+    public const DEFAULT_MAX_SECTIONS = 18;
+    public const SECTIONS_CAP = 40;
+
     public static function normalizeReduceModel(?string $model): string
     {
         return in_array($model, self::REDUCE_MODELS, true) ? $model : self::REDUCE_MODELS[0];
     }
 
+    public static function normalizeMaxSections($value): int
+    {
+        $v = (int)$value;
+        if ($v < 1) {
+            return self::DEFAULT_MAX_SECTIONS;
+        }
+        return min($v, self::SECTIONS_CAP);
+    }
+
     /**
      * Estimativa de volume e custo antes de rodar.
      */
-    public static function preview(?int $agentId, string $dateFrom, string $dateTo, int $limit, string $reduceModel = 'gpt-4o'): array
+    public static function preview(?int $agentId, string $dateFrom, string $dateTo, int $limit, string $reduceModel = 'gpt-4o', ?int $maxSections = null): array
     {
         $reduceModel = self::normalizeReduceModel($reduceModel);
+        $maxSections = self::normalizeMaxSections($maxSections ?? self::DEFAULT_MAX_SECTIONS);
         $convs = self::selectConversations($agentId, $dateFrom, $dateTo, $limit);
         $n = count($convs);
 
@@ -152,9 +175,8 @@ class ManualGeneratorService
         $mapOut = $n * 900;
         $mapCost = AIUsageLogger::estimateChatCost('gpt-4o-mini', $mapIn, $mapOut);
 
-        // REDUCE multi-passo: visão geral + 1 seção por cenário + divergências.
-        // Estimativa de cenários ≈ min(n/4, MAX_SCENARIO_SECTIONS), no mínimo 1.
-        $sections = max(1, min((int)ceil($n / 4), self::MAX_SCENARIO_SECTIONS));
+        // REDUCE multi-passo: visão geral + 1 seção por cenário (até maxSections) + divergências.
+        $sections = max(1, min((int)ceil($n / 4), $maxSections));
         $reduceCalls = $sections + 2; // overview + divergências
         $reduceIn = $reduceCalls * 2500;
         $reduceOut = 3500 + $sections * 1600 + 1500;
@@ -163,6 +185,8 @@ class ManualGeneratorService
         return [
             'conversations' => $n,
             'reduce_model' => $reduceModel,
+            'max_sections' => $maxSections,
+            'estimated_scenarios' => $sections,
             'estimated_tokens' => $mapIn + $mapOut + $reduceIn + $reduceOut,
             'estimated_cost' => round($mapCost + $reduceCost, 4),
             'sync_limit' => self::SYNC_LIMIT,
@@ -177,15 +201,16 @@ class ManualGeneratorService
     {
         self::ensureTables();
         $sql = "INSERT INTO manual_jobs
-                    (title, agent_id, date_from, date_to, conversation_limit,
+                    (title, agent_id, date_from, date_to, conversation_limit, max_sections,
                      status, model_map, model_reduce, created_by, created_at)
-                VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())";
+                VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, NOW())";
         return Database::insert($sql, [
             $data['title'],
             $data['agent_id'] ?: null,
             $data['date_from'],
             $data['date_to'],
             (int)($data['conversation_limit'] ?? 30),
+            self::normalizeMaxSections($data['max_sections'] ?? null),
             $data['model_map'] ?? 'gpt-4o-mini',
             $data['model_reduce'] ?? 'gpt-4o',
             $data['created_by'] ?? null,
@@ -301,7 +326,8 @@ class ManualGeneratorService
         // ---------- REDUCE ----------
         Database::execute("UPDATE manual_jobs SET status='reducing' WHERE id=?", [$jobId]);
 
-        $synthesis = self::synthesize($clusters, $job['title'], $job['model_reduce']);
+        $synthesis = self::synthesize($clusters, $job['title'], $job['model_reduce'],
+            self::normalizeMaxSections($job['max_sections'] ?? null));
         $totalTokens += $synthesis['tokens'];
         $totalCost += $synthesis['cost'];
 
@@ -546,16 +572,15 @@ class ManualGeneratorService
     // REDUCE / SÍNTESE
     // ----------------------------------------------------------------------
 
-    /** Máx. de cenários que viram seção detalhada própria (controle de custo). */
-    private const MAX_SCENARIO_SECTIONS = 18;
-
     /**
      * Síntese multi-passo: visão geral + uma seção DETALHADA por cenário (com
      * passos, scripts e exemplo real) + divergências. Produz um manual muito mais
      * completo do que uma única chamada conseguiria.
      */
-    private static function synthesize(array $clusters, string $title, string $model): array
+    private static function synthesize(array $clusters, string $title, string $model, int $maxSections = self::DEFAULT_MAX_SECTIONS): array
     {
+        $maxSections = self::normalizeMaxSections($maxSections);
+
         // Ordenar por relevância (mais casos primeiro).
         usort($clusters, fn($a, $b) => ((int)($b['n_casos'] ?? 0)) <=> ((int)($a['n_casos'] ?? 0)));
 
@@ -575,7 +600,7 @@ class ManualGeneratorService
 
         // ---- 2) Uma seção detalhada por cenário ----
         $sections = ["## Procedimentos Detalhados por Cenário"];
-        $top = array_slice($clusters, 0, self::MAX_SCENARIO_SECTIONS);
+        $top = array_slice($clusters, 0, $maxSections);
         foreach ($top as $i => $cl) {
             $sec = self::reduceScenario($cl, $i + 1, $model);
             $tokens += $sec['tokens'];

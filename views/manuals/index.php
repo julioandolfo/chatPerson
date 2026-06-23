@@ -68,6 +68,12 @@ $manuals = $manuals ?? [];
                     </select>
                     <div class="form-text">O "Completo" gera seções mais ricas; o "Econômico" reduz bastante o custo.</div>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold">Máx. de cenários (seções)</label>
+                    <input type="number" id="m_max_sections" class="form-control form-control-sm" value="18" min="1" max="40"
+                           onchange="document.getElementById('m_generate_btn').disabled = true;">
+                    <div class="form-text">Mais cenários = manual maior e mais caro (1–40).</div>
+                </div>
             </div>
 
             <div class="d-flex align-items-center gap-3 mt-5">
@@ -141,7 +147,8 @@ function _mParams() {
         date_to: document.getElementById('m_to').value,
         limit: document.getElementById('m_limit').value,
         title: document.getElementById('m_title').value,
-        reduce_model: document.getElementById('m_reduce_model').value
+        reduce_model: document.getElementById('m_reduce_model').value,
+        max_sections: document.getElementById('m_max_sections').value
     };
 }
 
@@ -150,7 +157,7 @@ function previewManual() {
     const btn = document.getElementById('m_preview_btn');
     const res = document.getElementById('m_preview_result');
     btn.disabled = true; res.textContent = 'Calculando…';
-    const qs = new URLSearchParams({ agent_id: p.agent_id, date_from: p.date_from, date_to: p.date_to, limit: p.limit, reduce_model: p.reduce_model });
+    const qs = new URLSearchParams({ agent_id: p.agent_id, date_from: p.date_from, date_to: p.date_to, limit: p.limit, reduce_model: p.reduce_model, max_sections: p.max_sections });
     fetch('<?= Url::to('/manuals/preview') ?>?' + qs.toString(), {
         credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
@@ -159,7 +166,7 @@ function previewManual() {
         btn.disabled = false;
         if (!j.success) { res.textContent = 'Erro: ' + (j.message || ''); return; }
         const d = j.data;
-        res.innerHTML = `<strong>${d.conversations}</strong> conversas · síntese <strong>${d.reduce_model}</strong> · ~${Number(d.estimated_tokens).toLocaleString()} tokens · custo estimado <strong>$${d.estimated_cost}</strong>`;
+        res.innerHTML = `<strong>${d.conversations}</strong> conversas · ~<strong>${d.estimated_scenarios}</strong> cenários · síntese <strong>${d.reduce_model}</strong> · ~${Number(d.estimated_tokens).toLocaleString()} tokens · custo estimado <strong>$${d.estimated_cost}</strong>`;
         document.getElementById('m_generate_btn').disabled = d.conversations < 1;
     })
     .catch(e => { btn.disabled = false; res.textContent = 'Falha: ' + e; });

@@ -59,6 +59,17 @@ $manuals = $manuals ?? [];
                 </div>
             </div>
 
+            <div class="row g-4 mt-1">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold">Profundidade da síntese</label>
+                    <select id="m_reduce_model" class="form-select form-select-sm" onchange="document.getElementById('m_generate_btn').disabled = true;">
+                        <option value="gpt-4o" selected>Completo — gpt-4o (melhor qualidade)</option>
+                        <option value="gpt-4o-mini">Econômico — gpt-4o-mini (~15× mais barato)</option>
+                    </select>
+                    <div class="form-text">O "Completo" gera seções mais ricas; o "Econômico" reduz bastante o custo.</div>
+                </div>
+            </div>
+
             <div class="d-flex align-items-center gap-3 mt-5">
                 <button class="btn btn-light-primary btn-sm" id="m_preview_btn" onclick="previewManual()">
                     🔍 Pré-visualizar (volume e custo)
@@ -129,7 +140,8 @@ function _mParams() {
         date_from: document.getElementById('m_from').value,
         date_to: document.getElementById('m_to').value,
         limit: document.getElementById('m_limit').value,
-        title: document.getElementById('m_title').value
+        title: document.getElementById('m_title').value,
+        reduce_model: document.getElementById('m_reduce_model').value
     };
 }
 
@@ -138,7 +150,7 @@ function previewManual() {
     const btn = document.getElementById('m_preview_btn');
     const res = document.getElementById('m_preview_result');
     btn.disabled = true; res.textContent = 'Calculando…';
-    const qs = new URLSearchParams({ agent_id: p.agent_id, date_from: p.date_from, date_to: p.date_to, limit: p.limit });
+    const qs = new URLSearchParams({ agent_id: p.agent_id, date_from: p.date_from, date_to: p.date_to, limit: p.limit, reduce_model: p.reduce_model });
     fetch('<?= Url::to('/manuals/preview') ?>?' + qs.toString(), {
         credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
     })
@@ -147,7 +159,7 @@ function previewManual() {
         btn.disabled = false;
         if (!j.success) { res.textContent = 'Erro: ' + (j.message || ''); return; }
         const d = j.data;
-        res.innerHTML = `<strong>${d.conversations}</strong> conversas · ~${Number(d.estimated_tokens).toLocaleString()} tokens · custo estimado <strong>$${d.estimated_cost}</strong>`;
+        res.innerHTML = `<strong>${d.conversations}</strong> conversas · síntese <strong>${d.reduce_model}</strong> · ~${Number(d.estimated_tokens).toLocaleString()} tokens · custo estimado <strong>$${d.estimated_cost}</strong>`;
         document.getElementById('m_generate_btn').disabled = d.conversations < 1;
     })
     .catch(e => { btn.disabled = false; res.textContent = 'Falha: ' + e; });

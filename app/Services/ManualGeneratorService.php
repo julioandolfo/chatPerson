@@ -130,11 +130,20 @@ class ManualGeneratorService
         return Database::fetchAll($sql, $params);
     }
 
+    /** Modelos permitidos para a síntese (REDUCE). O primeiro é o padrão. */
+    public const REDUCE_MODELS = ['gpt-4o', 'gpt-4o-mini'];
+
+    public static function normalizeReduceModel(?string $model): string
+    {
+        return in_array($model, self::REDUCE_MODELS, true) ? $model : self::REDUCE_MODELS[0];
+    }
+
     /**
      * Estimativa de volume e custo antes de rodar.
      */
-    public static function preview(?int $agentId, string $dateFrom, string $dateTo, int $limit): array
+    public static function preview(?int $agentId, string $dateFrom, string $dateTo, int $limit, string $reduceModel = 'gpt-4o'): array
     {
+        $reduceModel = self::normalizeReduceModel($reduceModel);
         $convs = self::selectConversations($agentId, $dateFrom, $dateTo, $limit);
         $n = count($convs);
 
@@ -143,16 +152,17 @@ class ManualGeneratorService
         $mapOut = $n * 900;
         $mapCost = AIUsageLogger::estimateChatCost('gpt-4o-mini', $mapIn, $mapOut);
 
-        // REDUCE multi-passo (gpt-4o): visão geral + 1 seção por cenário + divergências.
+        // REDUCE multi-passo: visão geral + 1 seção por cenário + divergências.
         // Estimativa de cenários ≈ min(n/4, MAX_SCENARIO_SECTIONS), no mínimo 1.
         $sections = max(1, min((int)ceil($n / 4), self::MAX_SCENARIO_SECTIONS));
         $reduceCalls = $sections + 2; // overview + divergências
         $reduceIn = $reduceCalls * 2500;
         $reduceOut = 3500 + $sections * 1600 + 1500;
-        $reduceCost = AIUsageLogger::estimateChatCost('gpt-4o', $reduceIn, $reduceOut);
+        $reduceCost = AIUsageLogger::estimateChatCost($reduceModel, $reduceIn, $reduceOut);
 
         return [
             'conversations' => $n,
+            'reduce_model' => $reduceModel,
             'estimated_tokens' => $mapIn + $mapOut + $reduceIn + $reduceOut,
             'estimated_cost' => round($mapCost + $reduceCost, 4),
             'sync_limit' => self::SYNC_LIMIT,

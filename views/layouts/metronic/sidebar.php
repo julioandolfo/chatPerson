@@ -334,6 +334,16 @@
                                 <span class="menu-title">Comparar</span>
                             </a>
                         </div>
+                        <?php if (\App\Helpers\Permission::can('conversations.view.all')): ?>
+                        <div class="menu-item">
+                            <a class="menu-link <?= isActive('/manuals', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/manuals') ?>">
+                                <span class="menu-bullet">
+                                    <span class="bullet bullet-dot"></span>
+                                </span>
+                                <span class="menu-title">Gerar Manuais (IA)</span>
+                            </a>
+                        </div>
+                        <?php endif; ?>
                         <?php endif; ?>
                         <div class="menu-item">
                             <a class="menu-link <?= isActive('/agent-performance/agent', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/agent-performance/agent?id=' . \App\Helpers\Auth::user()['id']) ?>">

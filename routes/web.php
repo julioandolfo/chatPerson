@@ -450,6 +450,14 @@ Router::get('/agent-performance/chart-data', [AgentPerformanceController::class,
 Router::get('/agent-performance/sla-breached', [AgentPerformanceController::class, 'getSLABreachedConversations'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/sla-breached-details', [AgentPerformanceController::class, 'getSLABreachedDetails'], ['Authentication', 'Permission:agent_performance.view.all']);
 
+// Gerador de Manuais (CS/Pós-venda) a partir de conversas reais
+Router::get('/manuals', [\App\Controllers\ManualGeneratorController::class, 'index'], ['Authentication']);
+Router::get('/manuals/preview', [\App\Controllers\ManualGeneratorController::class, 'preview'], ['Authentication']);
+Router::post('/manuals/generate', [\App\Controllers\ManualGeneratorController::class, 'generate'], ['Authentication']);
+Router::get('/manuals/view', [\App\Controllers\ManualGeneratorController::class, 'view'], ['Authentication']);
+Router::get('/manuals/export', [\App\Controllers\ManualGeneratorController::class, 'export'], ['Authentication']);
+Router::post('/manuals/publish-rag', [\App\Controllers\ManualGeneratorController::class, 'publishRag'], ['Authentication']);
+
 // Rotas de Coaching em Tempo Real (IA)
 Router::get('/api/coaching/settings', [RealtimeCoachingController::class, 'getSettings'], ['Authentication']); // ✅ Configurações do coaching
 Router::get('/api/coaching/hints/conversation/{conversationId}', [RealtimeCoachingController::class, 'getHintsByConversation'], ['Authentication']);

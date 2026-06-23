@@ -94,6 +94,17 @@
                 
                 <!--begin:Menu item-->
                 <div class="menu-item">
+                    <a class="menu-link <?= isActive('/copilot', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/copilot') ?>" data-title="Copiloto">
+                        <span class="menu-icon">
+                            <i class="ki-duotone ki-abstract-26 fs-2"><span class="path1"></span><span class="path2"></span></i>
+                        </span>
+                        <span class="menu-title">Copiloto IA</span>
+                    </a>
+                </div>
+                <!--end:Menu item-->
+
+                <!--begin:Menu item-->
+                <div class="menu-item">
                     <a class="menu-link <?= isActive('/contacts', $currentUri) ? 'active' : '' ?>" href="<?= \App\Helpers\Url::to('/contacts') ?>" data-title="Contatos">
                         <span class="menu-icon">
                             <i class="ki-duotone ki-profile-user fs-2"></i>

@@ -1619,10 +1619,17 @@ class ConversationService
             
             // Invalidar cache de conversas
             self::invalidateCache($conversationId);
-            
+
             // Atualizar contagem de conversas do agente
             if ($agentId) {
                 User::updateConversationsCount($agentId);
+            }
+
+            // Indexar no Copiloto (RAG). Best-effort: o cron pega o que falhar aqui.
+            try {
+                \App\Services\CopilotService::indexConversation($conversationId);
+            } catch (\Throwable $e) {
+                error_log("Copilot index ao fechar conversa {$conversationId}: " . $e->getMessage());
             }
             
             // Obter conversa atualizada para notificar via WebSocket

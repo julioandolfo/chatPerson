@@ -3200,6 +3200,58 @@ function getChannelInfo(channel) {
     </div>
 </div>
 
+<!-- Copiloto de Atendimento: botão flutuante + painel lateral -->
+<button type="button" class="btn btn-primary shadow"
+        style="position:fixed; right:22px; bottom:22px; z-index:1045; border-radius:40px; padding:10px 18px;"
+        data-bs-toggle="offcanvas" data-bs-target="#copilotPanel" title="Copiloto de Atendimento (IA)">
+    🤖 Copiloto
+</button>
+<div class="offcanvas offcanvas-end" tabindex="-1" id="copilotPanel" style="width: 440px; max-width: 92vw;">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title fw-bold">🤖 Copiloto de Atendimento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+    </div>
+    <div class="offcanvas-body">
+        <p class="text-muted fs-7">Descreva o problema do cliente. Busco casos parecidos já resolvidos e sugiro como agir.</p>
+        <textarea id="cpsp_q" class="form-control mb-2" rows="3" placeholder="Ex.: cliente recebeu produto com defeito e quer troca..."></textarea>
+        <button class="btn btn-primary w-100 mb-3" id="cpsp_btn" onclick="cpspAsk()">Perguntar</button>
+        <div id="cpsp_answer" class="text-gray-800 fs-7" style="white-space: pre-wrap;"></div>
+        <div id="cpsp_sources" class="mt-3 d-flex flex-column gap-2"></div>
+    </div>
+</div>
+<script>
+function cpspAsk() {
+    var q = document.getElementById('cpsp_q').value.trim();
+    if (!q) { return; }
+    var btn = document.getElementById('cpsp_btn');
+    btn.disabled = true; btn.textContent = 'Buscando…';
+    document.getElementById('cpsp_answer').textContent = '';
+    document.getElementById('cpsp_sources').innerHTML = '';
+    fetch('<?= \App\Helpers\Url::to('/copilot/ask') ?>', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: new URLSearchParams({ question: q }).toString()
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+        btn.disabled = false; btn.textContent = 'Perguntar';
+        if (!j.success) { document.getElementById('cpsp_answer').textContent = 'Erro: ' + (j.message || ''); return; }
+        var d = j.data;
+        document.getElementById('cpsp_answer').textContent = d.answer || '';
+        var src = document.getElementById('cpsp_sources');
+        (d.sources || []).forEach(function(s){
+            var el = document.createElement('div');
+            el.className = 'p-2 bg-light rounded fs-8';
+            el.innerHTML = '<span class="fw-bold">Conversa #' + s.conversation_id + '</span> '
+                + '<span class="badge badge-light-info">' + (s.category || '—') + ' · ' + Math.round((s.score||0)*100) + '%</span>'
+                + '<div class="text-muted mt-1">' + String(s.summary || '').replace(/</g,'&lt;') + '</div>';
+            src.appendChild(el);
+        });
+    })
+    .catch(function(e){ btn.disabled = false; btn.textContent = 'Perguntar'; document.getElementById('cpsp_answer').textContent = 'Falha: ' + e; });
+}
+</script>
+
 <div class="conversations-layout">
     
     <!-- COLUNA 1: LISTA DE CONVERSAS -->

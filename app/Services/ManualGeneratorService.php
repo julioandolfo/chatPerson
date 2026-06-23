@@ -22,7 +22,7 @@ class ManualGeneratorService
     private const API_URL = 'https://api.openai.com/v1/chat/completions';
 
     /** Máx. de caracteres de transcrição enviados por conversa (controle de custo). */
-    private const MAX_TRANSCRIPT_CHARS = 6000;
+    private const MAX_TRANSCRIPT_CHARS = 8000;
 
     /** Teto de conversas processadas de forma síncrona pela UI. */
     public const SYNC_LIMIT = 30;
@@ -138,13 +138,17 @@ class ManualGeneratorService
         $convs = self::selectConversations($agentId, $dateFrom, $dateTo, $limit);
         $n = count($convs);
 
-        // Estimativa grosseira de tokens: ~1500 in + 350 out por conversa (MAP) + reduce.
-        $mapIn = $n * 1500;
-        $mapOut = $n * 350;
-        $reduceIn = $n * 220 + 500;
-        $reduceOut = 3500;
-
+        // MAP: extração rica por conversa (~2500 in + 900 out) com modelo barato.
+        $mapIn = $n * 2500;
+        $mapOut = $n * 900;
         $mapCost = AIUsageLogger::estimateChatCost('gpt-4o-mini', $mapIn, $mapOut);
+
+        // REDUCE multi-passo (gpt-4o): visão geral + 1 seção por cenário + divergências.
+        // Estimativa de cenários ≈ min(n/4, MAX_SCENARIO_SECTIONS), no mínimo 1.
+        $sections = max(1, min((int)ceil($n / 4), self::MAX_SCENARIO_SECTIONS));
+        $reduceCalls = $sections + 2; // overview + divergências
+        $reduceIn = $reduceCalls * 2500;
+        $reduceOut = 3500 + $sections * 1600 + 1500;
         $reduceCost = AIUsageLogger::estimateChatCost('gpt-4o', $reduceIn, $reduceOut);
 
         return [
@@ -380,27 +384,34 @@ class ManualGeneratorService
 
     private static function mapConversation(string $transcript, string $model): ?array
     {
-        $system = "Você é um analista de processos de atendimento. Extraia conhecimento ÚTIL "
-                . "para um manual de novos funcionários a partir da conversa. Responda APENAS com JSON válido.";
+        $system = "Você é um analista sênior de processos de atendimento (CS/Pós-venda). "
+                . "Extraia conhecimento DETALHADO e ACIONÁVEL desta conversa para um manual de novos "
+                . "funcionários. Capture o passo a passo real, as frases usadas e as políticas aplicadas. "
+                . "Responda APENAS com JSON válido. Não invente o que não estiver na conversa.";
 
         $user = "A partir desta conversa (já anonimizada), extraia em JSON:\n"
               . "{\n"
-              . "  \"situacao\": \"o problema/contexto do cliente\",\n"
-              . "  \"gatilho_cliente\": \"o que o cliente pediu/reclamou\",\n"
-              . "  \"decisao_agente\": \"que decisão o atendente tomou\",\n"
-              . "  \"acao_executada\": \"passos/ação realizada para resolver\",\n"
-              . "  \"norma_ou_criterio\": \"regra/política aplicada (explícita ou implícita)\",\n"
-              . "  \"excecoes\": \"casos-limite ou exceções observadas\",\n"
-              . "  \"tom_linguagem\": \"tom/estilo usado pelo atendente\",\n"
-              . "  \"categoria\": \"tema curto, ex: troca, reembolso, garantia, atraso\"\n"
+              . "  \"categoria\": \"tema curto (ex: troca, reembolso, garantia, atraso, rastreio, cancelamento)\",\n"
+              . "  \"situacao\": \"contexto/problema do cliente, com detalhes concretos\",\n"
+              . "  \"gatilho_cliente\": \"o que o cliente pediu/reclamou, na prática\",\n"
+              . "  \"decisao_agente\": \"a decisão central que o atendente tomou\",\n"
+              . "  \"passos\": [\"passo a passo concreto do que o atendente fez, um item por etapa\"],\n"
+              . "  \"politicas\": [\"regras/políticas aplicadas com detalhes concretos: prazos, valores, condições\"],\n"
+              . "  \"scripts\": [\"frases/respostas REAIS e reaproveitáveis ditas pelo atendente (verbatim, anonimizado)\"],\n"
+              . "  \"dados_solicitados\": [\"informações que o atendente pediu ao cliente (ex: nº do pedido, e-mail)\"],\n"
+              . "  \"ferramentas\": [\"sistemas/ações usadas (ex: abrir ticket, transferir, consultar rastreio)\"],\n"
+              . "  \"excecoes\": \"casos-limite, exceções ou ressalvas observadas\",\n"
+              . "  \"tom_linguagem\": \"tom/estilo do atendente\",\n"
+              . "  \"resultado\": \"como terminou (resolvido, escalado, pendente) e por quê\",\n"
+              . "  \"exemplo_dialogo\": \"um trecho CURTO e REAL da conversa (2 a 5 linhas no formato 'CLIENTE: ...\\nATENDENTE: ...') que ilustre bem o atendimento\"\n"
               . "}\n"
-              . "Se algum campo não se aplicar, use string vazia. Não invente.\n\n"
+              . "Use listas com vários itens quando houver. Campos sem informação: string vazia ou lista vazia.\n\n"
               . "CONVERSA:\n" . $transcript;
 
         $resp = self::callOpenAI($model, [
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
-        ], 600, 0.2, true);
+        ], 1400, 0.2, true);
 
         if (!$resp) return null;
 
@@ -464,32 +475,51 @@ class ManualGeneratorService
         return array_map(fn($c) => self::condenseCluster($c['members']), $clusters);
     }
 
-    /** Condensar membros de um cluster em um único "cenário" com abordagens distintas. */
+    /** Condensar membros de um cluster em um único "cenário" rico, mantendo exemplos reais. */
     private static function condenseCluster(array $members): array
     {
-        $decisoes = $acoes = $normas = $tons = $cats = $cids = [];
+        $decisoes = $normas = $tons = $cats = $cids = [];
+        $passos = $scripts = $dados = $ferramentas = $resultados = $dialogos = [];
         $situacao = '';
+        $flatten = function ($v, array &$bucket) {
+            foreach ((is_array($v) ? $v : [$v]) as $x) {
+                $x = trim((string)$x);
+                if ($x !== '') $bucket[] = $x;
+            }
+        };
         foreach ($members as $m) {
             $d = $m['data'] ?? $m; // tolera item cru
             if ($situacao === '' && !empty($d['situacao'])) $situacao = $d['situacao'];
             if (!empty($d['decisao_agente']))   $decisoes[] = trim($d['decisao_agente']);
-            if (!empty($d['acao_executada']))   $acoes[]    = trim($d['acao_executada']);
-            if (!empty($d['norma_ou_criterio'])) $normas[]  = trim($d['norma_ou_criterio']);
             if (!empty($d['tom_linguagem']))    $tons[]     = trim($d['tom_linguagem']);
             if (!empty($d['categoria']))        $cats[]     = trim($d['categoria']);
+            if (!empty($d['resultado']))        $resultados[] = trim($d['resultado']);
+            if (!empty($d['excecoes']))         $normas[]   = trim($d['excecoes']);
+            if (!empty($d['passos']))           $flatten($d['passos'], $passos);
+            if (!empty($d['politicas']))        $flatten($d['politicas'], $normas);
+            if (!empty($d['scripts']))          $flatten($d['scripts'], $scripts);
+            if (!empty($d['dados_solicitados'])) $flatten($d['dados_solicitados'], $dados);
+            if (!empty($d['ferramentas']))      $flatten($d['ferramentas'], $ferramentas);
+            if (!empty($d['exemplo_dialogo']))  $dialogos[] = trim((string)$d['exemplo_dialogo']);
             // ID da conversa: caminho com embedding usa 'cid'; caminho cru usa 'conversation_id'.
             $cid = $m['cid'] ?? $m['conversation_id'] ?? null;
             if ($cid !== null)                  $cids[]     = $cid;
         }
+        $uniq = fn(array $a, int $cap) => array_slice(array_values(array_unique($a)), 0, $cap);
         return [
             'categoria' => self::topValue($cats),
             'situacao_representativa' => $situacao,
             'n_casos' => count($members),
-            'decisoes' => array_values(array_unique($decisoes)),
-            'acoes' => array_values(array_unique($acoes)),
-            'normas' => array_values(array_unique($normas)),
-            'tons' => array_values(array_unique($tons)),
-            'exemplos_conversas' => array_slice(array_values(array_unique($cids)), 0, 5),
+            'decisoes' => $uniq($decisoes, 8),
+            'passos' => $uniq($passos, 15),
+            'politicas' => $uniq($normas, 12),
+            'scripts' => $uniq($scripts, 12),
+            'dados_solicitados' => $uniq($dados, 10),
+            'ferramentas' => $uniq($ferramentas, 10),
+            'resultados' => $uniq($resultados, 6),
+            'tons' => $uniq($tons, 6),
+            'exemplos_dialogo' => array_slice(array_values(array_filter($dialogos)), 0, 3),
+            'exemplos_conversas' => $uniq($cids, 6),
         ];
     }
 
@@ -506,59 +536,185 @@ class ManualGeneratorService
     // REDUCE / SÍNTESE
     // ----------------------------------------------------------------------
 
+    /** Máx. de cenários que viram seção detalhada própria (controle de custo). */
+    private const MAX_SCENARIO_SECTIONS = 18;
+
+    /**
+     * Síntese multi-passo: visão geral + uma seção DETALHADA por cenário (com
+     * passos, scripts e exemplo real) + divergências. Produz um manual muito mais
+     * completo do que uma única chamada conseguiria.
+     */
     private static function synthesize(array $clusters, string $title, string $model): array
     {
-        $compact = json_encode($clusters, JSON_UNESCAPED_UNICODE);
-        // Proteção de contexto: limitar tamanho do material consolidado.
-        if (mb_strlen($compact) > 45000) {
-            $compact = mb_substr($compact, 0, 45000) . ' ...';
+        // Ordenar por relevância (mais casos primeiro).
+        usort($clusters, fn($a, $b) => ((int)($b['n_casos'] ?? 0)) <=> ((int)($a['n_casos'] ?? 0)));
+
+        $tokens = 0;
+        $cost = 0.0;
+        $parts = [];
+
+        // ---- 1) Visão geral: normas, critérios de decisão e tom de voz ----
+        $overview = self::reduceOverview($clusters, $title, $model);
+        $tokens += $overview['tokens'];
+        $cost += $overview['cost'];
+        if (trim($overview['markdown']) === '') {
+            // Sem nem a visão geral, é falha real → runJob marca 'failed'.
+            throw new \RuntimeException('Falha na síntese (REDUCE): OpenAI indisponível ou resposta inválida.');
         }
+        $parts[] = $overview['markdown'];
 
-        $system = "Você é um especialista em processos de CS/Pós-venda que escreve manuais operacionais "
-                . "claros para novos funcionários. Baseie-se SOMENTE nos dados fornecidos. Responda em JSON.";
+        // ---- 2) Uma seção detalhada por cenário ----
+        $sections = ["## Procedimentos Detalhados por Cenário"];
+        $top = array_slice($clusters, 0, self::MAX_SCENARIO_SECTIONS);
+        foreach ($top as $i => $cl) {
+            $sec = self::reduceScenario($cl, $i + 1, $model);
+            $tokens += $sec['tokens'];
+            $cost += $sec['cost'];
+            if (trim($sec['markdown']) !== '') {
+                $sections[] = $sec['markdown'];
+            }
+        }
+        $parts[] = implode("\n\n", $sections);
 
-        $user = "Título do manual: \"{$title}\".\n"
-              . "Abaixo está uma lista (JSON) de CENÁRIOS já agrupados por similaridade. Cada item traz: "
-              . "categoria, situacao_representativa, n_casos (quantas conversas), e listas de decisoes/acoes/normas/tons "
-              . "DISTINTAS observadas, além de exemplos_conversas (IDs).\n"
-              . "Produza um JSON com:\n"
-              . "{\n"
-              . "  \"manual_markdown\": \"manual completo em Markdown com as seções: "
-              . "1) Normas e Políticas, 2) Procedimentos por Cenário, 3) Critérios de Decisão, "
-              . "4) Ações Passo a Passo, 5) Tom de Voz e Scripts, 6) FAQ e Casos-Limite. "
-              . "Priorize cenários com maior n_casos. Quando útil, cite os IDs de conversas-exemplo.\",\n"
-              . "  \"divergences\": [ {\"cenario\": \"...\", \"variacoes\": [\"abordagem A\", \"abordagem B\"], \"recomendacao\": \"...\", \"exemplos\": [123,456]} ]\n"
-              . "}\n"
-              . "Para 'divergences', foque nos cenários cujas listas 'decisoes' ou 'acoes' têm MAIS DE UMA abordagem "
-              . "distinta — são tratamentos inconsistentes (oportunidades de padronização). Não invente regras que não estejam nos dados.\n\n"
-              . "CENÁRIOS:\n" . $compact;
+        // ---- 3) Divergências (data-driven a partir dos clusters) ----
+        $div = self::reduceDivergences($clusters, $model);
+        $tokens += $div['tokens'];
+        $cost += $div['cost'];
+
+        return [
+            'manual_markdown' => implode("\n\n", $parts),
+            'divergences' => $div['divergences'],
+            'tokens' => $tokens,
+            'cost' => $cost,
+        ];
+    }
+
+    /** Passo 1 do REDUCE: visão geral (normas, critérios, tom de voz). */
+    private static function reduceOverview(array $clusters, string $title, string $model): array
+    {
+        // Material agregado, compacto.
+        $agg = [];
+        foreach ($clusters as $c) {
+            $agg[] = [
+                'categoria' => $c['categoria'] ?? '',
+                'n_casos' => $c['n_casos'] ?? 0,
+                'politicas' => $c['politicas'] ?? [],
+                'decisoes' => $c['decisoes'] ?? [],
+                'tons' => $c['tons'] ?? [],
+            ];
+        }
+        $compact = self::cap(json_encode($agg, JSON_UNESCAPED_UNICODE), 40000);
+
+        $system = "Você é um especialista em CS/Pós-venda que escreve manuais operacionais DETALHADOS "
+                . "para novos funcionários. Escreva em Markdown, em português, de forma completa e prática. "
+                . "Baseie-se SOMENTE nos dados. Não invente políticas que não apareçam.";
+
+        $user = "Manual: \"{$title}\".\n"
+              . "Com base nos cenários agregados (JSON) abaixo, escreva a ABERTURA do manual em Markdown contendo:\n"
+              . "## Visão Geral (1 parágrafo sobre o propósito e o panorama dos atendimentos)\n"
+              . "## 1) Normas e Políticas (lista detalhada; inclua prazos, valores e condições quando houver)\n"
+              . "## 2) Critérios de Decisão (quando escalar, quando trocar/reembolsar, etc. — seja específico)\n"
+              . "## 3) Tom de Voz e Diretrizes de Linguagem\n"
+              . "Seja abrangente e concreto. NÃO escreva os procedimentos por cenário (virão depois).\n\n"
+              . "CENÁRIOS (agregado):\n" . $compact;
 
         $resp = self::callOpenAI($model, [
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
-        ], 4000, 0.4, true);
-
-        if (!$resp) {
-            // Lança para que runJob marque o job como 'failed' (em vez de gravar
-            // um manual placeholder e marcar 'done').
-            throw new \RuntimeException('Falha na síntese (REDUCE): OpenAI indisponível ou resposta inválida.');
-        }
-
-        $parsed = self::parseJson($resp['content']);
-        $manual = is_array($parsed) ? ($parsed['manual_markdown'] ?? '') : '';
-        $divergences = is_array($parsed) ? ($parsed['divergences'] ?? []) : [];
-
-        // Fallback: se não veio JSON, usar o conteúdo bruto como manual.
-        if ($manual === '') {
-            $manual = $resp['content'];
-        }
+        ], 3500, 0.4, false);
 
         return [
-            'manual_markdown' => $manual,
+            'markdown' => $resp['content'] ?? '',
+            'tokens' => $resp['total_tokens'] ?? 0,
+            'cost' => $resp['cost'] ?? 0,
+        ];
+    }
+
+    /** Passo 2 do REDUCE: uma seção rica para UM cenário (com exemplo real). */
+    private static function reduceScenario(array $cluster, int $index, string $model): array
+    {
+        $compact = self::cap(json_encode($cluster, JSON_UNESCAPED_UNICODE), 30000);
+        $ids = implode(', ', array_map('strval', $cluster['exemplos_conversas'] ?? []));
+
+        $system = "Você é um especialista em CS/Pós-venda que documenta procedimentos operacionais "
+                . "DETALHADOS para treinar novos funcionários. Escreva em Markdown, em português. "
+                . "Use SOMENTE os dados do cenário. Reaproveite os 'scripts' como frases prontas (verbatim) "
+                . "e os 'exemplos_dialogo' como exemplo real. Não invente.";
+
+        $user = "Escreva UMA seção de procedimento detalhada para o cenário a seguir, no formato:\n\n"
+              . "### {$index}. <título curto do cenário (use a categoria/situação)>\n"
+              . "**Quando acontece:** <descrição do gatilho>\n"
+              . "**Passo a passo:**\n1. ...\n2. ...\n(detalhe cada etapa de forma acionável)\n"
+              . "**Dados a solicitar:** <lista>\n"
+              . "**Políticas aplicáveis:** <lista com prazos/valores/condições>\n"
+              . "**Scripts prontos:** use blocos de citação (>) com as frases reaproveitáveis\n"
+              . "**Exceções e casos-limite:** <lista>\n"
+              . "**📌 Exemplo real:** reproduza um trecho de 'exemplos_dialogo' formatado como diálogo\n"
+              . "**Conversas de referência:** {$ids}\n\n"
+              . "Seja completo e específico. Se um campo não tiver dados, omita a linha correspondente.\n\n"
+              . "CENÁRIO (JSON):\n" . $compact;
+
+        $resp = self::callOpenAI($model, [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], 2200, 0.4, false);
+
+        return [
+            'markdown' => $resp['content'] ?? '',
+            'tokens' => $resp['total_tokens'] ?? 0,
+            'cost' => $resp['cost'] ?? 0,
+        ];
+    }
+
+    /** Passo 3 do REDUCE: divergências a partir de clusters com >1 decisão distinta. */
+    private static function reduceDivergences(array $clusters, string $model): array
+    {
+        // Candidatos estruturais: cenários com mais de uma decisão distinta.
+        $candidatos = [];
+        foreach ($clusters as $c) {
+            $decisoes = $c['decisoes'] ?? [];
+            if (count($decisoes) >= 2) {
+                $candidatos[] = [
+                    'cenario' => $c['situacao_representativa'] ?: ($c['categoria'] ?? ''),
+                    'variacoes' => array_slice($decisoes, 0, 5),
+                    'exemplos' => $c['exemplos_conversas'] ?? [],
+                ];
+            }
+        }
+        if (empty($candidatos)) {
+            return ['divergences' => [], 'tokens' => 0, 'cost' => 0];
+        }
+
+        $compact = self::cap(json_encode($candidatos, JSON_UNESCAPED_UNICODE), 20000);
+        $system = "Você analisa inconsistências de atendimento. Responda em JSON.";
+        $user = "Para cada cenário abaixo (que teve abordagens diferentes entre conversas), escreva uma "
+              . "recomendação de padronização. Responda JSON: "
+              . "{ \"divergences\": [ {\"cenario\":\"...\",\"variacoes\":[...],\"recomendacao\":\"...\",\"exemplos\":[...]} ] }.\n"
+              . "Mantenha 'exemplos' (IDs) de cada item.\n\nCENÁRIOS:\n" . $compact;
+
+        $resp = self::callOpenAI($model, [
+            ['role' => 'system', 'content' => $system],
+            ['role' => 'user', 'content' => $user],
+        ], 2000, 0.4, true);
+
+        if (!$resp) {
+            // Divergências são secundárias: cair para os candidatos estruturais.
+            return ['divergences' => $candidatos, 'tokens' => 0, 'cost' => 0];
+        }
+        $parsed = self::parseJson($resp['content']);
+        $divergences = is_array($parsed) ? ($parsed['divergences'] ?? $candidatos) : $candidatos;
+
+        return [
             'divergences' => $divergences,
             'tokens' => $resp['total_tokens'],
             'cost' => $resp['cost'],
         ];
+    }
+
+    /** Truncar string mantendo limite de caracteres. */
+    private static function cap(string $s, int $max): string
+    {
+        return mb_strlen($s) > $max ? mb_substr($s, 0, $max) . ' ...' : $s;
     }
 
     // ----------------------------------------------------------------------

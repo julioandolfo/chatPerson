@@ -10,6 +10,7 @@ use App\Helpers\Url;
 ob_start();
 
 $stats = $stats ?? ['indexed' => 0, 'pending' => 0];
+$categories = $categories ?? [];
 ?>
 <div class="d-flex flex-column flex-column-fluid p-6">
 
@@ -27,6 +28,25 @@ $stats = $stats ?? ['indexed' => 0, 'pending' => 0];
                 Descreva o problema do cliente. O copiloto busca <strong>casos parecidos já resolvidos</strong>
                 e sugere como agir, citando as conversas de referência.
             </p>
+            <div class="row g-2 mb-2">
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold fs-8 text-muted mb-1">Categoria (opcional)</label>
+                    <select id="cp_category" class="form-select form-select-sm">
+                        <option value="">Todas as categorias</option>
+                        <?php foreach ($categories as $cat): ?>
+                            <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold fs-8 text-muted mb-1">Resolvidas de</label>
+                    <input type="date" id="cp_from" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold fs-8 text-muted mb-1">até</label>
+                    <input type="date" id="cp_to" class="form-control form-control-sm">
+                </div>
+            </div>
             <div class="d-flex gap-2">
                 <textarea id="cp_question" class="form-control" rows="2"
                           placeholder="Ex.: cliente recebeu o produto com defeito e quer a troca, como proceder?"></textarea>
@@ -60,7 +80,12 @@ function cpAsk() {
     fetch('<?= Url::to('/copilot/ask') ?>', {
         method: 'POST', credentials: 'same-origin',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ question: q }).toString()
+        body: new URLSearchParams({
+            question: q,
+            category: document.getElementById('cp_category').value,
+            date_from: document.getElementById('cp_from').value,
+            date_to: document.getElementById('cp_to').value
+        }).toString()
     })
     .then(r => r.json())
     .then(j => {

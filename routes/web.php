@@ -463,6 +463,7 @@ Router::post('/manuals/publish-rag', [\App\Controllers\ManualGeneratorController
 Router::get('/copilot', [\App\Controllers\CopilotController::class, 'index'], ['Authentication']);
 Router::post('/copilot/ask', [\App\Controllers\CopilotController::class, 'ask'], ['Authentication']);
 Router::get('/copilot/stats', [\App\Controllers\CopilotController::class, 'stats'], ['Authentication']);
+Router::get('/copilot/context', [\App\Controllers\CopilotController::class, 'context'], ['Authentication']);
 Router::post('/copilot/reindex', [\App\Controllers\CopilotController::class, 'reindex'], ['Authentication']);
 
 // Rotas de Coaching em Tempo Real (IA)

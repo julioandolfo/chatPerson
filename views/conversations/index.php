@@ -3220,6 +3220,27 @@ function getChannelInfo(channel) {
     </div>
 </div>
 <script>
+// Pré-preencher o painel com a última mensagem do cliente da conversa aberta.
+(function () {
+    var panel = document.getElementById('copilotPanel');
+    if (!panel) return;
+    panel.addEventListener('show.bs.offcanvas', function () {
+        var convId = window.currentConversationId || (typeof currentConversationId !== 'undefined' ? currentConversationId : null);
+        var ta = document.getElementById('cpsp_q');
+        if (!convId || !ta || ta.value.trim() !== '') return;
+        fetch('<?= \App\Helpers\Url::to('/copilot/context') ?>?conversation_id=' + convId, {
+            credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            if (j.success && j.data && j.data.last_client_message) {
+                ta.value = j.data.last_client_message;
+            }
+        })
+        .catch(function () {});
+    });
+})();
+
 function cpspAsk() {
     var q = document.getElementById('cpsp_q').value.trim();
     if (!q) { return; }

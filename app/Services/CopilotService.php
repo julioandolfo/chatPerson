@@ -76,6 +76,20 @@ class CopilotService
         return ['indexed' => $indexed, 'pending' => $pending];
     }
 
+    /** Categorias disponíveis no índice (para filtro), mais frequentes primeiro. */
+    public static function categories(int $limit = 40): array
+    {
+        self::ensureTable();
+        $rows = Database::fetchAll(
+            "SELECT category, COUNT(*) AS n
+             FROM copilot_conversation_index
+             WHERE category IS NOT NULL AND category <> ''
+             GROUP BY category ORDER BY n DESC
+             LIMIT " . max(1, min($limit, 100))
+        );
+        return array_map(fn($r) => $r['category'], $rows);
+    }
+
     /**
      * Indexar um lote de conversas resolvidas ainda não indexadas.
      * @return int quantidade indexada
@@ -208,9 +222,11 @@ class CopilotService
 
     /**
      * Responder a uma pergunta usando os casos passados mais parecidos.
+     *
+     * @param array $filters ['category'=>?string, 'date_from'=>?string, 'date_to'=>?string]
      * @return array ['answer'=>string, 'sources'=>array, 'tokens'=>int, 'cost'=>float]
      */
-    public static function ask(string $question, int $topK = 6): array
+    public static function ask(string $question, int $topK = 6, array $filters = []): array
     {
         self::ensureTable();
         $question = trim($question);
@@ -223,13 +239,31 @@ class CopilotService
             return ['answer' => 'Não consegui processar a busca agora (embedding indisponível).', 'sources' => []];
         }
 
+        // Filtros opcionais (categoria / período) aplicados no SQL, antes do cosseno.
+        $where = ['embedding IS NOT NULL'];
+        $params = [];
+        if (!empty($filters['category'])) {
+            $where[] = 'category = ?';
+            $params[] = $filters['category'];
+        }
+        if (!empty($filters['date_from'])) {
+            $where[] = 'resolved_at >= ?';
+            $params[] = $filters['date_from'] . ' 00:00:00';
+        }
+        if (!empty($filters['date_to'])) {
+            $where[] = 'resolved_at <= ?';
+            $params[] = $filters['date_to'] . ' 23:59:59';
+        }
+        $whereSql = implode(' AND ', $where);
+
         // Carregar candidatos e pontuar por similaridade (cosseno) em PHP.
         $rows = Database::fetchAll(
             "SELECT conversation_id, category, problem, resolution, summary, embedding
              FROM copilot_conversation_index
-             WHERE embedding IS NOT NULL
+             WHERE {$whereSql}
              ORDER BY resolved_at DESC
-             LIMIT " . self::CANDIDATE_CAP
+             LIMIT " . self::CANDIDATE_CAP,
+            $params
         );
 
         $scored = [];

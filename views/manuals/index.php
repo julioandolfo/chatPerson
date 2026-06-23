@@ -50,8 +50,8 @@ $manuals = $manuals ?? [];
                 </div>
                 <div class="col-md-2">
                     <label class="form-label fw-semibold">Máx. conversas</label>
-                    <input type="number" id="m_limit" class="form-control form-control-sm" value="30" min="1" max="30">
-                    <div class="form-text">Limite por geração: 30 (síncrono).</div>
+                    <input type="number" id="m_limit" class="form-control form-control-sm" value="50" min="1" max="100">
+                    <div class="form-text">Até 100 por geração.</div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Título do manual</label>
@@ -70,8 +70,14 @@ $manuals = $manuals ?? [];
             </div>
 
             <div id="m_progress" class="alert alert-info mt-4 d-none">
-                <span class="spinner-border spinner-border-sm me-2"></span>
-                Gerando manual a partir das conversas… isso pode levar 1–2 minutos. Não feche a página.
+                <div class="d-flex align-items-center mb-2">
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    <span id="m_progress_label">Iniciando…</span>
+                </div>
+                <div class="progress h-8px">
+                    <div id="m_progress_bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div class="form-text mt-1">Você pode acompanhar aqui; o processamento roda em segundo plano.</div>
             </div>
         </div>
     </div>
@@ -147,12 +153,23 @@ function previewManual() {
     .catch(e => { btn.disabled = false; res.textContent = 'Falha: ' + e; });
 }
 
+const _statusLabels = {
+    pending: 'Na fila…',
+    mapping: 'Lendo conversas (extração)…',
+    clustering: 'Agrupando cenários…',
+    reducing: 'Escrevendo o manual…',
+    done: 'Concluído!',
+    failed: 'Falhou'
+};
+
 function generateManual() {
     const p = _mParams();
     if (!confirm('Gerar o manual agora? Isso consome tokens da OpenAI.')) return;
     const gen = document.getElementById('m_generate_btn');
     gen.disabled = true;
     document.getElementById('m_progress').classList.remove('d-none');
+    setProgress('Iniciando…', 5);
+
     const body = new URLSearchParams(p);
     fetch('<?= Url::to('/manuals/generate') ?>', {
         method: 'POST', credentials: 'same-origin',
@@ -161,16 +178,54 @@ function generateManual() {
     })
     .then(r => r.json())
     .then(j => {
-        if (j.success && j.redirect) { window.location.href = j.redirect; return; }
-        document.getElementById('m_progress').classList.add('d-none');
-        gen.disabled = false;
-        alert('Erro ao gerar: ' + (j.message || 'desconhecido'));
+        if (j.success && j.job_id) { pollStatus(j.job_id); return; }
+        failProgress(j.message || 'Erro ao criar o job');
     })
-    .catch(e => {
-        document.getElementById('m_progress').classList.add('d-none');
-        gen.disabled = false;
-        alert('Falha: ' + e);
-    });
+    .catch(e => failProgress('Falha: ' + e));
+}
+
+function setProgress(label, pct) {
+    document.getElementById('m_progress_label').textContent = label;
+    document.getElementById('m_progress_bar').style.width = Math.max(0, Math.min(100, pct)) + '%';
+}
+
+function failProgress(msg) {
+    document.getElementById('m_progress').classList.remove('d-none');
+    document.getElementById('m_progress_label').textContent = '❌ ' + msg;
+    document.getElementById('m_progress_bar').classList.remove('bg-primary');
+    document.getElementById('m_progress_bar').classList.add('bg-danger');
+    document.getElementById('m_generate_btn').disabled = false;
+}
+
+function pollStatus(jobId) {
+    const tick = () => {
+        fetch('<?= Url::to('/manuals/status') ?>?job_id=' + jobId, {
+            credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(r => r.json())
+        .then(j => {
+            if (!j.success) { failProgress(j.message || 'Erro no status'); return; }
+            const d = j.data;
+            const label = _statusLabels[d.status] || d.status;
+            let pct = 10;
+            if (d.status === 'mapping' && d.total > 0) pct = 10 + Math.round((d.processed / d.total) * 60);
+            else if (d.status === 'clustering') pct = 75;
+            else if (d.status === 'reducing') pct = 85;
+            else if (d.status === 'done') pct = 100;
+
+            if (d.status === 'mapping' && d.total > 0) {
+                setProgress(`${label} (${d.processed}/${d.total})`, pct);
+            } else {
+                setProgress(label, pct);
+            }
+
+            if (d.status === 'done' && d.redirect) { window.location.href = d.redirect; return; }
+            if (d.status === 'failed') { failProgress(d.error || 'Geração falhou'); return; }
+            setTimeout(tick, 2500);
+        })
+        .catch(e => setTimeout(tick, 4000));
+    };
+    tick();
 }
 </script>
 

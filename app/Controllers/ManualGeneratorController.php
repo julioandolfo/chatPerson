@@ -67,7 +67,8 @@ class ManualGeneratorController
     }
 
     /**
-     * Gerar o manual (síncrono, com teto de conversas para a UI).
+     * Criar o job e iniciar o processamento em background.
+     * Responde imediatamente com o job_id; a UI acompanha via /manuals/status.
      */
     public function generate(): void
     {
@@ -76,11 +77,8 @@ class ManualGeneratorController
         $agentId = (int)Request::post('agent_id') ?: null;
         $dateFrom = Request::post('date_from', date('Y-m-01'));
         $dateTo = Request::post('date_to', date('Y-m-d'));
-        $limit = min((int)Request::post('limit', 30), ManualGeneratorService::SYNC_LIMIT);
+        $limit = min((int)Request::post('limit', 50), 100);
         $title = trim((string)Request::post('title')) ?: ('Manual de Processos — ' . date('d/m/Y'));
-
-        @set_time_limit(0);
-        @ignore_user_abort(true);
 
         try {
             $jobId = ManualGeneratorService::createJob([
@@ -91,13 +89,64 @@ class ManualGeneratorController
                 'conversation_limit' => $limit,
                 'created_by' => Auth::id(),
             ]);
-
-            $manualId = ManualGeneratorService::runJob($jobId);
-            Response::json(['success' => true, 'manual_id' => $manualId,
-                'redirect' => \App\Helpers\Url::to('/manuals/view?id=' . $manualId)]);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
+            return;
         }
+
+        // Responder imediatamente e processar em background no mesmo processo (php-fpm).
+        // Se fastcgi_finish_request não existir, o worker cron (process-manual-jobs.php)
+        // pega o job pendente em seguida.
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'job_id' => $jobId, 'status' => 'pending']);
+
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+            @set_time_limit(0);
+            @ignore_user_abort(true);
+            try {
+                ManualGeneratorService::runJob($jobId);
+            } catch (\Throwable $e) {
+                \App\Helpers\Logger::error('Manual job ' . $jobId . ' falhou: ' . $e->getMessage());
+            }
+        }
+        return;
+    }
+
+    /**
+     * AJAX: progresso do job (polling pela UI).
+     */
+    public function status(): void
+    {
+        Permission::abortIfCannot(self::PERMISSION);
+
+        $jobId = (int)Request::get('job_id');
+        $job = Database::fetch(
+            "SELECT id, status, total_conversations, processed_conversations, error_message, cost
+             FROM manual_jobs WHERE id = ?",
+            [$jobId]
+        );
+        if (!$job) {
+            Response::json(['success' => false, 'message' => 'Job não encontrado'], 404);
+            return;
+        }
+
+        $manual = Database::fetch(
+            "SELECT id FROM generated_manuals WHERE job_id = ? ORDER BY id DESC LIMIT 1",
+            [$jobId]
+        );
+        $manualId = $manual['id'] ?? null;
+
+        Response::json(['success' => true, 'data' => [
+            'status' => $job['status'],
+            'total' => (int)$job['total_conversations'],
+            'processed' => (int)$job['processed_conversations'],
+            'cost' => (float)$job['cost'],
+            'error' => $job['error_message'],
+            'manual_id' => $manualId,
+            'redirect' => $manualId ? \App\Helpers\Url::to('/manuals/view?id=' . $manualId) : null,
+        ]]);
     }
 
     /**

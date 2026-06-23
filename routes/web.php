@@ -454,6 +454,7 @@ Router::get('/agent-performance/sla-breached-details', [AgentPerformanceControll
 Router::get('/manuals', [\App\Controllers\ManualGeneratorController::class, 'index'], ['Authentication']);
 Router::get('/manuals/preview', [\App\Controllers\ManualGeneratorController::class, 'preview'], ['Authentication']);
 Router::post('/manuals/generate', [\App\Controllers\ManualGeneratorController::class, 'generate'], ['Authentication']);
+Router::get('/manuals/status', [\App\Controllers\ManualGeneratorController::class, 'status'], ['Authentication']);
 Router::get('/manuals/view', [\App\Controllers\ManualGeneratorController::class, 'view'], ['Authentication']);
 Router::get('/manuals/export', [\App\Controllers\ManualGeneratorController::class, 'export'], ['Authentication']);
 Router::post('/manuals/publish-rag', [\App\Controllers\ManualGeneratorController::class, 'publishRag'], ['Authentication']);

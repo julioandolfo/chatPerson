@@ -117,6 +117,16 @@ class ManualGeneratorService
             throw new \RuntimeException("Job {$jobId} não encontrado");
         }
 
+        // Trava atômica: só processa quem conseguir mudar de 'pending' para 'mapping'.
+        // Evita processamento duplicado (ex.: fpm + worker cron disputando o mesmo job).
+        $claimed = Database::execute(
+            "UPDATE manual_jobs SET status='mapping' WHERE id=? AND status='pending'",
+            [$jobId]
+        );
+        if ($claimed < 1) {
+            throw new \RuntimeException("Job {$jobId} já está em processamento ou concluído.");
+        }
+
         $convs = self::selectConversations(
             $job['agent_id'] ? (int)$job['agent_id'] : null,
             $job['date_from'],
@@ -136,7 +146,7 @@ class ManualGeneratorService
         }
 
         // ---------- MAP ----------
-        $extracts = [];
+        $items = [];
         $totalTokens = 0;
         $totalCost = 0.0;
         $processed = 0;
@@ -147,7 +157,7 @@ class ManualGeneratorService
 
             $result = self::mapConversation($transcript, $job['model_map']);
             if ($result && !empty($result['extract'])) {
-                $extracts[] = $result['extract'];
+                $items[] = ['conversation_id' => (int)$c['id'], 'data' => $result['extract']];
                 Database::insert(
                     "INSERT INTO manual_extracts (job_id, conversation_id, extract_json, tokens, cost, created_at)
                      VALUES (?, ?, ?, ?, ?, NOW())",
@@ -170,16 +180,20 @@ class ManualGeneratorService
             Database::execute("UPDATE manual_jobs SET processed_conversations=? WHERE id=?", [$processed, $jobId]);
         }
 
-        if (empty($extracts)) {
+        if (empty($items)) {
             Database::execute("UPDATE manual_jobs SET status='failed', error_message=? WHERE id=?",
                 ['Não foi possível extrair conhecimento das conversas.', $jobId]);
             throw new \RuntimeException('MAP não produziu extrações.');
         }
 
+        // ---------- CLUSTER (dedupe por similaridade semântica) ----------
+        Database::execute("UPDATE manual_jobs SET status='clustering' WHERE id=?", [$jobId]);
+        $clusters = self::clusterExtracts($items);
+
         // ---------- REDUCE ----------
         Database::execute("UPDATE manual_jobs SET status='reducing' WHERE id=?", [$jobId]);
 
-        $synthesis = self::synthesize($extracts, $job['title'], $job['model_reduce']);
+        $synthesis = self::synthesize($clusters, $job['title'], $job['model_reduce']);
         $totalTokens += $synthesis['tokens'];
         $totalCost += $synthesis['cost'];
 
@@ -306,12 +320,98 @@ class ManualGeneratorService
     }
 
     // ----------------------------------------------------------------------
+    // CLUSTER (dedupe semântico + sinal de divergência)
+    // ----------------------------------------------------------------------
+
+    /**
+     * Agrupar extrações por similaridade semântica (embeddings) e condensar.
+     * Cada cluster vira um "cenário" com as abordagens DISTINTAS observadas —
+     * o que reduz repetição no REDUCE e expõe divergências de atendimento.
+     *
+     * @param array $items  [ ['conversation_id'=>int, 'data'=>array], ... ]
+     * @return array        lista de cenários condensados
+     */
+    private static function clusterExtracts(array $items, float $threshold = 0.82): array
+    {
+        // Se houver poucos itens, não vale o custo de clusterizar.
+        if (count($items) <= 6) {
+            return array_map(fn($it) => self::condenseCluster([$it]), $items);
+        }
+
+        // 1) Embedding por item (texto = categoria + situação + gatilho)
+        $withEmb = [];
+        foreach ($items as $it) {
+            $d = $it['data'];
+            $text = trim(($d['categoria'] ?? '') . '. ' . ($d['situacao'] ?? '') . '. ' . ($d['gatilho_cliente'] ?? ''));
+            $emb = $text !== '' ? EmbeddingService::generate($text) : null;
+            $withEmb[] = ['cid' => $it['conversation_id'], 'data' => $d, 'emb' => $emb];
+        }
+
+        // 2) Clustering guloso por similaridade ao representante
+        $clusters = [];
+        foreach ($withEmb as $item) {
+            $placed = false;
+            if ($item['emb']) {
+                foreach ($clusters as $idx => $c) {
+                    if ($c['emb'] && EmbeddingService::cosineSimilarity($item['emb'], $c['emb']) >= $threshold) {
+                        $clusters[$idx]['members'][] = $item;
+                        $placed = true;
+                        break;
+                    }
+                }
+            }
+            if (!$placed) {
+                $clusters[] = ['emb' => $item['emb'], 'members' => [$item]];
+            }
+        }
+
+        // 3) Condensar cada cluster
+        return array_map(fn($c) => self::condenseCluster($c['members']), $clusters);
+    }
+
+    /** Condensar membros de um cluster em um único "cenário" com abordagens distintas. */
+    private static function condenseCluster(array $members): array
+    {
+        $decisoes = $acoes = $normas = $tons = $cats = $cids = [];
+        $situacao = '';
+        foreach ($members as $m) {
+            $d = $m['data'] ?? $m; // tolera item cru
+            if ($situacao === '' && !empty($d['situacao'])) $situacao = $d['situacao'];
+            if (!empty($d['decisao_agente']))   $decisoes[] = trim($d['decisao_agente']);
+            if (!empty($d['acao_executada']))   $acoes[]    = trim($d['acao_executada']);
+            if (!empty($d['norma_ou_criterio'])) $normas[]  = trim($d['norma_ou_criterio']);
+            if (!empty($d['tom_linguagem']))    $tons[]     = trim($d['tom_linguagem']);
+            if (!empty($d['categoria']))        $cats[]     = trim($d['categoria']);
+            if (isset($m['cid']))               $cids[]     = $m['cid'];
+        }
+        return [
+            'categoria' => self::topValue($cats),
+            'situacao_representativa' => $situacao,
+            'n_casos' => count($members),
+            'decisoes' => array_values(array_unique($decisoes)),
+            'acoes' => array_values(array_unique($acoes)),
+            'normas' => array_values(array_unique($normas)),
+            'tons' => array_values(array_unique($tons)),
+            'exemplos_conversas' => array_slice(array_values(array_unique($cids)), 0, 5),
+        ];
+    }
+
+    /** Valor mais frequente de um array (para a categoria do cluster). */
+    private static function topValue(array $values): string
+    {
+        if (empty($values)) return '';
+        $counts = array_count_values($values);
+        arsort($counts);
+        return (string)array_key_first($counts);
+    }
+
+    // ----------------------------------------------------------------------
     // REDUCE / SÍNTESE
     // ----------------------------------------------------------------------
 
-    private static function synthesize(array $extracts, string $title, string $model): array
+    private static function synthesize(array $clusters, string $title, string $model): array
     {
-        $compact = json_encode($extracts, JSON_UNESCAPED_UNICODE);
+        $compact = json_encode($clusters, JSON_UNESCAPED_UNICODE);
         // Proteção de contexto: limitar tamanho do material consolidado.
         if (mb_strlen($compact) > 45000) {
             $compact = mb_substr($compact, 0, 45000) . ' ...';
@@ -321,17 +421,20 @@ class ManualGeneratorService
                 . "claros para novos funcionários. Baseie-se SOMENTE nos dados fornecidos. Responda em JSON.";
 
         $user = "Título do manual: \"{$title}\".\n"
-              . "Abaixo está uma lista (JSON) de unidades de conhecimento extraídas de conversas reais.\n"
+              . "Abaixo está uma lista (JSON) de CENÁRIOS já agrupados por similaridade. Cada item traz: "
+              . "categoria, situacao_representativa, n_casos (quantas conversas), e listas de decisoes/acoes/normas/tons "
+              . "DISTINTAS observadas, além de exemplos_conversas (IDs).\n"
               . "Produza um JSON com:\n"
               . "{\n"
               . "  \"manual_markdown\": \"manual completo em Markdown com as seções: "
               . "1) Normas e Políticas, 2) Procedimentos por Cenário, 3) Critérios de Decisão, "
-              . "4) Ações Passo a Passo, 5) Tom de Voz e Scripts, 6) FAQ e Casos-Limite\",\n"
-              . "  \"divergences\": [ {\"cenario\": \"...\", \"variacoes\": [\"abordagem A\", \"abordagem B\"], \"recomendacao\": \"...\"} ]\n"
+              . "4) Ações Passo a Passo, 5) Tom de Voz e Scripts, 6) FAQ e Casos-Limite. "
+              . "Priorize cenários com maior n_casos. Quando útil, cite os IDs de conversas-exemplo.\",\n"
+              . "  \"divergences\": [ {\"cenario\": \"...\", \"variacoes\": [\"abordagem A\", \"abordagem B\"], \"recomendacao\": \"...\", \"exemplos\": [123,456]} ]\n"
               . "}\n"
-              . "Em 'divergences', liste cenários em que conversas diferentes mostraram tratamentos CONTRADITÓRIOS "
-              . "(oportunidades de padronização). Consolide repetições. Não invente regras que não estejam nos dados.\n\n"
-              . "DADOS:\n" . $compact;
+              . "Para 'divergences', foque nos cenários cujas listas 'decisoes' ou 'acoes' têm MAIS DE UMA abordagem "
+              . "distinta — são tratamentos inconsistentes (oportunidades de padronização). Não invente regras que não estejam nos dados.\n\n"
+              . "CENÁRIOS:\n" . $compact;
 
         $resp = self::callOpenAI($model, [
             ['role' => 'system', 'content' => $system],

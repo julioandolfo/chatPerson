@@ -58,9 +58,11 @@ class ManualGeneratorController
         $dateFrom = Request::get('date_from', date('Y-m-01'));
         $dateTo = Request::get('date_to', date('Y-m-d'));
         $limit = (int)Request::get('limit', 30);
+        $reduceModel = ManualGeneratorService::normalizeReduceModel(Request::get('reduce_model'));
+        $maxSections = ManualGeneratorService::normalizeMaxSections(Request::get('max_sections'));
 
         try {
-            $data = ManualGeneratorService::preview($agentId, $dateFrom, $dateTo, $limit);
+            $data = ManualGeneratorService::preview($agentId, $dateFrom, $dateTo, $limit, $reduceModel, $maxSections);
             Response::json(['success' => true, 'data' => $data]);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -80,6 +82,8 @@ class ManualGeneratorController
         $dateTo = Request::post('date_to', date('Y-m-d'));
         $limit = min((int)Request::post('limit', 50), 100);
         $title = trim((string)Request::post('title')) ?: ('Manual de Processos — ' . date('d/m/Y'));
+        $reduceModel = ManualGeneratorService::normalizeReduceModel(Request::post('reduce_model'));
+        $maxSections = ManualGeneratorService::normalizeMaxSections(Request::post('max_sections'));
 
         try {
             $jobId = ManualGeneratorService::createJob([
@@ -88,6 +92,8 @@ class ManualGeneratorController
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
                 'conversation_limit' => $limit,
+                'model_reduce' => $reduceModel,
+                'max_sections' => $maxSections,
                 'created_by' => Auth::id(),
             ]);
         } catch (\Throwable $e) {

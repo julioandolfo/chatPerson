@@ -459,6 +459,13 @@ Router::get('/manuals/view', [\App\Controllers\ManualGeneratorController::class,
 Router::get('/manuals/export', [\App\Controllers\ManualGeneratorController::class, 'export'], ['Authentication']);
 Router::post('/manuals/publish-rag', [\App\Controllers\ManualGeneratorController::class, 'publishRag'], ['Authentication']);
 
+// Copiloto de Atendimento (RAG sobre conversas resolvidas)
+Router::get('/copilot', [\App\Controllers\CopilotController::class, 'index'], ['Authentication']);
+Router::post('/copilot/ask', [\App\Controllers\CopilotController::class, 'ask'], ['Authentication']);
+Router::get('/copilot/stats', [\App\Controllers\CopilotController::class, 'stats'], ['Authentication']);
+Router::get('/copilot/context', [\App\Controllers\CopilotController::class, 'context'], ['Authentication']);
+Router::post('/copilot/reindex', [\App\Controllers\CopilotController::class, 'reindex'], ['Authentication']);
+
 // Rotas de Coaching em Tempo Real (IA)
 Router::get('/api/coaching/settings', [RealtimeCoachingController::class, 'getSettings'], ['Authentication']); // ✅ Configurações do coaching
 Router::get('/api/coaching/hints/conversation/{conversationId}', [RealtimeCoachingController::class, 'getHintsByConversation'], ['Authentication']);

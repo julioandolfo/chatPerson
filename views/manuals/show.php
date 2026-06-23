@@ -38,6 +38,9 @@ function mdToHtml(string $md): string {
         } elseif (preg_match('/^\s*#\s+(.*)/', $line, $mm)) {
             $closeList();
             $out[] = '<h2 class="fw-bolder mt-5 mb-3">' . htmlspecialchars($mm[1]) . '</h2>';
+        } elseif (preg_match('/^\s*>\s?(.*)/', $safe, $mm)) {
+            $closeList();
+            $out[] = '<blockquote class="border-start border-4 border-primary ps-3 py-1 my-2 text-gray-700 fst-italic">' . $mm[1] . '</blockquote>';
         } elseif (preg_match('/^\s*[-*]\s+(.*)/', $safe, $mm)) {
             $openList('ul');
             $out[] = '<li>' . preg_replace('/^\s*[-*]\s+/', '', $mm[1]) . '</li>';

@@ -24,6 +24,7 @@ class ManualGeneratorController
     public function index(): void
     {
         Permission::abortIfCannot(self::PERMISSION);
+        ManualGeneratorService::ensureTables();
 
         $agents = User::getAgents();
         $manuals = Database::fetchAll(
@@ -125,6 +126,7 @@ class ManualGeneratorController
     public function status(): void
     {
         Permission::abortIfCannot(self::PERMISSION);
+        ManualGeneratorService::ensureTables();
 
         $jobId = (int)Request::get('job_id');
         $job = Database::fetch(
@@ -160,6 +162,7 @@ class ManualGeneratorController
     public function view(): void
     {
         Permission::abortIfCannot(self::PERMISSION);
+        ManualGeneratorService::ensureTables();
 
         $id = (int)Request::get('id');
         $manual = Database::fetch(
@@ -193,6 +196,7 @@ class ManualGeneratorController
     public function export(): void
     {
         Permission::abortIfCannot(self::PERMISSION);
+        ManualGeneratorService::ensureTables();
 
         $id = (int)Request::get('id');
         $manual = Database::fetch("SELECT * FROM generated_manuals WHERE id = ?", [$id]);
@@ -214,6 +218,7 @@ class ManualGeneratorController
     public function publishRag(): void
     {
         Permission::abortIfCannot(self::PERMISSION);
+        ManualGeneratorService::ensureTables();
 
         $manualId = (int)Request::post('manual_id');
         $aiAgentId = (int)Request::post('ai_agent_id');

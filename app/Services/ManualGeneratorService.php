@@ -27,6 +27,77 @@ class ManualGeneratorService
     /** Teto de conversas processadas de forma síncrona pela UI. */
     public const SYNC_LIMIT = 30;
 
+    private static bool $tablesEnsured = false;
+
+    // ----------------------------------------------------------------------
+    // BOOTSTRAP
+    // ----------------------------------------------------------------------
+
+    /**
+     * Cria as tabelas do gerador sob demanda (idempotente). Mantém a tela
+     * funcional mesmo que a migration 152 ainda não tenha sido executada.
+     */
+    public static function ensureTables(): void
+    {
+        if (self::$tablesEnsured) {
+            return;
+        }
+
+        $db = Database::getInstance();
+
+        $db->exec("CREATE TABLE IF NOT EXISTS manual_jobs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(200) NOT NULL,
+            agent_id INT NULL,
+            date_from DATE NOT NULL,
+            date_to DATE NOT NULL,
+            conversation_limit INT DEFAULT 30,
+            status VARCHAR(20) DEFAULT 'pending',
+            total_conversations INT DEFAULT 0,
+            processed_conversations INT DEFAULT 0,
+            model_map VARCHAR(60) DEFAULT 'gpt-4o-mini',
+            model_reduce VARCHAR(60) DEFAULT 'gpt-4o',
+            tokens_used INT DEFAULT 0,
+            cost DECIMAL(12,6) DEFAULT 0,
+            error_message TEXT NULL,
+            created_by INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_agent (agent_id),
+            INDEX idx_status (status),
+            INDEX idx_created_at (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS manual_extracts (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            job_id INT NOT NULL,
+            conversation_id INT NOT NULL,
+            extract_json JSON NULL,
+            tokens INT DEFAULT 0,
+            cost DECIMAL(12,6) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_job (job_id),
+            INDEX idx_conversation (conversation_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        $db->exec("CREATE TABLE IF NOT EXISTS generated_manuals (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            job_id INT NOT NULL,
+            title VARCHAR(200) NOT NULL,
+            content_markdown MEDIUMTEXT NULL,
+            divergences_json JSON NULL,
+            status VARCHAR(20) DEFAULT 'draft',
+            version INT DEFAULT 1,
+            published_to_rag_agent_id INT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_job (job_id),
+            INDEX idx_status (status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+        self::$tablesEnsured = true;
+    }
+
     // ----------------------------------------------------------------------
     // SELEÇÃO / PREVIEW
     // ----------------------------------------------------------------------
@@ -90,6 +161,7 @@ class ManualGeneratorService
 
     public static function createJob(array $data): int
     {
+        self::ensureTables();
         $sql = "INSERT INTO manual_jobs
                     (title, agent_id, date_from, date_to, conversation_limit,
                      status, model_map, model_reduce, created_by, created_at)
@@ -112,6 +184,7 @@ class ManualGeneratorService
      */
     public static function runJob(int $jobId): int
     {
+        self::ensureTables();
         $job = Database::fetch("SELECT * FROM manual_jobs WHERE id = ?", [$jobId]);
         if (!$job) {
             throw new \RuntimeException("Job {$jobId} não encontrado");

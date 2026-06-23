@@ -42,9 +42,14 @@ class CopilotController
             'date_to' => trim((string)Request::post('date_to')) ?: null,
         ];
 
+        $history = json_decode((string)Request::post('history', '[]'), true);
+        if (!is_array($history)) {
+            $history = [];
+        }
+
         @set_time_limit(60);
         try {
-            $result = CopilotService::ask($question, 6, $filters);
+            $result = CopilotService::ask($question, 6, $filters, $history);
             Response::json(['success' => true, 'data' => $result]);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -75,7 +80,7 @@ class CopilotController
         Permission::abortIfCannot('conversations.view.all');
         @set_time_limit(0);
         try {
-            $done = CopilotService::indexPending(50);
+            $done = CopilotService::indexPending(20);
             Response::json(['success' => true, 'indexed' => $done, 'stats' => CopilotService::stats()]);
         } catch (\Throwable $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 500);

@@ -226,7 +226,7 @@ class CopilotService
      * @param array $filters ['category'=>?string, 'date_from'=>?string, 'date_to'=>?string]
      * @return array ['answer'=>string, 'sources'=>array, 'tokens'=>int, 'cost'=>float]
      */
-    public static function ask(string $question, int $topK = 6, array $filters = []): array
+    public static function ask(string $question, int $topK = 6, array $filters = [], array $history = []): array
     {
         self::ensureTable();
         $question = trim($question);
@@ -309,10 +309,18 @@ class CopilotService
               . "3) Pontos de atenção/exceções.\n"
               . "Cite os números das conversas usadas (ex: #12345). Se os casos não cobrirem bem o problema, diga isso claramente.";
 
-        $resp = self::callOpenAI('gpt-4o-mini', [
-            ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $user],
-        ], 1200, 0.3, false);
+        // Montar mensagens: sistema + histórico recente (chat) + pergunta atual com contexto.
+        $messages = [['role' => 'system', 'content' => $system]];
+        foreach (array_slice($history, -6) as $h) {
+            $role = ($h['role'] ?? '') === 'assistant' ? 'assistant' : 'user';
+            $content = trim((string)($h['content'] ?? ''));
+            if ($content !== '') {
+                $messages[] = ['role' => $role, 'content' => mb_substr($content, 0, 2000)];
+            }
+        }
+        $messages[] = ['role' => 'user', 'content' => $user];
+
+        $resp = self::callOpenAI('gpt-4o-mini', $messages, 1200, 0.3, false);
 
         $answer = $resp['content'] ?? 'Não consegui gerar a resposta agora. Tente novamente.';
 

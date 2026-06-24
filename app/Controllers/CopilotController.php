@@ -21,7 +21,6 @@ class CopilotController
         Permission::abortIfCannotAny(self::VIEW_PERMS);
         Response::view('copilot/index', [
             'stats' => CopilotService::stats(),
-            'categories' => CopilotService::categories(),
         ]);
     }
 

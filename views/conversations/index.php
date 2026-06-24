@@ -3211,19 +3211,52 @@ function getChannelInfo(channel) {
         <h5 class="offcanvas-title fw-bold">🤖 Copiloto de Atendimento</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
     </div>
-    <div class="offcanvas-body">
-        <p class="text-muted fs-7">Descreva o problema do cliente. Busco casos parecidos já resolvidos e sugiro como agir.</p>
-        <textarea id="cpsp_q" class="form-control mb-2" rows="3" placeholder="Ex.: cliente recebeu produto com defeito e quer troca..."></textarea>
-        <button class="btn btn-primary w-100 mb-3" id="cpsp_btn" onclick="cpspAsk()">Perguntar</button>
-        <div id="cpsp_answer" class="text-gray-800 fs-7" style="white-space: pre-wrap;"></div>
-        <div id="cpsp_sources" class="mt-3 d-flex flex-column gap-2"></div>
+    <div class="offcanvas-body p-0 d-flex flex-column" style="height: calc(100% - 60px);">
+        <div id="cpsp_messages" class="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2">
+            <div class="cpsp-bubble cpsp-bot">Descreva o problema do cliente que eu busco casos parecidos já resolvidos. 😊</div>
+        </div>
+        <div class="border-top p-2 d-flex gap-2">
+            <textarea id="cpsp_q" class="form-control form-control-sm" rows="2" style="resize:none;"
+                      placeholder="Problema do cliente…  (Enter envia)"></textarea>
+            <button class="btn btn-primary btn-sm" id="cpsp_btn" onclick="cpspSend()" style="min-width:84px;">Enviar</button>
+        </div>
     </div>
 </div>
+<style>
+.cpsp-bubble { max-width: 90%; padding: 9px 12px; border-radius: 12px; white-space: pre-wrap; line-height: 1.45; font-size: .9rem; }
+.cpsp-user { align-self: flex-end; background: var(--bs-primary); color: #fff; border-bottom-right-radius: 4px; }
+.cpsp-bot { align-self: flex-start; background: var(--bs-gray-100); color: var(--bs-gray-900); border-bottom-left-radius: 4px; }
+.cpsp-src { align-self: flex-start; max-width: 90%; }
+</style>
 <script>
-// Pré-preencher o painel com a última mensagem do cliente da conversa aberta.
 (function () {
     var panel = document.getElementById('copilotPanel');
     if (!panel) return;
+    var cpspHistory = [];
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+    function bubble(role, text) {
+        var box = document.getElementById('cpsp_messages');
+        var el = document.createElement('div');
+        el.className = 'cpsp-bubble ' + (role === 'user' ? 'cpsp-user' : 'cpsp-bot');
+        el.textContent = text;
+        box.appendChild(el); box.scrollTop = box.scrollHeight;
+        return el;
+    }
+    function sources(list) {
+        if (!list || !list.length) return;
+        var box = document.getElementById('cpsp_messages');
+        var wrap = document.createElement('div');
+        wrap.className = 'cpsp-src d-flex flex-wrap gap-1';
+        list.forEach(function (s) {
+            wrap.innerHTML += '<a href="<?= \App\Helpers\Url::to('/conversations') ?>?conversation_id=' + s.conversation_id
+                + '" target="_blank" class="badge badge-light-primary text-decoration-none" title="' + esc(s.summary) + '">#'
+                + s.conversation_id + ' · ' + Math.round((s.score||0)*100) + '%</a>';
+        });
+        box.appendChild(wrap); box.scrollTop = box.scrollHeight;
+    }
+
+    // Pré-preencher com a última mensagem do cliente ao abrir.
     panel.addEventListener('show.bs.offcanvas', function () {
         var convId = window.currentConversationId || (typeof currentConversationId !== 'undefined' ? currentConversationId : null);
         var ta = document.getElementById('cpsp_q');
@@ -3232,45 +3265,41 @@ function getChannelInfo(channel) {
             credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function (r) { return r.json(); })
-        .then(function (j) {
-            if (j.success && j.data && j.data.last_client_message) {
-                ta.value = j.data.last_client_message;
-            }
-        })
+        .then(function (j) { if (j.success && j.data && j.data.last_client_message) { ta.value = j.data.last_client_message; } })
         .catch(function () {});
     });
-})();
 
-function cpspAsk() {
-    var q = document.getElementById('cpsp_q').value.trim();
-    if (!q) { return; }
-    var btn = document.getElementById('cpsp_btn');
-    btn.disabled = true; btn.textContent = 'Buscando…';
-    document.getElementById('cpsp_answer').textContent = '';
-    document.getElementById('cpsp_sources').innerHTML = '';
-    fetch('<?= \App\Helpers\Url::to('/copilot/ask') ?>', {
-        method: 'POST', credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: new URLSearchParams({ question: q }).toString()
-    })
-    .then(function(r){ return r.json(); })
-    .then(function(j){
-        btn.disabled = false; btn.textContent = 'Perguntar';
-        if (!j.success) { document.getElementById('cpsp_answer').textContent = 'Erro: ' + (j.message || ''); return; }
-        var d = j.data;
-        document.getElementById('cpsp_answer').textContent = d.answer || '';
-        var src = document.getElementById('cpsp_sources');
-        (d.sources || []).forEach(function(s){
-            var el = document.createElement('div');
-            el.className = 'p-2 bg-light rounded fs-8';
-            el.innerHTML = '<span class="fw-bold">Conversa #' + s.conversation_id + '</span> '
-                + '<span class="badge badge-light-info">' + (s.category || '—') + ' · ' + Math.round((s.score||0)*100) + '%</span>'
-                + '<div class="text-muted mt-1">' + String(s.summary || '').replace(/</g,'&lt;') + '</div>';
-            src.appendChild(el);
-        });
-    })
-    .catch(function(e){ btn.disabled = false; btn.textContent = 'Perguntar'; document.getElementById('cpsp_answer').textContent = 'Falha: ' + e; });
-}
+    window.cpspSend = function () {
+        var ta = document.getElementById('cpsp_q');
+        var q = ta.value.trim();
+        if (!q) return;
+        var btn = document.getElementById('cpsp_btn');
+        btn.disabled = true; btn.textContent = '…';
+        ta.value = '';
+        bubble('user', q);
+        cpspHistory.push({ role: 'user', content: q });
+        var thinking = bubble('bot', 'Buscando…');
+
+        fetch('<?= \App\Helpers\Url::to('/copilot/ask') ?>', {
+            method: 'POST', credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new URLSearchParams({ question: q, history: JSON.stringify(cpspHistory.slice(-6)) }).toString()
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            btn.disabled = false; btn.textContent = 'Enviar';
+            var answer = (j.success && j.data) ? j.data.answer : ('Erro: ' + (j.message || 'falha'));
+            thinking.textContent = answer;
+            cpspHistory.push({ role: 'assistant', content: answer });
+            if (j.success && j.data) sources(j.data.sources);
+        })
+        .catch(function (e) { btn.disabled = false; btn.textContent = 'Enviar'; thinking.textContent = 'Falha: ' + e; });
+    };
+
+    document.getElementById('cpsp_q').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); window.cpspSend(); }
+    });
+})();
 </script>
 
 <div class="conversations-layout">

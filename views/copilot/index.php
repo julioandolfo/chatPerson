@@ -35,24 +35,6 @@ $categories = $categories ?? [];
         </div>
 
         <div class="card-body p-0">
-            <!-- Filtros -->
-            <div class="row g-2 px-4 pt-4">
-                <div class="col-md-4">
-                    <select id="cp_category" class="form-select form-select-sm">
-                        <option value="">Todas as categorias</option>
-                        <?php foreach ($categories as $cat): ?>
-                            <option value="<?= htmlspecialchars($cat) ?>"><?= htmlspecialchars($cat) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <input type="date" id="cp_from" class="form-control form-control-sm" title="Resolvidas a partir de">
-                </div>
-                <div class="col-md-4">
-                    <input type="date" id="cp_to" class="form-control form-control-sm" title="Resolvidas até">
-                </div>
-            </div>
-
             <!-- Chat -->
             <div class="cp-chat">
                 <div class="cp-messages" id="cp_messages">
@@ -121,9 +103,6 @@ function cpSend() {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         body: new URLSearchParams({
             question: q,
-            category: document.getElementById('cp_category').value,
-            date_from: document.getElementById('cp_from').value,
-            date_to: document.getElementById('cp_to').value,
             history: JSON.stringify(cpHistory.slice(-6))
         }).toString()
     })

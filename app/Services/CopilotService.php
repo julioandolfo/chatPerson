@@ -62,7 +62,7 @@ class CopilotService
     // INDEXAÇÃO (retroalimentação incremental)
     // ----------------------------------------------------------------------
 
-    /** Estatísticas simples para a UI. */
+    /** Estatísticas simples para a UI (inclui estimativa de custo para indexar o restante). */
     public static function stats(): array
     {
         self::ensureTable();
@@ -73,7 +73,23 @@ class CopilotService
              LEFT JOIN copilot_conversation_index k ON k.conversation_id = c.id
              WHERE c.status IN ($statusList) AND k.id IS NULL"
         )['n'] ?? 0);
-        return ['indexed' => $indexed, 'pending' => $pending];
+
+        // Custo médio REAL por conversa já indexada (resumo) + embedding (~negligível).
+        $avgRow = Database::fetch("SELECT AVG(cost) AS a, COUNT(*) AS n FROM copilot_conversation_index WHERE cost > 0");
+        $sample = (int)($avgRow['n'] ?? 0);
+        $avg = (float)($avgRow['a'] ?? 0);
+        if ($avg <= 0) {
+            $avg = 0.00035; // fallback antes de haver amostra
+        }
+        $avg += 0.000006; // embedding text-embedding-3-small (~300 tokens)
+
+        return [
+            'indexed' => $indexed,
+            'pending' => $pending,
+            'avg_cost' => round($avg, 6),
+            'cost_sample' => $sample,
+            'estimated_remaining_cost' => round($avg * $pending, 2),
+        ];
     }
 
     /** Categorias disponíveis no índice (para filtro), mais frequentes primeiro. */

@@ -9,7 +9,7 @@ class User extends Model
 {
     protected string $table = 'users';
     protected string $primaryKey = 'id';
-    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'woocommerce_seller_id', 'availability_status', 'queue_enabled', 'max_conversations', 'current_conversations', 'last_seen_at', 'agent_settings'];
+    protected array $fillable = ['name', 'email', 'password', 'role', 'status', 'avatar', 'woocommerce_seller_id', 'availability_status', 'queue_enabled', 'queue_auto_paused', 'max_conversations', 'current_conversations', 'last_seen_at', 'last_activity_at', 'agent_settings'];
     protected array $hidden = ['password'];
     protected bool $timestamps = true;
 

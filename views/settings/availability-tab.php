@@ -53,8 +53,22 @@ $bhs = $businessHoursSettings ?? [];
                        value="<?= htmlspecialchars($as['away_timeout_minutes'] ?? 15) ?>" min="1" max="120" />
                 <div class="form-text">Tempo em minutos sem atividade para mudar automaticamente para status "Ausente"</div>
             </div>
+
+            <div class="col-lg-12 mt-3">
+                <label class="form-label fw-semibold">Desativar da fila de atribuições quando ausente</label>
+                <div class="form-check form-switch form-check-custom form-check-solid">
+                    <input class="form-check-input" type="checkbox" name="pause_queue_when_away" id="pause_queue_when_away"
+                           <?= ($as['pause_queue_when_away'] ?? false) ? 'checked' : '' ?> />
+                    <label class="form-check-label" for="pause_queue_when_away">Habilitar</label>
+                </div>
+                <div class="form-text">
+                    Quando o agente ficar <strong>ausente</strong> ou <strong>offline</strong>, ele é removido automaticamente
+                    da distribuição de novas conversas (round-robin) e religado ao voltar a ficar <strong>online</strong>.
+                    Não sobrescreve agentes desativados manualmente. Usa o mesmo tempo do "ausente" acima.
+                </div>
+            </div>
         </div>
-        
+
         <div class="row mb-5">
             <div class="col-lg-6">
                 <label class="form-label fw-semibold">Rastrear atividade do usuário</label>

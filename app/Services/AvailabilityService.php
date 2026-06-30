@@ -29,6 +29,9 @@ class AvailabilityService
             'track_mouse_movement' => Setting::get('availability.track_mouse_movement', false),
             'track_keyboard' => Setting::get('availability.track_keyboard', true),
             'track_page_visibility' => Setting::get('availability.track_page_visibility', true),
+            // Desativar o agente da fila de atribuições quando ficar ausente/offline,
+            // e religar automaticamente quando voltar a ficar online.
+            'pause_queue_when_away' => Setting::get('availability.pause_queue_when_away', false),
         ];
     }
 
@@ -300,6 +303,9 @@ class AvailabilityService
 
         $result = User::update($userId, $data);
 
+        // Sincronizar a fila de atribuições com a presença (se habilitado).
+        self::syncQueueWithAvailability($userId, $status, $user);
+
         // Criar novo registro no histórico
         self::createHistoryRecord($userId, $status, $reason);
 
@@ -322,6 +328,43 @@ class AvailabilityService
         }
 
         return $result;
+    }
+
+    /**
+     * Desativar/retomar o agente da fila de atribuições conforme a presença.
+     * - away/offline → desativa da fila (queue_enabled=0), marcando como auto-pausado;
+     * - online       → religa a fila SOMENTE se foi o sistema que desativou
+     *                  (não sobrescreve uma desativação MANUAL feita por um admin).
+     *
+     * @param array|null $user estado do usuário ANTES da mudança de status.
+     */
+    private static function syncQueueWithAvailability(int $userId, string $status, ?array $user = null): void
+    {
+        if (!self::getSettings()['pause_queue_when_away']) {
+            return;
+        }
+        $user = $user ?: User::find($userId);
+        if (!$user) {
+            return;
+        }
+
+        try {
+            if (in_array($status, ['away', 'offline'], true)) {
+                // Só pausa quem está ativo na fila (não mexe em desativação manual).
+                if ((int)($user['queue_enabled'] ?? 1) === 1) {
+                    User::update($userId, ['queue_enabled' => 0, 'queue_auto_paused' => 1]);
+                }
+            } elseif ($status === 'online') {
+                // Religa apenas se a desativação foi automática (por ausência).
+                if ((int)($user['queue_auto_paused'] ?? 0) === 1) {
+                    User::update($userId, ['queue_enabled' => 1, 'queue_auto_paused' => 0]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Coluna queue_auto_paused ausente (migration 155 não rodada) ou outro erro:
+            // não interromper a atualização de status.
+            error_log('syncQueueWithAvailability: ' . $e->getMessage());
+        }
     }
 
     /**

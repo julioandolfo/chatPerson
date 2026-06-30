@@ -570,7 +570,8 @@ class SettingsController
             SettingService::set('availability.track_mouse_movement', isset($data['track_mouse_movement']), 'boolean', 'availability');
             SettingService::set('availability.track_keyboard', isset($data['track_keyboard']), 'boolean', 'availability');
             SettingService::set('availability.track_page_visibility', isset($data['track_page_visibility']), 'boolean', 'availability');
-            
+            SettingService::set('availability.pause_queue_when_away', isset($data['pause_queue_when_away']), 'boolean', 'availability');
+
             // Configurações de horário comercial
             SettingService::set('business_hours.enabled', isset($data['business_hours_enabled']), 'boolean', 'business_hours');
             SettingService::set('business_hours.timezone', $data['business_hours_timezone'] ?? 'America/Sao_Paulo', 'string', 'business_hours');

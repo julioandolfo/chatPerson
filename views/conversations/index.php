@@ -4628,8 +4628,78 @@ function getChannelInfo(channel) {
     <?php endif; ?>
 
     <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeConversationSidebar()"></div>
-    
+
 </div>
+
+<style>
+/* ============================================================================
+   Correção de empilhamento do painel de detalhes (drawer) em mobile/tablet.
+   IMPORTANTE: este bloco é carregado APÓS sidebar-conversation.php de propósito,
+   para vencer o conflito de ordem de origem (mesma especificidade). Sem isso, a
+   regra base ".conversation-sidebar { position: relative; z-index: 100 }" do
+   partial sobrescrevia o drawer e o overlay preto ficava POR CIMA do painel,
+   bloqueando os cliques (transferir, atribuir agente, encerrar, etc.).
+   ============================================================================ */
+@media (max-width: 991px) {
+    /* Overlay sempre abaixo do painel de detalhes */
+    .sidebar-overlay {
+        z-index: 1040;
+    }
+}
+
+/* Mobile: drawer ocupa a tela inteira e fica acima do overlay */
+@media (max-width: 767px) {
+    .conversation-sidebar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        border-left: none;
+    }
+    .conversation-sidebar.mobile-active {
+        width: 100% !important;
+        max-width: 100% !important;
+        z-index: 1050 !important;
+        transform: translateX(0);
+        opacity: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        background: var(--bs-body-bg);
+        pointer-events: auto;
+    }
+    .conversation-sidebar:not(.mobile-active) {
+        transform: translateX(100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+}
+
+/* Tablet: drawer lateral direito, acima do overlay */
+@media (min-width: 768px) and (max-width: 991px) {
+    .conversation-sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: auto;
+        width: 0;
+        max-width: 90vw;
+        border-left: 1px solid var(--bs-border-color);
+        overflow: hidden;
+        transition: width 0.3s ease;
+        z-index: 1050;
+    }
+    .conversation-sidebar.open {
+        width: 420px !important;
+        max-width: 90vw !important;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+</style>
 
 <!-- MODAL: Templates de Mensagens -->
 <div class="modal fade" id="kt_modal_templates" tabindex="-1" aria-hidden="true">

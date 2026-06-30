@@ -32,6 +32,9 @@ class AvailabilityService
             // Desativar o agente da fila de atribuições quando ficar ausente/offline,
             // e religar automaticamente quando voltar a ficar online.
             'pause_queue_when_away' => Setting::get('availability.pause_queue_when_away', false),
+            // O que fazer quando NINGUÉM está elegível (todos offline/ausentes):
+            // 'none' | 'assign_to_all' | 'first_online_gets_pending'
+            'empty_queue_fallback' => Setting::get('availability.empty_queue_fallback', 'none'),
         ];
     }
 
@@ -306,6 +309,13 @@ class AvailabilityService
         // Sincronizar a fila de atribuições com a presença (se habilitado).
         self::syncQueueWithAvailability($userId, $status, $user);
 
+        // Modo "primeiro que logar pega as pendentes": ao voltar online, recebe todas
+        // as conversas que ficaram sem atendente (ex.: equipe inteira ficou ausente).
+        if ($status === 'online'
+            && Setting::get('availability.empty_queue_fallback', 'none') === 'first_online_gets_pending') {
+            self::assignPendingToAgent($userId);
+        }
+
         // Criar novo registro no histórico
         self::createHistoryRecord($userId, $status, $reason);
 
@@ -364,6 +374,44 @@ class AvailabilityService
             // Coluna queue_auto_paused ausente (migration 155 não rodada) ou outro erro:
             // não interromper a atualização de status.
             error_log('syncQueueWithAvailability: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Atribuir todas as conversas sem atendente (open/pending) ao agente informado.
+     * Usado pelo modo "primeiro que logar pega as pendentes".
+     */
+    private static function assignPendingToAgent(int $userId): void
+    {
+        try {
+            // Só despeja em quem está apto a receber (não desativado manualmente).
+            $user = User::find($userId);
+            if (!$user || (int)($user['queue_enabled'] ?? 1) !== 1) {
+                return;
+            }
+
+            $rows = Database::fetchAll(
+                "SELECT id FROM conversations
+                 WHERE (agent_id IS NULL OR agent_id = 0)
+                   AND status IN ('open','pending')
+                 ORDER BY created_at ASC
+                 LIMIT 500"
+            );
+
+            $count = 0;
+            foreach ($rows as $r) {
+                try {
+                    \App\Services\ConversationService::assignToAgent((int)$r['id'], $userId, true);
+                    $count++;
+                } catch (\Throwable $e) {
+                    error_log('assignPendingToAgent conv ' . $r['id'] . ': ' . $e->getMessage());
+                }
+            }
+            if ($count > 0) {
+                error_log("assignPendingToAgent: {$count} conversas pendentes atribuídas ao agente {$userId}");
+            }
+        } catch (\Throwable $e) {
+            error_log('assignPendingToAgent: ' . $e->getMessage());
         }
     }
 

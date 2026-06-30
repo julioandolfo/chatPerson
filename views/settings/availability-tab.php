@@ -67,6 +67,26 @@ $bhs = $businessHoursSettings ?? [];
                     Não sobrescreve agentes desativados manualmente. Usa o mesmo tempo do "ausente" acima.
                 </div>
             </div>
+
+            <div class="col-lg-12 mt-3">
+                <label class="form-label fw-semibold">Quando NINGUÉM estiver disponível na fila</label>
+                <select class="form-select form-select-solid" name="empty_queue_fallback">
+                    <?php $eqf = $as['empty_queue_fallback'] ?? 'none'; ?>
+                    <option value="none" <?= $eqf === 'none' ? 'selected' : '' ?>>
+                        Não atribuir — conversas ficam sem atendente até alguém pegar
+                    </option>
+                    <option value="assign_to_all" <?= $eqf === 'assign_to_all' ? 'selected' : '' ?>>
+                        Distribuir para todos — atribui normalmente, como se estivessem online
+                    </option>
+                    <option value="first_online_gets_pending" <?= $eqf === 'first_online_gets_pending' ? 'selected' : '' ?>>
+                        Primeiro que voltar online recebe todas as pendentes acumuladas
+                    </option>
+                </select>
+                <div class="form-text">
+                    Define o comportamento quando todos os agentes estão offline/ausentes (ou fora da fila).
+                    "Distribuir para todos" inclui os auto-pausados por ausência (não os desativados manualmente).
+                </div>
+            </div>
         </div>
 
         <div class="row mb-5">

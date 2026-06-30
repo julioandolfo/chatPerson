@@ -679,6 +679,20 @@ class ConversationSettingsService
                 break;
         }
 
+        // 🆘 FALLBACK "distribuir para todos": se ninguém é elegível por presença
+        // (todos offline/ausentes ou fora da fila), e a config permitir, distribui
+        // para todos como se estivessem online (inclui os auto-pausados por ausência).
+        if ($result === null
+            && \App\Models\Setting::get('availability.empty_queue_fallback', 'none') === 'assign_to_all') {
+            $result = self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, false, false, $excludeAgentId, true);
+            if ($result !== null) {
+                \App\Helpers\Logger::aiAgent("autoAssign: FALLBACK assign_to_all aplicado", [
+                    'conversation_id' => $conversationId,
+                    'result' => $result,
+                ]);
+            }
+        }
+
         \App\Helpers\Logger::aiAgent("autoAssign: método aplicado", [
             'conversation_id' => $conversationId,
             'method' => $method,
@@ -702,16 +716,17 @@ class ConversationSettingsService
      * ATUALIZADO: Agora aceita excludeAgentId
      */
     public static function assignRoundRobin(
-        ?int $departmentId = null, 
-        ?int $funnelId = null, 
-        ?int $stageId = null, 
+        ?int $departmentId = null,
+        ?int $funnelId = null,
+        ?int $stageId = null,
         bool $includeAI = false,
         bool $considerAvailability = true,
         bool $considerMaxConversations = true,
-        ?int $excludeAgentId = null
+        ?int $excludeAgentId = null,
+        bool $emergencyIncludePaused = false
     ): ?int
     {
-        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations);
+        $agents = self::getAvailableAgents($departmentId, $funnelId, $stageId, $includeAI, $considerAvailability, $considerMaxConversations, $emergencyIncludePaused);
         
         // Filtrar agente excluído
         if ($excludeAgentId !== null) {
@@ -1108,17 +1123,18 @@ class ConversationSettingsService
      * ✅ ATUALIZADO: Agora filtra por permissões de funil/etapa
      */
     private static function getAvailableAgents(
-        ?int $departmentId = null, 
-        ?int $funnelId = null, 
-        ?int $stageId = null, 
+        ?int $departmentId = null,
+        ?int $funnelId = null,
+        ?int $stageId = null,
         bool $includeAI = false,
         bool $considerAvailability = true,
-        bool $considerMaxConversations = true
+        bool $considerMaxConversations = true,
+        bool $emergencyIncludePaused = false
     ): array
     {
         $settings = self::getSettings();
         $agents = [];
-        
+
         // Agentes humanos
         // Round-robin: ordenar por "última vez que recebeu uma conversa" (atribuição), NÃO por updated_at
         // (mensagens do cliente alteram updated_at e distorcem a fila).
@@ -1126,10 +1142,18 @@ class ConversationSettingsService
                        MAX(COALESCE(c.assigned_at, c.created_at)) as last_assignment_at, 'human' as agent_type
                 FROM users u
                 LEFT JOIN conversations c ON u.id = c.agent_id AND c.status IN ('open', 'pending')
-                WHERE u.status = 'active' 
-                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')
-                AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)";
-        
+                WHERE u.status = 'active'
+                AND u.role IN ('agent', 'admin', 'supervisor', 'senior_agent', 'junior_agent')";
+
+        // Filtro de fila: normalmente exige queue_enabled=1. No modo de emergência
+        // (todos ficaram fora da fila por ausência), inclui também os auto-pausados
+        // — mas continua excluindo quem foi desativado MANUALMENTE.
+        if ($emergencyIncludePaused) {
+            $sql .= " AND (u.queue_enabled IS NULL OR u.queue_enabled = 1 OR u.queue_auto_paused = 1)";
+        } else {
+            $sql .= " AND (u.queue_enabled IS NULL OR u.queue_enabled = 1)";
+        }
+
         // Filtrar por disponibilidade apenas se considerAvailability = true
         if ($considerAvailability) {
             $sql .= " AND u.availability_status = 'online'";

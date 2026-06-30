@@ -2622,14 +2622,29 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 
 /* Mobile: Layout vertical com navegação entre views */
 @media (max-width: 767px) {
-    /* Layout principal - vertical em mobile */
+    /* Layout principal - vertical em mobile (ocupa a viewport real disponível) */
     .conversations-layout {
         flex-direction: column;
         height: calc(100vh - 60px);
+        height: calc(100dvh - 60px); /* dvh evita que a barra do navegador móvel corte o input */
         margin: 0;
         padding: 0;
         position: relative;
         overflow: hidden;
+    }
+
+    /* Remover respiro lateral do container do Metronic para o chat ocupar a tela toda */
+    #kt_content_container,
+    .container-fluid {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Ocultar o título de página (duplicado) que o Metronic injeta no conteúdo em mobile,
+       liberando espaço vertical para a conversa */
+    #kt_content_container > .page-title,
+    .page-title[data-kt-swapper="true"] {
+        display: none !important;
     }
     
     /* Sistema de views - apenas uma visível por vez */
@@ -2675,20 +2690,10 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         pointer-events: none;
     }
     
-    /* Cabeçalho de mêtricas - mobile */
+    /* Cabeçalho de métricas - oculto no mobile para ganhar espaço vertical
+       (título, fila e SLAs ficam acessíveis no desktop) */
     .conversations-metrics-header {
-        padding: 10px 15px;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    
-    .conversations-metrics-header h2 {
-        font-size: 1.25rem;
-    }
-    
-    .conversations-metrics-header #agent-metrics-container {
-        display: none !important; /* Ocultar métricas e SLAs no mobile */
+        display: none !important;
     }
     
     /* Lista de conversas - full width em mobile */
@@ -2714,35 +2719,47 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     }
     
     .chat-header {
-        padding: 12px 15px;
+        padding: 8px 10px;
         position: sticky;
         top: 0;
         background: var(--bs-body-bg);
         z-index: 100;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        flex-wrap: nowrap;
     }
-    
+
     .chat-header-info {
-        width: 100%;
-        gap: 10px;
+        width: auto;
+        flex: 1 1 auto;
+        min-width: 0; /* permite truncar o nome */
+        gap: 8px;
     }
 
     .chat-header .symbol {
-        width: 40px;
-        height: 40px;
+        width: 38px;
+        height: 38px;
+        flex-shrink: 0;
     }
 
     .chat-header-title {
         font-size: 15px;
         line-height: 1.2;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
     }
 
     .chat-header-subtitle {
-        flex-direction: column;
-        align-items: flex-start;
+        flex-direction: row;
+        align-items: center;
+        flex-wrap: wrap;
         gap: 4px;
+        row-gap: 2px;
+        font-size: 12px;
     }
 
     .chat-header-separator {
@@ -2752,29 +2769,32 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     .chat-header-channel svg {
         display: none;
     }
-    
+
     /* Botão voltar no header do chat (mobile) */
     .chat-header-back-btn {
         display: flex !important;
-        margin-right: 10px;
+        margin-right: 2px;
+        flex-shrink: 0;
     }
-    
+
     /* Ocultar busca de mensagens em mobile (pode ser acessada via menu) */
     .chat-header .position-relative.d-flex.gap-2 {
         display: none !important;
     }
-    
-    /* BotÁes do header - ajustar tamanho */
+
+    /* Botões do header - alvos de toque adequados e compactos */
     .chat-header .btn {
-        padding: 8px !important;
-        min-width: 40px;
-        height: 40px;
+        padding: 7px !important;
+        min-width: 38px;
+        height: 38px;
     }
 
     .chat-header-actions {
-        width: 100%;
-        gap: 8px;
-        justify-content: flex-start;
+        width: auto;
+        flex: 0 0 auto;
+        gap: 4px;
+        justify-content: flex-end;
+        flex-wrap: nowrap;
     }
     
     /* Mensagens - padding reduzido em mobile */
@@ -2787,14 +2807,44 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         max-width: 85% !important;
     }
     
-    /* Input de mensagem - fixo no rodapé */
-    .chat-input-container {
-        position: sticky;
-        bottom: 0;
+    /* Input de mensagem - fixo no rodapé (a classe correta é .chat-input) */
+    .chat-input {
+        padding: 8px 10px;
         background: var(--bs-body-bg);
-        padding: 15px;
         border-top: 1px solid var(--bs-border-color);
+        position: relative;
         z-index: 100;
+        padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); /* respeita o notch/gestos */
+    }
+
+    /* Barra de ferramentas com muitos botões: rolagem horizontal para caber em 1 linha */
+    .chat-input-toolbar {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+        margin-bottom: 8px;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+    }
+    .chat-input-toolbar::-webkit-scrollbar {
+        display: none;
+    }
+    .chat-input-toolbar .btn {
+        flex: 0 0 auto;
+    }
+
+    /* font-size >= 16px evita o zoom automático do iOS ao focar o campo */
+    .chat-input-textarea {
+        font-size: 16px;
+        min-height: 46px;
+        max-height: 120px;
+    }
+
+    .chat-input-footer {
+        gap: 8px;
+        margin-top: 8px;
     }
     
     /* Sidebar como drawer full-screen */
@@ -2803,8 +2853,10 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
         max-width: 100% !important;
         border-left: none;
         z-index: 1000;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
-    
+
     .conversation-sidebar.open {
         width: 100% !important;
     }
@@ -2869,7 +2921,48 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     }
     .filters-grid {
         grid-template-columns: 1fr 1fr;
-        gap: 4px;
+        gap: 6px;
+    }
+
+    /* font-size >= 16px nos campos evita o zoom automático do iOS ao focar */
+    .conversations-list-header .form-control,
+    #kt_conversations_search,
+    #messageSearch,
+    .filters-grid .form-select,
+    .filters-panel .form-control {
+        font-size: 16px !important;
+    }
+    /* Selects de filtro: mais altos no mobile para toque confortável */
+    .filters-grid .form-select {
+        height: 40px !important;
+        padding: 6px 28px 6px 10px !important;
+    }
+
+    /* Garantir que nada gere rolagem horizontal na página */
+    .conversations-layout,
+    .conversations-list,
+    .chat-area,
+    .conversation-sidebar {
+        max-width: 100vw;
+        overflow-x: hidden;
+    }
+
+    /* Botão flutuante do Copiloto: compacto. Por padrão fica no canto inferior;
+       quando a conversa está aberta (body.conv-mobile-chat) sobe para não cobrir
+       o botão "Enviar" do compositor */
+    button[data-bs-target="#copilotPanel"] {
+        right: 14px !important;
+        bottom: 16px !important;
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+        z-index: 90 !important;
+    }
+    body.conv-mobile-chat button[data-bs-target="#copilotPanel"] {
+        bottom: 150px !important;
+    }
+    #copilotPanel {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
@@ -20022,6 +20115,7 @@ function showListView() {
         if (chatView) chatView.classList.remove('mobile-active');
         if (sidebarView) sidebarView.classList.remove('mobile-active');
         if (overlay) overlay.classList.remove('active');
+        document.body.classList.remove('conv-mobile-chat');
     }
 }
 
@@ -20038,6 +20132,7 @@ function showChatView() {
         if (chatView) chatView.classList.add('mobile-active');
         if (sidebarView) sidebarView.classList.remove('mobile-active');
         if (backBtn) backBtn.classList.remove('d-none');
+        document.body.classList.add('conv-mobile-chat');
     }
 }
 
@@ -20057,6 +20152,7 @@ function showDetailsView() {
             sidebarView.classList.add('open');
         }
         if (overlay) overlay.classList.add('active');
+        document.body.classList.remove('conv-mobile-chat');
     }
 }
 

@@ -567,19 +567,33 @@ document.addEventListener("DOMContentLoaded", function() {
     const table = document.querySelector("#kt_users_table");
     const searchInput = document.querySelector("[data-kt-filter=\"search\"]");
     
-    if (table && searchInput) {
-        const datatable = $(table).DataTable({
-            "info": false,
-            "order": [],
-            "pageLength": 10,
-            "lengthChange": false,
-            "columnDefs": [
-                { "orderable": false, "targets": 6 } // Disable ordering on actions column
-            ]
-        });
-        
+    // Blindado: se o plugin DataTables não estiver carregado, não pode abortar o
+    // restante do script (senão editUser/deleteUser/etc. ficam indefinidos).
+    if (table && searchInput && window.jQuery && $.fn && $.fn.DataTable) {
+        try {
+            const datatable = $(table).DataTable({
+                "info": false,
+                "order": [],
+                "pageLength": 10,
+                "lengthChange": false,
+                "columnDefs": [
+                    { "orderable": false, "targets": 6 } // Disable ordering on actions column
+                ]
+            });
+
+            searchInput.addEventListener("keyup", function(e) {
+                datatable.search(e.target.value).draw();
+            });
+        } catch (err) {
+            console.error("Falha ao inicializar DataTable na página de usuários:", err);
+        }
+    } else if (table && searchInput) {
+        // Fallback de busca simples caso o DataTables não esteja disponível.
         searchInput.addEventListener("keyup", function(e) {
-            datatable.search(e.target.value).draw();
+            const term = (e.target.value || "").toLowerCase();
+            table.querySelectorAll("tbody tr").forEach(function(tr) {
+                tr.style.display = tr.textContent.toLowerCase().includes(term) ? "" : "none";
+            });
         });
     }
     

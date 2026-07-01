@@ -19,6 +19,9 @@ class AvailabilityService
     public static function getSettings(): array
     {
         return [
+            // Interruptor mestre de TODA a automação de disponibilidade/fila.
+            // Desligado por padrão: nada é alterado automaticamente até ativar.
+            'system_enabled' => Setting::get('availability.system_enabled', false),
             'auto_online_on_login' => Setting::get('availability.auto_online_on_login', true),
             'auto_offline_on_logout' => Setting::get('availability.auto_offline_on_logout', true),
             'auto_away_enabled' => Setting::get('availability.auto_away_enabled', true),
@@ -29,6 +32,12 @@ class AvailabilityService
             'track_mouse_movement' => Setting::get('availability.track_mouse_movement', false),
             'track_keyboard' => Setting::get('availability.track_keyboard', true),
             'track_page_visibility' => Setting::get('availability.track_page_visibility', true),
+            // Desativar o agente da fila de atribuições quando ficar ausente/offline,
+            // e religar automaticamente quando voltar a ficar online.
+            'pause_queue_when_away' => Setting::get('availability.pause_queue_when_away', false),
+            // O que fazer quando NINGUÉM está elegível (todos offline/ausentes):
+            // 'none' | 'assign_to_all' | 'first_online_gets_pending'
+            'empty_queue_fallback' => Setting::get('availability.empty_queue_fallback', 'none'),
         ];
     }
 
@@ -158,6 +167,12 @@ class AvailabilityService
     public static function checkAndUpdateStatus(int $userId): void
     {
         $settings = self::getSettings();
+
+        // Interruptor mestre: se a automação está desligada, não muda nada.
+        if (!$settings['system_enabled']) {
+            return;
+        }
+
         $user = User::find($userId);
 
         if (!$user) {
@@ -198,6 +213,12 @@ class AvailabilityService
     public static function checkAllAgents(): array
     {
         $settings = self::getSettings();
+
+        // Interruptor mestre: se a automação está desligada, não muda nada.
+        if (!$settings['system_enabled']) {
+            return [];
+        }
+
         $offlineTimeoutMinutes = $settings['offline_timeout_minutes'];
         $awayTimeoutMinutes = $settings['away_timeout_minutes'];
         
@@ -300,6 +321,17 @@ class AvailabilityService
 
         $result = User::update($userId, $data);
 
+        // Sincronizar a fila de atribuições com a presença (se habilitado).
+        self::syncQueueWithAvailability($userId, $status, $user);
+
+        // Modo "primeiro que logar pega as pendentes": ao voltar online, recebe todas
+        // as conversas que ficaram sem atendente (ex.: equipe inteira ficou ausente).
+        if ($status === 'online'
+            && Setting::get('availability.system_enabled', false)
+            && Setting::get('availability.empty_queue_fallback', 'none') === 'first_online_gets_pending') {
+            self::assignPendingToAgent($userId);
+        }
+
         // Criar novo registro no histórico
         self::createHistoryRecord($userId, $status, $reason);
 
@@ -322,6 +354,82 @@ class AvailabilityService
         }
 
         return $result;
+    }
+
+    /**
+     * Desativar/retomar o agente da fila de atribuições conforme a presença.
+     * - away/offline → desativa da fila (queue_enabled=0), marcando como auto-pausado;
+     * - online       → religa a fila SOMENTE se foi o sistema que desativou
+     *                  (não sobrescreve uma desativação MANUAL feita por um admin).
+     *
+     * @param array|null $user estado do usuário ANTES da mudança de status.
+     */
+    private static function syncQueueWithAvailability(int $userId, string $status, ?array $user = null): void
+    {
+        $settings = self::getSettings();
+        if (!$settings['system_enabled'] || !$settings['pause_queue_when_away']) {
+            return;
+        }
+        $user = $user ?: User::find($userId);
+        if (!$user) {
+            return;
+        }
+
+        try {
+            if (in_array($status, ['away', 'offline'], true)) {
+                // Só pausa quem está ativo na fila (não mexe em desativação manual).
+                if ((int)($user['queue_enabled'] ?? 1) === 1) {
+                    User::update($userId, ['queue_enabled' => 0, 'queue_auto_paused' => 1]);
+                }
+            } elseif ($status === 'online') {
+                // Religa apenas se a desativação foi automática (por ausência).
+                if ((int)($user['queue_auto_paused'] ?? 0) === 1) {
+                    User::update($userId, ['queue_enabled' => 1, 'queue_auto_paused' => 0]);
+                }
+            }
+        } catch (\Throwable $e) {
+            // Coluna queue_auto_paused ausente (migration 155 não rodada) ou outro erro:
+            // não interromper a atualização de status.
+            error_log('syncQueueWithAvailability: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Atribuir todas as conversas sem atendente (open/pending) ao agente informado.
+     * Usado pelo modo "primeiro que logar pega as pendentes".
+     */
+    private static function assignPendingToAgent(int $userId): void
+    {
+        try {
+            // Só despeja em quem está apto a receber (não desativado manualmente).
+            $user = User::find($userId);
+            if (!$user || (int)($user['queue_enabled'] ?? 1) !== 1) {
+                return;
+            }
+
+            $rows = Database::fetchAll(
+                "SELECT id FROM conversations
+                 WHERE (agent_id IS NULL OR agent_id = 0)
+                   AND status IN ('open','pending')
+                 ORDER BY created_at ASC
+                 LIMIT 500"
+            );
+
+            $count = 0;
+            foreach ($rows as $r) {
+                try {
+                    \App\Services\ConversationService::assignToAgent((int)$r['id'], $userId, true);
+                    $count++;
+                } catch (\Throwable $e) {
+                    error_log('assignPendingToAgent conv ' . $r['id'] . ': ' . $e->getMessage());
+                }
+            }
+            if ($count > 0) {
+                error_log("assignPendingToAgent: {$count} conversas pendentes atribuídas ao agente {$userId}");
+            }
+        } catch (\Throwable $e) {
+            error_log('assignPendingToAgent: ' . $e->getMessage());
+        }
     }
 
     /**

@@ -559,6 +559,9 @@ class SettingsController
         try {
             $data = Request::post();
             
+            // Interruptor mestre de toda a automação de disponibilidade/fila
+            SettingService::set('availability.system_enabled', isset($data['system_enabled']), 'boolean', 'availability');
+
             // Configurações de disponibilidade
             SettingService::set('availability.auto_online_on_login', isset($data['auto_online_on_login']), 'boolean', 'availability');
             SettingService::set('availability.auto_offline_on_logout', isset($data['auto_offline_on_logout']), 'boolean', 'availability');
@@ -570,7 +573,11 @@ class SettingsController
             SettingService::set('availability.track_mouse_movement', isset($data['track_mouse_movement']), 'boolean', 'availability');
             SettingService::set('availability.track_keyboard', isset($data['track_keyboard']), 'boolean', 'availability');
             SettingService::set('availability.track_page_visibility', isset($data['track_page_visibility']), 'boolean', 'availability');
-            
+            SettingService::set('availability.pause_queue_when_away', isset($data['pause_queue_when_away']), 'boolean', 'availability');
+            $emptyQueueFallback = in_array($data['empty_queue_fallback'] ?? 'none', ['none', 'assign_to_all', 'first_online_gets_pending'], true)
+                ? $data['empty_queue_fallback'] : 'none';
+            SettingService::set('availability.empty_queue_fallback', $emptyQueueFallback, 'string', 'availability');
+
             // Configurações de horário comercial
             SettingService::set('business_hours.enabled', isset($data['business_hours_enabled']), 'boolean', 'business_hours');
             SettingService::set('business_hours.timezone', $data['business_hours_timezone'] ?? 'America/Sao_Paulo', 'string', 'business_hours');

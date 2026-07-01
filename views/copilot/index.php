@@ -28,7 +28,10 @@ $categories = $categories ?? [];
             <div class="card-title"><h2 class="fw-bold">🤖 Copiloto de Atendimento</h2></div>
             <div class="card-toolbar">
                 <span class="badge badge-light-success me-2" id="cp_indexed"><?= (int)$stats['indexed'] ?> na base</span>
-                <span class="badge badge-light-warning me-3" id="cp_pending"><?= (int)$stats['pending'] ?> a indexar</span>
+                <span class="badge badge-light-warning me-2" id="cp_pending"><?= (int)$stats['pending'] ?> a indexar</span>
+                <span class="text-muted fs-8 me-3" id="cp_estcost" title="Estimativa baseada no custo médio real das conversas já indexadas">
+                    ≈ $<?= number_format((float)($stats['estimated_remaining_cost'] ?? 0), 2) ?> p/ indexar tudo
+                </span>
                 <button class="btn btn-sm btn-light-primary" onclick="cpToggleIndex()" id="cp_reindex_btn">Indexar pendentes</button>
                 <button class="btn btn-sm btn-light" onclick="cpReset()" title="Limpar conversa">Limpar</button>
             </div>
@@ -142,6 +145,9 @@ function cpIndexLoop() {
         if (!j.success) { cpIndexing = false; document.getElementById('cp_reindex_btn').textContent = 'Indexar pendentes'; return; }
         document.getElementById('cp_indexed').textContent = j.stats.indexed + ' na base';
         document.getElementById('cp_pending').textContent = j.stats.pending + ' a indexar';
+        if (j.stats.estimated_remaining_cost != null) {
+            document.getElementById('cp_estcost').textContent = '≈ $' + Number(j.stats.estimated_remaining_cost).toFixed(2) + ' p/ indexar tudo';
+        }
         if (cpIndexing && j.stats.pending > 0 && j.indexed > 0) { cpIndexLoop(); }
         else { cpIndexing = false; document.getElementById('cp_reindex_btn').textContent = 'Indexar pendentes'; }
     })

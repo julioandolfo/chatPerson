@@ -4,10 +4,31 @@ $bhs = $businessHoursSettings ?? [];
 ?>
 
 <form id="availability_form" method="POST" action="<?= \App\Helpers\Url::to('/settings/availability') ?>">
+    <!-- Interruptor mestre -->
+    <?php $systemEnabled = $as['system_enabled'] ?? false; ?>
+    <div class="alert <?= $systemEnabled ? 'alert-success' : 'alert-warning' ?> d-flex align-items-center justify-content-between flex-wrap gap-3 mb-8">
+        <div>
+            <h4 class="fw-bold mb-1">Sistema de Disponibilidade &amp; Fila Automática</h4>
+            <div class="fs-7">
+                Controla <strong>toda</strong> a automação: mudança automática de status (online/ausente/offline),
+                desativação da fila por ausência e o comportamento quando ninguém está disponível.
+                <strong>Enquanto desligado, nada disso roda</strong> — nenhum status ou fila é alterado automaticamente.
+            </div>
+        </div>
+        <div class="form-check form-switch form-check-custom form-check-solid" style="min-width: 160px;">
+            <input class="form-check-input" type="checkbox" name="system_enabled" id="system_enabled"
+                   style="width: 3rem; height: 1.5rem;" <?= $systemEnabled ? 'checked' : '' ?> />
+            <label class="form-check-label fw-bold ms-2" for="system_enabled">
+                <?= $systemEnabled ? 'Ativado' : 'Desativado' ?>
+            </label>
+        </div>
+    </div>
+
     <!-- Configurações de Disponibilidade -->
     <div class="mb-10">
         <h4 class="fw-bold mb-5">Configurações de Disponibilidade</h4>
-        
+        <p class="text-muted fs-7 mb-5">As opções abaixo só têm efeito com o sistema <strong>ativado</strong> acima.</p>
+
         <div class="row mb-5">
             <div class="col-lg-6">
                 <label class="form-label fw-semibold">Marcar como online automaticamente ao fazer login</label>
@@ -53,8 +74,42 @@ $bhs = $businessHoursSettings ?? [];
                        value="<?= htmlspecialchars($as['away_timeout_minutes'] ?? 15) ?>" min="1" max="120" />
                 <div class="form-text">Tempo em minutos sem atividade para mudar automaticamente para status "Ausente"</div>
             </div>
+
+            <div class="col-lg-12 mt-3">
+                <label class="form-label fw-semibold">Desativar da fila de atribuições quando ausente</label>
+                <div class="form-check form-switch form-check-custom form-check-solid">
+                    <input class="form-check-input" type="checkbox" name="pause_queue_when_away" id="pause_queue_when_away"
+                           <?= ($as['pause_queue_when_away'] ?? false) ? 'checked' : '' ?> />
+                    <label class="form-check-label" for="pause_queue_when_away">Habilitar</label>
+                </div>
+                <div class="form-text">
+                    Quando o agente ficar <strong>ausente</strong> ou <strong>offline</strong>, ele é removido automaticamente
+                    da distribuição de novas conversas (round-robin) e religado ao voltar a ficar <strong>online</strong>.
+                    Não sobrescreve agentes desativados manualmente. Usa o mesmo tempo do "ausente" acima.
+                </div>
+            </div>
+
+            <div class="col-lg-12 mt-3">
+                <label class="form-label fw-semibold">Quando NINGUÉM estiver disponível na fila</label>
+                <select class="form-select form-select-solid" name="empty_queue_fallback">
+                    <?php $eqf = $as['empty_queue_fallback'] ?? 'none'; ?>
+                    <option value="none" <?= $eqf === 'none' ? 'selected' : '' ?>>
+                        Não atribuir — conversas ficam sem atendente até alguém pegar
+                    </option>
+                    <option value="assign_to_all" <?= $eqf === 'assign_to_all' ? 'selected' : '' ?>>
+                        Distribuir para todos — atribui normalmente, como se estivessem online
+                    </option>
+                    <option value="first_online_gets_pending" <?= $eqf === 'first_online_gets_pending' ? 'selected' : '' ?>>
+                        Primeiro que voltar online recebe todas as pendentes acumuladas
+                    </option>
+                </select>
+                <div class="form-text">
+                    Define o comportamento quando todos os agentes estão offline/ausentes (ou fora da fila).
+                    "Distribuir para todos" inclui os auto-pausados por ausência (não os desativados manualmente).
+                </div>
+            </div>
         </div>
-        
+
         <div class="row mb-5">
             <div class="col-lg-6">
                 <label class="form-label fw-semibold">Rastrear atividade do usuário</label>

@@ -683,6 +683,7 @@ class ConversationSettingsService
         // (todos offline/ausentes ou fora da fila), e a config permitir, distribui
         // para todos como se estivessem online (inclui os auto-pausados por ausência).
         if ($result === null
+            && \App\Models\Setting::get('availability.system_enabled', false)
             && \App\Models\Setting::get('availability.empty_queue_fallback', 'none') === 'assign_to_all') {
             $result = self::assignRoundRobin($departmentId, $funnelId, $stageId, $includeAI, false, false, $excludeAgentId, true);
             if ($result !== null) {

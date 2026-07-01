@@ -4,10 +4,31 @@ $bhs = $businessHoursSettings ?? [];
 ?>
 
 <form id="availability_form" method="POST" action="<?= \App\Helpers\Url::to('/settings/availability') ?>">
+    <!-- Interruptor mestre -->
+    <?php $systemEnabled = $as['system_enabled'] ?? false; ?>
+    <div class="alert <?= $systemEnabled ? 'alert-success' : 'alert-warning' ?> d-flex align-items-center justify-content-between flex-wrap gap-3 mb-8">
+        <div>
+            <h4 class="fw-bold mb-1">Sistema de Disponibilidade &amp; Fila Automática</h4>
+            <div class="fs-7">
+                Controla <strong>toda</strong> a automação: mudança automática de status (online/ausente/offline),
+                desativação da fila por ausência e o comportamento quando ninguém está disponível.
+                <strong>Enquanto desligado, nada disso roda</strong> — nenhum status ou fila é alterado automaticamente.
+            </div>
+        </div>
+        <div class="form-check form-switch form-check-custom form-check-solid" style="min-width: 160px;">
+            <input class="form-check-input" type="checkbox" name="system_enabled" id="system_enabled"
+                   style="width: 3rem; height: 1.5rem;" <?= $systemEnabled ? 'checked' : '' ?> />
+            <label class="form-check-label fw-bold ms-2" for="system_enabled">
+                <?= $systemEnabled ? 'Ativado' : 'Desativado' ?>
+            </label>
+        </div>
+    </div>
+
     <!-- Configurações de Disponibilidade -->
     <div class="mb-10">
         <h4 class="fw-bold mb-5">Configurações de Disponibilidade</h4>
-        
+        <p class="text-muted fs-7 mb-5">As opções abaixo só têm efeito com o sistema <strong>ativado</strong> acima.</p>
+
         <div class="row mb-5">
             <div class="col-lg-6">
                 <label class="form-label fw-semibold">Marcar como online automaticamente ao fazer login</label>

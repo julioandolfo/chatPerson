@@ -19,6 +19,9 @@ class AvailabilityService
     public static function getSettings(): array
     {
         return [
+            // Interruptor mestre de TODA a automação de disponibilidade/fila.
+            // Desligado por padrão: nada é alterado automaticamente até ativar.
+            'system_enabled' => Setting::get('availability.system_enabled', false),
             'auto_online_on_login' => Setting::get('availability.auto_online_on_login', true),
             'auto_offline_on_logout' => Setting::get('availability.auto_offline_on_logout', true),
             'auto_away_enabled' => Setting::get('availability.auto_away_enabled', true),
@@ -164,6 +167,12 @@ class AvailabilityService
     public static function checkAndUpdateStatus(int $userId): void
     {
         $settings = self::getSettings();
+
+        // Interruptor mestre: se a automação está desligada, não muda nada.
+        if (!$settings['system_enabled']) {
+            return;
+        }
+
         $user = User::find($userId);
 
         if (!$user) {
@@ -204,6 +213,12 @@ class AvailabilityService
     public static function checkAllAgents(): array
     {
         $settings = self::getSettings();
+
+        // Interruptor mestre: se a automação está desligada, não muda nada.
+        if (!$settings['system_enabled']) {
+            return [];
+        }
+
         $offlineTimeoutMinutes = $settings['offline_timeout_minutes'];
         $awayTimeoutMinutes = $settings['away_timeout_minutes'];
         
@@ -312,6 +327,7 @@ class AvailabilityService
         // Modo "primeiro que logar pega as pendentes": ao voltar online, recebe todas
         // as conversas que ficaram sem atendente (ex.: equipe inteira ficou ausente).
         if ($status === 'online'
+            && Setting::get('availability.system_enabled', false)
             && Setting::get('availability.empty_queue_fallback', 'none') === 'first_online_gets_pending') {
             self::assignPendingToAgent($userId);
         }
@@ -350,7 +366,8 @@ class AvailabilityService
      */
     private static function syncQueueWithAvailability(int $userId, string $status, ?array $user = null): void
     {
-        if (!self::getSettings()['pause_queue_when_away']) {
+        $settings = self::getSettings();
+        if (!$settings['system_enabled'] || !$settings['pause_queue_when_away']) {
             return;
         }
         $user = $user ?: User::find($userId);

@@ -559,6 +559,9 @@ class SettingsController
         try {
             $data = Request::post();
             
+            // Interruptor mestre de toda a automação de disponibilidade/fila
+            SettingService::set('availability.system_enabled', isset($data['system_enabled']), 'boolean', 'availability');
+
             // Configurações de disponibilidade
             SettingService::set('availability.auto_online_on_login', isset($data['auto_online_on_login']), 'boolean', 'availability');
             SettingService::set('availability.auto_offline_on_logout', isset($data['auto_offline_on_logout']), 'boolean', 'availability');

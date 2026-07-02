@@ -97,6 +97,37 @@ $routes = [
     'GET /stats/departments'       => ['Api\V1\Controllers\StatsController', 'departments', true],
     'GET /stats/funnels'           => ['Api\V1\Controllers\StatsController', 'funnels',     true],
     'GET /stats/sla'               => ['Api\V1\Controllers\StatsController', 'sla',         true],
+
+    // ══════ App mobile (Chat Privus) ══════
+
+    // Tempo real (polling)
+    'GET /realtime/config'  => ['Api\V1\Controllers\RealtimeController', 'config', true],
+    'POST /realtime/poll'   => ['Api\V1\Controllers\RealtimeController', 'poll', true],
+
+    // Dispositivos (push notifications)
+    'POST /devices'           => ['Api\V1\Controllers\DevicesController', 'store', true],
+    'DELETE /devices/:token'  => ['Api\V1\Controllers\DevicesController', 'destroy', true],
+
+    // Notificações in-app
+    'GET /notifications'            => ['Api\V1\Controllers\NotificationsController', 'index', true],
+    'GET /notifications/unread'     => ['Api\V1\Controllers\NotificationsController', 'unread', true],
+    'POST /notifications/read-all'  => ['Api\V1\Controllers\NotificationsController', 'markAllRead', true],
+    'POST /notifications/:id/read'  => ['Api\V1\Controllers\NotificationsController', 'markRead', true],
+
+    // Notas internas
+    'GET /conversations/:id/notes'  => ['Api\V1\Controllers\NotesController', 'index', true],
+    'POST /conversations/:id/notes' => ['Api\V1\Controllers\NotesController', 'store', true],
+
+    // Ações de conversa (paridade com o web)
+    'POST /conversations/check-existing'          => ['Api\V1\Controllers\ConversationActionsController', 'checkExisting', true],
+    'POST /conversations/:id/mark-read'           => ['Api\V1\Controllers\ConversationActionsController', 'markRead', true],
+    'POST /conversations/:id/mark-unread'         => ['Api\V1\Controllers\ConversationActionsController', 'markUnread', true],
+    'GET /conversations/:id/cloud-window'         => ['Api\V1\Controllers\ConversationActionsController', 'cloudWindow', true],
+    'POST /conversations/:id/send-cloud-template' => ['Api\V1\Controllers\ConversationActionsController', 'sendCloudTemplate', true],
+
+    // Anexos (mídia)
+    'GET /attachments/sign' => ['Api\V1\Controllers\AttachmentsController', 'sign', true],
+    'GET /attachments/view' => ['Api\V1\Controllers\AttachmentsController', 'view', false], // validado por assinatura HMAC
 ];
 
 // Encontrar rota correspondente
@@ -141,7 +172,10 @@ if ($requiresAuth) {
     ApiAuthMiddleware::handle();
 }
 
-RateLimitMiddleware::handle();
+// Polling de tempo real fica fora do rate limit (o app chama a cada ~5s)
+if ($path !== '/realtime/poll') {
+    RateLimitMiddleware::handle();
+}
 
 // Executar controller
 [$controllerClass, $method] = $handler;

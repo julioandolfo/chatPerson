@@ -34,8 +34,32 @@ class NotificationService
         if (!empty($errors)) {
             throw new \InvalidArgumentException('Dados inválidos: ' . implode(', ', $errors));
         }
-        
-        return Notification::createNotification($data);
+
+        $notificationId = Notification::createNotification($data);
+
+        // Push para o app mobile (Chat Privus) — best-effort, nunca bloqueia o fluxo
+        try {
+            $pushData = is_array($data['data'] ?? null) ? $data['data'] : [];
+            $pushData['type'] = $data['type'];
+            $pushData['notification_id'] = $notificationId;
+
+            $conversationId = $pushData['conversation_id'] ?? null;
+
+            \App\Services\PushNotificationService::sendToUser(
+                (int)$data['user_id'],
+                $data['title'],
+                $data['message'],
+                $pushData,
+                [
+                    'thread_id' => $conversationId ? 'conversation_' . $conversationId : null,
+                    'channel_id' => 'messages',
+                ]
+            );
+        } catch (\Throwable $e) {
+            Logger::error("NotificationService: erro ao enviar push: " . $e->getMessage());
+        }
+
+        return $notificationId;
     }
 
     /**

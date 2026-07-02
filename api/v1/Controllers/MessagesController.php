@@ -17,33 +17,63 @@ class MessagesController
 {
     /**
      * Listar mensagens de uma conversa
-     * GET /api/v1/conversations/:id/messages
+     * GET /api/v1/conversations/:id/messages?limit=50&before_id=&after_id=
+     *
+     * Cursores:
+     * - before_id: mensagens ANTERIORES a esse ID (scroll infinito do histórico)
+     * - after_id: mensagens POSTERIORES a esse ID (polling da conversa aberta)
+     * - sem cursor: últimas `limit` mensagens
+     * Fallback: paginação legada com page/per_page continua funcionando.
      */
     public function index(string $conversationId): void
     {
         try {
             // Verificar se conversa existe e se usuário tem permissão
             $conversation = Conversation::find((int)$conversationId);
-            
+
             if (!$conversation) {
                 ApiResponse::notFound('Conversa não encontrada');
             }
-            
+
             if (!ConversationService::canView((int)$conversationId, ApiAuthMiddleware::userId())) {
                 ApiResponse::forbidden('Você não tem permissão para visualizar esta conversa');
             }
-            
-            // Paginação
+
+            $beforeId = isset($_GET['before_id']) ? (int)$_GET['before_id'] : null;
+            $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : null;
+
+            // Modo cursor (app mobile)
+            if ($beforeId !== null || $afterId !== null || isset($_GET['limit'])) {
+                $limit = min(max((int)($_GET['limit'] ?? 50), 1), 100);
+
+                $messages = Message::getMessagesWithSenderDetails(
+                    (int)$conversationId,
+                    $limit,
+                    null,
+                    $beforeId ?: null,
+                    $afterId ?: null
+                );
+
+                $ids = array_column($messages, 'id');
+
+                ApiResponse::success([
+                    'items' => $messages,
+                    'oldest_id' => !empty($ids) ? min($ids) : null,
+                    'newest_id' => !empty($ids) ? max($ids) : null,
+                    'has_more' => count($messages) === $limit,
+                ]);
+            }
+
+            // Paginação legada (page/per_page)
             $page = (int)($_GET['page'] ?? 1);
             $perPage = min((int)($_GET['per_page'] ?? 50), 100);
-            
+
             $messages = Message::getByConversation((int)$conversationId);
-            
-            // Aplicar paginação
+
             $total = count($messages);
             $offset = ($page - 1) * $perPage;
             $messages = array_slice($messages, $offset, $perPage);
-            
+
             ApiResponse::paginated($messages, $total, $page, $perPage);
         } catch (\Exception $e) {
             ApiResponse::serverError('Erro ao listar mensagens', $e);
@@ -51,40 +81,165 @@ class MessagesController
     }
     
     /**
-     * Enviar mensagem
+     * Enviar mensagem (texto, mídia multipart e nota interna)
      * POST /api/v1/conversations/:id/messages
+     *
+     * Aceita:
+     * - JSON: { content|body: string, quoted_message_id?: int, is_note?: bool }
+     * - multipart/form-data: content?, attachments[] (arquivos), quoted_message_id?, is_note? ('1')
+     *
+     * Mesmo pipeline do web: grava no banco, responde imediatamente e envia
+     * ao provider (WhatsApp/Instagram/etc.) em background.
      */
     public function store(string $conversationId): void
     {
         ApiAuthMiddleware::requirePermission('messages.send');
-        
-        $input = json_decode(file_get_contents('php://input'), true) ?: [];
-        
-        if (empty($input['body'])) {
-            ApiResponse::badRequest('Campo body é obrigatório');
-        }
-        
+
+        $conversationId = (int)$conversationId;
+        $userId = ApiAuthMiddleware::userId();
+
         try {
-            // Verificar se conversa existe
-            $conversation = Conversation::find((int)$conversationId);
-            
+            $conversation = ConversationService::getConversation($conversationId);
+
             if (!$conversation) {
                 ApiResponse::notFound('Conversa não encontrada');
             }
-            
-            // Preparar dados da mensagem
-            $messageData = [
-                'conversation_id' => (int)$conversationId,
-                'body' => $input['body'],
-                'type' => $input['type'] ?? 'text',
-                'direction' => 'outbound',
-                'sender_id' => ApiAuthMiddleware::userId(),
-                'sender_type' => 'user'
-            ];
-            
-            $message = MessageService::send($messageData);
-            
-            ApiResponse::created($message, 'Mensagem enviada com sucesso');
+
+            if (!ConversationService::canView($conversationId, $userId)) {
+                ApiResponse::forbidden('Você não tem permissão para enviar mensagens nesta conversa');
+            }
+
+            // Aceitar JSON ou multipart/form-data
+            $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+            if (stripos($contentType, 'application/json') !== false) {
+                $input = json_decode(file_get_contents('php://input'), true) ?: [];
+            } else {
+                $input = $_POST;
+            }
+
+            $content = trim((string)($input['content'] ?? $input['body'] ?? $input['message'] ?? ''));
+            $isNote = !empty($input['is_note']) && $input['is_note'] !== '0' && $input['is_note'] !== 'false';
+            $quotedMessageId = !empty($input['quoted_message_id']) ? (int)$input['quoted_message_id'] : null;
+
+            // Processar anexos (multipart)
+            $attachments = [];
+            if (!empty($_FILES['attachments'])) {
+                $files = $_FILES['attachments'];
+
+                if (is_array($files['name'])) {
+                    $fileCount = count($files['name']);
+                    for ($i = 0; $i < $fileCount; $i++) {
+                        if ($files['error'][$i] !== UPLOAD_ERR_OK) {
+                            continue;
+                        }
+                        $file = [
+                            'name' => $files['name'][$i],
+                            'type' => $files['type'][$i],
+                            'tmp_name' => $files['tmp_name'][$i],
+                            'error' => $files['error'][$i],
+                            'size' => $files['size'][$i],
+                        ];
+                        try {
+                            $attachments[] = \App\Services\AttachmentService::upload($file, $conversationId);
+                        } catch (\Exception $e) {
+                            ApiResponse::validationError('Erro no upload de anexo', [
+                                'attachments' => [$e->getMessage()],
+                            ]);
+                        }
+                    }
+                } elseif ($files['error'] === UPLOAD_ERR_OK) {
+                    try {
+                        $attachments[] = \App\Services\AttachmentService::upload($files, $conversationId);
+                    } catch (\Exception $e) {
+                        ApiResponse::validationError('Erro no upload de anexo', [
+                            'attachments' => [$e->getMessage()],
+                        ]);
+                    }
+                }
+            }
+
+            if ($content === '' && empty($attachments)) {
+                ApiResponse::validationError('Dados inválidos', ['content' => ['Mensagem não pode estar vazia']]);
+            }
+
+            // Auto-atribuição: conversa sem dono é atribuída a quem responde (não notas)
+            $assignedTo = $conversation['agent_id'] ?? null;
+            $isUnassigned = ($assignedTo === null || $assignedTo === '' || (int)$assignedTo === 0);
+            if (!$isNote && $isUnassigned) {
+                try {
+                    ConversationService::assignToAgent($conversationId, $userId, true);
+                    $conversation['agent_id'] = $userId;
+                } catch (\Exception $e) {
+                    \App\Helpers\Logger::error("[API-V1] Auto-assign falhou (conv {$conversationId}): " . $e->getMessage());
+                }
+            }
+
+            // Janela de 24h (WhatsApp Cloud/CoEx) — somente mensagens, não notas
+            if (!$isNote) {
+                $iaId = $conversation['integration_account_id'] ?? null;
+                if (!empty($conversation['is_merged']) && !empty($conversation['last_customer_account_id'])) {
+                    $iaId = (int)$conversation['last_customer_account_id'];
+                }
+                if ($iaId) {
+                    $ia = \App\Models\IntegrationAccount::find($iaId);
+                    if ($ia && in_array($ia['provider'] ?? '', ['meta_cloud', 'meta_coex'])) {
+                        $viaId = !empty($conversation['is_merged']) ? $iaId : null;
+                        if (!\App\Services\WhatsAppCloudService::isWithin24hWindow($conversationId, $viaId)) {
+                            ApiResponse::error(
+                                'Fora da janela de 24 horas. Use um template aprovado para iniciar a conversa.',
+                                422,
+                                'OUTSIDE_24H_WINDOW'
+                            );
+                        }
+                    }
+                }
+            }
+
+            $messageType = $isNote ? 'note' : null;
+
+            // deferIntegrationSend=true: salva no banco, envio ao provider vai para background
+            $messageId = ConversationService::sendMessage(
+                $conversationId, $content, 'agent', $userId, $attachments, $messageType, $quotedMessageId,
+                null, null, false, true
+            );
+
+            if (!$messageId) {
+                ApiResponse::serverError('Falha ao enviar mensagem');
+            }
+
+            // Buscar a mensagem criada com detalhes
+            $created = null;
+            foreach (Message::getMessagesWithSenderDetails($conversationId, 20) as $msg) {
+                if ((int)$msg['id'] === (int)$messageId) {
+                    $created = $msg;
+                    break;
+                }
+            }
+
+            $responseData = json_encode([
+                'success' => true,
+                'data' => $created ?: ['id' => $messageId],
+                'message' => 'Mensagem enviada com sucesso',
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            // Responder imediatamente e processar envio ao provider em background
+            ignore_user_abort(true);
+            while (ob_get_level() > 0) {
+                ob_end_clean();
+            }
+            http_response_code(201);
+            header('Content-Type: application/json; charset=utf-8');
+            header('Content-Length: ' . strlen($responseData));
+            header('Connection: close');
+            echo $responseData;
+            flush();
+
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+
+            ConversationService::processBackgroundTasks();
+            exit;
         } catch (\Exception $e) {
             ApiResponse::badRequest($e->getMessage());
         }

@@ -18,16 +18,18 @@ class CorsMiddleware
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
         
         // Verificar se origem é permitida
+        // Nota: Allow-Credentials só pode ser enviado com origem específica —
+        // navegadores rejeitam a combinação de credenciais com wildcard (*)
         if (self::isOriginAllowed($origin, $allowedOrigins)) {
             header("Access-Control-Allow-Origin: {$origin}");
+            header('Access-Control-Allow-Credentials: true');
+            header('Vary: Origin');
         } else {
-            // Permitir todas (ajustar conforme necessário)
             header('Access-Control-Allow-Origin: *');
         }
-        
+
         header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS, PATCH');
         header('Access-Control-Allow-Headers: Content-Type, Authorization, X-API-Key, X-Requested-With');
-        header('Access-Control-Allow-Credentials: true');
         header('Access-Control-Max-Age: 86400'); // 24 horas
         
         // Responder a OPTIONS (preflight)

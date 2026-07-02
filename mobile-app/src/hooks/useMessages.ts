@@ -79,11 +79,13 @@ export function prependMessage(
   conversationId: number,
   message: Message,
 ): void {
-  queryClient.setQueryData<MessagesCache>(messagesQueryKey(conversationId), (old) => {
+  queryClient.setQueryData<MessagesCache>(
+    messagesQueryKey(conversationId),
+    (old: MessagesCache | undefined) => {
     if (!old || old.pages.length === 0) return old;
-    const exists = old.pages.some((page) =>
+    const exists = old.pages.some((page: MessagesPage) =>
       page.items.some(
-        (m) =>
+        (m: Message) =>
           (message.id > 0 && m.id === message.id) ||
           (message.local_id != null && m.local_id === message.local_id),
       ),
@@ -92,7 +94,8 @@ export function prependMessage(
     const pages = old.pages.slice();
     pages[0] = { ...pages[0], items: [message, ...pages[0].items] };
     return { ...old, pages };
-  });
+    },
+  );
 }
 
 export function replaceLocalMessage(
@@ -101,17 +104,22 @@ export function replaceLocalMessage(
   localId: string,
   serverMessage: Message,
 ): void {
-  queryClient.setQueryData<MessagesCache>(messagesQueryKey(conversationId), (old) => {
-    if (!old) return old;
-    const pages = old.pages.map((page) => ({
-      ...page,
-      items: page.items
-        // Remove eco do realtime que possa ter chegado antes da resposta.
-        .filter((m) => !(m.id === serverMessage.id && m.local_id !== localId))
-        .map((m) => (m.local_id === localId ? { ...serverMessage, local_id: localId } : m)),
-    }));
-    return { ...old, pages };
-  });
+  queryClient.setQueryData<MessagesCache>(
+    messagesQueryKey(conversationId),
+    (old: MessagesCache | undefined) => {
+      if (!old) return old;
+      const pages = old.pages.map((page: MessagesPage) => ({
+        ...page,
+        items: page.items
+          // Remove eco do realtime que possa ter chegado antes da resposta.
+          .filter((m: Message) => !(m.id === serverMessage.id && m.local_id !== localId))
+          .map((m: Message) =>
+            m.local_id === localId ? { ...serverMessage, local_id: localId } : m,
+          ),
+      }));
+      return { ...old, pages };
+    },
+  );
 }
 
 export function markLocalMessageError(
@@ -119,16 +127,19 @@ export function markLocalMessageError(
   conversationId: number,
   localId: string,
 ): void {
-  queryClient.setQueryData<MessagesCache>(messagesQueryKey(conversationId), (old) => {
-    if (!old) return old;
-    const pages = old.pages.map((page) => ({
-      ...page,
-      items: page.items.map((m) =>
-        m.local_id === localId ? { ...m, status: 'error' as const } : m,
-      ),
-    }));
-    return { ...old, pages };
-  });
+  queryClient.setQueryData<MessagesCache>(
+    messagesQueryKey(conversationId),
+    (old: MessagesCache | undefined) => {
+      if (!old) return old;
+      const pages = old.pages.map((page: MessagesPage) => ({
+        ...page,
+        items: page.items.map((m: Message) =>
+          m.local_id === localId ? { ...m, status: 'error' as const } : m,
+        ),
+      }));
+      return { ...old, pages };
+    },
+  );
 }
 
 export function removeLocalMessage(
@@ -136,14 +147,17 @@ export function removeLocalMessage(
   conversationId: number,
   localId: string,
 ): void {
-  queryClient.setQueryData<MessagesCache>(messagesQueryKey(conversationId), (old) => {
-    if (!old) return old;
-    const pages = old.pages.map((page) => ({
-      ...page,
-      items: page.items.filter((m) => m.local_id !== localId),
-    }));
-    return { ...old, pages };
-  });
+  queryClient.setQueryData<MessagesCache>(
+    messagesQueryKey(conversationId),
+    (old: MessagesCache | undefined) => {
+      if (!old) return old;
+      const pages = old.pages.map((page: MessagesPage) => ({
+        ...page,
+        items: page.items.filter((m: Message) => m.local_id !== localId),
+      }));
+      return { ...old, pages };
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

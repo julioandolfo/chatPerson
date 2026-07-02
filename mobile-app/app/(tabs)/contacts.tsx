@@ -21,7 +21,7 @@ import { getContacts, getWhatsAppAccounts } from '@/api/misc';
 import { Avatar } from '@/components/Avatar';
 import { EmptyState } from '@/components/EmptyState';
 import { useTheme } from '@/theme';
-import type { ContactSummary } from '@/types';
+import type { ContactSummary, WhatsAppAccount } from '@/types';
 import { formatPhone } from '@/utils/phone';
 
 export default function ContactsScreen() {
@@ -248,7 +248,7 @@ export default function ContactsScreen() {
                   <Text style={[typography.caption, { color: colors.textSecondary }]}>
                     Escolha a conta para iniciar a conversa:
                   </Text>
-                  {(accounts.data ?? []).map((account) => (
+                  {(accounts.data ?? []).map((account: WhatsAppAccount) => (
                     <Pressable
                       key={account.id}
                       onPress={() => void createWithAccount(account.id)}

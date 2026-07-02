@@ -30,7 +30,7 @@ import { updateConversationInCaches } from '@/hooks/useConversations';
 import { removeLocalMessage, useMessages, useSendMessage } from '@/hooks/useMessages';
 import { useUiStore } from '@/stores/ui';
 import { useTheme } from '@/theme';
-import type { Message, SendMessageInput } from '@/types';
+import type { Conversation, Message, SendMessageInput } from '@/types';
 
 let localIdCounter = 0;
 function nextLocalId(): string {
@@ -155,7 +155,7 @@ export default function ConversationScreen() {
     [handleImagePress, handleQuote, handleRetry],
   );
 
-  const detail = conversation.data;
+  const detail: Conversation | undefined = conversation.data;
   const isCloudBlocked =
     cloudWindow.data?.is_cloud === true && cloudWindow.data.within_window === false;
   const isClosed = detail?.status === 'closed';

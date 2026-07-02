@@ -7,7 +7,7 @@ import { CHANNEL_LABELS } from '@/components/ChannelIcon';
 import { STATUS_LABELS } from '@/components/StatusBadge';
 import { EMPTY_ADVANCED_FILTERS, useUiStore, type AdvancedFilters } from '@/stores/ui';
 import { useTheme } from '@/theme';
-import type { Channel, ConversationStatus } from '@/types';
+import type { Channel, ConversationStatus, Department, Funnel } from '@/types';
 
 interface FilterSheetProps {
   visible: boolean;
@@ -135,7 +135,7 @@ export function FilterSheet({ visible, onClose }: FilterSheetProps) {
               selected={draft.department_id === null}
               onPress={() => setDraft((d) => ({ ...d, department_id: null }))}
             />
-            {(departments.data ?? []).map((department) => (
+            {(departments.data ?? []).map((department: Department) => (
               <OptionChip
                 key={department.id}
                 label={department.name}
@@ -154,7 +154,7 @@ export function FilterSheet({ visible, onClose }: FilterSheetProps) {
               selected={draft.funnel_id === null}
               onPress={() => setDraft((d) => ({ ...d, funnel_id: null }))}
             />
-            {(funnels.data ?? []).map((funnel) => (
+            {(funnels.data ?? []).map((funnel: Funnel) => (
               <OptionChip
                 key={funnel.id}
                 label={funnel.name}

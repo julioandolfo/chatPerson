@@ -131,7 +131,7 @@ export function CloudTemplateModal({
                 Nenhum template disponível.
               </Text>
             ) : null}
-            {(templates.data ?? []).map((template) => (
+            {(templates.data ?? []).map((template: CloudTemplate) => (
               <Pressable
                 key={`${template.name}-${template.language}`}
                 onPress={() => selectTemplate(template)}

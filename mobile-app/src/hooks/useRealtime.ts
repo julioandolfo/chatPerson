@@ -69,8 +69,9 @@ function handlePollResult(
   for (const update of data.conversation_updates ?? []) {
     const found = updateConversationInCaches(queryClient, update.id, (c) => ({ ...c, ...update }));
     if (!found) shouldInvalidateLists = true;
-    queryClient.setQueryData<Conversation>(['conversation', update.id], (old) =>
-      old ? { ...old, ...update } : old,
+    queryClient.setQueryData<Conversation>(
+      ['conversation', update.id],
+      (old: Conversation | undefined) => (old ? { ...old, ...update } : old),
     );
   }
 

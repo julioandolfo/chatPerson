@@ -33,7 +33,7 @@ import { TagChip } from '@/components/TagChip';
 import { CONVERSATIONS_KEY } from '@/hooks/useConversations';
 import { useAuthStore } from '@/stores/auth';
 import { useTheme } from '@/theme';
-import type { Conversation } from '@/types';
+import type { Conversation, Department, FunnelStage, Note, Tag } from '@/types';
 import { formatFullDate } from '@/utils/format';
 import { formatPhone } from '@/utils/phone';
 
@@ -239,7 +239,7 @@ export function ConversationDetailsSheet({
   const renderStage = () => (
     <>
       {stages.isLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : null}
-      {(stages.data ?? []).map((stage) => (
+      {(stages.data ?? []).map((stage: FunnelStage) => (
         <ActionRow
           key={stage.id}
           icon={
@@ -258,7 +258,7 @@ export function ConversationDetailsSheet({
       {departments.isLoading ? (
         <ActivityIndicator color={colors.primary} style={styles.loader} />
       ) : null}
-      {(departments.data ?? []).map((department) => (
+      {(departments.data ?? []).map((department: Department) => (
         <ActionRow
           key={department.id}
           icon={department.id === conversation.department_id ? 'radio-button-on' : 'radio-button-off'}
@@ -275,7 +275,7 @@ export function ConversationDetailsSheet({
   const renderTags = () => (
     <>
       {allTags.isLoading ? <ActivityIndicator color={colors.primary} style={styles.loader} /> : null}
-      {(allTags.data ?? []).map((tag) => {
+      {(allTags.data ?? []).map((tag: Tag) => {
         const active = activeTagIds.has(tag.id);
         return (
           <ActionRow
@@ -298,7 +298,7 @@ export function ConversationDetailsSheet({
           Nenhuma nota nesta conversa.
         </Text>
       ) : null}
-      {(notes.data ?? []).map((note) => (
+      {(notes.data ?? []).map((note: Note) => (
         <View key={note.id} style={[styles.noteCard, { backgroundColor: colors.noteBg }]}>
           <Text style={[typography.body, { color: colors.textPrimary }]}>{note.content}</Text>
           <Text style={[typography.caption, { color: colors.textSecondary }]}>

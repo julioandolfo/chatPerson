@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "Chat Privus",
+    "slug": "chat-privus",
+    "version": "1.0.0",
+    "scheme": "chatprivus",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "com.privus.chat",
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "O Chat Privus usa o microfone para gravar mensagens de áudio.",
+        "NSCameraUsageDescription": "O Chat Privus usa a câmera para enviar fotos nas conversas.",
+        "NSPhotoLibraryUsageDescription": "O Chat Privus acessa suas fotos para enviá-las nas conversas."
+      }
+    },
+    "android": {
+      "package": "com.privus.chat",
+      "permissions": ["RECORD_AUDIO", "CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

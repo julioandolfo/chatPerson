@@ -2960,10 +2960,8 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
     body.conv-mobile-chat button[data-bs-target="#copilotPanel"] {
         bottom: 150px !important;
     }
-    #copilotPanel {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
+    /* O tamanho do painel no mobile é definido nos estilos do widget
+       (.copilot-widget), junto ao markup do Copiloto */
 }
 
 /* Tablet: Layout híbrido */
@@ -3299,27 +3297,146 @@ function getChannelInfo(channel) {
         data-bs-toggle="offcanvas" data-bs-target="#copilotPanel" title="Copiloto de Atendimento (IA)">
     🤖 Copiloto
 </button>
-<div class="offcanvas offcanvas-end" tabindex="-1" id="copilotPanel" style="width: 440px; max-width: 92vw;">
-    <div class="offcanvas-header border-bottom">
-        <h5 class="offcanvas-title fw-bold">🤖 Copiloto de Atendimento</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
+<div class="offcanvas offcanvas-end copilot-widget" tabindex="-1" id="copilotPanel"
+     data-bs-backdrop="false" data-bs-scroll="true">
+    <div class="offcanvas-header copilot-widget-header">
+        <div class="d-flex align-items-center gap-3 min-w-0">
+            <div class="copilot-avatar">🤖</div>
+            <div class="min-w-0">
+                <h5 class="offcanvas-title fw-bold fs-6 mb-0 text-white">Copiloto de Atendimento</h5>
+                <span class="copilot-subtitle">IA • encontra casos parecidos já resolvidos</span>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white flex-shrink-0" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
     </div>
     <div class="offcanvas-body p-0 d-flex flex-column" style="height: calc(100% - 60px);">
         <div id="cpsp_messages" class="flex-grow-1 overflow-auto p-3 d-flex flex-column gap-2">
             <div class="cpsp-bubble cpsp-bot">Descreva o problema do cliente que eu busco casos parecidos já resolvidos. 😊</div>
         </div>
-        <div class="border-top p-2 d-flex gap-2">
+        <div class="copilot-widget-input d-flex gap-2 align-items-end">
             <textarea id="cpsp_q" class="form-control form-control-sm" rows="2" style="resize:none;"
                       placeholder="Problema do cliente…  (Enter envia)"></textarea>
-            <button class="btn btn-primary btn-sm" id="cpsp_btn" onclick="cpspSend()" style="min-width:84px;">Enviar</button>
+            <button class="btn btn-primary btn-icon copilot-send-btn" id="cpsp_btn" onclick="cpspSend()" title="Enviar">
+                <i class="ki-duotone ki-send fs-2"><span class="path1"></span><span class="path2"></span></i>
+            </button>
         </div>
     </div>
 </div>
 <style>
+/* ============================================================================
+   COPILOTO: widget de chat flutuante compacto
+   (o offcanvas do Bootstrap é reposicionado como card ancorado ao botão)
+   ============================================================================ */
+#copilotPanel.copilot-widget {
+    position: fixed;
+    top: auto !important;
+    left: auto !important;
+    right: 20px !important;
+    bottom: 84px !important;
+    width: 380px !important;
+    max-width: calc(100vw - 40px);
+    height: min(560px, calc(100dvh - 120px)) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--bs-body-bg) !important;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+    z-index: 1055;
+    transition: transform 0.22s ease, opacity 0.22s ease !important;
+}
+
+/* Dark mode: o bundle não redefine --bs-offcanvas-bg, então forçamos aqui */
+[data-bs-theme="dark"] #copilotPanel.copilot-widget {
+    background: #1e1e2d !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-bs-theme="dark"] .cpsp-bot {
+    background: #2b2b40;
+    color: #cdcdd4;
+}
+
+[data-bs-theme="dark"] .copilot-widget-input {
+    background: #1e1e2d;
+    border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Animação: sobe suavemente a partir do botão (em vez de deslizar da lateral) */
+#copilotPanel.copilot-widget:not(.show) {
+    transform: translateY(14px) scale(0.98);
+    opacity: 0;
+}
+#copilotPanel.copilot-widget.showing,
+#copilotPanel.copilot-widget.show:not(.hiding) {
+    transform: none;
+    opacity: 1;
+}
+#copilotPanel.copilot-widget.hiding {
+    transform: translateY(14px) scale(0.98);
+    opacity: 0;
+}
+
+.copilot-widget-header {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #1b84ff 60%, #4fb3ff 100%);
+    padding: 12px 16px;
+    border-bottom: 0;
+}
+
+.copilot-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+
+.copilot-subtitle {
+    display: block;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.72rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.copilot-widget-input {
+    border-top: 1px solid var(--bs-border-color);
+    padding: 10px 12px;
+    background: var(--bs-body-bg);
+}
+
+.copilot-widget-input .form-control {
+    border-radius: 12px;
+}
+
+.copilot-send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    flex-shrink: 0;
+}
+
 .cpsp-bubble { max-width: 90%; padding: 9px 12px; border-radius: 12px; white-space: pre-wrap; line-height: 1.45; font-size: .9rem; }
 .cpsp-user { align-self: flex-end; background: var(--bs-primary); color: #fff; border-bottom-right-radius: 4px; }
 .cpsp-bot { align-self: flex-start; background: var(--bs-gray-100); color: var(--bs-gray-900); border-bottom-left-radius: 4px; }
 .cpsp-src { align-self: flex-start; max-width: 90%; }
+
+/* Mobile: ocupa a largura da tela com margens, ancorado embaixo */
+@media (max-width: 575.98px) {
+    #copilotPanel.copilot-widget {
+        left: 10px !important;
+        right: 10px !important;
+        bottom: 10px !important;
+        width: auto !important;
+        max-width: none;
+        height: min(72dvh, 560px) !important;
+    }
+}
 </style>
 <script>
 (function () {

@@ -1,0 +1,392 @@
+/* ============================================================================
+   CONVERSAS — SKIN "PAINÉIS FLUTUANTES"
+   Override 100% CSS sobre os seletores existentes de views/conversations/.
+   Mesma linguagem visual do menu flutuante e do widget do Copiloto.
+   Rollback: remover o <link> deste arquivo na view de conversas.
+   Tokens com prefixo --cvg- para não colidir com theme-dark-light-fix.css.
+   ============================================================================ */
+
+:root {
+    --cvg-radius: 16px;
+    --cvg-radius-sm: 13px;
+    --cvg-surface: rgba(255, 255, 255, 0.86);
+    --cvg-surface-solid: #ffffff;
+    --cvg-glass: rgba(255, 255, 255, 0.72);
+    --cvg-border: rgba(20, 30, 55, 0.08);
+    --cvg-shadow: 0 8px 30px rgba(20, 30, 55, 0.08);
+    --cvg-hover: rgba(20, 30, 55, 0.04);
+    --cvg-active-bg: rgba(var(--bs-primary-rgb), 0.10);
+    --cvg-active-border: rgba(var(--bs-primary-rgb), 0.25);
+    --cvg-msg-area: rgba(20, 30, 55, 0.025);
+    --cvg-bubble-in: #ffffff;
+    --cvg-page-glow: rgba(var(--bs-primary-rgb), 0.06);
+}
+
+[data-bs-theme="dark"] {
+    --cvg-surface: rgba(30, 30, 45, 0.82);
+    --cvg-surface-solid: #1e1e2d;
+    --cvg-glass: rgba(30, 30, 45, 0.68);
+    --cvg-border: rgba(255, 255, 255, 0.08);
+    --cvg-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    --cvg-hover: rgba(255, 255, 255, 0.05);
+    --cvg-active-bg: rgba(var(--bs-primary-rgb), 0.16);
+    --cvg-msg-area: rgba(0, 0, 0, 0.22);
+    --cvg-bubble-in: #262738;
+    --cvg-page-glow: rgba(var(--bs-primary-rgb), 0.05);
+}
+
+/* Fallback sem backdrop-filter: superfícies sólidas */
+@supports not (backdrop-filter: blur(1px)) {
+    :root,
+    [data-bs-theme="dark"] {
+        --cvg-glass: var(--cvg-surface-solid);
+        --cvg-surface: var(--cvg-surface-solid);
+    }
+}
+
+/* ============================================================================
+   FUNDO DA PÁGINA
+   ============================================================================ */
+body:has(.conversations-layout) {
+    background:
+        radial-gradient(1000px 500px at 85% -10%, var(--cvg-page-glow), transparent 60%)
+        var(--bs-body-bg);
+}
+
+/* ============================================================================
+   BARRA DE MÉTRICAS (glass flutuante)
+   ============================================================================ */
+.conversations-metrics-header {
+    margin: 10px 20px 12px 0;
+    border: 1px solid var(--cvg-border) !important;
+    border-radius: var(--cvg-radius);
+    background: var(--cvg-glass) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--cvg-shadow);
+}
+
+/* ============================================================================
+   OS 3 PAINÉIS FLUTUANTES
+   ============================================================================ */
+@media (min-width: 768px) {
+    .conversations-layout {
+        gap: 14px;
+        padding: 2px 20px 16px 2px;
+        height: calc(100vh - 196px);
+    }
+
+    .conversations-list,
+    .chat-area {
+        border: 1px solid var(--cvg-border);
+        border-radius: var(--cvg-radius);
+        box-shadow: var(--cvg-shadow);
+        background: var(--cvg-surface);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .conversations-list {
+        border-right: 1px solid var(--cvg-border); /* substitui o divisor colado */
+    }
+
+    /* Painel de detalhes: decorado apenas quando aberto (width > 0) */
+    .conversation-sidebar {
+        border-left: none !important;
+        background: transparent;
+    }
+
+    .conversation-sidebar.open {
+        border: 1px solid var(--cvg-border);
+        border-radius: var(--cvg-radius);
+        box-shadow: var(--cvg-shadow);
+        background: var(--cvg-surface);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    /* Cantos internos acompanham o raio do painel (sem overflow:hidden,
+       para não cortar os dropdowns dos itens) */
+    .conversations-list-header {
+        border-top-left-radius: var(--cvg-radius);
+        border-top-right-radius: var(--cvg-radius);
+    }
+
+    .conversations-list-items {
+        border-bottom-left-radius: var(--cvg-radius);
+        border-bottom-right-radius: var(--cvg-radius);
+    }
+
+    .chat-header {
+        border-top-left-radius: var(--cvg-radius);
+        border-top-right-radius: var(--cvg-radius);
+    }
+
+    .chat-input {
+        border-bottom-left-radius: var(--cvg-radius);
+        border-bottom-right-radius: var(--cvg-radius);
+    }
+
+    .chat-messages:last-child {
+        border-bottom-left-radius: var(--cvg-radius);
+        border-bottom-right-radius: var(--cvg-radius);
+    }
+
+    .sidebar-header {
+        border-top-left-radius: var(--cvg-radius);
+        border-top-right-radius: var(--cvg-radius);
+    }
+}
+
+/* ============================================================================
+   LISTA DE CONVERSAS
+   ============================================================================ */
+.conversations-list-header {
+    border-bottom-color: var(--cvg-border) !important;
+    background: transparent;
+}
+
+.conversations-list-header .form-control,
+.conversations-list-header .form-select {
+    border-radius: 12px !important;
+}
+
+.filters-panel {
+    background: transparent;
+    border-bottom-color: var(--cvg-border) !important;
+}
+
+.filters-grid .form-select {
+    border-radius: 10px !important;
+}
+
+.conversation-tabs-bar {
+    background: transparent;
+}
+
+/* Itens viram cards arredondados */
+.conversations-list-items {
+    padding: 6px 8px 10px;
+}
+
+.conversation-item {
+    border: 1px solid transparent !important;
+    border-radius: var(--cvg-radius-sm);
+    margin-bottom: 4px;
+    padding: 13px 14px;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.conversation-item:hover {
+    background: var(--cvg-hover);
+}
+
+.conversation-item.active {
+    background: var(--cvg-active-bg);
+    border-color: var(--cvg-active-border) !important;
+}
+
+.conversation-item.pinned {
+    background: rgba(255, 193, 7, 0.07);
+    border-color: rgba(255, 193, 7, 0.28) !important;
+}
+
+.conversation-item.pinned.active {
+    background: rgba(255, 193, 7, 0.12);
+    border-color: rgba(255, 193, 7, 0.45) !important;
+}
+
+.conversation-item.inactivity-alert {
+    background: rgba(220, 53, 69, 0.07);
+    border-color: rgba(220, 53, 69, 0.25) !important;
+}
+
+.conversation-item.inactivity-alert:hover {
+    background: rgba(220, 53, 69, 0.12);
+}
+
+.conversation-item.inactivity-alert.active {
+    background: rgba(220, 53, 69, 0.14);
+    border-color: rgba(220, 53, 69, 0.45) !important;
+}
+
+.conversation-item.awaiting-reply:not(.inactivity-alert) {
+    border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.conversation-item.awaiting-reply:not(.inactivity-alert):hover {
+    background: rgba(245, 158, 11, 0.08);
+}
+
+.conversation-item.awaiting-reply:not(.inactivity-alert).active {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.55) !important;
+}
+
+/* Badges/chips dos itens: cantos mais suaves */
+.conversation-item .inactivity-alert-badge,
+.conversation-item .awaiting-reply-badge {
+    border-radius: 7px;
+}
+
+/* Barra de autoclose respeita o raio do card */
+.conv-autoclose-bar {
+    left: 10px;
+    width: calc(100% - 20px);
+    border-radius: 3px;
+}
+
+/* Avatares dos itens: quadrado arredondado (par do rail) */
+.conversation-item .symbol-label,
+.conversation-item .symbol-label img {
+    border-radius: 12px !important;
+}
+
+/* ============================================================================
+   CHAT
+   ============================================================================ */
+.chat-header {
+    background: var(--cvg-glass) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom-color: var(--cvg-border) !important;
+}
+
+.chat-header .btn {
+    border-radius: 12px !important;
+}
+
+.chat-messages {
+    background: var(--cvg-msg-area) !important;
+}
+
+/* Bolhas */
+.message-bubble {
+    border-radius: 16px;
+    box-shadow: 0 1px 4px rgba(20, 30, 55, 0.06);
+}
+
+.chat-message.incoming .message-bubble {
+    background: var(--cvg-bubble-in);
+    border-color: var(--cvg-border);
+    border-bottom-left-radius: 6px;
+}
+
+.chat-message.outgoing .message-bubble {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #1b84ff 100%);
+    border-bottom-right-radius: 6px;
+    box-shadow: 0 3px 10px rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Separador de data: pill glass */
+.date-separator-label {
+    background: var(--cvg-glass) !important;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--cvg-border);
+    border-radius: 20px;
+    padding: 4px 14px;
+}
+
+.date-separator-line {
+    background: var(--cvg-border) !important;
+}
+
+/* ============================================================================
+   COMPOSER
+   ============================================================================ */
+.chat-input {
+    background: var(--cvg-glass) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-top-color: var(--cvg-border) !important;
+}
+
+.chat-input-toolbar .btn {
+    border-radius: 10px !important;
+}
+
+.chat-input-textarea {
+    border-radius: 14px !important;
+    background: var(--cvg-surface-solid) !important;
+    border-color: var(--cvg-border) !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chat-input-textarea:focus {
+    border-color: rgba(var(--bs-primary-rgb), 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), 0.12);
+}
+
+.chat-input-footer .btn-primary {
+    border-radius: 12px !important;
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #1b84ff 100%);
+    border: 0;
+    box-shadow: 0 4px 14px rgba(var(--bs-primary-rgb), 0.3);
+}
+
+/* ============================================================================
+   PAINEL DE DETALHES
+   ============================================================================ */
+.sidebar-header {
+    border-bottom-color: var(--cvg-border) !important;
+    background: transparent;
+}
+
+#sidebarAccordion .accordion-button {
+    border-bottom-color: var(--cvg-border) !important;
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+.conversations-list-items::-webkit-scrollbar-thumb,
+.chat-messages::-webkit-scrollbar-thumb,
+.sidebar-content::-webkit-scrollbar-thumb {
+    background: rgba(var(--bs-primary-rgb), 0.18) !important;
+    border-radius: 3px;
+}
+
+.conversations-list-items::-webkit-scrollbar-thumb:hover,
+.chat-messages::-webkit-scrollbar-thumb:hover,
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--bs-primary-rgb), 0.32) !important;
+}
+
+/* ============================================================================
+   MOBILE (< 768px): painéis full-bleed, sem molduras
+   (as views são absolutas em tela cheia com transição lateral — a decoração
+   de painel atrapalharia; o glass permanece no header e composer)
+   ============================================================================ */
+@media (max-width: 767.98px) {
+    .conversations-list,
+    .chat-area,
+    .conversation-sidebar,
+    .conversation-sidebar.open {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: var(--bs-body-bg);
+    }
+
+    .conversations-list-header,
+    .conversations-list-items,
+    .chat-header,
+    .chat-input,
+    .sidebar-header,
+    .chat-messages {
+        border-radius: 0 !important;
+    }
+}
+
+/* Tablet (768-991px): o painel de detalhes vira drawer fixo — sem moldura */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .conversation-sidebar,
+    .conversation-sidebar.open {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: var(--cvg-shadow);
+    }
+}

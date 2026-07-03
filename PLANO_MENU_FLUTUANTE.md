@@ -2,7 +2,7 @@
 
 **Data:** 03/07/2026
 **Branch:** `claude/floating-menu-redesign-nwjhmi`
-**Status:** 📋 Plano aprovado para implementação
+**Status:** ✅ Implementado (ver seção 8 — Implementação Realizada)
 
 ---
 
@@ -228,3 +228,26 @@ Cada item suporta: `label`, `icon`, `route`, `permission`, `children`, `badge` (
 | Fase 3 (mobile) | 1 dia |
 | Fase 4 (validação) | 0,5-1 dia |
 | **Total** | **~4 dias úteis** |
+
+---
+
+## 8. Implementação Realizada
+
+**Arquivos criados:**
+- `views/layouts/metronic/menu-config.php` — fonte única do menu (rotas, permissões, ícones, badges)
+- `views/layouts/metronic/floating-menu.php` — renderer (rail + flyouts + dock + bottom sheet)
+- `public/assets/css/custom/floating-menu.css` — estilos completos (dark/light, safe-area, print)
+- `public/assets/js/custom/floating-menu.js` — flyouts (hover-intent + clique), sheet, teclado virtual
+
+**Arquivos alterados:**
+- `views/layouts/metronic/app.php` — include do menu novo; removido CSS do aside (290px/padding-left do body) e o JS `initSidebarToggle`; removido link do `sidebar-toggle.css`
+- `views/layouts/metronic/header.php` — removido toggle do drawer mobile (`#kt_aside_toggle`)
+
+**Rollback:** `sidebar.php` e `sidebar-toggle.css` permanecem no repositório. Para voltar: restaurar o include e o bloco CSS do aside em `app.php` (git revert deste commit).
+
+**Notas de implementação:**
+- Os ícones `ki-home` e `ki-chat` do menu antigo **não existem** no bundle keenicons (0 paths no CSS) — estavam invisíveis. Substituídos por `ki-element-11` e `ki-message-text-2`.
+- Dock oculta-se em `body.conv-mobile-chat` (chat aberto) e com teclado virtual aberto (`visualViewport`).
+- Rail/dock ocultos no editor de automações (`body:has(.ae-wrapper)`).
+- Botão flutuante do Copiloto sobe acima do dock na lista de conversas mobile.
+- Validado com smoke-tests de renderização (permissões all/partial, estados ativos, resolução de `{userId}`) e paridade de rotas 100% vs menu antigo.

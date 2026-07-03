@@ -21,28 +21,13 @@
     
     <!-- Custom CSS -->
     <link href="<?= \App\Helpers\Url::asset('css/custom/theme-dark-light-fix.css') ?>" rel="stylesheet" type="text/css" />
-    <link href="<?= \App\Helpers\Url::asset('css/custom/sidebar-toggle.css') ?>" rel="stylesheet" type="text/css" />
+    <?php /* sidebar-toggle.css removido: pertencia ao aside fixo antigo (rollback: sidebar.php + sidebar-toggle.css) */ ?>
+    <link href="<?= \App\Helpers\Url::asset('css/custom/floating-menu.css') ?>" rel="stylesheet" type="text/css" />
     <link href="<?= \App\Helpers\Url::asset('css/custom/sweetalert-dark.css') ?>" rel="stylesheet" type="text/css" />
-    
+
     <style>
-        :root {
-            --aside-width: 290px; /* largura efetiva do menu lateral (ajustado para evitar sobreposição) */
-            --aside-collapsed: 80px;
-        }
-
-        /* Fixar largura do aside desktop e posicionar fixo */
-        #kt_aside {
-            position: fixed !important;
-            left: 0 !important;
-            top: 0 !important;
-            bottom: 0 !important;
-            width: var(--aside-width) !important;
-            min-width: var(--aside-width) !important;
-            max-width: var(--aside-width) !important;
-            z-index: 100 !important;
-        }
-
-        /* Layout base: página com aside + conteúdo */
+        /* Layout base: o deslocamento para o menu flutuante (rail/dock) é
+           definido em css/custom/floating-menu.css */
         .page {
             display: flex !important;
             flex-direction: row !important;
@@ -52,7 +37,6 @@
             max-width: 100% !important;
         }
 
-        /* Wrapper ocupa todo espaço; deslocamento é feito no body */
         .wrapper {
             flex: 1 1 auto !important;
             width: 100% !important;
@@ -83,29 +67,12 @@
             box-sizing: border-box !important;
         }
 
-        /* Gutters zero no body + deslocamento do aside (fixo) */
+        /* Gutters zero no body */
         body {
             --bs-gutter-x: 0 !important;
-            padding-left: var(--aside-width) !important;
         }
 
-        /* Quando o aside estiver minimizado */
-        body.aside-minimize {
-            padding-left: var(--aside-collapsed) !important;
-        }
-        body.aside-minimize .wrapper {
-            margin-left: 0 !important;
-            padding-left: 8px !important;
-            padding-right: 16px !important;
-        }
-
-        /* Responsivo: em mobile, não deslocar por aside */
         @media (max-width: 991.98px) {
-            #kt_aside {
-                width: auto !important;
-                min-width: auto !important;
-                max-width: none !important;
-            }
             .wrapper {
                 width: 100% !important;
                 max-width: 100% !important;
@@ -114,9 +81,6 @@
                 padding-right: 0 !important;
             }
             .page {
-                padding-left: 0 !important;
-            }
-            body {
                 padding-left: 0 !important;
             }
         }
@@ -153,9 +117,9 @@
     <div class="d-flex flex-column flex-root">
         <!--begin::Page-->
         <div class="page d-flex flex-row flex-column-fluid">
-            <!--begin::Aside-->
-            <?php include __DIR__ . '/sidebar.php'; ?>
-            <!--end::Aside-->
+            <!--begin::Floating menu (rail desktop + dock mobile)-->
+            <?php include __DIR__ . '/floating-menu.php'; ?>
+            <!--end::Floating menu-->
             
             <!--begin::Wrapper-->
             <div class="wrapper d-flex flex-column flex-row-fluid" id="kt_wrapper" style="width: 100%">
@@ -261,78 +225,14 @@
     <!-- Notification Manager (Push/Toast Notifications) -->
     <script src="<?= \App\Helpers\Url::asset('js/notification-manager.js') ?>"></script>
     
-    <!--begin::Sidebar Toggle Script-->
-    <script>
-        // Função para toggle do sidebar esquerdo
-        function initSidebarToggle() {
-            const asideToggleSidebar = document.getElementById('kt_aside_toggle_sidebar');
-            const aside = document.getElementById('kt_aside');
-            
-            if (!aside) return;
-            
-            // Função para recolher todos os submenus
-            function closeAllSubmenus() {
-                const openSubmenus = aside.querySelectorAll('.menu-item.menu-accordion.show');
-                openSubmenus.forEach(item => {
-                    item.classList.remove('show');
-                    const submenu = item.querySelector('.menu-sub');
-                    if (submenu) {
-                        submenu.style.display = 'none';
-                    }
-                });
-            }
-            
-            // Função para toggle do sidebar
-            function toggleSidebar() {
-                const isMinimized = aside.classList.contains('aside-minimize');
-                
-                if (isMinimized) {
-                    // Expandir
-                    aside.classList.remove('aside-minimize');
-                    document.body.classList.remove('aside-minimize');
-                    localStorage.setItem('sidebar_collapsed', 'false');
-                } else {
-                    // Recolher - fechar todos os submenus primeiro
-                    closeAllSubmenus();
-                    aside.classList.add('aside-minimize');
-                    document.body.classList.add('aside-minimize');
-                    localStorage.setItem('sidebar_collapsed', 'true');
-                }
-                
-                // Trigger resize event para ajustar layouts
-                setTimeout(() => {
-                    window.dispatchEvent(new Event('resize'));
-                }, 300);
-            }
-            
-            // Verificar estado salvo no localStorage
-            const sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
-            
-            // Aplicar estado inicial
-            if (sidebarCollapsed) {
-                closeAllSubmenus();
-                aside.classList.add('aside-minimize');
-                document.body.classList.add('aside-minimize');
-            }
-            
-            // Toggle ao clicar no botão do sidebar
-            if (asideToggleSidebar) {
-                asideToggleSidebar.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    toggleSidebar();
-                });
-            }
-        }
-        
-    </script>
-    
+    <!--begin::Floating Menu Script-->
+    <script src="<?= \App\Helpers\Url::asset('js/custom/floating-menu.js') ?>"></script>
+    <!--end::Floating Menu Script-->
+
     <!--begin::Initialize Metronic Components-->
     <script>
         // Aguardar carregamento completo dos scripts
         document.addEventListener('DOMContentLoaded', function() {
-            // Inicializar toggle do sidebar esquerdo
-            initSidebarToggle();
-            
             // Verificar se Bootstrap está disponível
             if (typeof bootstrap === 'undefined') {
                 console.error('Bootstrap não está carregado!');

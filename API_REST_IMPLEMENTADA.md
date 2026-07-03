@@ -85,6 +85,11 @@
   - `GET /api/v1/agents/:id` - Obter agente
   - `GET /api/v1/agents/:id/stats` - Estatísticas do agente
 
+#### **Conversão comercial (Lead → Venda WooCommerce)**
+- ✅ `api/v1/Controllers/StatsController.php` (permissão `reports.view`)
+  - `GET /api/v1/stats/conversion` - Conversão de todos os vendedores (usuários com `woocommerce_seller_id`). Params: `date_from`, `date_to`. Retorna, por vendedor: leads (conversas) por variante, pedidos, faturamento, ticket médio e as taxas de conversão `total`, `client_only`, `receptivas_ativas` e `interactive`. Consumido pelo mktplace-privus (comissões/metas por conversão).
+  - `GET /api/v1/stats/agents/:id/conversion` - Mesmo payload para um vendedor específico.
+
 #### **Setores**
 - ✅ `api/v1/Controllers/DepartmentsController.php`
   - `GET /api/v1/departments` - Listar setores

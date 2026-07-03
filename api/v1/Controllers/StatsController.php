@@ -193,6 +193,121 @@ class StatsController
     }
 
     /**
+     * Conversão comercial (Lead → Venda WooCommerce) de todos os vendedores
+     * GET /api/v1/stats/conversion
+     *
+     * Vendedor = usuário ativo com woocommerce_seller_id preenchido.
+     * Retorna as três variantes da taxa de conversão (receptivas,
+     * receptivas+ativas e interativas) para consumo por sistemas externos.
+     *
+     * Query params:
+     *   date_from (Y-m-d) — padrão: primeiro dia do mês
+     *   date_to   (Y-m-d) — padrão: hoje
+     */
+    public function conversion(): void
+    {
+        ApiAuthMiddleware::requirePermission('reports.view');
+
+        $dateFrom = $_GET['date_from'] ?? null;
+        $dateTo   = $_GET['date_to']   ?? null;
+
+        try {
+            $sellers = \App\Models\User::getSellers();
+
+            $data = [];
+            foreach ($sellers as $seller) {
+                $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
+                    (int)$seller['id'],
+                    $dateFrom,
+                    $dateTo
+                );
+                $data[] = self::formatConversionMetrics($seller, $metrics);
+            }
+
+            ApiResponse::success([
+                'period' => [
+                    'from' => $dateFrom ?? date('Y-m-01'),
+                    'to'   => $dateTo   ?? date('Y-m-d'),
+                ],
+                'sellers' => $data,
+            ]);
+        } catch (\Exception $e) {
+            ApiResponse::serverError('Erro ao obter métricas de conversão', $e);
+        }
+    }
+
+    /**
+     * Conversão comercial de um vendedor específico
+     * GET /api/v1/stats/agents/:id/conversion
+     *
+     * Query params:
+     *   date_from (Y-m-d)
+     *   date_to   (Y-m-d)
+     */
+    public function agentConversion(string $id): void
+    {
+        ApiAuthMiddleware::requirePermission('reports.view');
+
+        $dateFrom = $_GET['date_from'] ?? null;
+        $dateTo   = $_GET['date_to']   ?? null;
+
+        try {
+            $agent = \App\Models\User::find((int)$id);
+            if (!$agent) {
+                ApiResponse::notFound('Agente não encontrado');
+            }
+
+            $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
+                (int)$id,
+                $dateFrom,
+                $dateTo
+            );
+
+            ApiResponse::success(self::formatConversionMetrics($agent, $metrics));
+        } catch (\Exception $e) {
+            ApiResponse::serverError('Erro ao obter métricas de conversão do agente', $e);
+        }
+    }
+
+    /**
+     * Payload padronizado de conversão para consumo externo
+     */
+    private static function formatConversionMetrics(array $agent, array $metrics): array
+    {
+        return [
+            'agent_id'               => (int)$agent['id'],
+            'agent_name'             => $agent['name'] ?? null,
+            'agent_email'            => $agent['email'] ?? null,
+            'woocommerce_seller_id'  => isset($agent['woocommerce_seller_id']) && $agent['woocommerce_seller_id'] !== null
+                ? (int)$agent['woocommerce_seller_id']
+                : null,
+            'period'                 => $metrics['period'] ?? null,
+
+            // Vendas (pedidos WooCommerce válidos do período)
+            'total_orders'           => (int)($metrics['total_orders'] ?? 0),
+            'total_revenue'          => (float)($metrics['total_revenue'] ?? 0),
+            'avg_ticket'             => (float)($metrics['avg_ticket'] ?? 0),
+
+            // Leads (conversas) por variante
+            'leads' => [
+                'total_conversations'      => (int)($metrics['total_conversations'] ?? 0),
+                'client_initiated'         => (int)($metrics['conversations_client_initiated'] ?? 0),
+                'agent_initiated'          => (int)($metrics['conversations_agent_initiated'] ?? 0),
+                'receptivas_ativas'        => (int)($metrics['conversations_receptivas_ativas'] ?? 0),
+                'interactive'              => (int)($metrics['interactive_conversations'] ?? 0),
+            ],
+
+            // Taxas de conversão por variante (%)
+            'conversion_rates' => [
+                'total'             => (float)($metrics['conversion_rate'] ?? 0),
+                'client_only'       => (float)($metrics['conversion_rate_client_only'] ?? 0),
+                'receptivas_ativas' => (float)($metrics['conversion_rate_receptivas_ativas'] ?? 0),
+                'interactive'       => (float)($metrics['conversion_rate_interactive'] ?? 0),
+            ],
+        ];
+    }
+
+    /**
      * Métricas de SLA
      * GET /api/v1/stats/sla
      *

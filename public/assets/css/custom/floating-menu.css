@@ -1,0 +1,587 @@
+/* ============================================================================
+   MENU FLUTUANTE
+   - Rail vertical flutuante (desktop >= 992px) com flyouts
+   - Dock inferior flutuante + bottom sheet (mobile < 992px)
+   Substitui o aside fixo (#kt_aside) e o drawer mobile do Metronic.
+   ============================================================================ */
+
+:root {
+    --fm-rail-width: 68px;
+    --fm-rail-gap: 12px;             /* distância do rail até a borda da tela */
+    --fm-content-offset: 92px;       /* rail + margens (padding-left do body no desktop) */
+    --fm-dock-height: 64px;
+    --fm-radius: 18px;
+    --fm-z-bar: 1050;                /* rail e dock */
+    --fm-z-overlay: 1060;            /* flyouts e bottom sheet (abaixo dos dropdowns do header: 1100+) */
+    --fm-surface: var(--bs-body-bg, #fff);
+    --fm-border: var(--bs-border-color, #e4e6ef);
+    --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    --fm-item-color: var(--bs-gray-600, #7e8299);
+    --fm-item-hover-bg: var(--bs-gray-100, #f9f9f9);
+    --fm-item-active-bg: var(--bs-primary-light, #eef6ff);
+    --fm-item-active-color: var(--bs-primary, #3e97ff);
+}
+
+[data-bs-theme="dark"] {
+    --fm-surface: #1e1e2d;
+    --fm-border: rgba(255, 255, 255, 0.08);
+    --fm-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    --fm-item-color: #9d9da6;
+    --fm-item-hover-bg: rgba(255, 255, 255, 0.05);
+    --fm-item-active-bg: rgba(62, 151, 255, 0.15);
+    --fm-item-active-color: #3e97ff;
+}
+
+/* ============================================================================
+   RAIL (desktop)
+   ============================================================================ */
+
+.fm-rail {
+    position: fixed;
+    left: var(--fm-rail-gap);
+    top: 50%;
+    transform: translateY(-50%);
+    width: var(--fm-rail-width);
+    max-height: calc(100vh - 24px);
+    z-index: var(--fm-z-bar);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 0 12px;
+    background: var(--fm-surface);
+    border: 1px solid var(--fm-border);
+    border-radius: var(--fm-radius);
+    box-shadow: var(--fm-shadow);
+}
+
+.fm-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+    text-decoration: none;
+    overflow: hidden;
+}
+
+.fm-logo img {
+    max-width: 36px;
+    max-height: 36px;
+    object-fit: contain;
+}
+
+.fm-logo-letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: var(--fm-item-active-bg);
+    color: var(--fm-item-active-color);
+    font-weight: 700;
+    font-size: 1.25rem;
+}
+
+.fm-rail-items {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.fm-rail-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border: 0;
+    border-radius: 14px;
+    background: transparent;
+    color: var(--fm-item-color);
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+    text-decoration: none;
+}
+
+.fm-rail-item i {
+    color: inherit;
+}
+
+.fm-rail-item:hover {
+    background: var(--fm-item-hover-bg);
+    color: var(--fm-item-active-color);
+}
+
+.fm-rail-item.active,
+.fm-rail-item.fm-open {
+    background: var(--fm-item-active-bg);
+    color: var(--fm-item-active-color);
+}
+
+/* Indicador lateral do item ativo */
+.fm-rail-item.active::before {
+    content: "";
+    position: absolute;
+    left: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 4px;
+    height: 22px;
+    border-radius: 4px;
+    background: var(--fm-item-active-color);
+}
+
+/* Tooltip do rail (somente desktop/hover) */
+@media (hover: hover) {
+    .fm-rail-item[data-fm-tooltip]:hover::after {
+        content: attr(data-fm-tooltip);
+        position: absolute;
+        left: calc(100% + 14px);
+        top: 50%;
+        transform: translateY(-50%);
+        background: #1e1e2d;
+        color: #fff;
+        padding: 0.4rem 0.7rem;
+        border-radius: 0.5rem;
+        white-space: nowrap;
+        font-size: 0.85rem;
+        font-weight: 500;
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+        pointer-events: none;
+        z-index: 5;
+    }
+
+    /* Sem tooltip enquanto o flyout correspondente está aberto */
+    .fm-rail-item.fm-open[data-fm-tooltip]:hover::after {
+        display: none;
+    }
+
+    [data-bs-theme="dark"] .fm-rail-item[data-fm-tooltip]:hover::after {
+        background: #15171c;
+        color: #f5f5f5;
+    }
+}
+
+/* ============================================================================
+   FLYOUTS (desktop)
+   ============================================================================ */
+
+.fm-flyout {
+    position: fixed;
+    left: calc(var(--fm-rail-gap) + var(--fm-rail-width) + 10px);
+    top: 0; /* posicionado via JS */
+    min-width: 250px;
+    max-width: 320px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    z-index: var(--fm-z-overlay);
+    background: var(--fm-surface);
+    border: 1px solid var(--fm-border);
+    border-radius: 14px;
+    box-shadow: var(--fm-shadow);
+    padding: 10px;
+    display: none;
+}
+
+.fm-flyout.fm-open {
+    display: block;
+    animation: fm-flyout-in 0.14s ease;
+}
+
+@keyframes fm-flyout-in {
+    from { opacity: 0; transform: translateX(-6px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+.fm-flyout-wide {
+    min-width: 480px;
+    max-width: 560px;
+}
+
+.fm-flyout-wide .fm-flyout-body {
+    column-count: 2;
+    column-gap: 8px;
+}
+
+.fm-flyout-wide .fm-flyout-heading,
+.fm-flyout-wide .fm-flyout-link {
+    break-inside: avoid;
+}
+
+.fm-flyout-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fm-item-color);
+    padding: 6px 10px 8px;
+}
+
+.fm-flyout-heading {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fm-item-color);
+    padding: 10px 10px 4px;
+    column-span: none;
+}
+
+.fm-flyout-separator {
+    height: 1px;
+    background: var(--fm-border);
+    margin: 6px 10px;
+}
+
+.fm-flyout-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    color: var(--bs-gray-800, #3f4254);
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+[data-bs-theme="dark"] .fm-flyout-link {
+    color: #cdcdd4;
+}
+
+.fm-flyout-link:hover {
+    background: var(--fm-item-hover-bg);
+    color: var(--fm-item-active-color);
+}
+
+.fm-flyout-link.active {
+    background: var(--fm-item-active-bg);
+    color: var(--fm-item-active-color);
+    font-weight: 600;
+}
+
+.fm-badge-pulse {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+}
+
+/* ============================================================================
+   DOCK (mobile)
+   ============================================================================ */
+
+.fm-dock {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    height: var(--fm-dock-height);
+    z-index: var(--fm-z-bar);
+    display: flex;
+    align-items: stretch;
+    justify-content: space-around;
+    background: var(--fm-surface);
+    border: 1px solid var(--fm-border);
+    border-radius: 20px;
+    box-shadow: var(--fm-shadow);
+    padding: 0 4px;
+    transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.fm-dock-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 44px;
+    border: 0;
+    background: transparent;
+    color: var(--fm-item-color);
+    text-decoration: none;
+    border-radius: 16px;
+    margin: 6px 2px;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.fm-dock-item i {
+    color: inherit;
+    font-size: 1.35rem !important;
+}
+
+.fm-dock-item.active {
+    background: var(--fm-item-active-bg);
+    color: var(--fm-item-active-color);
+}
+
+.fm-dock-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    line-height: 1;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Dock oculto: conversa aberta no chat mobile ou teclado virtual visível */
+body.conv-mobile-chat .fm-dock,
+body.fm-keyboard-open .fm-dock {
+    transform: translateY(calc(100% + 20px));
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ============================================================================
+   BOTTOM SHEET (mobile)
+   ============================================================================ */
+
+.fm-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: var(--fm-z-overlay);
+}
+
+.fm-sheet[hidden] {
+    display: none;
+}
+
+.fm-sheet-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    animation: fm-fade-in 0.2s ease;
+}
+
+.fm-sheet-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 82vh;
+    max-height: 82dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--fm-surface);
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: fm-sheet-up 0.25s ease;
+}
+
+@keyframes fm-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes fm-sheet-up {
+    from { transform: translateY(30%); opacity: 0.6; }
+    to   { transform: translateY(0); opacity: 1; }
+}
+
+.fm-sheet-handle {
+    width: 44px;
+    height: 5px;
+    border-radius: 3px;
+    background: var(--fm-border);
+    margin: 10px auto 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+.fm-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 18px 8px;
+    flex-shrink: 0;
+}
+
+.fm-sheet-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--bs-gray-900, #181c32);
+}
+
+[data-bs-theme="dark"] .fm-sheet-title {
+    color: #f5f5f5;
+}
+
+.fm-sheet-close {
+    border: 0;
+    background: transparent;
+    color: var(--fm-item-color);
+    padding: 6px;
+    border-radius: 10px;
+    cursor: pointer;
+}
+
+.fm-sheet-body {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 14px 18px;
+}
+
+.fm-sheet-section {
+    margin-bottom: 14px;
+}
+
+.fm-sheet-section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fm-item-color);
+    padding: 8px 4px 8px;
+}
+
+.fm-sheet-section-title i {
+    color: inherit;
+}
+
+.fm-sheet-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.fm-sheet-subheading {
+    grid-column: 1 / -1;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--fm-item-color);
+    padding: 8px 4px 0;
+}
+
+.fm-sheet-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: var(--fm-item-hover-bg);
+    color: var(--bs-gray-800, #3f4254);
+    font-size: 0.9rem;
+    font-weight: 500;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+[data-bs-theme="dark"] .fm-sheet-cell {
+    color: #cdcdd4;
+}
+
+.fm-sheet-cell i {
+    color: inherit;
+    flex-shrink: 0;
+}
+
+.fm-sheet-cell span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fm-sheet-cell.active {
+    background: var(--fm-item-active-bg);
+    color: var(--fm-item-active-color);
+    font-weight: 600;
+}
+
+/* Trava o scroll do body enquanto o sheet está aberto */
+body.fm-sheet-open {
+    overflow: hidden;
+}
+
+/* ============================================================================
+   VISIBILIDADE POR BREAKPOINT + DESLOCAMENTO DO CONTEÚDO
+   ============================================================================ */
+
+@media (min-width: 992px) {
+    .fm-dock,
+    .fm-sheet {
+        display: none !important;
+    }
+
+    body {
+        padding-left: var(--fm-content-offset) !important;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .fm-rail,
+    .fm-flyout {
+        display: none !important;
+    }
+
+    body {
+        padding-left: 0 !important;
+    }
+
+    /* Respiro inferior para o conteúdo não terminar atrás do dock
+       (páginas full-height, como Conversas, tratadas abaixo) */
+    #kt_content_container {
+        padding-bottom: calc(var(--fm-dock-height) + 26px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    /* Conversas: layout ocupa a viewport inteira — sem padding no container;
+       o respiro vai no scroller interno da lista */
+    body:has(.conversations-layout) #kt_content_container {
+        padding-bottom: 0 !important;
+    }
+
+    body:has(.conversations-layout) .conversations-list-items {
+        padding-bottom: calc(var(--fm-dock-height) + 24px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    /* Botão flutuante do Copiloto sobe para não ficar atrás do dock
+       (quando o chat está aberto o dock some e a regra da página prevalece) */
+    body:not(.conv-mobile-chat) button[data-bs-target="#copilotPanel"] {
+        bottom: calc(var(--fm-dock-height) + 26px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+/* Editor de automações em tela cheia: menu não deve aparecer */
+body:has(.ae-wrapper) .fm-rail,
+body:has(.ae-wrapper) .fm-flyout,
+body:has(.ae-wrapper) .fm-dock,
+body:has(.ae-wrapper) .fm-sheet {
+    display: none !important;
+}
+
+@media (min-width: 992px) {
+    body:has(.ae-wrapper) {
+        padding-left: 0 !important;
+    }
+}
+
+/* Impressão: sem menu */
+@media print {
+    .fm-rail,
+    .fm-flyout,
+    .fm-dock,
+    .fm-sheet {
+        display: none !important;
+    }
+
+    body {
+        padding-left: 0 !important;
+    }
+}

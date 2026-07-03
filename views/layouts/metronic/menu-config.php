@@ -19,6 +19,7 @@
  * - heading     string  Em vez de link, cabeçalho de seção dentro do flyout
  * - separator   bool    Linha separadora antes do item
  * - badge       string  'pulse-success' exibe o ponto pulsante (ex.: Coaching IA)
+ * - hidden      bool    Oculta o item do menu sem remover a configuração/lógica
  * - activeNot   array   Rotas que, se ativas, anulam o estado ativo deste item
  *                       (para distinguir prefixos como /goals vs /goals/dashboard)
  * - exact       bool    Rota ativa apenas em correspondência exata (com sufixo)
@@ -101,11 +102,12 @@ return [
             ['label' => 'Gerar Manuais (IA)', 'route' => '/manuals', 'permission' => ['agent_performance.view.all', 'conversations.view.all']],
             ['label' => 'Minha Performance', 'route' => '/agent-performance/agent?id={userId}'],
             ['label' => 'Minhas Conversões', 'route' => '/agent-conversion/agent?id={userId}'],
-            ['label' => 'Minha Meta', 'route' => '/goals/my'],
+            // Metas ocultadas da UI (lógica preservada) — reative removendo 'hidden'
+            ['label' => 'Minha Meta', 'route' => '/goals/my', 'hidden' => true],
             ['label' => 'Melhores Práticas', 'route' => '/agent-performance/best-practices', 'permission' => 'agent_performance.best_practices'],
-            ['label' => 'Minhas Metas', 'route' => '/goals/dashboard', 'permission' => 'goals.view'],
+            ['label' => 'Minhas Metas', 'route' => '/goals/dashboard', 'permission' => 'goals.view', 'hidden' => true],
             ['label' => '🎯 Gerenciar Metas', 'route' => '/goals', 'permissionAny' => ['goals.create', 'goals.edit'],
-             'activeNot' => ['/goals/dashboard', '/goals/my']],
+             'activeNot' => ['/goals/dashboard', '/goals/my'], 'hidden' => true],
             ['label' => '🚀 Coaching IA', 'route' => '/coaching/dashboard', 'permission' => 'coaching.view',
              'badge' => 'pulse-success', 'activeMatch' => '/coaching'],
         ],

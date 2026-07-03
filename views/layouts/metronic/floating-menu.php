@@ -14,9 +14,12 @@ $fmUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $fmUserId = \App\Helpers\Auth::check() ? (\App\Helpers\Auth::user()['id'] ?? 0) : 0;
 
 if (!function_exists('fmCan')) {
-    /** Verifica as permissões de um item do menu (permission = AND, permissionAny = OR). */
+    /** Verifica visibilidade de um item: flag hidden + permissões (permission = AND, permissionAny = OR). */
     function fmCan(array $item): bool
     {
+        if (!empty($item['hidden'])) {
+            return false;
+        }
         if (!empty($item['permission'])) {
             foreach ((array) $item['permission'] as $perm) {
                 if (!\App\Helpers\Permission::can($perm)) {

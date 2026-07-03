@@ -476,7 +476,8 @@ ob_start();
 <!--end::Row - Análise de Performance de Chamadas-->
 
 <!--begin::Row - Metas-->
-<?php if (!empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
+<?php /* Metas ocultadas da UI (lógica preservada) — reative removendo o "false &&" */ ?>
+<?php if (false && !empty($goalsSummary) && $goalsSummary['total_goals'] > 0): ?>
 <div class="card mb-5">
     <div class="card-header border-0 pt-5">
         <h3 class="card-title align-items-start flex-column">
@@ -2580,7 +2581,8 @@ document.addEventListener('DOMContentLoaded', loadVendorAnalytics);
 </script>
 <?php endif; ?>
 
-<?php if (!empty($goalsOverview)): ?>
+<?php /* Metas ocultadas da UI (lógica preservada) — reative removendo o "false &&" */ ?>
+<?php if (false && !empty($goalsOverview)): ?>
 <?php
 $uniqueTeams = [];
 foreach ($goalsOverview as $goalItem) {

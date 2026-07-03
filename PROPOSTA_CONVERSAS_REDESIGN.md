@@ -2,7 +2,7 @@
 
 **Data:** 03/07/2026
 **Branch:** `claude/floating-menu-redesign-nwjhmi`
-**Status:** 📋 Proposta aguardando aprovação (mockups enviados no chat)
+**Status:** ✅ Aprovada e implementada — `public/assets/css/custom/conversations-glass.css`
 **Contexto:** continuação da linguagem visual do menu flutuante (rail/dock)
 
 ---

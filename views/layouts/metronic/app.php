@@ -72,6 +72,12 @@
             --bs-gutter-x: 0 !important;
         }
 
+        /* Utilitário usado nos markups mas ausente nos bundles do Metronic
+           (sem ele, flex items com conteúdo longo não encolhem e estouram o card) */
+        .min-w-0 {
+            min-width: 0 !important;
+        }
+
         @media (max-width: 991.98px) {
             .wrapper {
                 width: 100% !important;

@@ -213,3 +213,36 @@ body {
 .card .dataTables_wrapper .dataTables_filter input {
     border-radius: 10px !important;
 }
+
+/* ============================================================================
+   DARK MODE — vencer os overrides opacos do theme-dark-light-fix.css
+   (ele pinta .card/.card-header/.card-body/.card-footer com #15171C
+   !important e especificidade [data-bs-theme="dark"] .card; este arquivo
+   carrega DEPOIS no body, então o empate de !important resolve a favor daqui)
+   ============================================================================ */
+[data-bs-theme="dark"] .card {
+    background-color: var(--dbg-surface) !important;
+    border-color: var(--dbg-border) !important;
+}
+
+[data-bs-theme="dark"] .card-header,
+[data-bs-theme="dark"] .card-body,
+[data-bs-theme="dark"] .card-footer {
+    background-color: transparent !important;
+}
+
+[data-bs-theme="dark"] .card-header {
+    border-bottom-color: var(--dbg-border) !important;
+}
+
+[data-bs-theme="dark"] .card-footer {
+    border-top-color: var(--dbg-border) !important;
+}
+
+/* Tints dos cards de estatística (bg-light-*) — o dark-fix os achatava em
+   #15171C; devolvemos o tom da cor no escuro */
+[data-bs-theme="dark"] .card.bg-light-primary { background-color: rgba(var(--bs-primary-rgb), 0.12) !important; }
+[data-bs-theme="dark"] .card.bg-light-success { background-color: rgba(23, 198, 83, 0.12) !important; }
+[data-bs-theme="dark"] .card.bg-light-warning { background-color: rgba(246, 192, 0, 0.12) !important; }
+[data-bs-theme="dark"] .card.bg-light-danger  { background-color: rgba(248, 40, 90, 0.12) !important; }
+[data-bs-theme="dark"] .card.bg-light-info    { background-color: rgba(114, 57, 234, 0.12) !important; }

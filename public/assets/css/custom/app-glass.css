@@ -1,8 +1,8 @@
 /* ============================================================================
-   DASHBOARD — SKIN "PAINÉIS FLUTUANTES"
-   Override 100% CSS sobre os cards Metronic da página de dashboard.
+   SKIN "PAINÉIS FLUTUANTES" — páginas de cards (dashboard, kanban, contatos, funis)
+   Override 100% CSS sobre os cards Metronic das páginas que o linkam.
    Mesma linguagem do menu flutuante, conversas e login.
-   Carregado apenas em views/dashboard/index.php — rollback: remover o <link>.
+   Rollback por página: remover o <link> correspondente na view.
    Tokens com prefixo --dbg- para não colidir com outros overrides.
    ============================================================================ */
 
@@ -175,4 +175,41 @@ body {
     .card.hoverable:hover {
         transform: none;
     }
+}
+
+/* ============================================================================
+   KANBAN DE FUNIS
+   ============================================================================ */
+.kanban-item.conversation-item.card {
+    border-radius: 13px !important;
+}
+
+.kanban-item.conversation-item:hover {
+    box-shadow: var(--dbg-shadow-hover) !important;
+}
+
+.kanban-column-body.drop-zone-active {
+    border-radius: 14px;
+    border-color: rgba(var(--bs-primary-rgb), 0.5);
+    background-color: rgba(var(--bs-primary-rgb), 0.06);
+}
+
+.kanban-item .dropdown-menu {
+    border-radius: 12px;
+    border-color: var(--dbg-border);
+    box-shadow: var(--dbg-shadow);
+}
+
+/* ============================================================================
+   DATATABLES (contatos e listagens)
+   ============================================================================ */
+.card .dataTables_wrapper .dataTables_paginate .paginate_button,
+.card .pagination .page-link {
+    border-radius: 10px !important;
+    margin: 0 2px;
+}
+
+.card .dataTables_wrapper .dataTables_length select,
+.card .dataTables_wrapper .dataTables_filter input {
+    border-radius: 10px !important;
 }

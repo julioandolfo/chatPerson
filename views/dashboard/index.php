@@ -5,6 +5,9 @@ $title = 'Dashboard';
 // Content
 ob_start();
 ?>
+<!-- Skin "Painéis Flutuantes" (mesma linguagem do menu/conversas) — rollback: remover este link -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/dashboard-glass.css') ?>">
+
 <!--begin::Card - Filtros de Período e Agentes-->
 <div class="card mb-5">
     <div class="card-body">

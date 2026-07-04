@@ -1,0 +1,178 @@
+/* ============================================================================
+   DASHBOARD — SKIN "PAINÉIS FLUTUANTES"
+   Override 100% CSS sobre os cards Metronic da página de dashboard.
+   Mesma linguagem do menu flutuante, conversas e login.
+   Carregado apenas em views/dashboard/index.php — rollback: remover o <link>.
+   Tokens com prefixo --dbg- para não colidir com outros overrides.
+   ============================================================================ */
+
+:root {
+    --dbg-radius: 16px;
+    --dbg-surface: rgba(255, 255, 255, 0.86);
+    --dbg-border: rgba(20, 30, 55, 0.08);
+    --dbg-shadow: 0 8px 30px rgba(20, 30, 55, 0.07);
+    --dbg-shadow-hover: 0 12px 36px rgba(20, 30, 55, 0.12);
+    --dbg-hover: rgba(20, 30, 55, 0.04);
+    --dbg-page-glow-1: rgba(var(--bs-primary-rgb), 0.06);
+    --dbg-page-glow-2: rgba(112, 72, 232, 0.05);
+}
+
+[data-bs-theme="dark"] {
+    --dbg-surface: rgba(30, 30, 45, 0.82);
+    --dbg-border: rgba(255, 255, 255, 0.08);
+    --dbg-shadow: 0 8px 30px rgba(0, 0, 0, 0.40);
+    --dbg-shadow-hover: 0 12px 36px rgba(0, 0, 0, 0.55);
+    --dbg-hover: rgba(255, 255, 255, 0.05);
+    --dbg-page-glow-1: rgba(var(--bs-primary-rgb), 0.06);
+    --dbg-page-glow-2: rgba(112, 72, 232, 0.07);
+}
+
+/* ============================================================================
+   FUNDO DA PÁGINA
+   ============================================================================ */
+body {
+    background:
+        radial-gradient(1000px 500px at 85% -10%, var(--dbg-page-glow-1), transparent 60%),
+        radial-gradient(800px 500px at 0% 100%, var(--dbg-page-glow-2), transparent 60%),
+        var(--bs-body-bg);
+}
+
+/* ============================================================================
+   CARDS — painéis flutuantes
+   (sem backdrop-filter: são muitos cards; alpha alto dá o efeito translúcido)
+   ============================================================================ */
+.card {
+    border: 1px solid var(--dbg-border) !important;
+    border-radius: var(--dbg-radius) !important;
+    background-color: var(--dbg-surface);
+    box-shadow: var(--dbg-shadow) !important;
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+/* Cards de estatística coloridos (bg-light-*): mantêm o tint, ganham a moldura */
+.card[class*="bg-light-"] {
+    background-blend-mode: normal;
+}
+
+.card .card-header {
+    border-bottom-color: var(--dbg-border) !important;
+    border-top-left-radius: var(--dbg-radius) !important;
+    border-top-right-radius: var(--dbg-radius) !important;
+}
+
+.card .card-footer {
+    border-top-color: var(--dbg-border) !important;
+    border-bottom-left-radius: var(--dbg-radius) !important;
+    border-bottom-right-radius: var(--dbg-radius) !important;
+}
+
+/* Elevação suave nos cards de estatística clicáveis/informativos */
+.card[class*="bg-light-"]:hover,
+.card.hoverable:hover {
+    box-shadow: var(--dbg-shadow-hover) !important;
+    transform: translateY(-2px);
+}
+
+/* ============================================================================
+   CONTROLES (filtros do topo e toolbars)
+   ============================================================================ */
+.card .form-control,
+.card .form-select {
+    border-radius: 12px !important;
+}
+
+.card .form-control:focus,
+.card .form-select:focus {
+    border-color: rgba(var(--bs-primary-rgb), 0.5) !important;
+    box-shadow: 0 0 0 3px rgba(var(--bs-primary-rgb), 0.12);
+}
+
+.card .btn {
+    border-radius: 12px !important;
+}
+
+/* Grupo de filtros rápidos: pills conectadas */
+.card .btn-group .btn {
+    border-radius: 0 !important;
+}
+
+.card .btn-group .btn:first-child {
+    border-top-left-radius: 12px !important;
+    border-bottom-left-radius: 12px !important;
+}
+
+.card .btn-group .btn:last-child {
+    border-top-right-radius: 12px !important;
+    border-bottom-right-radius: 12px !important;
+}
+
+/* Select2 (filtro de agentes) acompanha o raio */
+.card .select2-container .select2-selection {
+    border-radius: 12px !important;
+}
+
+/* ============================================================================
+   TABELAS DENTRO DOS CARDS
+   ============================================================================ */
+.card .table thead th,
+.card .table thead td {
+    border-bottom-color: var(--dbg-border) !important;
+}
+
+.card .table tbody tr td {
+    border-bottom-color: var(--dbg-border) !important;
+}
+
+.card .table tbody tr:hover {
+    background: var(--dbg-hover);
+}
+
+/* Badges e símbolos mais arredondados (par do rail/lista de conversas) */
+.card .symbol .symbol-label {
+    border-radius: 12px !important;
+}
+
+.card .badge {
+    border-radius: 8px;
+}
+
+/* Barras de progresso */
+.card .progress {
+    border-radius: 8px;
+}
+
+/* ============================================================================
+   SCROLLBARS
+   ============================================================================ */
+.card ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.card ::-webkit-scrollbar-thumb {
+    background: rgba(var(--bs-primary-rgb), 0.18);
+    border-radius: 3px;
+}
+
+.card ::-webkit-scrollbar-thumb:hover {
+    background: rgba(var(--bs-primary-rgb), 0.32);
+}
+
+.card ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ============================================================================
+   MOBILE: cards com raio ligeiramente menor e sem hover-lift
+   ============================================================================ */
+@media (max-width: 767.98px) {
+    :root,
+    [data-bs-theme="dark"] {
+        --dbg-radius: 14px;
+    }
+
+    .card[class*="bg-light-"]:hover,
+    .card.hoverable:hover {
+        transform: none;
+    }
+}

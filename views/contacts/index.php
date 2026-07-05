@@ -5,6 +5,9 @@ $title = 'Contatos';
 // Content
 ob_start();
 ?>
+<!-- Skin "Painéis Flutuantes" (mesma linguagem do menu/conversas) — rollback: remover este link -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/app-glass.css') ?>">
+
 <!--begin::Card-->
 <div class="card">
     <div class="card-header border-0 pt-6">

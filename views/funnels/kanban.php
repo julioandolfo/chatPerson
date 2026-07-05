@@ -5,6 +5,9 @@ $title = 'Kanban - Funis';
 ob_start();
 ?>
 
+<!-- Skin "Painéis Flutuantes" (mesma linguagem do menu/conversas) — rollback: remover este link -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/app-glass.css') ?>">
+
 <!-- CSS Personalizado para Kanban Melhorado -->
 <style>
 /* ============================================================================

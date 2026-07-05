@@ -501,6 +501,74 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 20px;
     border-bottom: 1px solid var(--bs-border-color);
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Abas do sidebar em carrossel horizontal (sem quebra de linha) */
+.sidebar-tabs-carousel {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar-tabs-scroll {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-tabs-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.sidebar-tabs-scroll .nav {
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+}
+
+.sidebar-tabs-scroll .nav-item {
+    flex-shrink: 0;
+}
+
+.sidebar-tabs-scroll .nav-link {
+    white-space: nowrap;
+}
+
+.sidebar-tabs-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--bs-gray-500);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    padding: 0;
+}
+
+.sidebar-tabs-arrow:hover {
+    background: var(--bs-gray-100);
+    color: var(--bs-primary);
+}
+
+[data-bs-theme="dark"] .sidebar-tabs-arrow:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sidebar-tabs-arrow.d-none {
+    display: none !important;
 }
 
 .sidebar-content {
@@ -657,24 +725,72 @@ document.addEventListener('DOMContentLoaded', function() {
                 <span class="path2"></span>
             </i>
         </button>
-        <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x border-transparent fs-7 fw-bold">
-            <li class="nav-item">
-                <a class="nav-link active" data-bs-toggle="tab" href="#kt_tab_details">Detalhes</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_timeline">Timeline</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_history">Histórico</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders">Pedidos</a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_mockups" onclick="loadMockupGallery()">Mockups</a>
-            </li>
-        </ul>
+        <div class="sidebar-tabs-carousel">
+            <button type="button" class="sidebar-tabs-arrow d-none" id="sidebarTabsPrev" aria-label="Abas anteriores">
+                <i class="ki-duotone ki-arrow-left fs-3"><span class="path1"></span><span class="path2"></span></i>
+            </button>
+            <div class="sidebar-tabs-scroll" id="sidebarTabsScroll">
+                <ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x border-transparent fs-7 fw-bold">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#kt_tab_details">Detalhes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_timeline">Timeline</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_history">Histórico</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_orders">Pedidos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#kt_tab_mockups" onclick="loadMockupGallery()">Mockups</a>
+                    </li>
+                </ul>
+            </div>
+            <button type="button" class="sidebar-tabs-arrow d-none" id="sidebarTabsNext" aria-label="Próximas abas">
+                <i class="ki-duotone ki-arrow-right fs-3"><span class="path1"></span><span class="path2"></span></i>
+            </button>
+        </div>
     </div>
+
+    <script>
+    // Carrossel das abas do sidebar: setas aparecem quando não cabem todas
+    (function () {
+        var scroller = document.getElementById('sidebarTabsScroll');
+        var prev = document.getElementById('sidebarTabsPrev');
+        var next = document.getElementById('sidebarTabsNext');
+        if (!scroller || !prev || !next) return;
+
+        function update() {
+            var max = scroller.scrollWidth - scroller.clientWidth;
+            var overflow = max > 4;
+            prev.classList.toggle('d-none', !overflow || scroller.scrollLeft <= 2);
+            next.classList.toggle('d-none', !overflow || scroller.scrollLeft >= max - 2);
+        }
+
+        prev.addEventListener('click', function () { scroller.scrollBy({ left: -140, behavior: 'smooth' }); });
+        next.addEventListener('click', function () { scroller.scrollBy({ left: 140, behavior: 'smooth' }); });
+        scroller.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+
+        // Aba clicada sempre visível dentro do carrossel
+        scroller.querySelectorAll('.nav-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                setTimeout(function () {
+                    link.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+                }, 0);
+            });
+        });
+
+        // O sidebar abre com animação de largura — recalcular ao fim da transição
+        var sidebar = document.getElementById('conversationSidebar');
+        if (sidebar) sidebar.addEventListener('transitionend', update);
+
+        update();
+        setTimeout(update, 400);
+    })();
+    </script>
     
     <!-- Conteúdo do Sidebar (sempre presente, preenchido via JS quando necessário) -->
     <div class="sidebar-content">

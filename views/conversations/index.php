@@ -3052,6 +3052,9 @@ body.dark-mode .conversation-item-actions .dropdown-divider {
 <!-- SLA Indicator CSS -->
 <link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/sla-indicator.css') ?>">
 
+<!-- Skin "Painéis Flutuantes" (ver PROPOSTA_CONVERSAS_REDESIGN.md) — rollback: remover este link -->
+<link rel="stylesheet" href="<?= \App\Helpers\Url::asset('css/custom/conversations-glass.css') ?>">
+
 <!-- Realtime Coaching CSS já incluído no layout principal (app.php) -->
 
 <!-- Script inline para definir função ANTES do HTML do botão -->

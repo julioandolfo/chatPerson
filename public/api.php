@@ -321,6 +321,39 @@ function validateToken() {
 /**
  * Obter body JSON
  */
+/**
+ * Payload padronizado de conversão comercial por vendedor — MESMO shape do
+ * endpoint /api/v1/stats/conversion (StatsController::formatConversionMetrics),
+ * para o consumidor (mktplace-privus) funcionar por qualquer um dos caminhos.
+ */
+function formatConversionPayload(array $agent, array $metrics) {
+    return [
+        'agent_id' => (int)$agent['id'],
+        'agent_name' => $agent['name'] ?? null,
+        'agent_email' => $agent['email'] ?? null,
+        'woocommerce_seller_id' => isset($agent['woocommerce_seller_id']) && $agent['woocommerce_seller_id'] !== null
+            ? (int)$agent['woocommerce_seller_id']
+            : null,
+        'period' => $metrics['period'] ?? null,
+        'total_orders' => (int)($metrics['total_orders'] ?? 0),
+        'total_revenue' => (float)($metrics['total_revenue'] ?? 0),
+        'avg_ticket' => (float)($metrics['avg_ticket'] ?? 0),
+        'leads' => [
+            'total_conversations' => (int)($metrics['total_conversations'] ?? 0),
+            'client_initiated' => (int)($metrics['conversations_client_initiated'] ?? 0),
+            'agent_initiated' => (int)($metrics['conversations_agent_initiated'] ?? 0),
+            'receptivas_ativas' => (int)($metrics['conversations_receptivas_ativas'] ?? 0),
+            'interactive' => (int)($metrics['interactive_conversations'] ?? 0),
+        ],
+        'conversion_rates' => [
+            'total' => (float)($metrics['conversion_rate'] ?? 0),
+            'client_only' => (float)($metrics['conversion_rate_client_only'] ?? 0),
+            'receptivas_ativas' => (float)($metrics['conversion_rate_receptivas_ativas'] ?? 0),
+            'interactive' => (float)($metrics['conversion_rate_interactive'] ?? 0),
+        ],
+    ];
+}
+
 function getJsonBody() {
     $input = json_decode(file_get_contents('php://input'), true);
     if (json_last_error() !== JSON_ERROR_NONE) {
@@ -446,6 +479,12 @@ $routes = [
     'GET /agents' => 'agentsList',
     'GET /agents/:id' => 'agentsShow',
     'GET /agents/:id/stats' => 'agentsStats',
+
+    // ============== CONVERSÃO COMERCIAL (Lead → Venda WooCommerce) ==============
+    // Mesmo payload dos endpoints /api/v1/stats/conversion — consumido pelo
+    // mktplace-privus (comissões/metas por taxa de conversão do vendedor).
+    'GET /stats/conversion' => 'statsConversion',
+    'GET /agents/:id/conversion' => 'agentConversion',
     
     // ============== SETORES ==============
     'GET /departments' => 'departmentsList',
@@ -1612,7 +1651,7 @@ try {
             
         case 'agentsStats':
             $stmt = $db->prepare("
-                SELECT 
+                SELECT
                     COUNT(*) as total_conversations,
                     SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) as open_conversations,
                     SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) as closed_conversations
@@ -1622,6 +1661,48 @@ try {
             $stmt->execute([$params['id']]);
             successResponse($stmt->fetch(\PDO::FETCH_ASSOC));
             break;
+
+        // ============== CONVERSÃO COMERCIAL ==============
+        case 'statsConversion': {
+            $dateFrom = $_GET['date_from'] ?? null;
+            $dateTo = $_GET['date_to'] ?? null;
+
+            $sellers = \App\Models\User::getSellers();
+            $data = [];
+            foreach ($sellers as $seller) {
+                $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
+                    (int)$seller['id'],
+                    $dateFrom,
+                    $dateTo
+                );
+                $data[] = formatConversionPayload($seller, $metrics);
+            }
+
+            successResponse([
+                'period' => [
+                    'from' => $dateFrom ?? date('Y-m-01'),
+                    'to' => $dateTo ?? date('Y-m-d'),
+                ],
+                'sellers' => $data,
+            ]);
+            break;
+        }
+
+        case 'agentConversion': {
+            $agent = \App\Models\User::find((int)$params['id']);
+            if (!$agent) {
+                errorResponse('Agente não encontrado', 'NOT_FOUND', 404);
+            }
+
+            $metrics = \App\Services\AgentConversionService::getDetailedConversionMetrics(
+                (int)$params['id'],
+                $_GET['date_from'] ?? null,
+                $_GET['date_to'] ?? null
+            );
+
+            successResponse(formatConversionPayload($agent, $metrics));
+            break;
+        }
         
         // ============== SETORES ==============
         case 'departmentsList':

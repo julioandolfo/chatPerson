@@ -3541,6 +3541,7 @@ class WhatsAppService
 
             // Se chegou aqui, é mensagem RECEBIDA (não enviada do número conectado)
             // Criar ou atualizar contato
+            $pendingAvatarFetch = null;
             Logger::quepasa("processWebhook - Buscando contato pelo telefone normalizado: {$fromPhone}");
             
             // Verificar se é um número real (não é LID) e se há conversas recentes com LID deste remetente
@@ -3744,28 +3745,19 @@ class WhatsAppService
                 
                 Logger::quepasa("processWebhook - Contato criado: ID={$contactId}");
                 
-                // Tentar buscar avatar usando Quepasa (rota instances/{instanceId}/contacts/{number}/photo), depois fallback
-                try {
-                    $chatId = $payload['chat']['id'] ?? null;
-                    $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
-                    
-                    // Primeira tentativa: rota Quepasa com instance_id + phone/chat
-                    \App\Helpers\Logger::quepasa("processWebhook - Tentando avatar via Quepasa (novo contato): chatId={$chatId}, phone={$fromPhone}");
-                    $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
-                    
-                    if ($avatarFetched) {
-                        \App\Helpers\Logger::quepasa("processWebhook - Avatar via Quepasa obtido para contato {$contact['id']}");
-                    } elseif ($avatarUrl) {
-                        Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
-                        \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
-                    } elseif ($chatId) {
-                        \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
-                    } else {
-                        \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
-                    }
-                } catch (\Exception $e) {
-                    Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
-                }
+                // ⚠️ Avatar é ADIADO para depois de salvar a mensagem (ver $pendingAvatarFetch).
+                // Buscar avatar aqui custa várias chamadas HTTP ao Quepasa ENTRE a criação do
+                // contato e a criação da conversa. Se o provider demora, o webhook estoura o
+                // max_execution_time exatamente nesse ponto: o contato fica criado e a
+                // conversa/mensagem nunca são gravadas — a primeira mensagem do lead se perde.
+                $pendingAvatarFetch = [
+                    'contact_id' => $contact['id'],
+                    'chat_id'    => $payload['chat']['id'] ?? null,
+                    'avatar_url' => $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null,
+                    'phone'      => $fromPhone,
+                    'origem'     => 'novo contato',
+                ];
+                Logger::quepasa("processWebhook - Avatar adiado para depois de salvar a mensagem (novo contato {$contact['id']})");
             } else {
                 // Atualizar whatsapp_id se vier diferente do armazenado (ex: @lid vs @s.whatsapp.net)
                 // Usar o $from que já foi processado anteriormente, que preserva o sufixo correto
@@ -3805,26 +3797,15 @@ class WhatsAppService
                 
                 // Se contato existe mas não tem avatar, tentar buscar usando Quepasa (rota instance/contact/photo) ou chat.id
                 if (empty($contact['avatar'])) {
-                    try {
-                        $chatId = $payload['chat']['id'] ?? null;
-                        $avatarUrl = $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null;
-                        
-                        \App\Helpers\Logger::quepasa("processWebhook - Tentando avatar via Quepasa (contato existente): chatId={$chatId}, phone={$fromPhone}");
-                        $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($contact['id'], $account, $chatId, $fromPhone);
-                        
-                        if ($avatarFetched) {
-                            \App\Helpers\Logger::quepasa("processWebhook - Avatar via Quepasa obtido para contato {$contact['id']}");
-                        } elseif ($avatarUrl) {
-                            Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avatarUrl}");
-                            \App\Services\ContactService::downloadAvatarFromUrl($contact['id'], $avatarUrl);
-                        } elseif ($chatId) {
-                            \App\Services\ContactService::fetchWhatsAppAvatarByChatId($contact['id'], $account['id'], $chatId);
-                        } else {
-                            \App\Services\ContactService::fetchWhatsAppAvatar($contact['id'], $account['id']);
-                        }
-                    } catch (\Exception $e) {
-                        Logger::quepasa("Erro ao buscar avatar: " . $e->getMessage());
-                    }
+                    // Adiado (mesmo motivo do bloco de contato novo)
+                    $pendingAvatarFetch = [
+                        'contact_id' => $contact['id'],
+                        'chat_id'    => $payload['chat']['id'] ?? null,
+                        'avatar_url' => $payload['chat']['picture'] ?? $payload['chat']['avatar'] ?? $payload['avatar'] ?? null,
+                        'phone'      => $fromPhone,
+                        'origem'     => 'contato existente',
+                    ];
+                    Logger::quepasa("processWebhook - Avatar adiado para depois de salvar a mensagem (contato existente {$contact['id']})");
                 }
             }
 
@@ -4690,6 +4671,33 @@ class WhatsAppService
 
                 Logger::quepasa("processWebhook - Mensagem processada com sucesso: fromPhone={$fromPhone}, message={$message}, conversationId={$conversation['id']}");
                 
+                // Avatar: só agora, com a mensagem já persistida. Se o Quepasa travar aqui,
+                // perdemos apenas a foto do contato — nunca a mensagem.
+                if (!empty($pendingAvatarFetch)) {
+                    try {
+                        $avContactId = $pendingAvatarFetch['contact_id'];
+                        $avChatId    = $pendingAvatarFetch['chat_id'];
+                        $avUrl       = $pendingAvatarFetch['avatar_url'];
+                        $avPhone     = $pendingAvatarFetch['phone'];
+
+                        Logger::quepasa("processWebhook - Buscando avatar (pós-mensagem, {$pendingAvatarFetch['origem']}): chatId={$avChatId}, phone={$avPhone}");
+                        $avatarFetched = \App\Services\ContactService::fetchQuepasaAvatar($avContactId, $account, $avChatId, $avPhone);
+
+                        if ($avatarFetched) {
+                            Logger::quepasa("processWebhook - Avatar via Quepasa obtido para contato {$avContactId}");
+                        } elseif ($avUrl) {
+                            Logger::quepasa("processWebhook - Avatar encontrado no payload: {$avUrl}");
+                            \App\Services\ContactService::downloadAvatarFromUrl($avContactId, $avUrl);
+                        } elseif ($avChatId) {
+                            \App\Services\ContactService::fetchWhatsAppAvatarByChatId($avContactId, $account['id'], $avChatId);
+                        } else {
+                            \App\Services\ContactService::fetchWhatsAppAvatar($avContactId, $account['id']);
+                        }
+                    } catch (\Throwable $e) {
+                        Logger::quepasa("Erro ao buscar avatar (pós-mensagem): " . $e->getMessage());
+                    }
+                }
+
                 // Notificar WebSocket sobre nova mensagem com dados de reply (para exibição imediata)
                 try {
                     $fullMessage = \App\Models\Message::find($messageId);

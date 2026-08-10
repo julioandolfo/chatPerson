@@ -644,6 +644,25 @@ class WhatsAppService
     }
 
     /**
+     * Retorna o valor como string se for escalar, senão null.
+     *
+     * O Quepasa manda campos que às vezes são string e às vezes objeto (o caso
+     * clássico é 'url', que vira {"reference": "..."} em preview de link). Passar
+     * um array adiante estoura TypeError em funções de string — que é \Error e não
+     * \Exception, matando a request sem deixar rastro.
+     */
+    private static function scalarOrNull($value): ?string
+    {
+        if (is_string($value)) {
+            return $value !== '' ? $value : null;
+        }
+        if (is_scalar($value)) {
+            return (string)$value;
+        }
+        return null;
+    }
+
+    /**
      * Normalizar número de telefone do WhatsApp
      * Remove sufixos como @s.whatsapp.net, @lid, @c.us, @g.us, etc.
      * Remove caracteres especiais e deixa apenas dígitos
@@ -2819,18 +2838,34 @@ class WhatsAppService
             }
             
             // Media / arquivos (vários formatos possíveis)
-            // ⚠️ IMPORTANTE: $payload['url'] pode ser um array com metadados de link, não uma URL de mídia!
-            // Primeiro, tentar extrair de campos específicos de mídia
-            $mediaUrl = $quepasaData['url'] ?? $payload['media_url'] ?? $payload['mediaUrl'] ?? null;
-            
-            // Se ainda não encontrou, verificar $payload['url'] mas APENAS se for string (não array de metadados de link)
-            if (!$mediaUrl && isset($payload['url']) && is_string($payload['url'])) {
-                $mediaUrl = $payload['url'];
+            // ⚠️ O campo 'url' do Quepasa NÃO é sempre uma URL de mídia. Quando a mensagem
+            // de texto contém um link, o Quepasa manda o preview como OBJETO:
+            //     "url": {"reference": "https://site.com/produto/x"}
+            // A guarda is_string() existia só no fallback de $payload['url']; a primeira
+            // atribuição aceitava o array e ele chegava em str_contains() logo abaixo,
+            // estourando TypeError — que é \Error, não \Exception, então não era capturado
+            // e matava a request. Resultado: mensagem de texto com link (típica da PRIMEIRA
+            // mensagem vinda de catálogo/anúncio) sumia sem contato, conversa nem log de erro.
+            $mediaUrl = null;
+            foreach ([
+                $quepasaData['url'] ?? null,
+                $payload['media_url'] ?? null,
+                $payload['mediaUrl'] ?? null,
+                $payload['url'] ?? null,
+            ] as $urlCandidate) {
+                if (is_string($urlCandidate) && $urlCandidate !== '') {
+                    $mediaUrl = $urlCandidate;
+                    break;
+                }
+                if (is_array($urlCandidate)) {
+                    Logger::quepasa("processWebhook - Campo 'url' veio como objeto (preview de link), ignorando como mídia: " . json_encode($urlCandidate));
+                }
             }
-            
-            $mimetype = $quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null;
-            $filename = $quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null;
+
+            $mimetype = self::scalarOrNull($quepasaData['mimeType'] ?? $payload['mimetype'] ?? $payload['mime_type'] ?? null);
+            $filename = self::scalarOrNull($quepasaData['fileName'] ?? $quepasaData['filename'] ?? $payload['filename'] ?? $payload['media_name'] ?? null);
             $size = $quepasaData['size'] ?? $payload['size'] ?? null;
+            $size = is_scalar($size) ? $size : null;
 
             // Possíveis contêineres de mídia (media/audio/document/image/video/attachment/extra/file/sticker)
             $candidates = [
@@ -2875,10 +2910,16 @@ class WhatsAppService
             ];
             foreach ($candidates as $cand) {
                 if (isset($cand) && is_array($cand)) {
-                    $mediaUrl = $cand['url'] ?? $cand['link'] ?? $mediaUrl;  // ✅ NOVO: Também verificar 'link'
-                    $mimetype = $cand['mimeType'] ?? $cand['mimetype'] ?? $cand['mime_type'] ?? $mimetype;
-                    $filename = $cand['fileName'] ?? $cand['filename'] ?? $cand['file_name'] ?? $cand['name'] ?? $filename;
-                    $size = $cand['size'] ?? $cand['fileSize'] ?? $cand['file_size'] ?? $size;
+                    // Mesma proteção: só aceitar string. Um contêiner de mídia com 'url'
+                    // aninhado como objeto quebraria str_contains() logo abaixo.
+                    $candUrl = $cand['url'] ?? $cand['link'] ?? null;
+                    if (is_string($candUrl) && $candUrl !== '') {
+                        $mediaUrl = $candUrl;
+                    }
+                    $mimetype = self::scalarOrNull($cand['mimeType'] ?? $cand['mimetype'] ?? $cand['mime_type'] ?? null) ?? $mimetype;
+                    $filename = self::scalarOrNull($cand['fileName'] ?? $cand['filename'] ?? $cand['file_name'] ?? $cand['name'] ?? null) ?? $filename;
+                    $candSize = $cand['size'] ?? $cand['fileSize'] ?? $cand['file_size'] ?? null;
+                    $size = is_scalar($candSize) ? $candSize : $size;
                 }
             }
 

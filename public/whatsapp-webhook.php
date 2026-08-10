@@ -19,6 +19,7 @@ require_once __DIR__ . '/../config/database.php';
 
 use App\Services\WhatsAppService;
 use App\Services\EvolutionService;
+use App\Services\WebhookAuditService;
 use App\Helpers\Logger;
 
 // Permitir apenas POST
@@ -31,22 +32,31 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Obter payload
 $rawInput = file_get_contents('php://input');
 
-Logger::quepasa("=== WEBHOOK WHATSAPP RECEBIDO (whatsapp-webhook.php) ===");
-Logger::quepasa("Raw input length: " . strlen($rawInput) . " bytes");
-Logger::quepasa("Raw input preview: " . substr($rawInput, 0, 500));
-
 $payload = json_decode($rawInput, true);
 
+// Auditoria: registrar a chegada ANTES de qualquer validação, e capturar fatais.
+// Sem isso, um webhook descartado (ou uma request morta por max_execution_time)
+// não deixa nenhum rastro consultável.
+WebhookAuditService::start($rawInput, is_array($payload) ? $payload : null, 'whatsapp-webhook.php');
+WebhookAuditService::registerFatalHandler();
+
+$rid = WebhookAuditService::requestId();
+
+Logger::quepasa("=== WEBHOOK WHATSAPP RECEBIDO (whatsapp-webhook.php) rid={$rid} ===");
+Logger::quepasa("[rid={$rid}] Raw input length: " . strlen($rawInput) . " bytes");
+Logger::quepasa("[rid={$rid}] Raw input preview: " . substr($rawInput, 0, 500));
+
 if (!$payload) {
-    Logger::error("WhatsApp webhook - JSON inválido ou vazio");
+    Logger::error("WhatsApp webhook - JSON inválido ou vazio (rid={$rid})");
     Logger::error("Raw input: " . $rawInput);
+    WebhookAuditService::drop('json_invalido', 'Body vazio ou JSON inválido (' . strlen($rawInput) . ' bytes)');
     http_response_code(400);
     echo json_encode(['error' => 'Invalid JSON']);
     exit;
 }
 
-Logger::quepasa("Payload decodificado - Keys: " . implode(', ', array_keys($payload)));
-Logger::quepasa("Payload completo: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
+Logger::quepasa("[rid={$rid}] Payload decodificado - Keys: " . implode(', ', array_keys($payload)));
+Logger::quepasa("[rid={$rid}] Payload completo: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
 
 try {
     // Detectar se é webhook da Evolution API
@@ -66,15 +76,23 @@ try {
         WhatsAppService::processWebhook($payload);
     }
     
-    Logger::quepasa("Webhook processado com sucesso!");
-    
+    Logger::quepasa("[rid={$rid}] Webhook processado com sucesso!");
+
+    // Finaliza a auditoria caso o handler não tenha registrado desfecho próprio
+    // (eco outgoing, Evolution, eventos de status). No-op se já finalizada.
+    WebhookAuditService::processed();
+
     // Responder com sucesso
     http_response_code(200);
     echo json_encode(['success' => true]);
-} catch (\Exception $e) {
-    Logger::error("WhatsApp Webhook Error: " . $e->getMessage());
+} catch (\Throwable $e) {
+    // ⚠️ Throwable (não só Exception): TypeError/Error de PHP 8 são \Error e
+    // passavam batido aqui, matando a request sem log e sem gravar a mensagem.
+    Logger::error("WhatsApp Webhook Error (rid={$rid}): " . get_class($e) . ' - ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
     Logger::error("Stack trace: " . $e->getTraceAsString());
-    
+
+    WebhookAuditService::error(get_class($e) . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
+
     http_response_code(500);
     echo json_encode([
         'success' => false,

@@ -528,6 +528,7 @@ class ContactService
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_TIMEOUT => 10,
+                    CURLOPT_CONNECTTIMEOUT => 3,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_SSL_VERIFYPEER => false,
@@ -601,6 +602,7 @@ class ContactService
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_TIMEOUT => 10,
+                    CURLOPT_CONNECTTIMEOUT => 3,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_SSL_VERIFYPEER => false,
@@ -687,6 +689,7 @@ class ContactService
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_TIMEOUT => 10,
+                    CURLOPT_CONNECTTIMEOUT => 3,
                     CURLOPT_HTTPHEADER => [
                         "X-QUEPASA-CHATID: {$quepasaChatId}",
                         "X-QUEPASA-TOKEN: {$token}",
@@ -757,6 +760,7 @@ class ContactService
             curl_setopt_array($ch, [
                 CURLOPT_RETURNTRANSFER => true,
                 CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 3,
                 CURLOPT_FOLLOWLOCATION => true,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,

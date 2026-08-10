@@ -2416,6 +2416,7 @@ class WhatsAppService
             $editedId = $payload['id'] ?? ($payload['message']['id'] ?? 'unknown');
             Logger::quepasa("processWebhook - ⏭️ IGNORANDO webhook com edited=true (re-entrega/edição de mensagem antiga): id={$editedId}, type=" . ($payload['type'] ?? 'N/A') . ", chat=" . ($payload['chat']['phone'] ?? 'N/A'));
             \App\Helpers\Logger::info("WhatsAppService::processWebhook - Webhook ignorado por edited=true: id={$editedId}");
+            \App\Services\WebhookAuditService::drop('edited_true', "id={$editedId}, type=" . ($payload['type'] ?? 'N/A'));
             return;
         }
 
@@ -2454,6 +2455,7 @@ class WhatsAppService
             
             if (!$trackid && !$chatid && !$fromPhone) {
                 Logger::error("WhatsApp webhook sem identificação: " . json_encode($payload));
+                \App\Services\WebhookAuditService::drop('sem_identificacao', 'Sem trackid, chatid e fromPhone no payload');
                 return;
             }
 
@@ -2568,6 +2570,7 @@ class WhatsAppService
                 
                 if (!$account) {
                     Logger::error("WhatsApp webhook: CONTA NÃO ENCONTRADA - Verifique se o número do WhatsApp está correto no cadastro");
+                    \App\Services\WebhookAuditService::drop('conta_nao_encontrada', "trackid={$trackid}, chatid={$chatid}, wid=" . ($payload['wid'] ?? 'N/A'));
                     return;
                 }
             }
@@ -2583,6 +2586,11 @@ class WhatsAppService
             Logger::quepasa("📱   wid recebido: " . ($payload['wid'] ?? 'NULL'));
             Logger::quepasa("📱   from/cliente: " . ($from ?? 'NULL'));
             Logger::quepasa("📱 ==========================================");
+
+            \App\Services\WebhookAuditService::context([
+                'account_id' => (int)$account['id'],
+                'provider'   => $account['provider'] ?? 'quepasa',
+            ]);
 
             // ✅ UNIFICADO: $account já vem de integration_accounts, então $account['id'] É o integration_account_id
             $account['integration_account_id'] = $account['id'];
@@ -2793,6 +2801,7 @@ class WhatsAppService
             
             if ($isGroup && !$allowGroupMessages) {
                 Logger::quepasa("processWebhook - ❌ Mensagem de grupo IGNORADA (grupos desabilitados): from={$from}, chatid={$chatid}, groupName={$groupName}");
+                \App\Services\WebhookAuditService::drop('grupo_desabilitado', "from={$from}, groupName=" . ($groupName ?? 'N/A'));
                 return;
             }
             
@@ -3212,10 +3221,19 @@ class WhatsAppService
                 Logger::quepasa("processWebhook - 📎 Tipo de mídia: {$messageType}, mediaUrl=" . ($mediaUrl ?: 'NULL') . ", filename=" . ($filename ?: 'NULL') . ", mimetype=" . ($mimetype ?: 'NULL'));
             }
             
+            \App\Services\WebhookAuditService::context([
+                'phone'        => $fromPhone ?: null,
+                'from_raw'     => is_scalar($from) ? mb_substr((string)$from, 0, 255) : null,
+                'message_type' => is_scalar($messageType) ? mb_substr((string)$messageType, 0, 50) : null,
+                'direction'    => $isMessageFromConnectedNumber ? 'outgoing' : 'incoming',
+                'external_id'  => is_scalar($messageId ?? null) ? mb_substr((string)$messageId, 0, 255) : null,
+            ]);
+
             if (!$fromPhone || (empty($message) && !$mediaUrl && empty($location))) {
                 // ✅ MELHORADO: Log mais detalhado para debug de documentos
                 Logger::error("WhatsApp webhook: dados incompletos - fromPhone=" . ($fromPhone ?? 'NULL') . ", message=" . ($message ?? 'NULL') . ", mediaUrl=" . ($mediaUrl ?? 'NULL') . ", messageType={$messageType}, filename=" . ($filename ?? 'NULL'));
                 Logger::error("WhatsApp webhook: payload keys=" . implode(',', array_keys($payload)));
+                \App\Services\WebhookAuditService::drop('dados_incompletos', "fromPhone=" . ($fromPhone ?: 'VAZIO') . ", type={$messageType}, semTexto=" . (empty($message) ? 'sim' : 'nao') . ", semMidia=" . ($mediaUrl ? 'nao' : 'sim'));
                 return;
             }
 
@@ -3268,6 +3286,7 @@ class WhatsAppService
                     // Se fromPhone termina com @lid ou @g.us e não conseguimos obter número real, ignorar
                     if (str_ends_with($from, '@lid') || str_ends_with($from, '@g.us') || str_ends_with($from, '@c.us')) {
                         Logger::quepasa("processWebhook - Não foi possível identificar número real do destinatário (from={$from}). Ignorando mensagem enviada do número conectado.");
+                        \App\Services\WebhookAuditService::drop('outgoing_destinatario_desconhecido', "from={$from}");
                         return; // Ignorar mensagem se não conseguir identificar destinatário
                     }
                     // Se não é @lid/@g.us, usar o fromPhone normalizado
@@ -3278,6 +3297,7 @@ class WhatsAppService
                 // Validar se número real é válido (deve ter pelo menos 10 dígitos)
                 if (strlen($realRecipientPhone) < 10 || !preg_match('/^\d+$/', $realRecipientPhone)) {
                     Logger::quepasa("processWebhook - Número destinatário inválido ({$realRecipientPhone}). Ignorando mensagem enviada do número conectado.");
+                    \App\Services\WebhookAuditService::drop('outgoing_numero_invalido', "recipient={$realRecipientPhone}");
                     return; // Ignorar se número não é válido
                 }
                 
@@ -3452,6 +3472,7 @@ class WhatsAppService
                     $existingByExtId = \App\Models\Message::findByExternalId($webhookMsgId);
                     if ($existingByExtId) {
                         Logger::quepasa("processWebhook - ⚠️ Duplicata detectada por external_id={$webhookMsgId}, existingId={$existingByExtId['id']}. Ignorando eco.");
+                        \App\Services\WebhookAuditService::drop('eco_duplicado_external_id', "external_id={$webhookMsgId}, existingId={$existingByExtId['id']}");
                         return;
                     }
                 }
@@ -3474,6 +3495,7 @@ class WhatsAppService
                         Logger::quepasa("processWebhook - external_id atualizado na msg existente ID={$existingMessage['id']}");
                     }
                     Logger::quepasa("processWebhook - ⚠️ Duplicata detectada por conteúdo! existingId={$existingMessage['id']}. Ignorando eco.");
+                    \App\Services\WebhookAuditService::drop('eco_duplicado_conteudo', "existingId={$existingMessage['id']}");
                     return;
                 }
                 
@@ -3697,6 +3719,7 @@ class WhatsAppService
                     // ⚠️ Ignorar contatos do sistema (ex: mensagens automáticas do WhatsApp)
                     if ($whatsappId === 'system' || $whatsappId === '0' || empty($whatsappId)) {
                         Logger::quepasa("processWebhook - Ignorando contato do sistema: whatsapp_id={$whatsappId}");
+                        \App\Services\WebhookAuditService::drop('contato_sistema', "whatsapp_id={$whatsappId}");
                         return;
                     }
                     
@@ -3705,6 +3728,7 @@ class WhatsAppService
                     // ⚠️ Ignorar se o telefone normalizado for 'system' ou inválido
                     if ($normalizedPhone === 'system' || $normalizedPhone === '0' || empty($normalizedPhone)) {
                         Logger::quepasa("processWebhook - Ignorando contato do sistema: phone={$normalizedPhone}");
+                        \App\Services\WebhookAuditService::drop('contato_sistema', "phone_normalizado={$normalizedPhone}, fromPhone={$fromPhone}");
                         return;
                     }
                     
@@ -3807,6 +3831,7 @@ class WhatsAppService
             // ⚠️ VALIDAÇÃO FINAL: Não criar conversa se contato tiver phone = 'system'
             if (isset($contact['phone']) && ($contact['phone'] === 'system' || $contact['phone'] === '0')) {
                 Logger::quepasa("processWebhook - ⚠️ Abortando: Contato com phone do sistema (phone={$contact['phone']}, id={$contact['id']})");
+                \App\Services\WebhookAuditService::drop('contato_sistema', "contact_id={$contact['id']}, phone={$contact['phone']}");
                 return;
             }
 
@@ -3915,16 +3940,27 @@ class WhatsAppService
             if (!$conversation) {
                 // Trava: não criar conversa se a primeira mensagem for exatamente o nome do contato (caso sem mídia)
                 Logger::quepasa("🔍 DEBUG: Verificando proteção nome... messageType={$messageType}, mediaUrl=" . ($mediaUrl ? 'EXISTS' : 'NULL') . ", message='" . substr($message, 0, 80) . "', contact_name='" . ($contact['name'] ?? 'NULL') . "'");
+                // ⚠️ A proteção NÃO se aplica quando o "nome" do contato é só o telefone.
+                // Quando o Quepasa não manda chat.title, o nome do contato vira o próprio
+                // número (ver fallback em "Extrair nome do contato do payload"). Nesse caso
+                // um cliente que escreve o próprio número como primeira mensagem tinha a
+                // mensagem descartada e a conversa nunca era criada.
+                $contactNameForCheck = trim((string)($contact['name'] ?? ''));
+                $contactNameDigits = preg_replace('/[\s+()\-\.]/', '', $contactNameForCheck);
+                $nameIsJustPhone = $contactNameDigits !== '' && ctype_digit($contactNameDigits);
+
                 $shouldIgnoreFirstMessage = $messageType === 'text'
                     && empty($mediaUrl)
+                    && !$nameIsJustPhone
                     && \App\Services\ConversationService::isFirstMessageContactName((string)$message, $contact['name'] ?? null);
 
-                Logger::quepasa("🔍 DEBUG: shouldIgnoreFirstMessage=" . ($shouldIgnoreFirstMessage ? 'TRUE' : 'FALSE'));
-                
+                Logger::quepasa("🔍 DEBUG: shouldIgnoreFirstMessage=" . ($shouldIgnoreFirstMessage ? 'TRUE' : 'FALSE') . ", nameIsJustPhone=" . ($nameIsJustPhone ? 'TRUE' : 'FALSE'));
+
                 if ($shouldIgnoreFirstMessage) {
                     $contactName = trim((string)($contact['name'] ?? ''));
                     Logger::quepasa("processWebhook - ❌ PROTEÇÃO ATIVADA: Ignorando criação - primeira mensagem = nome do contato ({$contactName})");
                     Logger::unificacao("[PROTEÇÃO] Webhook ignorou criação de conversa: mensagem='{$message}' = nome '{$contactName}'");
+                    \App\Services\WebhookAuditService::drop('primeira_msg_igual_nome', "contact_id={$contact['id']}, nome='{$contactName}', mensagem='" . mb_substr((string)$message, 0, 120) . "'");
                     if ($usedLock && $db->inTransaction()) {
                         $db->rollBack();
                     }
@@ -4500,6 +4536,7 @@ class WhatsAppService
                 $existingMessage = \App\Models\Message::findByExternalId($externalId);
                 if ($existingMessage) {
                     Logger::quepasa("processWebhook - ⚠️ Mensagem já existe no banco (ID: {$existingMessage['id']}). Ignorando webhook duplicado.");
+                    \App\Services\WebhookAuditService::drop('duplicada_external_id', "external_id={$externalId}, existingId={$existingMessage['id']}");
                     return; // Ignorar mensagem duplicada
                 }
             } else {
@@ -4511,7 +4548,13 @@ class WhatsAppService
             // quando não recebe ACK rápido. Sem isso, o buffer do agente agenda
             // um segundo processamento com a mesma frase e a IA responde 2x.
             // Só aplica para texto não-vazio (anexo ou localização sempre passa).
-            if (!empty(trim($message ?? '')) && empty($attachments) && empty($location)) {
+            // ⚠️ Esta regra descarta mensagens REAIS quando o cliente repete o mesmo
+            // texto curto ("oi", "?", "sim") dentro da janela. A janela é configurável
+            // em `whatsapp_content_dedup_seconds` — use 0 para desligar por completo.
+            $contentDedupSeconds = (int)\App\Services\SettingService::get('whatsapp_content_dedup_seconds', 60);
+            $contentDedupSeconds = max(0, min(300, $contentDedupSeconds));
+
+            if ($contentDedupSeconds > 0 && !empty(trim($message ?? '')) && empty($attachments) && empty($location)) {
                 try {
                     $msgTrim = trim($message);
                     $existingSameContent = \App\Helpers\Database::fetch(
@@ -4519,13 +4562,14 @@ class WhatsAppService
                          WHERE conversation_id = ?
                          AND sender_type = 'contact'
                          AND TRIM(content) = ?
-                         AND created_at >= DATE_SUB(NOW(), INTERVAL 60 SECOND)
+                         AND created_at >= DATE_SUB(NOW(), INTERVAL {$contentDedupSeconds} SECOND)
                          ORDER BY id DESC
                          LIMIT 1",
                         [$conversation['id'], $msgTrim]
                     );
                     if ($existingSameContent) {
-                        Logger::quepasa("processWebhook - ⚠️ Duplicata de CONTEÚDO (contact) detectada na janela de 60s. existingId={$existingSameContent['id']}, existingExtId=" . ($existingSameContent['external_id'] ?? 'NULL') . ", novoExtId=" . ($externalId ?? 'NULL') . ". Ignorando re-entrega do Evolution.");
+                        Logger::quepasa("processWebhook - ⚠️ Duplicata de CONTEÚDO (contact) detectada na janela de {$contentDedupSeconds}s. existingId={$existingSameContent['id']}, existingExtId=" . ($existingSameContent['external_id'] ?? 'NULL') . ", novoExtId=" . ($externalId ?? 'NULL') . ". Ignorando re-entrega do Evolution.");
+                        \App\Services\WebhookAuditService::drop('duplicada_conteudo', "existingId={$existingSameContent['id']}, existingExtId=" . ($existingSameContent['external_id'] ?? 'NULL') . ", novoExtId=" . ($externalId ?? 'NULL') . ", janela={$contentDedupSeconds}s, texto='" . mb_substr($msgTrim, 0, 80) . "'");
                         return;
                     }
                 } catch (\Exception $dedupEx) {
@@ -4535,6 +4579,11 @@ class WhatsAppService
             }
             
             // Criar mensagem usando ConversationService (com todas as integrações)
+            \App\Services\WebhookAuditService::context([
+                'conversation_id' => (int)$conversation['id'],
+                'phone'           => $fromPhone ?: null,
+            ]);
+
             Logger::quepasa("processWebhook - Preparando criação de mensagem: conversationId={$conversation['id']}, contactId={$contact['id']}, message='" . substr($message, 0, 50) . "', attachmentsCount=" . count($attachments) . ", timestamp=" . date('Y-m-d H:i:s', $timestamp));
             
             try {
@@ -4662,9 +4711,17 @@ class WhatsAppService
                     Logger::quepasa("processWebhook - Erro ao notificar WebSocket com reply: " . $e->getMessage());
                 }
             Logger::log("WhatsApp mensagem processada: {$fromPhone} -> {$message}");
-        } catch (\Exception $e) {
-            Logger::error("WhatsApp processWebhook Error: " . $e->getMessage());
+            \App\Services\WebhookAuditService::processed(
+                $conversation['id'] ?? null,
+                is_numeric($messageId ?? null) ? (int)$messageId : null
+            );
+        } catch (\Throwable $e) {
+            // ⚠️ Throwable: um TypeError aqui dentro (ex.: campo do payload vindo como
+            // array onde se espera string) não era capturado e derrubava a request
+            // inteira sem gravar a mensagem nem registrar o motivo.
+            Logger::error("WhatsApp processWebhook Error: " . get_class($e) . ' - ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             Logger::error("WhatsApp processWebhook Stack: " . $e->getTraceAsString());
+            \App\Services\WebhookAuditService::error(get_class($e) . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
         }
     }
 
@@ -4832,7 +4889,7 @@ class WhatsAppService
 
             $apiUrl = rtrim($account['api_url'], '/');
             $token = $account['quepasa_token'];
-            
+
             // Tentar endpoints possíveis para obter informações do contato
             $endpoints = [
                 "/v4/bot/{$token}/contact/{$linkedId}",
@@ -4841,7 +4898,24 @@ class WhatsAppService
                 "/chat/{$linkedId}"
             ];
 
+            // ⚠️ ORÇAMENTO DE TEMPO (crítico)
+            // Este método roda DENTRO do webhook síncrono e SÓ na primeira mensagem
+            // de um contato novo (quando o chat vem como @lid). Antes eram 4 endpoints
+            // × CURLOPT_TIMEOUT=120s sem CONNECTTIMEOUT = até 480s de bloqueio, acima
+            // do max_execution_time=300 do .user.ini: a request morria por fatal e a
+            // PRIMEIRA mensagem do lead nunca era gravada (as seguintes chegavam
+            // normalmente, porque o contato já existia e este caminho não rodava).
+            $budgetSeconds = (int)\App\Services\SettingService::get('quepasa_lid_resolve_budget_seconds', 12);
+            $budgetSeconds = max(3, min(30, $budgetSeconds));
+            $deadline = microtime(true) + $budgetSeconds;
+
             foreach ($endpoints as $endpoint) {
+                $remaining = (int)ceil($deadline - microtime(true));
+                if ($remaining < 2) {
+                    Logger::quepasa("getPhoneFromLinkedId - ⏱️ Orçamento de {$budgetSeconds}s esgotado, abortando resolução de LID {$linkedId}");
+                    break;
+                }
+
                 $url = $apiUrl . $endpoint;
                 $headers = [
                     'Accept: application/json',
@@ -4852,7 +4926,8 @@ class WhatsAppService
                 $ch = curl_init($url);
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 120, // ✅ Timeout padrão de 120s
+                    CURLOPT_CONNECTTIMEOUT => 3,
+                    CURLOPT_TIMEOUT => $remaining,
                     CURLOPT_HTTPHEADER => $headers,
                     CURLOPT_FOLLOWLOCATION => true,
                     CURLOPT_SSL_VERIFYPEER => false,
@@ -4880,7 +4955,7 @@ class WhatsAppService
             }
 
             return null;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Logger::quepasa("getPhoneFromLinkedId - Erro: " . $e->getMessage());
             return null;
         }

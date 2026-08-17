@@ -1597,12 +1597,12 @@ class KanbanAgentService
             
             case 'move_to_stage':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'move_to_stage': movendo conversa {$conversation['id']} para etapa " . ($config['stage_id'] ?? 'N/A'));
-                return self::actionMoveToStage($conversation, $config);
-            
+                return self::actionMoveToStage($conversation, $config, $agentId);
+
             case 'move_to_next_stage':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'move_to_next_stage': movendo conversa {$conversation['id']} para próxima etapa");
-                return self::actionMoveToNextStage($conversation);
-            
+                return self::actionMoveToNextStage($conversation, $agentId);
+
             case 'assign_to_agent':
                 Logger::info("KanbanAgentService::executeSingleAction - Ação 'assign_to_agent': atribuindo conversa {$conversation['id']} a agente");
                 return self::actionAssignToAgent($conversation, $config);
@@ -1916,7 +1916,7 @@ class KanbanAgentService
     /**
      * Ação: Mover para etapa específica
      */
-    private static function actionMoveToStage(array $conversation, array $config): array
+    private static function actionMoveToStage(array $conversation, array $config, int $kanbanAgentId = 0): array
     {
         $stageId = $config['stage_id'] ?? null;
         if (!$stageId) {
@@ -1941,7 +1941,25 @@ class KanbanAgentService
         ]);
         
         Logger::info("KanbanAgentService::actionMoveToStage - Conversa {$conversation['id']} movida: Funil {$oldFunnelId} -> {$newFunnelId}, Etapa {$oldStageId} -> {$stageId}");
-        
+
+        // ✅ Registrar no histórico de etapas (sem isso a conversa some dos
+        // filtros de "passou pela etapa X")
+        \App\Services\FunnelService::recordStageTransition(
+            (int)$conversation['id'],
+            $oldStageId ? (int)$oldStageId : null,
+            (int)$stageId,
+            null,
+            'kanban_agent',
+            $kanbanAgentId ?: null,
+            (int)$newFunnelId
+        );
+
+        try {
+            \App\Services\ActivityService::logStageMoved((int)$conversation['id'], (int)$stageId, $oldStageId ? (int)$oldStageId : null, null);
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::actionMoveToStage - Erro ao logar atividade: " . $e->getMessage());
+        }
+
         // Notificar via WebSocket para atualizar UI em tempo real
         self::notifyConversationChange($conversation['id'], 'stage_changed', [
             'old_stage_id' => $oldStageId,
@@ -1957,7 +1975,7 @@ class KanbanAgentService
     /**
      * Ação: Mover para próxima etapa
      */
-    private static function actionMoveToNextStage(array $conversation): array
+    private static function actionMoveToNextStage(array $conversation, int $kanbanAgentId = 0): array
     {
         if (!$conversation['funnel_stage_id']) {
             throw new \Exception('Conversa não está em nenhuma etapa');
@@ -1979,7 +1997,24 @@ class KanbanAgentService
             'funnel_stage_id' => $nextStage['id'],
             'moved_at' => date('Y-m-d H:i:s')
         ]);
-        
+
+        // ✅ Registrar no histórico de etapas
+        \App\Services\FunnelService::recordStageTransition(
+            (int)$conversation['id'],
+            $oldStageId ? (int)$oldStageId : null,
+            (int)$nextStage['id'],
+            null,
+            'kanban_agent',
+            $kanbanAgentId ?: null,
+            (int)$currentStage['funnel_id']
+        );
+
+        try {
+            \App\Services\ActivityService::logStageMoved((int)$conversation['id'], (int)$nextStage['id'], $oldStageId ? (int)$oldStageId : null, null);
+        } catch (\Exception $e) {
+            Logger::error("KanbanAgentService::actionMoveToNextStage - Erro ao logar atividade: " . $e->getMessage());
+        }
+
         // Notificar via WebSocket para atualizar UI em tempo real
         self::notifyConversationChange($conversation['id'], 'stage_changed', [
             'old_stage_id' => $oldStageId,
@@ -2007,11 +2042,26 @@ class KanbanAgentService
             throw new \Exception('Nenhum agente disponível');
         }
 
+        $oldAgentId = $conversation['agent_id'] ?? null;
+
         Conversation::update($conversation['id'], [
             'agent_id' => $agentId,
             'assigned_at' => date('Y-m-d H:i:s')
         ]);
-        
+
+        // ✅ Registrar no histórico de atribuições (sem isso a conversa some dos
+        // filtros de "passou pelo agente X")
+        if ((int)$oldAgentId !== (int)$agentId) {
+            try {
+                if ($oldAgentId) {
+                    \App\Models\ConversationAssignment::recordRemoval((int)$conversation['id'], (int)$oldAgentId);
+                }
+                \App\Models\ConversationAssignment::recordAssignment((int)$conversation['id'], (int)$agentId, null);
+            } catch (\Exception $e) {
+                Logger::error("KanbanAgentService::actionAssignToAgent - Erro ao registrar histórico: " . $e->getMessage());
+            }
+        }
+
         // Notificar via WebSocket
         self::notifyConversationChange($conversation['id'], 'agent_assigned', [
             'agent_id' => $agentId

@@ -1643,10 +1643,22 @@ PROMPT;
                 case 'funnel_stage':
                     // Mover para etapa do funil e usar automação dela
                     if ($funnelStageId) {
-                Conversation::update($conversationId, [
+                        $stageBeforeEscalation = $conversation['funnel_stage_id'] ?? null;
+
+                        Conversation::update($conversationId, [
                             'funnel_stage_id' => $funnelStageId
                         ]);
-                        
+
+                        // ✅ Registrar a transição no histórico de etapas
+                        \App\Services\FunnelService::recordStageTransition(
+                            $conversationId,
+                            $stageBeforeEscalation ? (int)$stageBeforeEscalation : null,
+                            (int)$funnelStageId,
+                            null,
+                            'ai_tool',
+                            $context['ai_agent_id'] ?? null
+                        );
+
                         // Executar automação da etapa (se houver)
                         \App\Services\AutomationService::checkStageAutomations($conversationId, $funnelStageId);
                         
@@ -3516,9 +3528,20 @@ PROMPT;
             if (!$keepAgent) {
                 $updateData['assigned_user_id'] = null;
             }
-            
+
             Conversation::update($conversationId, $updateData);
-            
+
+            // ✅ Registrar a transição no histórico de etapas
+            \App\Services\FunnelService::recordStageTransition(
+                $conversationId,
+                $oldStageId ? (int)$oldStageId : null,
+                (int)$stageId,
+                null,
+                'ai_tool',
+                $context['ai_agent_id'] ?? null,
+                (int)$funnelId
+            );
+
             // Remover IA se configurado
             if ($removeAIAfter) {
                 ConversationAIService::removeAIAgent($conversationId);
@@ -3709,14 +3732,25 @@ PROMPT;
             if (!$keepAgent) {
                 $updateData['assigned_user_id'] = null;
             }
-            
+
             Conversation::update($conversationId, $updateData);
-            
+
+            // ✅ Registrar a transição no histórico de etapas
+            \App\Services\FunnelService::recordStageTransition(
+                $conversationId,
+                $oldStageId ? (int)$oldStageId : null,
+                (int)$selectedStageId,
+                null,
+                'ai_tool',
+                $context['ai_agent_id'] ?? null,
+                (int)$selectedFunnelId
+            );
+
             // Remover IA se configurado
             if ($removeAIAfter) {
                 ConversationAIService::removeAIAgent($conversationId);
             }
-            
+
             // Adicionar nota com justificativa da IA
             if ($addNote) {
                 Activity::create([

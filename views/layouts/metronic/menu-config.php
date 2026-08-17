@@ -100,6 +100,8 @@ return [
             ['label' => 'Ranking', 'route' => '/agent-performance/ranking', 'permission' => 'agent_performance.view.all'],
             ['label' => 'Comparar', 'route' => '/agent-performance/compare', 'permission' => 'agent_performance.view.all'],
             ['label' => 'Gerar Manuais (IA)', 'route' => '/manuals', 'permission' => ['agent_performance.view.all', 'conversations.view.all']],
+            ['label' => '🔎 Análise de Conversas', 'route' => '/conversation-insights', 'permission' => 'conversation_insights.view',
+             'activeMatch' => '/conversation-insights'],
             ['label' => 'Minha Performance', 'route' => '/agent-performance/agent?id={userId}'],
             ['label' => 'Minhas Conversões', 'route' => '/agent-conversion/agent?id={userId}'],
             // Metas ocultadas da UI (lógica preservada) — reative removendo 'hidden'

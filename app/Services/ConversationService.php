@@ -716,7 +716,20 @@ class ConversationService
         } else {
             Logger::debug("ConversationService::create - Nenhum agente para registrar no histórico (agentId=null)");
         }
-        
+
+        // Registrar a etapa inicial no histórico do funil (entrada na etapa)
+        if (!empty($conversationData['funnel_stage_id'])) {
+            \App\Services\FunnelService::recordStageTransition(
+                $id,
+                null,
+                (int)$conversationData['funnel_stage_id'],
+                null,
+                'system',
+                null,
+                !empty($conversationData['funnel_id']) ? (int)$conversationData['funnel_id'] : null
+            );
+        }
+
         // Verificar se foi salvo corretamente
         $savedConversation = Conversation::find($id);
         Logger::notificame("[INFO] ConversationService::create - Verificação pós-criação:");
@@ -1125,7 +1138,12 @@ class ConversationService
             try {
                 $currentUserId = \App\Helpers\Auth::user()['id'] ?? null;
                 Logger::info("ConversationService::assignToAgent - Agente mudou de {$oldAgentId} para {$agentId}, registrando histórico");
-                
+
+                // Fechar o período do agente anterior antes de abrir o novo
+                if ($oldAgentId) {
+                    \App\Models\ConversationAssignment::recordRemoval($conversationId, (int)$oldAgentId);
+                }
+
                 \App\Models\ConversationAssignment::recordAssignment(
                     $conversationId,
                     $agentId,
@@ -1315,6 +1333,14 @@ class ConversationService
         // Atualizar contagem do agente anterior, se houver
         if ($oldAgentId) {
             User::updateConversationsCount($oldAgentId);
+
+            // ✅ Fechar o período de atribuição no histórico (sem isso a
+            // participação do agente fica "aberta" para sempre)
+            try {
+                \App\Models\ConversationAssignment::recordRemoval($conversationId, (int)$oldAgentId);
+            } catch (\Exception $e) {
+                Logger::error("ConversationService::unassignAgent - Erro ao fechar histórico de atribuição: " . $e->getMessage());
+            }
         }
 
         // Obter conversa atualizada

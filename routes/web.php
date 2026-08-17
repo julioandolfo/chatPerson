@@ -455,11 +455,14 @@ Router::get('/agent-performance/sla-breached-details', [AgentPerformanceControll
 // ⚠️ Ordem importa: rotas estáticas antes das dinâmicas {id}
 Router::get('/conversation-insights', [ConversationInsightController::class, 'index'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::get('/conversation-insights/new', [ConversationInsightController::class, 'createForm'], ['Authentication', 'Permission:conversation_insights.run']);
+// Relatório PDF direto por parâmetros de URL, sem IA (fase 0 apenas)
+Router::get('/conversation-insights/report', [ConversationInsightController::class, 'report'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::post('/conversation-insights/preview', [ConversationInsightController::class, 'preview'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::post('/conversation-insights', [ConversationInsightController::class, 'create'], ['Authentication', 'Permission:conversation_insights.run']);
 Router::get('/conversation-insights/{id}/status', [ConversationInsightController::class, 'status'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::get('/conversation-insights/{id}/conversations', [ConversationInsightController::class, 'conversations'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::get('/conversation-insights/{id}/export', [ConversationInsightController::class, 'export'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::get('/conversation-insights/{id}/pdf', [ConversationInsightController::class, 'exportPdf'], ['Authentication', 'Permission:conversation_insights.view']);
 Router::post('/conversation-insights/{id}/cancel', [ConversationInsightController::class, 'cancel'], ['Authentication', 'Permission:conversation_insights.run']);
 Router::get('/conversation-insights/{id}', [ConversationInsightController::class, 'show'], ['Authentication', 'Permission:conversation_insights.view']);
 

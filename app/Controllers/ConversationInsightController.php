@@ -21,6 +21,7 @@ use App\Models\Team;
 use App\Models\User;
 use App\Services\ConversationBatchAnalysisService;
 use App\Services\ConversationCohortService;
+use App\Services\ConversationReportService;
 
 class ConversationInsightController
 {
@@ -260,6 +261,86 @@ class ConversationInsightController
             'success' => $ok,
             'message' => $ok ? 'Análise cancelada.' : 'Não foi possível cancelar (já concluída).',
         ]);
+    }
+
+    /**
+     * PDF do relatório completo de uma análise já processada (com a síntese da IA)
+     */
+    public function exportPdf(int $id): void
+    {
+        Permission::abortIfCannot('conversation_insights.view');
+
+        $batch = ConversationAnalysisBatch::find($id);
+
+        if (!$batch || !self::canAccess($batch)) {
+            Response::notFound('Análise não encontrada');
+            return;
+        }
+
+        @set_time_limit(300);
+
+        $batch = ConversationAnalysisBatch::decode($batch);
+
+        $metrics = $batch['metrics'];
+        if (empty($metrics)) {
+            $metrics = ConversationBatchAnalysisService::aggregate($id);
+        }
+
+        $items = ConversationAnalysisItem::getAnalyzed($id, [], 2000);
+
+        $pdf = ConversationReportService::renderBatchPdf($batch, $metrics, $batch['summary'] ?: [], $items);
+
+        $pdf->download('analise-conversas-' . $id . '.pdf');
+        exit;
+    }
+
+    /**
+     * Relatório direto em PDF a partir de parâmetros na URL — SEM IA.
+     *
+     * Roda apenas a fase 0 (métricas determinísticas) e monta o dossiê com as
+     * transcrições. Não consome a API da OpenAI: a ideia é baixar o PDF e
+     * analisá-lo por fora, num chat de IA.
+     *
+     * Ex.: /conversation-insights/report?days=30&min_messages=0&limit=2000
+     */
+    public function report(): void
+    {
+        Permission::abortIfCannot('conversation_insights.view');
+
+        // Relatórios grandes levam tempo e memória
+        @set_time_limit(600);
+        @ini_set('memory_limit', '512M');
+
+        try {
+            $input = Request::all();
+            $filters = self::readFilters();
+
+            $options = [
+                'transcripts' => !isset($input['transcripts']) || (string)$input['transcripts'] !== '0',
+                'transcript_limit' => isset($input['transcript_limit'])
+                    ? (int)$input['transcript_limit']
+                    : ConversationReportService::DEFAULT_TRANSCRIPT_LIMIT,
+                'anonymize' => !isset($input['anonymize']) || (string)$input['anonymize'] !== '0',
+                'title' => !empty($input['title']) ? (string)$input['title'] : 'Relatório de Conversas',
+            ];
+
+            $report = ConversationReportService::buildCohortReport($filters, $options);
+
+            if ($report['total'] === 0) {
+                Response::notFound('Nenhuma conversa encontrada com esses parâmetros.');
+                return;
+            }
+
+            $pdf = ConversationReportService::renderCohortPdf($report, $options);
+
+            $filename = 'conversas-' . $filters['date_from'] . '-a-' . $filters['date_to'] . '.pdf';
+
+            $pdf->download($filename);
+            exit;
+        } catch (\Exception $e) {
+            Logger::error('ConversationInsightController::report - ' . $e->getMessage());
+            Response::error('Erro ao gerar o relatório: ' . $e->getMessage(), 500);
+        }
     }
 
     /**

@@ -286,9 +286,44 @@ class FunnelService
     }
 
     /**
+     * Registrar transição de etapa no histórico.
+     *
+     * ⚠️ PONTO ÚNICO DE ESCRITA: qualquer código que altere conversations.funnel_stage_id
+     * deve chamar este método, senão a conversa fica sem rastro e os filtros de
+     * "passou pela etapa X" deixam de enxergá-la.
+     *
+     * @param string $source manual|automation|kanban_agent|ai_tool|api|system
+     */
+    public static function recordStageTransition(
+        int $conversationId,
+        ?int $fromStageId,
+        int $toStageId,
+        ?int $changedBy = null,
+        string $source = 'system',
+        ?int $changedByAiAgentId = null,
+        ?int $funnelId = null
+    ): void {
+        try {
+            \App\Models\FunnelStageHistory::record(
+                $conversationId,
+                $fromStageId,
+                $toStageId,
+                $changedBy,
+                $source,
+                $changedByAiAgentId,
+                $funnelId
+            );
+        } catch (\Exception $e) {
+            \App\Helpers\Logger::error(
+                "FunnelService::recordStageTransition - Falha ao registrar histórico da conversa {$conversationId}: " . $e->getMessage()
+            );
+        }
+    }
+
+    /**
      * Mover conversa para estágio (com validações)
      */
-    public static function moveConversation(int $conversationId, int $stageId, ?int $userId = null, bool $bypassPermissions = false): bool
+    public static function moveConversation(int $conversationId, int $stageId, ?int $userId = null, bool $bypassPermissions = false, ?string $source = null): bool
     {
         \App\Helpers\Logger::automation("FunnelService::moveConversation - INÍCIO");
         \App\Helpers\Logger::automation("  conversationId: {$conversationId}, stageId: {$stageId}, userId: " . ($userId ?? 'NULL') . ", bypassPermissions: " . ($bypassPermissions ? 'TRUE' : 'FALSE'));
@@ -376,6 +411,19 @@ class FunnelService
         
         if ($updateResult) {
             \App\Helpers\Logger::automation("  ✅ UPDATE bem-sucedido!");
+
+            // ✅ Registrar a transição ANTES das automações, para que qualquer
+            // regra disparada pela movimentação já enxergue o histórico completo
+            self::recordStageTransition(
+                $conversationId,
+                $oldStageId,
+                $stageId,
+                $userId,
+                $source ?? ($userId ? 'manual' : 'system'),
+                null,
+                (int)$stage['funnel_id']
+            );
+
             // Executar automações para movimentação
             try {
                 \App\Services\AutomationService::executeForConversationMoved(

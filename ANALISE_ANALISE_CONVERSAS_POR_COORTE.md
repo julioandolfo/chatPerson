@@ -1,5 +1,12 @@
 # Análise do Sistema de Conversas + Proposta: "Análise de Conversas por Coorte"
 
+> **STATUS: IMPLEMENTADO.** Este documento é o diagnóstico que originou a funcionalidade.
+> Para instalar e usar, veja **`SETUP_ANALISE_CONVERSAS.md`**.
+> A implementação seguiu a arquitetura descrita aqui, com dois ajustes:
+> (a) o filtro de etapa ganhou a opção *"a passagem precisa ter ocorrido dentro do período"*;
+> (b) a fila ganhou reserva atômica de itens + lock de arquivo, para que dois crons
+> simultâneos não analisem — e paguem — a mesma conversa duas vezes.
+
 > Objetivo do estudo: viabilizar a funcionalidade de **selecionar conversas que passaram por etapa(s) X e/ou agente(s) Y, num período de N dias, e analisá-las com IA sob um contexto Z**.
 > Exemplo alvo: _"analisar todas as conversas que passaram pelo time comercial nos últimos 30 dias e entender em que momento o cliente desiste da compra ou para de responder, e por quê"_.
 

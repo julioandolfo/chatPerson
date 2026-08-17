@@ -188,6 +188,10 @@ function seed_roles_and_permissions() {
         ['name' => 'Deletar campanhas', 'slug' => 'campaigns.delete', 'description' => 'Deletar campanhas', 'module' => 'campaigns'],
         ['name' => 'Iniciar/Pausar campanhas', 'slug' => 'campaigns.control', 'description' => 'Controlar execução de campanhas', 'module' => 'campaigns'],
         
+        // Análise de Conversas por Coorte
+        ['name' => 'Ver análises de conversas', 'slug' => 'conversation_insights.view', 'description' => 'Visualizar análises de conversas por coorte', 'module' => 'conversation_insights'],
+        ['name' => 'Executar análise de conversas', 'slug' => 'conversation_insights.run', 'description' => 'Criar e cancelar análises de conversas (consome créditos de IA)', 'module' => 'conversation_insights'],
+
         // Metas/Goals
         ['name' => 'Ver metas', 'slug' => 'goals.view', 'description' => 'Visualizar metas e progresso', 'module' => 'goals'],
         ['name' => 'Criar metas', 'slug' => 'goals.create', 'description' => 'Criar novas metas', 'module' => 'goals'],

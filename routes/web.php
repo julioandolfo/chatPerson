@@ -48,6 +48,7 @@ use App\Controllers\ContactListController;
 use App\Controllers\DripSequenceController;
 use App\Controllers\MockupController;
 use App\Controllers\VendorBroadcastController;
+use App\Controllers\ConversationInsightController;
 
 // Rotas públicas
 Router::get('/', function() {
@@ -449,6 +450,18 @@ Router::get('/agent-performance/compare', [AgentPerformanceController::class, 'c
 Router::get('/agent-performance/chart-data', [AgentPerformanceController::class, 'chartData'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/sla-breached', [AgentPerformanceController::class, 'getSLABreachedConversations'], ['Authentication', 'Permission:agent_performance.view.all']);
 Router::get('/agent-performance/sla-breached-details', [AgentPerformanceController::class, 'getSLABreachedDetails'], ['Authentication', 'Permission:agent_performance.view.all']);
+
+// Análise de Conversas por Coorte (passou pela etapa X / pelo agente Y)
+// ⚠️ Ordem importa: rotas estáticas antes das dinâmicas {id}
+Router::get('/conversation-insights', [ConversationInsightController::class, 'index'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::get('/conversation-insights/new', [ConversationInsightController::class, 'createForm'], ['Authentication', 'Permission:conversation_insights.run']);
+Router::post('/conversation-insights/preview', [ConversationInsightController::class, 'preview'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::post('/conversation-insights', [ConversationInsightController::class, 'create'], ['Authentication', 'Permission:conversation_insights.run']);
+Router::get('/conversation-insights/{id}/status', [ConversationInsightController::class, 'status'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::get('/conversation-insights/{id}/conversations', [ConversationInsightController::class, 'conversations'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::get('/conversation-insights/{id}/export', [ConversationInsightController::class, 'export'], ['Authentication', 'Permission:conversation_insights.view']);
+Router::post('/conversation-insights/{id}/cancel', [ConversationInsightController::class, 'cancel'], ['Authentication', 'Permission:conversation_insights.run']);
+Router::get('/conversation-insights/{id}', [ConversationInsightController::class, 'show'], ['Authentication', 'Permission:conversation_insights.view']);
 
 // Gerador de Manuais (CS/Pós-venda) a partir de conversas reais
 Router::get('/manuals', [\App\Controllers\ManualGeneratorController::class, 'index'], ['Authentication']);

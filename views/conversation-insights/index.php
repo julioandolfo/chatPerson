@@ -26,11 +26,19 @@ $statusBadges = [
                 </ul>
             </div>
 
-            <?php if (!empty($canRun)): ?>
-                <a href="/conversation-insights/new" class="btn btn-sm btn-primary">
-                    <i class="ki-duotone ki-plus fs-4"></i> Nova análise
+            <div class="d-flex align-items-center gap-2">
+                <a href="/conversation-insights/report?days=30&amp;min_messages=0&amp;limit=2000&amp;transcripts=1&amp;transcript_limit=50"
+                   class="btn btn-sm btn-light-success"
+                   data-bs-toggle="tooltip"
+                   title="Todas as conversas dos últimos 30 dias, com métricas e transcrições, sem consumir a API">
+                    PDF dos últimos 30 dias
                 </a>
-            <?php endif; ?>
+                <?php if (!empty($canRun)): ?>
+                    <a href="/conversation-insights/new" class="btn btn-sm btn-primary">
+                        <i class="ki-duotone ki-plus fs-4"></i> Nova análise
+                    </a>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 

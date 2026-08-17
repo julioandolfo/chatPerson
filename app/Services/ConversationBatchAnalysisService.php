@@ -307,7 +307,14 @@ class ConversationBatchAnalysisService
      * Métricas calculadas sem IA. São a base auditável do relatório:
      * "quem parou de responder" aqui é um fato, não uma opinião do modelo.
      */
-    public static function computeMetrics(int $conversationId, ?array $messages = null): array
+    /**
+     * @param array|null $precomputed Dados já carregados em lote, para evitar
+     *        3 consultas por conversa em relatórios grandes. Chaves aceitas:
+     *        'stage_events'   => eventos de etapa da conversa (asc)
+     *        'current_stage'  => ['stage_id' => int, 'stage_name' => string]
+     *        'agents_involved'=> int
+     */
+    public static function computeMetrics(int $conversationId, ?array $messages = null, ?array $precomputed = null): array
     {
         $messages = $messages ?? self::getMessages($conversationId);
 
@@ -371,28 +378,41 @@ class ConversationBatchAnalysisService
             $whoStopped = 'ninguem';
         }
 
-        // Etapa vigente quando a conversa parou
-        $dropOffStage = null;
-        if ($lastMessageAt) {
-            $dropOffStage = FunnelStageHistory::getStageAt($conversationId, $lastMessageAt);
-        }
+        // Etapa vigente quando a conversa parou + trocas de agente.
+        // Em relatórios grandes esses dados chegam pré-carregados em lote.
+        if ($precomputed !== null) {
+            $dropOffStage = self::resolveStageAt($precomputed['stage_events'] ?? [], $lastMessageAt);
 
-        if (!$dropOffStage) {
-            $current = Database::fetch(
-                "SELECT c.funnel_stage_id AS stage_id, fs.name AS stage_name
-                 FROM conversations c
-                 LEFT JOIN funnel_stages fs ON fs.id = c.funnel_stage_id
-                 WHERE c.id = ?",
+            if (!$dropOffStage) {
+                $current = $precomputed['current_stage'] ?? null;
+                $dropOffStage = !empty($current['stage_id']) ? $current : null;
+            }
+
+            $agentsInvolved = (int)($precomputed['agents_involved'] ?? 0);
+        } else {
+            $dropOffStage = null;
+            if ($lastMessageAt) {
+                $dropOffStage = FunnelStageHistory::getStageAt($conversationId, $lastMessageAt);
+            }
+
+            if (!$dropOffStage) {
+                $current = Database::fetch(
+                    "SELECT c.funnel_stage_id AS stage_id, fs.name AS stage_name
+                     FROM conversations c
+                     LEFT JOIN funnel_stages fs ON fs.id = c.funnel_stage_id
+                     WHERE c.id = ?",
+                    [$conversationId]
+                );
+                $dropOffStage = $current && $current['stage_id'] ? $current : null;
+            }
+
+            $handoffs = Database::fetch(
+                "SELECT COUNT(DISTINCT agent_id) AS agents FROM conversation_assignments WHERE conversation_id = ?",
                 [$conversationId]
             );
-            $dropOffStage = $current && $current['stage_id'] ? $current : null;
-        }
 
-        // Trocas de agente (handoffs)
-        $handoffs = Database::fetch(
-            "SELECT COUNT(DISTINCT agent_id) AS agents FROM conversation_assignments WHERE conversation_id = ?",
-            [$conversationId]
-        );
+            $agentsInvolved = (int)($handoffs['agents'] ?? 0);
+        }
 
         return [
             'messages_total' => count($messages),
@@ -410,10 +430,38 @@ class ConversationBatchAnalysisService
             'max_gap_seconds' => $maxGap,
             'drop_off_stage_id' => $dropOffStage['stage_id'] ?? null,
             'drop_off_stage_name' => $dropOffStage['stage_name'] ?? null,
-            'agents_involved' => (int)($handoffs['agents'] ?? 0),
+            'agents_involved' => $agentsInvolved,
             'last_contact_at' => $lastByContact ? date('Y-m-d H:i:s', $lastByContact) : null,
             'last_agent_at' => $lastByAgent ? date('Y-m-d H:i:s', $lastByAgent) : null,
         ];
+    }
+
+    /**
+     * Última etapa vigente até um instante, a partir de eventos já carregados.
+     *
+     * @param array $events eventos ordenados asc, com 'created_at', 'to_stage_id', 'stage_name'
+     */
+    private static function resolveStageAt(array $events, ?string $datetime): ?array
+    {
+        if (empty($events) || !$datetime) {
+            return null;
+        }
+
+        $limit = strtotime($datetime);
+        $found = null;
+
+        foreach ($events as $event) {
+            if (strtotime($event['created_at']) > $limit) {
+                break;
+            }
+
+            $found = [
+                'stage_id' => (int)$event['to_stage_id'],
+                'stage_name' => $event['stage_name'] ?? null,
+            ];
+        }
+
+        return $found;
     }
 
     /**
@@ -458,7 +506,7 @@ class ConversationBatchAnalysisService
      * Transcrição legível, com marcação de silêncio (que é o sinal de abandono)
      * e anonimização dos dados do cliente antes de sair para a OpenAI.
      */
-    public static function buildTranscript(array $messages, ?string $contactName = null): string
+    public static function buildTranscript(array $messages, ?string $contactName = null, bool $anonymize = true): string
     {
         $messages = self::truncateMessages($messages);
 
@@ -507,7 +555,7 @@ class ConversationBatchAnalysisService
         $transcript = implode("\n", $lines);
 
         // Privacidade: mesma anonimização usada pelo Copiloto antes de ir à OpenAI
-        if (class_exists('\App\Services\ManualGeneratorService')) {
+        if ($anonymize && class_exists('\App\Services\ManualGeneratorService')) {
             try {
                 $transcript = ManualGeneratorService::anonymize($transcript, $contactName);
             } catch (\Exception $e) {

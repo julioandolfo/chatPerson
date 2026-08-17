@@ -163,6 +163,94 @@ vendedor que recebeu a conversa e nunca respondeu.
 
 ---
 
+## Exportar em PDF
+
+Dois PDFs diferentes:
+
+| Onde | O que sai | Custo de API |
+|---|---|---|
+| **Baixar PDF** (tela de resultado) | Relatório completo da análise: diagnóstico da IA, distribuições e conversas | já pago no lote |
+| **PDF sem IA** (tela de criação, lista e resultado) | Dossiê com métricas determinísticas + transcrições | **zero** |
+
+O segundo é o caminho para analisar **sem gastar API**: monte a coorte, baixe o
+dossiê e jogue o arquivo num chat de IA por fora. O PDF é gerado com fontes base
+e WinAnsi, então o texto é **extraível** — a IA lê direto, sem OCR.
+
+### Rota direta (gera e baixa na hora)
+
+```
+GET /conversation-insights/report?<parâmetros>
+```
+
+**Todas as conversas do sistema, últimos 30 dias:**
+
+```
+/conversation-insights/report?days=30&min_messages=0&limit=2000&transcripts=1&transcript_limit=50
+```
+
+Só os números, sem transcrições (PDF bem menor):
+
+```
+/conversation-insights/report?days=30&min_messages=0&limit=2000&transcripts=0
+```
+
+Recorte por time comercial nos últimos 30 dias:
+
+```
+/conversation-insights/report?days=30&team_ids[]=2&agent_basis=both&transcript_limit=100
+```
+
+Conversas que passaram pelas etapas 12 e 15:
+
+```
+/conversation-insights/report?days=30&stage_ids[]=12&stage_ids[]=15&stage_match=any
+```
+
+### Parâmetros
+
+| Parâmetro | Padrão | O que faz |
+|---|---|---|
+| `days` | 30 | Janela em dias (ou use `date_from` / `date_to`) |
+| `date_from`, `date_to` | — | Período explícito (`YYYY-MM-DD`) |
+| `date_basis` | `activity` | `activity` (teve mensagem no período) ou `created` |
+| `stage_ids[]` | — | Passou pela(s) etapa(s) |
+| `stage_match` | `any` | `any` ou `all` |
+| `stage_window` | `any_time` | `in_period` exige que a passagem tenha ocorrido no período |
+| `agent_ids[]` | — | Passou pelo(s) agente(s) |
+| `agent_basis` | `both` | `both`, `assignment` ou `message` |
+| `agent_match` | `any` | `any` ou `all` |
+| `team_ids[]` | — | Time (expandido para os membros) |
+| `funnel_ids[]`, `department_ids[]`, `tag_ids[]` | — | Filtros complementares |
+| `channels[]`, `statuses[]` | — | Ex.: `channels[]=whatsapp`, `statuses[]=open` |
+| `min_messages` | 4 | Use `0` para não descartar conversa nenhuma |
+| `limit` | 300 | Conversas no relatório (**máx. 2000**) |
+| `transcripts` | 1 | `0` remove as transcrições |
+| `transcript_limit` | 50 | Quantas conversas trazem transcrição (máx. 400) |
+| `anonymize` | 1 | `0` mantém nome, telefone e e-mail reais |
+| `title` | — | Título na capa do PDF |
+
+A rota exige sessão logada e a permissão `conversation_insights.view`; o escopo
+de funil do usuário é reaplicado, então cada um só exporta o que já poderia ver.
+
+Se a coorte for maior que `limit`, o PDF traz as conversas mais recentes e
+**imprime o aviso** na capa dizendo quantas ficaram de fora.
+
+### O que vai no dossiê
+
+1. **Capa** — período, contagens e filtros aplicados
+2. **Como ler este relatório** — legenda que orienta a IA (o que é CLIENTE/VENDEDOR/IA, o que significa "quem parou")
+3. **Quem parou de responder** — cliente × vendedor × ainda ativa
+4. **Etapa onde travou**, **tempo em silêncio**, **tempo de resposta**, **por vendedor**, **por canal**, **por status**
+5. **Tabela de conversas** — uma linha por conversa da coorte
+6. **Transcrições** — conversas que travaram primeiro, ordenadas pelo tempo de silêncio
+
+As transcrições seguem o mesmo truncamento da análise por IA (15 primeiras + 40
+últimas mensagens) e passam pela anonimização, salvo `anonymize=0`.
+
+> O gerador de PDF é o `App\Helpers\SimplePdf` — PHP puro, sem dependência
+> externa (o projeto não tem biblioteca de PDF; os exports de campanhas e
+> dashboard eram stubs que devolviam HTML).
+
 ## Controle de custo
 
 - **Prévia obrigatória** antes de rodar, com custo estimado

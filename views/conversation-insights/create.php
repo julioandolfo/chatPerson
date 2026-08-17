@@ -294,12 +294,39 @@ ob_start();
                                 </button>
 
                                 <button type="submit" id="btnSubmit" class="btn btn-primary w-100">
-                                    Iniciar análise
+                                    Iniciar análise <span class="fs-8 opacity-75">(usa IA)</span>
                                 </button>
 
                                 <div class="text-muted fs-8 mt-3 text-center">
                                     O processamento roda em segundo plano.<br>
                                     Você pode fechar esta página.
+                                </div>
+
+                                <div class="separator separator-dashed my-5"></div>
+
+                                <div class="mb-3">
+                                    <label class="form-check form-switch form-check-sm">
+                                        <input class="form-check-input" type="checkbox" id="pdfTranscripts" checked>
+                                        <span class="form-check-label fs-8">Incluir transcrições no PDF</span>
+                                    </label>
+                                    <label class="form-check form-switch form-check-sm mt-2">
+                                        <input class="form-check-input" type="checkbox" id="pdfAnonymize" checked>
+                                        <span class="form-check-label fs-8">Mascarar dados pessoais</span>
+                                    </label>
+                                    <div class="mt-2">
+                                        <label class="form-label fs-8 fw-semibold mb-1">Transcrições no PDF</label>
+                                        <input type="number" id="pdfTranscriptLimit" class="form-control form-control-solid form-control-sm"
+                                               value="50" min="0" max="400">
+                                    </div>
+                                </div>
+
+                                <button type="button" id="btnPdf" class="btn btn-light-success w-100">
+                                    Baixar PDF sem IA
+                                </button>
+
+                                <div class="text-muted fs-8 mt-3 text-center">
+                                    Gera o dossiê com as métricas e as transcrições<br>
+                                    <b>sem consumir a API</b> — para você analisar por fora.
                                 </div>
                             </div>
                         </div>
@@ -350,6 +377,28 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     document.getElementById('btnPreview').addEventListener('click', loadPreview);
+
+    // PDF sem IA: manda os mesmos filtros por GET para a rota de relatório
+    document.getElementById('btnPdf').addEventListener('click', function () {
+        const params = new URLSearchParams();
+
+        buildFormData().forEach(function (value, key) {
+            if (value !== '' && key !== 'cost_limit') {
+                params.append(key, value);
+            }
+        });
+
+        params.set('transcripts', document.getElementById('pdfTranscripts').checked ? '1' : '0');
+        params.set('anonymize', document.getElementById('pdfAnonymize').checked ? '1' : '0');
+        params.set('transcript_limit', document.getElementById('pdfTranscriptLimit').value || '50');
+
+        const name = document.querySelector('[name="name"]').value.trim();
+        if (name) {
+            params.set('title', name);
+        }
+
+        window.open('/conversation-insights/report?' + params.toString(), '_blank');
+    });
 
     function schedulePreview() {
         clearTimeout(previewTimer);

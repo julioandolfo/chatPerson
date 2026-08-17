@@ -51,10 +51,29 @@ $whoStoppedLabels = [
                     <button class="btn btn-sm btn-light-danger" id="btnCancel">Cancelar</button>
                 <?php endif; ?>
                 <?php if ($analyzed > 0): ?>
+                    <a href="/conversation-insights/<?= (int)$batch['id'] ?>/pdf" class="btn btn-sm btn-primary">
+                        <i class="ki-duotone ki-file-down fs-5"><span class="path1"></span><span class="path2"></span></i>
+                        Baixar PDF
+                    </a>
                     <a href="/conversation-insights/<?= (int)$batch['id'] ?>/export" class="btn btn-sm btn-light-primary">
                         Exportar CSV
                     </a>
                 <?php endif; ?>
+
+                <?php
+                // Dossiê sem IA: mesma coorte desta análise, só com os dados brutos.
+                // Serve para analisar por fora sem gastar mais API.
+                $rawParams = http_build_query(array_merge(
+                    is_array($batch['filters'] ?? null) ? $batch['filters'] : [],
+                    ['title' => 'Dossiê — ' . ($batch['name'] ?? 'Análise')]
+                ));
+                ?>
+                <a href="/conversation-insights/report?<?= htmlspecialchars($rawParams) ?>"
+                   class="btn btn-sm btn-light-success"
+                   data-bs-toggle="tooltip"
+                   title="Baixa os dados brutos desta mesma coorte (métricas + transcrições) sem chamar a IA. Use para analisar por fora.">
+                    PDF sem IA
+                </a>
             </div>
         </div>
     </div>

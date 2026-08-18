@@ -45,10 +45,36 @@ class ConversationAnalysisBatch extends Model
     public const STATUS_CANCELLED = 'cancelled';
 
     /**
+     * As tabelas da análise existem? (migration 157)
+     *
+     * Sem esta checagem, uma instalação que ainda não rodou a migration
+     * derruba a tela inteira com PDOException em vez de avisar o que falta.
+     */
+    public static function tableExists(): bool
+    {
+        static $exists = null;
+
+        if ($exists === null) {
+            try {
+                $exists = !empty(Database::fetch("SHOW TABLES LIKE 'conversation_analysis_batches'"));
+            } catch (\Exception $e) {
+                \App\Helpers\Logger::error('ConversationAnalysisBatch::tableExists - ' . $e->getMessage());
+                $exists = false;
+            }
+        }
+
+        return $exists;
+    }
+
+    /**
      * Listar lotes com o nome de quem criou
      */
     public static function listRecent(int $limit = 30, ?int $createdBy = null): array
     {
+        if (!self::tableExists()) {
+            return [];
+        }
+
         $sql = "SELECT b.*, u.name AS created_by_name
                 FROM conversation_analysis_batches b
                 LEFT JOIN users u ON u.id = b.created_by
@@ -70,6 +96,10 @@ class ConversationAnalysisBatch extends Model
      */
     public static function getNextPending(): ?array
     {
+        if (!self::tableExists()) {
+            return null;
+        }
+
         return Database::fetch(
             "SELECT * FROM conversation_analysis_batches
              WHERE status IN ('pending', 'running')

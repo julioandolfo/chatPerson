@@ -25,6 +25,10 @@ use App\Services\ConversationReportService;
 
 class ConversationInsightController
 {
+    /** Mostrada quando a migration 157 ainda não rodou */
+    private const SETUP_MESSAGE = 'As tabelas da análise ainda não foram criadas. '
+        . 'Rode: php database/run_migrations.php 157 (e a 158, para o histórico de etapas).';
+
     /**
      * Listagem das análises
      */
@@ -40,6 +44,7 @@ class ConversationInsightController
         Response::view('conversation-insights/index', [
             'batches' => $batches,
             'canRun' => Permission::can('conversation_insights.run'),
+            'setupPending' => !ConversationAnalysisBatch::tableExists(),
         ]);
     }
 
@@ -49,6 +54,11 @@ class ConversationInsightController
     public function createForm(): void
     {
         Permission::abortIfCannot('conversation_insights.run');
+
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::redirect('/conversation-insights');
+            return;
+        }
 
         Response::view('conversation-insights/create', [
             'funnels' => self::getFunnelsWithStages(),
@@ -108,6 +118,11 @@ class ConversationInsightController
                 return;
             }
 
+            if (!ConversationAnalysisBatch::tableExists()) {
+                Response::error(self::SETUP_MESSAGE, 503);
+                return;
+            }
+
             $filters = self::readFilters();
             $user = Auth::user();
 
@@ -141,6 +156,11 @@ class ConversationInsightController
     public function show(int $id): void
     {
         Permission::abortIfCannot('conversation_insights.view');
+
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::notFound(self::SETUP_MESSAGE);
+            return;
+        }
 
         $batch = ConversationAnalysisBatch::find($id);
 
@@ -180,6 +200,11 @@ class ConversationInsightController
     {
         Permission::abortIfCannot('conversation_insights.view');
 
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::error(self::SETUP_MESSAGE, 503);
+            return;
+        }
+
         $batch = ConversationAnalysisBatch::find($id);
 
         if (!$batch || !self::canAccess($batch)) {
@@ -213,6 +238,11 @@ class ConversationInsightController
     public function conversations(int $id): void
     {
         Permission::abortIfCannot('conversation_insights.view');
+
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::error(self::SETUP_MESSAGE, 503);
+            return;
+        }
 
         $batch = ConversationAnalysisBatch::find($id);
 
@@ -248,6 +278,11 @@ class ConversationInsightController
     {
         Permission::abortIfCannot('conversation_insights.run');
 
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::error(self::SETUP_MESSAGE, 503);
+            return;
+        }
+
         $batch = ConversationAnalysisBatch::find($id);
 
         if (!$batch || !self::canAccess($batch)) {
@@ -269,6 +304,11 @@ class ConversationInsightController
     public function exportPdf(int $id): void
     {
         Permission::abortIfCannot('conversation_insights.view');
+
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::notFound(self::SETUP_MESSAGE);
+            return;
+        }
 
         $batch = ConversationAnalysisBatch::find($id);
 
@@ -349,6 +389,11 @@ class ConversationInsightController
     public function export(int $id): void
     {
         Permission::abortIfCannot('conversation_insights.view');
+
+        if (!ConversationAnalysisBatch::tableExists()) {
+            Response::notFound(self::SETUP_MESSAGE);
+            return;
+        }
 
         $batch = ConversationAnalysisBatch::find($id);
 

@@ -14,6 +14,21 @@ Diagnóstico técnico que originou esta implementação: `ANALISE_ANALISE_CONVER
 
 ## 1. Instalação
 
+**Caminho curto** — roda tudo na ordem e confere o resultado no final:
+
+```bash
+php database/scripts/install_conversation_insights.php
+
+# Docker
+docker exec CONTAINER php /var/www/html/database/scripts/install_conversation_insights.php
+```
+
+É idempotente: pode rodar de novo sem quebrar nada. Use `--skip-backfill` para
+pular a reconstrução do histórico de etapas.
+
+<details>
+<summary>Ou passo a passo, manualmente</summary>
+
 Execute na ordem:
 
 ```bash
@@ -30,6 +45,12 @@ php database/scripts/backfill_funnel_stage_history.php             # aplica
 # 4. Permissões
 php database/seeds/add_conversation_insights_permissions.php
 ```
+
+</details>
+
+Enquanto as migrations não rodam, a tela avisa o que falta em vez de quebrar —
+e o **PDF sem IA** já funciona, porque lê direto das conversas e não depende
+dessas tabelas.
 
 ### 2. Agendar o processamento
 

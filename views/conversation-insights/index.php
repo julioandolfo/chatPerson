@@ -33,7 +33,7 @@ $statusBadges = [
                    title="Todas as conversas dos últimos 30 dias, com métricas e transcrições, sem consumir a API">
                     PDF dos últimos 30 dias
                 </a>
-                <?php if (!empty($canRun)): ?>
+                <?php if (!empty($canRun) && empty($setupPending)): ?>
                     <a href="/conversation-insights/new" class="btn btn-sm btn-primary">
                         <i class="ki-duotone ki-plus fs-4"></i> Nova análise
                     </a>
@@ -45,7 +45,42 @@ $statusBadges = [
     <div id="kt_app_content" class="app-content flex-column-fluid">
         <div id="kt_app_content_container" class="app-container container-fluid">
 
-            <?php if (empty($batches)): ?>
+            <?php if (!empty($setupPending)): ?>
+                <div class="card mb-5 border border-warning">
+                    <div class="card-body">
+                        <h3 class="fw-bold text-dark mb-3">⚙️ Instalação pendente</h3>
+                        <p class="text-gray-700 fs-6">
+                            As tabelas desta funcionalidade ainda não existem no banco.
+                            Rode as migrations abaixo no servidor:
+                        </p>
+                        <div class="bg-light-dark rounded p-4 mb-4">
+                            <code class="text-dark d-block mb-2">php database/run_migrations.php 157</code>
+                            <code class="text-dark d-block mb-2">php database/run_migrations.php 158</code>
+                            <code class="text-dark d-block mb-2">php database/scripts/backfill_funnel_stage_history.php</code>
+                            <code class="text-dark d-block">php database/seeds/add_conversation_insights_permissions.php</code>
+                        </div>
+                        <p class="text-muted fs-7 mb-0">
+                            No Docker, prefixe com <code>docker exec CONTAINER</code>.
+                            A migration <b>157</b> cria as tabelas da análise; a <b>158</b> habilita o
+                            filtro por etapa. O passo a passo completo está em
+                            <code>SETUP_ANALISE_CONVERSAS.md</code>.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body text-center py-10">
+                        <p class="text-muted fs-6 mb-4">
+                            Enquanto isso, o <b>PDF sem IA</b> já funciona — ele lê direto das conversas
+                            e não depende dessas tabelas.
+                        </p>
+                        <a href="/conversation-insights/report?days=30&amp;min_messages=0&amp;limit=2000&amp;transcripts=1&amp;transcript_limit=50"
+                           class="btn btn-light-success">
+                            Baixar PDF dos últimos 30 dias
+                        </a>
+                    </div>
+                </div>
+            <?php elseif (empty($batches)): ?>
                 <div class="card">
                     <div class="card-body text-center py-15">
                         <div class="fs-1 mb-4">📊</div>

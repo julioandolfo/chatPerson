@@ -491,13 +491,21 @@ class ConversationBatchAnalysisService
     // FASE 1 — PROMPT E PARSING
     // ======================================================================
 
+    /**
+     * Mensagens da conversa em ordem de chegada.
+     *
+     * ⚠️ ORDER BY id, não created_at: mensagens recebidas gravam o timestamp do
+     * provedor e as enviadas o do servidor. Ordenar por created_at faz a última
+     * mensagem sair errada quando os relógios divergem — e é ela que define o
+     * "quem parou de responder".
+     */
     private static function getMessages(int $conversationId): array
     {
         return Database::fetchAll(
             "SELECT id, sender_type, sender_id, ai_agent_id, content, message_type, created_at
              FROM messages
              WHERE conversation_id = ?
-             ORDER BY created_at ASC, id ASC",
+             ORDER BY id ASC",
             [$conversationId]
         );
     }

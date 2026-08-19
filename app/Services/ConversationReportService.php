@@ -795,7 +795,7 @@ class ConversationReportService
             "SELECT conversation_id, sender_type, sender_id, ai_agent_id, content, message_type, created_at
              FROM messages
              WHERE conversation_id IN ({$placeholders})
-             ORDER BY conversation_id ASC, created_at ASC, id ASC",
+             ORDER BY conversation_id ASC, id ASC",
             $ids
         );
 

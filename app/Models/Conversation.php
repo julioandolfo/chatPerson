@@ -103,9 +103,13 @@ class Conversation extends Model
                        (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' AND m.read_at IS NULL) as unread_count,
                        (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
-                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent', 'ai_agent') ORDER BY m.created_at ASC LIMIT 1) as first_response_at_calc,
-                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' ORDER BY m.created_at DESC LIMIT 1) as last_contact_message_at,
-                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent') ORDER BY m.created_at DESC LIMIT 1) as last_agent_message_at,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent', 'ai_agent') ORDER BY m.id ASC LIMIT 1) as first_response_at_calc,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' ORDER BY m.id DESC LIMIT 1) as last_contact_message_at,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent') ORDER BY m.id DESC LIMIT 1) as last_agent_message_at,
+                       -- IDs para o front decidir quem falou por ultimo sem depender de relogio:
+                       -- o created_at das recebidas vem do provedor e o das enviadas do servidor
+                       (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact') as last_contact_message_id,
+                       (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent')) as last_agent_message_id,
                        GROUP_CONCAT(DISTINCT CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#009ef7')) SEPARATOR '|||') as tags_data,
                        GROUP_CONCAT(DISTINCT CONCAT(cp.user_id, ':', cp_user.name) SEPARATOR '|||') as participants_data,
                        COALESCE(c.pinned, 0) as pinned,
@@ -299,49 +303,47 @@ class Conversation extends Model
             }
         }
         
-        // Filtro: Sem resposta (última mensagem relevante do contato é mais recente que a última mensagem de agente humano)
+        // Filtro: Sem resposta (a última mensagem da conversa é do contato, e não de um agente humano)
+        //
+        // ⚠️ Compara por ID, não por created_at. As mensagens recebidas gravam o
+        // created_at com o timestamp do PROVEDOR (ver ConversationService::sendMessage,
+        // parâmetro $messageTimestamp), enquanto as enviadas usam o relógio do servidor.
+        // Alguns segundos de diferença entre os dois relógios invertiam a ordem quando o
+        // cliente respondia rápido, e a conversa sumia desta lista.
+        // O id é AUTO_INCREMENT: reflete a ordem real de chegada e é a mesma ordem que o
+        // chat exibe (Message::getByConversation usa ORDER BY m.id ASC).
         if (!empty($filters['unanswered'])) {
-            $sql .= " AND EXISTS (
-                SELECT 1
-                FROM messages m_contact
-                WHERE m_contact.conversation_id = c.id
-                  AND m_contact.sender_type = 'contact'
-                  AND m_contact.created_at = (
-                    SELECT MAX(m2.created_at)
-                    FROM messages m2
-                    WHERE m2.conversation_id = c.id
-                      AND m2.sender_type = 'contact'
-                  )
-                  AND (
-                    SELECT COALESCE(MAX(m3.created_at), '1970-01-01')
-                    FROM messages m3
-                    WHERE m3.conversation_id = c.id
-                      AND m3.sender_type = 'agent'
-                      AND m3.ai_agent_id IS NULL -- apenas agente humano
-                      AND m3.sender_id > 0 -- ✅ CORREÇÃO: Excluir mensagens do sistema (sender_id=0 ou null)
-                  ) < m_contact.created_at
-            )";
+            $sql .= " AND (
+                    SELECT COALESCE(MAX(m_contact.id), 0)
+                    FROM messages m_contact
+                    WHERE m_contact.conversation_id = c.id
+                      AND m_contact.sender_type = 'contact'
+                ) > (
+                    SELECT COALESCE(MAX(m_agent.id), 0)
+                    FROM messages m_agent
+                    WHERE m_agent.conversation_id = c.id
+                      AND m_agent.sender_type = 'agent'
+                      AND m_agent.ai_agent_id IS NULL -- apenas agente humano
+                      AND m_agent.sender_id > 0 -- exclui mensagens do sistema
+                )";
         }
         
         // Filtro: Respondido (última mensagem relevante é de agente humano, não contar bot/IA)
+        // Mesma correção do filtro acima: comparação por id, não por created_at.
         if (!empty($filters['answered'])) {
-            $sql .= " AND EXISTS (
-                SELECT 1
-                FROM messages m_agent
-                WHERE m_agent.conversation_id = c.id
-                  AND m_agent.sender_type = 'agent'
-                  AND m_agent.ai_agent_id IS NULL -- apenas agente humano
-                  AND m_agent.sender_id > 0 -- ✅ CORREÇÃO: Excluir mensagens do sistema (sender_id=0 ou null)
-                  AND m_agent.created_at = (
-                    SELECT MAX(m2.created_at)
-                    FROM messages m2
-                    WHERE m2.conversation_id = c.id
-                      AND (
-                        (m2.sender_type = 'agent' AND m2.ai_agent_id IS NULL AND m2.sender_id > 0) -- ✅ agente humano real
-                        OR m2.sender_type = 'contact'
-                      )
-                  )
-            )";
+            $sql .= " AND (
+                    SELECT COALESCE(MAX(m_agent.id), 0)
+                    FROM messages m_agent
+                    WHERE m_agent.conversation_id = c.id
+                      AND m_agent.sender_type = 'agent'
+                      AND m_agent.ai_agent_id IS NULL -- apenas agente humano
+                      AND m_agent.sender_id > 0 -- exclui mensagens do sistema
+                ) > (
+                    SELECT COALESCE(MAX(m_contact.id), 0)
+                    FROM messages m_contact
+                    WHERE m_contact.conversation_id = c.id
+                      AND m_contact.sender_type = 'contact'
+                )";
         }
         
         // Filtro por período (data de criação ou última mensagem)

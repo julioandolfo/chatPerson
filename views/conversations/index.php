@@ -3774,10 +3774,23 @@ function getChannelInfo(channel) {
                     $firstResponseAt = !empty($conv['first_response_at_calc']) ? $conv['first_response_at_calc'] : ($conv['first_response_at'] ?? '');
                     $lastContactAt = $conv['last_contact_message_at'] ?? '';
                     $lastAgentAt = $conv['last_agent_message_at'] ?? '';
-                    $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
-                    $awaitingReply = ($conv['status'] ?? 'open') === 'open'
-                        && !empty($lastContactAt)
-                        && (empty($lastAgentAt) || strtotime($lastContactAt) > strtotime($lastAgentAt));
+
+                    // ⚠️ Quem falou por último sai dos IDs, não do created_at: recebidas
+                    // gravam o timestamp do provedor e enviadas o do servidor, e a
+                    // diferença entre os relógios invertia a ordem em respostas rápidas.
+                    $lastContactId = (int)($conv['last_contact_message_id'] ?? 0);
+                    $lastAgentId = (int)($conv['last_agent_message_id'] ?? 0);
+
+                    if ($lastContactId > 0 || $lastAgentId > 0) {
+                        $lastMessageFromAgent = $lastAgentId >= $lastContactId;
+                        $contactSpokeLast = $lastContactId > $lastAgentId;
+                    } else {
+                        // Fallback para instalações sem as novas colunas
+                        $lastMessageFromAgent = !empty($lastAgentAt) && (empty($lastContactAt) || strtotime($lastAgentAt) >= strtotime($lastContactAt));
+                        $contactSpokeLast = !empty($lastContactAt) && (empty($lastAgentAt) || strtotime($lastContactAt) > strtotime($lastAgentAt));
+                    }
+
+                    $awaitingReply = ($conv['status'] ?? 'open') === 'open' && $contactSpokeLast;
                     ?>
                     <div class="conversation-item <?= $isActive ? 'active' : '' ?> <?= !empty($conv['pinned']) ? 'pinned' : '' ?> <?= !empty($conv['inactivity_alert_at']) ? 'inactivity-alert' : '' ?> <?= $awaitingReply ? 'awaiting-reply' : '' ?>"
                          data-conversation-id="<?= $conv['id'] ?>"
@@ -3788,6 +3801,8 @@ function getChannelInfo(channel) {
                          data-last-message-at="<?= htmlspecialchars($conv['last_message_at'] ?? '') ?>"
                          data-last-contact-message-at="<?= htmlspecialchars($lastContactAt) ?>"
                          data-last-agent-message-at="<?= htmlspecialchars($lastAgentAt) ?>"
+                         data-last-contact-message-id="<?= $lastContactId ?>"
+                         data-last-agent-message-id="<?= $lastAgentId ?>"
                          data-agent-id="<?= htmlspecialchars($conv['agent_id'] ?? '') ?>"
                          data-onclick="selectConversation">
                         <div class="d-flex gap-3 w-100">
@@ -8927,17 +8942,51 @@ function updateConversationMeta(conversationItem, conv) {
     conversationItem.dataset.updatedAt = updatedAt;
 }
 
-// Determinar se a última mensagem foi do agente (para mostrar borda verde/SLA ok)
-function isLastMessageFromAgent(data) {
-    const lastAgent = data.last_agent_message_at || data.lastAgentMessageAt || '';
-    const lastContact = data.last_contact_message_at || data.lastContactMessageAt || '';
-    if (!lastAgent) return false;
-    if (!lastContact) return true;
+// Quem falou por último: compara pelos IDs das mensagens quando disponíveis.
+//
+// ⚠️ Não dá para confiar só no created_at: mensagens recebidas gravam o timestamp
+// do PROVEDOR (WhatsApp) e as enviadas, o do servidor. Poucos segundos de
+// diferença entre os relógios invertiam a ordem quando o cliente respondia
+// rápido — o badge "Aguardando resposta" sumia e a conversa saía do filtro
+// "não respondidas". O id é a ordem real de chegada (e a que o chat exibe).
+//
+// Retorna: 'agent', 'contact' ou null quando não há dados suficientes.
+function whoSpokeLast(data, conversationItem) {
+    const ds = conversationItem ? conversationItem.dataset : {};
+
+    // 0 e valores inválidos significam "não existe mensagem desse lado"
+    const toId = (value) => {
+        const parsed = parseInt(value ?? '', 10);
+        return isNaN(parsed) || parsed <= 0 ? 0 : parsed;
+    };
+
+    const agentId = toId(data.last_agent_message_id ?? ds.lastAgentMessageId);
+    const contactId = toId(data.last_contact_message_id ?? ds.lastContactMessageId);
+
+    // Caminho preferido: ordem de chegada
+    if (agentId || contactId) {
+        if (!agentId) return 'contact';
+        if (!contactId) return 'agent';
+        return contactId > agentId ? 'contact' : 'agent';
+    }
+
+    // Fallback (payloads antigos, sem os ids): comparação por timestamp
+    const lastAgent = data.last_agent_message_at || ds.lastAgentMessageAt || '';
+    const lastContact = data.last_contact_message_at || ds.lastContactMessageAt || '';
+    if (!lastAgent && !lastContact) return null;
+    if (!lastAgent) return 'contact';
+    if (!lastContact) return 'agent';
+
     const agentTs = Date.parse(lastAgent);
     const contactTs = Date.parse(lastContact);
-    if (isNaN(agentTs)) return false;
-    if (isNaN(contactTs)) return true;
-    return agentTs >= contactTs;
+    if (isNaN(agentTs)) return 'contact';
+    if (isNaN(contactTs)) return 'agent';
+    return contactTs > agentTs ? 'contact' : 'agent';
+}
+
+// Determinar se a última mensagem foi do agente (para mostrar borda verde/SLA ok)
+function isLastMessageFromAgent(data) {
+    return whoSpokeLast(data, null) === 'agent';
 }
 
 function applySlaVisualState(conversationItem, conv) {
@@ -8954,12 +9003,8 @@ function applySlaVisualState(conversationItem, conv) {
 function applyAwaitingReplyState(conversationItem, conv) {
     if (!conversationItem) return;
     const status = conv.status || conversationItem.dataset.status || 'open';
-    const lastContact = conv.last_contact_message_at || conversationItem.dataset.lastContactMessageAt || '';
-    const lastAgent = conv.last_agent_message_at || conversationItem.dataset.lastAgentMessageAt || '';
     const hasInactivityAlert = conversationItem.classList.contains('inactivity-alert');
-    const awaiting = status === 'open'
-        && !!lastContact
-        && (!lastAgent || (Date.parse(lastContact) || 0) > (Date.parse(lastAgent) || 0));
+    const awaiting = status === 'open' && whoSpokeLast(conv, conversationItem) === 'contact';
 
     conversationItem.classList.toggle('awaiting-reply', awaiting);
 
@@ -9099,6 +9144,13 @@ function applyConversationUpdate(conv) {
     conversationItem.dataset.lastMessageAt = conv.last_message_at || conv.updated_at || conversationItem.dataset.lastMessageAt || '';
     conversationItem.dataset.lastContactMessageAt = lastContactAt;
     conversationItem.dataset.lastAgentMessageAt = lastAgentAt;
+    // IDs decidem quem falou por último (ver whoSpokeLast)
+    if (conv.last_contact_message_id) {
+        conversationItem.dataset.lastContactMessageId = conv.last_contact_message_id;
+    }
+    if (conv.last_agent_message_id) {
+        conversationItem.dataset.lastAgentMessageId = conv.last_agent_message_id;
+    }
     conversationItem.dataset.agentId = conv.agent_id || conversationItem.dataset.agentId || '';
 
     // Atualizar estado visual de SLA (borda verde quando última msg é do agente)
@@ -9302,11 +9354,15 @@ function updateConversationListPreview(conversationId, lastMessage) {
             conversationItem.setAttribute('data-updated-at', lastMessage.created_at);
         }
         
-        // Atualizar datasets de SLA/tempos
+        // Atualizar datasets de SLA/tempos.
+        // O id acompanha o timestamp: é ele que decide quem falou por último
+        // (ver whoSpokeLast) — deixar o id velho aqui reintroduz o bug.
         if (lastMessage.sender_type === 'contact') {
             conversationItem.dataset.lastContactMessageAt = lastMessage.created_at;
+            if (lastMessage.id) conversationItem.dataset.lastContactMessageId = lastMessage.id;
         } else if (lastMessage.sender_type === 'agent') {
             conversationItem.dataset.lastAgentMessageAt = lastMessage.created_at;
+            if (lastMessage.id) conversationItem.dataset.lastAgentMessageId = lastMessage.id;
         }
         
         // Atualizar indicador SLA em tempo real
@@ -16176,7 +16232,7 @@ function sendMessage() {
                 addMessageToChat(data.message);
             }
             
-            updateConversationInList(conversationId, message);
+            updateConversationInList(conversationId, message, data.message?.id || null);
         } else {
             _showMessageError(tempMessage.id, data.message || 'Erro desconhecido', conversationId, finalMessage, isNote, replyContext, filesToRetry);
         }
@@ -16232,7 +16288,7 @@ function _showMessageError(tempId, errorMsg, conversationId, finalMessage, isNot
                 if (data.success) {
                     tempMsg.remove();
                     if (data.message) addMessageToChat(data.message);
-                    updateConversationInList(conversationId, finalMessage);
+                    updateConversationInList(conversationId, finalMessage, data.message?.id || null);
                 } else {
                     errorEl.innerHTML = `
                         <span class="text-danger fs-8"><i class="ki-duotone ki-cross-circle fs-7 me-1"><span class="path1"></span><span class="path2"></span></i>Falha novamente</span>
@@ -16260,7 +16316,7 @@ function _showMessageError(tempId, errorMsg, conversationId, finalMessage, isNot
     if (bubble) bubble.style.opacity = '0.7';
 }
 
-function updateConversationInList(conversationId, lastMessage) {
+function updateConversationInList(conversationId, lastMessage, sentMessageId = null) {
     const conversationItem = document.querySelector(`[data-conversation-id="${conversationId}"]`);
     if (conversationItem) {
         const preview = conversationItem.querySelector('.conversation-item-preview');
@@ -16277,6 +16333,20 @@ function updateConversationInList(conversationId, lastMessage) {
             conversationItem.setAttribute('data-updated-at', timestamp);
             // Atualizar dataset para SLA (mensagem do agente)
             conversationItem.dataset.lastAgentMessageAt = timestamp;
+
+            // O agente acabou de falar, então o id dele precisa passar a ser o
+            // maior — senão whoSpokeLast continua lendo o id anterior e o badge
+            // "Aguardando resposta" não sai. Quando não temos o id real da
+            // mensagem, usamos um valor otimista, corrigido no próximo refresh.
+            if (sentMessageId) {
+                conversationItem.dataset.lastAgentMessageId = sentMessageId;
+            } else {
+                const currentAgent = parseInt(conversationItem.dataset.lastAgentMessageId || '0', 10) || 0;
+                const currentContact = parseInt(conversationItem.dataset.lastContactMessageId || '0', 10) || 0;
+                conversationItem.dataset.lastAgentMessageId = String(Math.max(currentAgent, currentContact) + 1);
+            }
+
+            applyAwaitingReplyState(conversationItem, {});
         }
         
         // Atualizar indicador SLA em tempo real
@@ -20524,9 +20594,12 @@ if (typeof window.wsClient !== 'undefined') {
                 // Atualizar dados relevantes para SLA
                 if (data.message.sender_type === 'contact') {
                     conversationItem.dataset.lastContactMessageAt = data.message.created_at;
+                    if (data.message.id) conversationItem.dataset.lastContactMessageId = data.message.id;
                 } else if (data.message.sender_type === 'agent') {
                     conversationItem.dataset.lastAgentMessageAt = data.message.created_at;
+                    if (data.message.id) conversationItem.dataset.lastAgentMessageId = data.message.id;
                 }
+                applyAwaitingReplyState(conversationItem, data.conversation || {});
                 // Forçar atualização do indicador
                 const convData = window.SLAIndicator.getConversationData(data.conversation_id);
                 if (convData) {
@@ -21116,6 +21189,13 @@ function refreshConversationBadges() {
                     }
                     if (conv.last_agent_message_at) {
                         conversationItem.dataset.lastAgentMessageAt = conv.last_agent_message_at;
+                    }
+                    // IDs decidem quem falou por último (ver whoSpokeLast)
+                    if (conv.last_contact_message_id) {
+                        conversationItem.dataset.lastContactMessageId = conv.last_contact_message_id;
+                    }
+                    if (conv.last_agent_message_id) {
+                        conversationItem.dataset.lastAgentMessageId = conv.last_agent_message_id;
                     }
                     // Reaplicar estado visual de SLA (borda verde quando última msg é do agente)
                     applySlaVisualState(conversationItem, conv);
@@ -23654,9 +23734,9 @@ function renderConversationItemHtml(conv, selectedConversationId) {
 
     const hasInactivityAlert = conv.inactivity_alert_at && conv.inactivity_alert_at !== '';
     const inactivityBadge = hasInactivityAlert ? '<span class="inactivity-alert-badge" title="Conversa inativa - agente não respondeu">Inativo</span>' : '';
-    const awaitingReply = (conv.status || 'open') === 'open'
-        && !!lastContactAt
-        && (!lastAgentAt || (Date.parse(lastContactAt) || 0) > (Date.parse(lastAgentAt) || 0));
+    const lastContactId = conv.last_contact_message_id || '';
+    const lastAgentId = conv.last_agent_message_id || '';
+    const awaitingReply = (conv.status || 'open') === 'open' && whoSpokeLast(conv, null) === 'contact';
     const awaitingBadge = (!hasInactivityAlert && awaitingReply)
         ? '<span class="awaiting-reply-badge" title="Aguardando resposta do agente">Aguardando</span>'
         : '';
@@ -23671,6 +23751,8 @@ function renderConversationItemHtml(conv, selectedConversationId) {
              data-last-message-at="${escapeHtml(lastMessageAt)}"
              data-last-contact-message-at="${escapeHtml(lastContactAt)}"
              data-last-agent-message-at="${escapeHtml(lastAgentAt)}"
+             data-last-contact-message-id="${escapeHtml(String(lastContactId))}"
+             data-last-agent-message-id="${escapeHtml(String(lastAgentId))}"
              data-agent-id="${escapeHtml(conv.agent_id || '')}"
              data-updated-at="${lastMessageAt || new Date().toISOString()}"
              data-onclick="selectConversation">

@@ -287,18 +287,30 @@ if ($phoneInput !== '') {
         // Diagnóstico do próprio arquivo: sem isso, "0 webhooks" é ambíguo
         // (pode ser log rotacionado, período não coberto, ou varredura falhando).
         if ($fh) {
-            $primeiraLinha = fgets($fh);
-            $logInfo['tamanho'] = $size !== false ? round($size / 1048576, 1) . ' MB' : 'desconhecido';
-            $logInfo['inicio']  = $primeiraLinha !== false ? (logLineTimestamp($primeiraLinha) ?? '?') : '?';
+            if ($size === false) {
+                $logInfo['tamanho'] = 'desconhecido';
+            } elseif ($size >= 1048576) {
+                $logInfo['tamanho'] = round($size / 1048576, 1) . ' MB';
+            } else {
+                // Arquivo pequeno = log recém-rotacionado/limpo. Mostrar em KB,
+                // porque "0 MB" esconde justamente esse sinal.
+                $logInfo['tamanho'] = round($size / 1024, 1) . ' KB';
+            }
 
-            if ($size !== false && $size > 200000) {
-                fseek($fh, -200000, SEEK_END);
+            // Primeira linha com timestamp
+            for ($i = 0; $i < 50 && ($l = fgets($fh)) !== false; $i++) {
+                if (($t = logLineTimestamp($l)) !== null) { $logInfo['inicio'] = $t; break; }
+            }
+
+            // Última linha com timestamp — vale para arquivo de qualquer tamanho
+            if ($size !== false && $size > 0) {
+                fseek($fh, max(0, $size - 200000));
                 $ultimoTs = null;
                 while (($l = fgets($fh)) !== false) {
                     $t = logLineTimestamp($l);
                     if ($t !== null) { $ultimoTs = $t; }
                 }
-                $logInfo['fim'] = $ultimoTs ?? '?';
+                $logInfo['fim'] = $ultimoTs;
             }
             rewind($fh);
         }
@@ -642,16 +654,26 @@ if ($phoneInput !== '') {
       <?php if ($logInfo['fim']): ?> · última linha <code><?= h($logInfo['fim']) ?></code><?php endif; ?>
     </div>
     <?php
-      $coberto = $dataRef === '' || (
-          substr($logInfo['inicio'], 0, 10) <= $dataRef
-          && (!$logInfo['fim'] || substr($logInfo['fim'], 0, 10) >= $dataRef)
-      );
+      // Comparar TIMESTAMP completo, não só a data: um log que começa às 13:18
+      // "cobre" a data de hoje mas não cobre nada que aconteceu de manhã.
+      $alvoInicio = $janelaDe !== '' ? $janelaDe : $dataRef . ' 00:00:00';
+      $alvoFim    = $janelaAte !== '' ? $janelaAte : $dataRef . ' 23:59:59';
+      // Tolerância de 60s: um log que começa poucos segundos depois da meia-noite
+      // não é uma lacuna real e não vale um alerta.
+      $faltaInicio = (strtotime($logInfo['inicio']) - strtotime($alvoInicio)) > 60;
+      $faltaFim    = $logInfo['fim'] && strtotime($logInfo['fim']) < strtotime($alvoInicio);
     ?>
-    <?php if (!$coberto): ?>
+    <?php if ($faltaFim): ?>
       <div class="verdict warn">
-        O log NÃO cobre <?= h($dataRef) ?> — ele vai de <?= h($logInfo['inicio']) ?> a <?= h($logInfo['fim'] ?: '?') ?>.
-        O arquivo foi rotacionado ou limpo. Procure o arquivo antigo (quepasa.log.1, .gz) antes de concluir
-        que o webhook não chegou.
+        O log termina em <?= h($logInfo['fim']) ?>, antes do período consultado. Arquivo antigo ou parado.
+      </div>
+    <?php elseif ($faltaInicio): ?>
+      <div class="verdict warn">
+        ⚠️ O log NÃO cobre o período consultado. Ele começa em <strong><?= h($logInfo['inicio']) ?></strong>,
+        mas você procura a partir de <strong><?= h($alvoInicio) ?></strong>.
+        O arquivo foi rotacionado ou limpo depois do ocorrido — logo, "nenhum webhook encontrado"
+        aqui NÃO significa que o webhook não chegou, significa que o rastro já não existe.
+        Procure quepasa.log.1 / .gz, ou use a auditoria (migration 156), que grava no banco e não se perde.
       </div>
     <?php endif; ?>
   <?php endif; ?>

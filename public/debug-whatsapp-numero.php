@@ -91,6 +91,52 @@ function logSeekToTimestamp($fh, int $size, string $target): int
     return $best;
 }
 
+/**
+ * Marcos do processWebhook, na ordem em que o código os grava.
+ * O último marco atingido diz onde a request parou — e o marco seguinte,
+ * que ficou faltando, aponta o trecho de código responsável.
+ */
+function marcosWebhook(): array
+{
+    return [
+        'entrou' => [
+            'needle' => 'processWebhook - Raw body',
+            'label'  => 'Webhook entrou no processWebhook',
+            'falha'  => 'Nada a apontar — é o primeiro marco.',
+        ],
+        'parse' => [
+            'needle' => 'processWebhook - Payload recebido',
+            'label'  => 'Payload lido (trackid/chatid/from extraídos)',
+            'falha'  => 'Morreu na leitura do payload.',
+        ],
+        'conta' => [
+            'needle' => 'CONTA IDENTIFICADA PARA WEBHOOK',
+            'label'  => 'Conta WhatsApp identificada',
+            'falha'  => 'Conta não resolvida: sem trackid/chatid/wid que bata com uma integração cadastrada.',
+        ],
+        'midia' => [
+            'needle' => 'processWebhook - media detect',
+            'label'  => 'Extração de mídia concluída',
+            'falha'  => 'Morreu na extração de mídia. Causa conhecida: campo "url" vindo como objeto de preview de link ({"reference":...}) estoura TypeError em str_contains(). Corrigido no commit 633e8ad.',
+        ],
+        'contato' => [
+            'needle' => 'Buscando contato pelo telefone normalizado',
+            'label'  => 'Resolução de contato iniciada',
+            'falha'  => 'Parou entre a mídia e o contato — normalmente a guarda de "dados incompletos" ou detecção de mensagem enviada (fromme).',
+        ],
+        'conversa' => [
+            'needle' => 'Iniciando criação/busca de conversa',
+            'label'  => 'Criação/busca de conversa iniciada',
+            'falha'  => 'Contato resolvido mas parou antes da conversa. Causa conhecida: resolução de @lid e busca de avatar estourando o max_execution_time. Corrigido nos commits 053ca1d e fdc5f9c.',
+        ],
+        'gravou' => [
+            'needle' => 'Mensagem processada com sucesso',
+            'label'  => 'Mensagem gravada no CRM',
+            'falha'  => 'Conversa resolvida mas a mensagem não foi gravada — ver exceção do ConversationService no bloco bruto abaixo.',
+        ],
+    ];
+}
+
 /** Normaliza "16:40" → "Y-m-d 16:40:00" usando a data de referência */
 function normalizeJanela(string $value, string $refDate, string $defaultSeconds): string
 {
@@ -151,6 +197,7 @@ $contacts     = [];
 $conversations = [];
 $messages     = [];
 $logLines     = [];
+$webhookBlocos = [];
 $errors       = [];
 
 if ($phoneInput !== '') {
@@ -256,29 +303,86 @@ if ($phoneInput !== '') {
                     }
                 }
             } else {
-                // MODO NÚMERO: filtra pelo telefone nos últimos 40 MB do arquivo
+                // MODO NÚMERO: agrupa o log em BLOCOS de webhook e, para cada bloco
+                // que mencione o telefone, marca até onde o processamento chegou.
+                // É isso que responde "por que não chegou": o último marco atingido
+                // aponta a linha exata onde a request morreu.
                 $needles = array_values(array_unique(array_filter([
                     $normalized,
                     preg_replace('/^55/', '', $normalized),
                     $phoneInput,
                 ])));
 
-                $chunk = 40 * 1024 * 1024;
-                if ($size > $chunk) {
-                    fseek($fh, -$chunk, SEEK_END);
-                    fgets($fh); // descartar linha parcial
+                if ($dataRef !== '') {
+                    // Restringe ao dia informado — busca binária evita varrer o arquivo inteiro
+                    fseek($fh, logSeekToTimestamp($fh, $size, $dataRef . ' 00:00:00'));
+                    $limiteData = $dataRef . ' 23:59:59';
+                } else {
+                    $chunk = 40 * 1024 * 1024;
+                    if ($size > $chunk) {
+                        fseek($fh, -$chunk, SEEK_END);
+                        fgets($fh);
+                    }
+                    $limiteData = null;
                 }
 
+                $blocoAtual = null;
+                $lidos = 0;
+
+                $fecharBloco = static function (?array $bloco) use (&$webhookBlocos) {
+                    if ($bloco !== null && $bloco['match']) {
+                        $webhookBlocos[] = $bloco;
+                    }
+                };
+
                 while (($line = fgets($fh)) !== false) {
+                    $lidos++;
+                    $ts = logLineTimestamp($line);
+
+                    if ($ts !== null && $limiteData !== null && $ts > $limiteData) {
+                        break;
+                    }
+
+                    // Início de um novo webhook
+                    if (strpos($line, 'processWebhook - Raw body') !== false
+                        || strpos($line, '=== WEBHOOK WHATSAPP RECEBIDO') !== false) {
+                        $fecharBloco($blocoAtual);
+                        $blocoAtual = ['ts' => $ts, 'linhas' => [], 'match' => false, 'marcos' => []];
+                    }
+
+                    if ($blocoAtual === null) {
+                        continue;
+                    }
+
                     foreach ($needles as $needle) {
                         if (strpos($line, $needle) !== false) {
-                            $logLines[] = rtrim($line);
+                            $blocoAtual['match'] = true;
                             break;
                         }
                     }
-                    if (count($logLines) > 600) {
-                        array_shift($logLines);
+
+                    if (count($blocoAtual['linhas']) < 250) {
+                        $blocoAtual['linhas'][] = rtrim($line);
                     }
+
+                    foreach (marcosWebhook() as $chave => $m) {
+                        if (!isset($blocoAtual['marcos'][$chave]) && strpos($line, $m['needle']) !== false) {
+                            $blocoAtual['marcos'][$chave] = $ts ?? '';
+                        }
+                    }
+
+                    // Trava de segurança: quepasa.log pode ter centenas de MB por dia
+                    if ($lidos > 4000000 || count($webhookBlocos) >= 40) {
+                        $errors[] = 'Varredura interrompida por limite de segurança. Use "De/Até" para reduzir o intervalo.';
+                        break;
+                    }
+                }
+
+                $fecharBloco($blocoAtual);
+
+                // Só as linhas do bloco mais recente vão para a visão bruta
+                if (!empty($webhookBlocos)) {
+                    $logLines = end($webhookBlocos)['linhas'];
                 }
             }
 
@@ -291,7 +395,34 @@ if ($phoneInput !== '') {
 $verdict = null;
 if ($phoneInput !== '') {
     $dropped = array_values(array_filter($audit, fn($a) => in_array($a['status'], ['dropped', 'error', 'fatal'], true)));
-    if (!$auditExists) {
+
+    // O log costuma ser mais conclusivo que o banco: se um webhook do número parou
+    // no meio, o marco faltante diz exatamente onde.
+    $blocoIncompleto = null;
+    foreach (array_reverse($webhookBlocos) as $b) {
+        if (!isset($b['marcos']['gravou'])) {
+            $blocoIncompleto = $b;
+            break;
+        }
+    }
+
+    if ($blocoIncompleto !== null) {
+        $marcos = marcosWebhook();
+        $ultimo = null;
+        $primeiroFaltante = null;
+        foreach ($marcos as $chave => $m) {
+            if (isset($blocoIncompleto['marcos'][$chave])) {
+                $ultimo = $m['label'];
+            } elseif ($primeiroFaltante === null) {
+                $primeiroFaltante = $m;
+            }
+        }
+        $verdict = ['bad',
+            'Webhook de ' . $blocoIncompleto['ts'] . ' CHEGOU mas NÃO gravou a mensagem. '
+            . 'Último marco atingido: "' . ($ultimo ?? 'nenhum') . '". '
+            . 'Parou antes de: "' . ($primeiroFaltante['label'] ?? '—') . '". '
+            . ($primeiroFaltante['falha'] ?? '')];
+    } elseif (!$auditExists) {
         $verdict = ['warn', 'Auditoria não instalada — rode a migration 156 para capturar os próximos webhooks. Abaixo, só o que já existe no banco e nos logs.'];
     } elseif (empty($audit)) {
         $verdict = ['bad', 'NENHUM webhook recebido para este número nas últimas ' . $hours . 'h. O problema está ANTES do CRM: verifique a entrega do webhook no Quepasa (URL, fila, retentativas) e o access log do servidor.'];
@@ -461,12 +592,48 @@ if ($phoneInput !== '') {
     </table>
   <?php endif; ?>
 
+  <h2>5. Webhooks encontrados no log (<?= count($webhookBlocos) ?>)</h2>
+  <?php if (empty($webhookBlocos)): ?>
+    <div class="empty">
+      Nenhum webhook desse número no trecho varrido<?= $dataRef !== '' ? ' em ' . h($dataRef) : '' ?>.
+      Se a cliente mandou mensagem nesse dia e nada aparece aqui, o webhook não chegou ao PHP —
+      verifique a entrega no Quepasa e o access log do servidor.
+    </div>
+  <?php else: ?>
+    <?php $marcos = marcosWebhook(); ?>
+    <table>
+      <tr>
+        <th>Horário</th>
+        <?php foreach ($marcos as $m): ?><th><?= h($m['label']) ?></th><?php endforeach; ?>
+      </tr>
+      <?php foreach ($webhookBlocos as $b): ?>
+      <tr>
+        <td><?= h($b['ts'] ?: '—') ?></td>
+        <?php foreach ($marcos as $chave => $m): ?>
+          <td style="text-align:center">
+            <?php if (isset($b['marcos'][$chave])): ?>
+              <span class="tag st-processed">ok</span>
+            <?php else: ?>
+              <span class="tag st-dropped">não</span>
+            <?php endif; ?>
+          </td>
+        <?php endforeach; ?>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <div class="sub" style="margin-top:8px">
+      A primeira coluna "não" depois de uma sequência de "ok" é onde a request morreu.
+    </div>
+  <?php endif; ?>
+
   <h2>
-    5. logs/quepasa.log (<?= count($logLines) ?> linhas)
+    6. logs/quepasa.log (<?= count($logLines) ?> linhas)
     <?php if ($janelaDe !== ''): ?>
       — trecho bruto de <code><?= h($janelaDe) ?></code> até <code><?= h($janelaAte ?: 'fim') ?></code>
+    <?php elseif (!empty($webhookBlocos)): ?>
+      — bloco do último webhook encontrado para o número
     <?php else: ?>
-      — filtrado pelo número, últimos 40 MB do arquivo
+      — filtrado pelo número
     <?php endif; ?>
   </h2>
   <?php if (empty($logLines)): ?>

@@ -3375,12 +3375,35 @@ class WhatsAppService
                 // Buscar conversa existente com esse contato
                 Logger::quepasa("processWebhook - Buscando conversa existente: contact_id={$contact['id']}, channel=whatsapp, wa_id={$account['id']}, int_id=" . ($account['integration_account_id'] ?? 'NULL'));
                 $conversation = \App\Models\Conversation::findByContactAndChannel(
-                    $contact['id'], 
-                    'whatsapp', 
+                    $contact['id'],
+                    'whatsapp',
                     $account['id'],  // whatsapp_account_id
                     $account['integration_account_id'] ?? null  // integration_account_id
                 );
-                
+
+                // ⚠️ REABRIR conversa fechada — o caminho de ENTRADA já faz isso, este não fazia.
+                // Sem reabrir, a conversa RACHA em duas: o eco da mensagem do agente é gravado
+                // dentro da conversa antiga (que continua 'closed' e com updated_at parado),
+                // e quando o cliente responde o caminho de entrada olha esse updated_at velho,
+                // conclui "fechada há meses", cria uma conversa NOVA e as duas pontas do
+                // diálogo ficam separadas. O agente vê a conversa dele sem as respostas.
+                //
+                // Caso real 2026-09-03 (contato 5084): agente escreveu 11:11:32–11:12:52 e caiu
+                // na conv 7339, fechada desde 31/07; o cliente respondeu 11:13:10 e abriu a
+                // conv 14745. Da conv 7339 ninguém mais viu resposta.
+                if ($conversation && in_array($conversation['status'], ['closed', 'resolved'], true)) {
+                    Logger::quepasa("processWebhook - Eco outgoing em conversa {$conversation['status']} (ID={$conversation['id']}). Reabrindo para não rachar a conversa.");
+                    try {
+                        \App\Services\ConversationService::reopen($conversation['id']);
+                        $conversation = \App\Models\Conversation::find($conversation['id']);
+                        Logger::quepasa("processWebhook - ✅ Conversa {$conversation['id']} reaberta pelo eco outgoing. Novo status: {$conversation['status']}");
+                    } catch (\Throwable $e) {
+                        Logger::quepasa("processWebhook - ⚠️ Erro ao reabrir pelo eco outgoing: " . $e->getMessage() . ". Aplicando status=open direto.");
+                        \App\Models\Conversation::update($conversation['id'], ['status' => 'open']);
+                        $conversation['status'] = 'open';
+                    }
+                }
+
                 if (!$conversation) {
                     Logger::quepasa("processWebhook - Conversa não encontrada, criando nova para mensagem enviada...");
                     try {
@@ -3572,7 +3595,18 @@ class WhatsAppService
 
                     $messageId = \App\Models\Message::createMessage($messageData);
                     Logger::quepasa("processWebhook - Eco OUTGOING gravado no DB: messageId={$messageId}, external_id=" . ($webhookMsgId ?? 'NULL'));
-                } catch (\Exception $e) {
+
+                    // Message::createMessage grava por SQL direto e NÃO toca na conversa.
+                    // Precisamos avançar o updated_at: é ele que o caminho de entrada usa para
+                    // calcular o período de graça de reabertura. Deixá-lo parado foi o que fez
+                    // a conversa 7339 parecer "fechada desde julho" segundos depois de o agente
+                    // escrever nela, provocando a criação de uma conversa duplicada.
+                    try {
+                        \App\Models\Conversation::update($conversation['id'], ['status' => $conversation['status'] ?? 'open']);
+                    } catch (\Throwable $touchEx) {
+                        Logger::quepasa("processWebhook - ⚠️ Não foi possível atualizar updated_at da conversa {$conversation['id']}: " . $touchEx->getMessage());
+                    }
+                } catch (\Throwable $e) {
                     Logger::quepasa("processWebhook - ERRO ao gravar eco OUTGOING: " . $e->getMessage());
                 }
                 

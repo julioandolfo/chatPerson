@@ -198,6 +198,7 @@ $conversations = [];
 $messages     = [];
 $logLines     = [];
 $webhookBlocos = [];
+$logInfo      = ['tamanho' => null, 'inicio' => null, 'fim' => null];
 $errors       = [];
 
 if ($phoneInput !== '') {
@@ -282,6 +283,25 @@ if ($phoneInput !== '') {
     } else {
         $fh   = @fopen($logFile, 'r');
         $size = @filesize($logFile);
+
+        // Diagnóstico do próprio arquivo: sem isso, "0 webhooks" é ambíguo
+        // (pode ser log rotacionado, período não coberto, ou varredura falhando).
+        if ($fh) {
+            $primeiraLinha = fgets($fh);
+            $logInfo['tamanho'] = $size !== false ? round($size / 1048576, 1) . ' MB' : 'desconhecido';
+            $logInfo['inicio']  = $primeiraLinha !== false ? (logLineTimestamp($primeiraLinha) ?? '?') : '?';
+
+            if ($size !== false && $size > 200000) {
+                fseek($fh, -200000, SEEK_END);
+                $ultimoTs = null;
+                while (($l = fgets($fh)) !== false) {
+                    $t = logLineTimestamp($l);
+                    if ($t !== null) { $ultimoTs = $t; }
+                }
+                $logInfo['fim'] = $ultimoTs ?? '?';
+            }
+            rewind($fh);
+        }
 
         if ($fh && $size !== false) {
             if ($janelaDe !== '') {
@@ -406,7 +426,30 @@ if ($phoneInput !== '') {
         }
     }
 
-    if ($blocoIncompleto !== null) {
+    // Conversa RACHADA: mensagens do mesmo contato, no mesmo dia, espalhadas em
+    // conversas diferentes. O agente fica olhando uma e o cliente responde na outra,
+    // o que parece "a mensagem não chegou" mesmo com tudo gravado.
+    $porDia = [];
+    foreach ($messages as $m) {
+        $dia = substr($m['created_at'], 0, 10);
+        $porDia[$dia][$m['conversation_id']] = true;
+    }
+    $diaRachado = null;
+    foreach ($porDia as $dia => $convs) {
+        if (count($convs) > 1) {
+            $diaRachado = ['dia' => $dia, 'convs' => array_keys($convs)];
+            break;
+        }
+    }
+
+    if ($diaRachado !== null) {
+        $verdict = ['bad',
+            'CONVERSA RACHADA em ' . $diaRachado['dia'] . ': mensagens do mesmo contato ficaram divididas entre as conversas '
+            . implode(' e ', $diaRachado['convs']) . '. As mensagens FORAM gravadas — mas em conversas diferentes, '
+            . 'então quem está olhando uma delas não vê as respostas e parece que "não chegou". '
+            . 'Causa: o eco de mensagem enviada gravava numa conversa fechada sem reabri-la nem atualizar o updated_at; '
+            . 'a resposta do cliente então via "fechada há muito tempo" e abria uma conversa nova. Corrigido no commit desta branch.'];
+    } elseif ($blocoIncompleto !== null) {
         $marcos = marcosWebhook();
         $ultimo = null;
         $primeiroFaltante = null;
@@ -593,11 +636,29 @@ if ($phoneInput !== '') {
   <?php endif; ?>
 
   <h2>5. Webhooks encontrados no log (<?= count($webhookBlocos) ?>)</h2>
+  <?php if ($logInfo['inicio']): ?>
+    <div class="sub">
+      Arquivo: <?= h($logInfo['tamanho'] ?? '?') ?> · primeira linha <code><?= h($logInfo['inicio']) ?></code>
+      <?php if ($logInfo['fim']): ?> · última linha <code><?= h($logInfo['fim']) ?></code><?php endif; ?>
+    </div>
+    <?php
+      $coberto = $dataRef === '' || (
+          substr($logInfo['inicio'], 0, 10) <= $dataRef
+          && (!$logInfo['fim'] || substr($logInfo['fim'], 0, 10) >= $dataRef)
+      );
+    ?>
+    <?php if (!$coberto): ?>
+      <div class="verdict warn">
+        O log NÃO cobre <?= h($dataRef) ?> — ele vai de <?= h($logInfo['inicio']) ?> a <?= h($logInfo['fim'] ?: '?') ?>.
+        O arquivo foi rotacionado ou limpo. Procure o arquivo antigo (quepasa.log.1, .gz) antes de concluir
+        que o webhook não chegou.
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
   <?php if (empty($webhookBlocos)): ?>
     <div class="empty">
       Nenhum webhook desse número no trecho varrido<?= $dataRef !== '' ? ' em ' . h($dataRef) : '' ?>.
-      Se a cliente mandou mensagem nesse dia e nada aparece aqui, o webhook não chegou ao PHP —
-      verifique a entrega no Quepasa e o access log do servidor.
+      Confira a cobertura do arquivo acima antes de concluir que o webhook não chegou ao PHP.
     </div>
   <?php else: ?>
     <?php $marcos = marcosWebhook(); ?>

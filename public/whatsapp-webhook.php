@@ -58,6 +58,43 @@ if (!$payload) {
 Logger::quepasa("[rid={$rid}] Payload decodificado - Keys: " . implode(', ', array_keys($payload)));
 Logger::quepasa("[rid={$rid}] Payload completo: " . json_encode($payload, JSON_UNESCAPED_UNICODE));
 
+// ══════════════════════════════════════════════════════════════════════════
+// RESPONDER ANTES DE PROCESSAR
+//
+// O Quepasa aborta o webhook em 10s e NÃO tenta de novo — quando estoura, a
+// mensagem é perdida em definitivo. Do log do Quepasa em 2026-09-03:
+//
+//   level=warning msg="webhook timeout after 10s"
+//   level=error   msg="webhook failed with status 0: context deadline exceeded"
+//   level=error   msg="error on dispatch: ..."      msgid=2A4A224CE289A69C4BFB
+//
+// E as mensagens RECEBIDAS estavam consumindo 4 a 5 segundos de forma
+// consistente (as de eco, que não fazem esse trabalho todo, levam 25-70ms).
+// Ou seja: metade do orçamento já era gasta no caminho normal, e qualquer
+// lentidão adicional — download de mídia, resolução de @lid, avatar, banco
+// mais carregado — jogava a request para além dos 10s.
+//
+// Devolvendo 200 imediatamente e processando depois, o tempo de resposta cai
+// para dezenas de milissegundos e o timeout deixa de ser alcançável. Como o
+// Quepasa não repete a entrega de qualquer forma, não há nada a perder: o
+// desfecho real fica registrado em whatsapp_webhook_audit.
+// ══════════════════════════════════════════════════════════════════════════
+ignore_user_abort(true);
+
+http_response_code(200);
+header('Content-Type: application/json');
+echo json_encode(['success' => true]);
+
+if (function_exists('fastcgi_finish_request')) {
+    fastcgi_finish_request();
+} else {
+    // Sem PHP-FPM: fecha o buffer para liberar o cliente o quanto antes
+    if (ob_get_level() > 0) {
+        @ob_end_flush();
+    }
+    @flush();
+}
+
 try {
     // Detectar se é webhook da Evolution API
     // Evolution API envia: { "event": "CONNECTION_UPDATE", "instance": "nome", "data": { ... } }
@@ -81,22 +118,14 @@ try {
     // Finaliza a auditoria caso o handler não tenha registrado desfecho próprio
     // (eco outgoing, Evolution, eventos de status). No-op se já finalizada.
     WebhookAuditService::processed();
-
-    // Responder com sucesso
-    http_response_code(200);
-    echo json_encode(['success' => true]);
 } catch (\Throwable $e) {
     // ⚠️ Throwable (não só Exception): TypeError/Error de PHP 8 são \Error e
     // passavam batido aqui, matando a request sem log e sem gravar a mensagem.
     Logger::error("WhatsApp Webhook Error (rid={$rid}): " . get_class($e) . ' - ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
     Logger::error("Stack trace: " . $e->getTraceAsString());
 
+    // A resposta 200 já foi enviada ao Quepasa — o que importa agora é deixar o
+    // erro registrado. Devolver 500 não adiantaria nada: o Quepasa não repete.
     WebhookAuditService::error(get_class($e) . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
-
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error' => $e->getMessage()
-    ]);
 }
 

@@ -120,6 +120,34 @@ class WebhookController
                 return;
             }
             
+            // ══════════════════════════════════════════════════════════════
+            // RESPONDER ANTES DE PROCESSAR
+            //
+            // O Quepasa aborta em 10s e NÃO reenvia — estourou, mensagem perdida.
+            // Log do Quepasa em 2026-09-03: "webhook timeout after 10s" seguido de
+            // "error on dispatch" no msgid 2A4A224CE289A69C4BFB, sem nova tentativa.
+            // As mensagens recebidas gastavam 4-5s de forma consistente (as de eco,
+            // 25-70ms), ou seja, metade do orçamento no caminho feliz.
+            //
+            // Respondendo primeiro, o tempo de resposta cai para milissegundos e o
+            // timeout deixa de ser alcançável. O desfecho real fica em
+            // whatsapp_webhook_audit.
+            // ══════════════════════════════════════════════════════════════
+            ignore_user_abort(true);
+
+            http_response_code(200);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true]);
+
+            if (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            } else {
+                if (ob_get_level() > 0) {
+                    @ob_end_flush();
+                }
+                @flush();
+            }
+
             // Detectar se é webhook da Evolution API
             // Evolution envia: { "event": "CONNECTION_UPDATE", "instance": "nome", "data": { ... } }
             $isEvolution = isset($data['event']) && isset($data['instance']);
@@ -138,20 +166,14 @@ class WebhookController
             // (eco outgoing, Evolution, eventos de status). No-op se já finalizada.
             \App\Services\WebhookAuditService::processed();
 
-            // Responder com sucesso
-            Response::json(['success' => true]);
-
         } catch (\Throwable $e) {
-            // ⚠️ Throwable: TypeError/Error do PHP 8 não são \Exception e escapavam daqui
+            // ⚠️ Throwable: TypeError/Error do PHP 8 não são \Exception e escapavam daqui.
+            // A resposta 200 já foi enviada — resta registrar o erro; devolver 500 não
+            // ajudaria, o Quepasa não repete a entrega.
             \App\Helpers\Logger::error("WhatsApp webhook error: " . get_class($e) . ' - ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
             \App\Helpers\Logger::error("Stack trace: " . $e->getTraceAsString());
 
             \App\Services\WebhookAuditService::error(get_class($e) . ': ' . $e->getMessage() . ' em ' . $e->getFile() . ':' . $e->getLine());
-
-            Response::json([
-                'success' => false,
-                'error' => $e->getMessage()
-            ], 500);
         }
     }
     

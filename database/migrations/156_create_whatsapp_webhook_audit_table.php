@@ -13,7 +13,10 @@
  */
 
 function up_create_whatsapp_webhook_audit_table() {
-    $db = \App\Helpers\Database::getInstance();
+    // Aceita os dois runners: database/run_migrations.php (define $pdo global e
+    // NÃO carrega o autoloader) e os scripts de public/ (que sobem o bootstrap).
+    global $pdo;
+    $db = isset($pdo) ? $pdo : \App\Helpers\Database::getInstance();
 
     $tables = $db->query("SHOW TABLES LIKE 'whatsapp_webhook_audit'")->fetchAll();
     if (!empty($tables)) {
@@ -55,7 +58,8 @@ function up_create_whatsapp_webhook_audit_table() {
 }
 
 function down_create_whatsapp_webhook_audit_table() {
-    $db = \App\Helpers\Database::getInstance();
+    global $pdo;
+    $db = isset($pdo) ? $pdo : \App\Helpers\Database::getInstance();
     $db->exec("DROP TABLE IF EXISTS whatsapp_webhook_audit");
     echo "✅ Tabela 'whatsapp_webhook_audit' removida!\n";
 }

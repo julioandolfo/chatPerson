@@ -1257,6 +1257,11 @@ ob_start();
                                 Auto-atribuição
                             </a>
                         </li>
+                        <li class="nav-item mt-2">
+                            <a class="nav-link text-active-primary ms-0 me-10" data-bs-toggle="tab" href="#kt_tab_stage_followup">
+                                Follow-up
+                            </a>
+                        </li>
                     </ul>
                     <!--end::Tabs-->
                     
@@ -1446,6 +1451,53 @@ ob_start();
                             </div>
                         </div>
                         <!--end::Tab Pane - Auto-atribuição-->
+
+                        <!--begin::Tab Pane - Follow-up-->
+                        <div class="tab-pane fade" id="kt_tab_stage_followup" role="tabpanel">
+                            <div class="notice d-flex bg-light-primary rounded border-primary border border-dashed p-4 mb-7">
+                                <i class="ki-duotone ki-time fs-2tx text-primary me-4"><span class="path1"></span><span class="path2"></span></i>
+                                <div class="fw-semibold">
+                                    <h4 class="text-gray-900 fw-bold">Mensagens para continuar a conversa</h4>
+                                    <div class="fs-7 text-gray-600">
+                                        Quando a última mensagem da conversa for <strong>sua</strong> e o cliente não responder, o sistema envia esta sequência.
+                                        Os tempos contam a partir da sua última mensagem. A sequência para quando o cliente responde, a conversa é encerrada ou muda de etapa,
+                                        e o agente pode cancelá-la pelo chat. Cada nova mensagem sua liga a sequência de novo.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sem atributo name: estes campos são salvos separadamente em /funnel-stages/{id}/followup -->
+                            <div class="fv-row mb-5">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_followup_enabled" />
+                                    <label class="form-check-label fw-semibold" for="kt_stage_followup_enabled">Ativar follow-up automático nesta etapa</label>
+                                </div>
+                            </div>
+                            <div class="fv-row mb-3">
+                                <div class="form-check form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_followup_business_hours" />
+                                    <label class="form-check-label" for="kt_stage_followup_business_hours">Enviar apenas em horário de atendimento</label>
+                                </div>
+                                <div class="form-text ms-9">Se o horário cair fora do expediente, a mensagem é adiada para a próxima abertura.</div>
+                            </div>
+                            <div class="fv-row mb-7">
+                                <div class="form-check form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_followup_only_human" />
+                                    <label class="form-check-label" for="kt_stage_followup_only_human">Ativar somente após mensagens de agentes humanos</label>
+                                </div>
+                                <div class="form-text ms-9">Se desmarcado, mensagens enviadas por IA e automações também ligam a sequência.</div>
+                            </div>
+
+                            <div id="kt_stage_followup_steps"></div>
+
+                            <button type="button" class="btn btn-sm btn-light-primary" id="kt_stage_followup_add">
+                                <i class="ki-duotone ki-plus fs-3"></i> Adicionar mensagem
+                            </button>
+                            <div class="form-text mt-3">
+                                Variáveis: <code>{{contact.name}}</code> <code>{{agent.name}}</code> <code>{{contact.phone}}</code> <code>{{date}}</code> <code>{{time}}</code>
+                            </div>
+                        </div>
+                        <!--end::Tab Pane - Follow-up-->
                     </div>
                     <!--end::Tab Content-->
                 </div>

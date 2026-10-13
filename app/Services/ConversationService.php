@@ -2028,7 +2028,17 @@ class ConversationService
         } catch (\Exception $e) {
             \App\Helpers\Logger::error("Erro ao disparar MessageReceivedListener: " . $e->getMessage());
         }
-        
+
+        // ✅ Follow-up por etapa: toda mensagem nossa (exceto nota) passa a ser a "última mensagem"
+        // e arma/rearma a sequência de "continuar conversa". skipAutomations = eco de webhook, ignorar.
+        if ($senderType === 'agent' && $messageType !== 'note' && !$skipAutomations) {
+            try {
+                StageFollowupService::onOutgoingMessage($conversation, (int)$messageId, $senderId > 0 && $aiAgentId === null);
+            } catch (\Throwable $e) {
+                \App\Helpers\Logger::error("Erro ao armar follow-up por etapa (conv={$conversationId}): " . $e->getMessage());
+            }
+        }
+
         // ✅ NOVO: Se agente HUMANO enviou mensagem, PARAR todas as automações ativas (chatbot, IA, etc)
         if ($senderType === 'agent' && $senderId > 0 && $aiAgentId === null) {
             \App\Helpers\Logger::automation("🛑 Agente humano (ID: {$senderId}) enviou mensagem - PARANDO automações ativas...");

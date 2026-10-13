@@ -10,6 +10,7 @@ use App\Controllers\ConversationController;
 use App\Controllers\ContactController;
 use App\Controllers\ContactAgentController;
 use App\Controllers\FunnelController;
+use App\Controllers\StageFollowupController;
 use App\Controllers\AutomationController;
 use App\Controllers\AgentController;
 use App\Controllers\UserController;
@@ -187,6 +188,10 @@ Router::delete('/conversations/{id}/scheduled-messages/{messageId}', [Conversati
 Router::post('/conversations/{id}/reminders', [ConversationController::class, 'createReminder'], ['Authentication']);
 Router::get('/conversations/{id}/reminders', [ConversationController::class, 'getReminders'], ['Authentication']);
 Router::post('/reminders/{reminderId}/resolve', [ConversationController::class, 'resolveReminder'], ['Authentication']);
+// Rotas de follow-up por etapa (aviso no chat + cancelar/reativar)
+Router::get('/conversations/{id}/stage-followup', [StageFollowupController::class, 'getConversationStatus'], ['Authentication']);
+Router::post('/conversations/{id}/stage-followup/cancel', [StageFollowupController::class, 'cancel'], ['Authentication']);
+Router::post('/conversations/{id}/stage-followup/reactivate', [StageFollowupController::class, 'reactivate'], ['Authentication']);
 
 // Rotas de Mockups (Gerador de Mockup com IA)
 Router::post('/api/conversations/{id}/mockups/generate', [MockupController::class, 'generate'], ['Authentication']);
@@ -258,6 +263,9 @@ Router::post('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'update
 Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'deleteStage'], ['Authentication']);
 Router::get('/funnels/{id}/metrics', [FunnelController::class, 'getFunnelMetrics'], ['Authentication']);
 Router::get('/funnels/{id}/stages/metrics', [FunnelController::class, 'getStageMetrics'], ['Authentication']);
+// Configuração de follow-up por etapa ("vamos continuar?")
+Router::get('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'getStageConfig'], ['Authentication']);
+Router::post('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'saveStageConfig'], ['Authentication']);
 
 // Rotas de Automações
 Router::get('/automations', [AutomationController::class, 'index'], ['Authentication']);

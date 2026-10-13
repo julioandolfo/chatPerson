@@ -1,0 +1,17 @@
+# Não vai para a imagem: reduz o contexto de build (~235MB → ~30MB) e o tamanho da imagem
+.git
+.github
+.env
+.env.*
+vendor
+node_modules
+**/node_modules
+
+# Fonte do tema Metronic: usada só pelo scripts/copy-metronic.php (instalação única).
+# As telas usam as cópias em public/assets.
+metronic
+
+# Dados de runtime (montados como volume no servidor, não devem ir na imagem)
+storage/logs
+storage/cache
+whatsapp-service/media

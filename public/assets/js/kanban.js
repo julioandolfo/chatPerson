@@ -342,6 +342,8 @@ function editStage(stageId, name, description, color) {
                 // Mostrar/ocultar campos de auto-atribuição
                 toggleAutoAssignFields();
                 
+                stageFollowupLoad(stageId);
+                
                 const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
                 modal.show();
             } else {
@@ -352,6 +354,7 @@ function editStage(stageId, name, description, color) {
                 document.getElementById("kt_stage_description").value = description || "";
                 document.getElementById("kt_stage_color").value = color || "#009ef7";
                 document.getElementById("kt_stage_default").checked = false;
+                stageFollowupLoad(stageId);
                 
                 const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
                 modal.show();
@@ -366,10 +369,143 @@ function editStage(stageId, name, description, color) {
             document.getElementById("kt_stage_description").value = description || "";
             document.getElementById("kt_stage_color").value = color || "#009ef7";
             document.getElementById("kt_stage_default").checked = false;
+            stageFollowupLoad(stageId);
             
             const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
             modal.show();
         });
+}
+
+// ============================================================================
+// FOLLOW-UP POR ETAPA ("vamos continuar?")
+// ============================================================================
+
+function stageFollowupUrl(stageId) {
+    return window.KANBAN_CONFIG.BASE_URL + "/funnel-stages/" + stageId + "/followup";
+}
+
+function stageFollowupEscape(text) {
+    const div = document.createElement("div");
+    div.textContent = text == null ? "" : String(text);
+    return div.innerHTML;
+}
+
+function stageFollowupRenumber() {
+    document.querySelectorAll("#kt_stage_followup_steps .stage-followup-step").forEach((row, i) => {
+        row.querySelector(".stage-followup-step-number").textContent = "Mensagem " + (i + 1);
+    });
+}
+
+function stageFollowupAddStep(step) {
+    const container = document.getElementById("kt_stage_followup_steps");
+    if (!container) return;
+    step = step || { delay_value: "", delay_unit: "hours", message: "" };
+
+    const row = document.createElement("div");
+    row.className = "stage-followup-step border border-dashed border-gray-300 rounded p-4 mb-4";
+    row.innerHTML = `
+        <div class="d-flex align-items-center mb-3">
+            <span class="fw-bold text-gray-800 stage-followup-step-number"></span>
+            <span class="text-muted fs-7 ms-3">enviar após</span>
+            <input type="number" min="1" class="form-control form-control-sm form-control-solid w-80px ms-2 stage-followup-delay" value="${stageFollowupEscape(step.delay_value)}" />
+            <select class="form-select form-select-sm form-select-solid w-125px ms-2 stage-followup-unit">
+                <option value="minutes">minutos</option>
+                <option value="hours">horas</option>
+                <option value="days">dias</option>
+            </select>
+            <span class="text-muted fs-7 ms-2">da sua última mensagem</span>
+            <button type="button" class="btn btn-sm btn-icon btn-light-danger ms-auto stage-followup-remove" title="Remover">
+                <i class="ki-duotone ki-trash fs-5"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+            </button>
+        </div>
+        <textarea class="form-control form-control-solid stage-followup-message" rows="2" placeholder="Ex: Oi {{contact.name}}, vamos continuar?">${stageFollowupEscape(step.message)}</textarea>
+    `;
+    row.querySelector(".stage-followup-unit").value = step.delay_unit || "hours";
+    row.querySelector(".stage-followup-remove").addEventListener("click", function() {
+        row.remove();
+        stageFollowupRenumber();
+    });
+    container.appendChild(row);
+    stageFollowupRenumber();
+}
+
+function stageFollowupFill(config) {
+    config = config || {};
+    document.getElementById("kt_stage_followup_enabled").checked = !!config.enabled;
+    document.getElementById("kt_stage_followup_business_hours").checked = !!config.only_business_hours;
+    document.getElementById("kt_stage_followup_only_human").checked = !!config.only_human_messages;
+    document.getElementById("kt_stage_followup_steps").innerHTML = "";
+    (config.steps || []).forEach(step => stageFollowupAddStep(step));
+}
+
+function stageFollowupLoad(stageId) {
+    stageFollowupFill(null);
+    if (!stageId || !document.getElementById("kt_stage_followup_steps")) return;
+
+    fetch(stageFollowupUrl(stageId), { headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" } })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) stageFollowupFill(data.config);
+        })
+        .catch(err => console.error("Erro ao carregar follow-up da etapa:", err));
+}
+
+function stageFollowupCollect() {
+    const steps = Array.from(document.querySelectorAll("#kt_stage_followup_steps .stage-followup-step")).map(row => ({
+        delay_value: parseInt(row.querySelector(".stage-followup-delay").value, 10) || 0,
+        delay_unit: row.querySelector(".stage-followup-unit").value,
+        message: row.querySelector(".stage-followup-message").value.trim()
+    }));
+    return {
+        enabled: document.getElementById("kt_stage_followup_enabled").checked,
+        only_business_hours: document.getElementById("kt_stage_followup_business_hours").checked,
+        only_human_messages: document.getElementById("kt_stage_followup_only_human").checked,
+        steps: steps
+    };
+}
+
+/**
+ * Salva o follow-up da etapa. Resolve com null em caso de sucesso (ou se não há o que salvar)
+ * e com a mensagem de erro caso contrário.
+ */
+function stageFollowupSave(stageId, isNewStage) {
+    if (!stageId || !document.getElementById("kt_stage_followup_steps")) return Promise.resolve(null);
+    const payload = stageFollowupCollect();
+    // Etapa nova sem nada configurado: não criar registro à toa
+    if (isNewStage && !payload.enabled && payload.steps.length === 0) return Promise.resolve(null);
+
+    return fetch(stageFollowupUrl(stageId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(data => data.success ? null : (data.message || "Erro ao salvar follow-up"))
+        .catch(err => "Erro ao salvar follow-up: " + err.message);
+}
+
+/**
+ * Validação no navegador (o servidor valida de novo) para não salvar a etapa e falhar no follow-up
+ */
+function stageFollowupValidate() {
+    if (!document.getElementById("kt_stage_followup_steps")) return null;
+    const payload = stageFollowupCollect();
+    const factor = { minutes: 1, hours: 60, days: 1440 };
+    if (payload.enabled && payload.steps.length === 0) {
+        return "Adicione pelo menos uma mensagem para ativar o follow-up.";
+    }
+    let previous = 0;
+    for (let i = 0; i < payload.steps.length; i++) {
+        const step = payload.steps[i];
+        if (!step.message) return "Mensagem " + (i + 1) + ": o texto é obrigatório.";
+        if (step.delay_value < 1) return "Mensagem " + (i + 1) + ": o tempo deve ser maior que zero.";
+        const minutes = step.delay_value * (factor[step.delay_unit] || 60);
+        if (minutes <= previous) {
+            return "Mensagem " + (i + 1) + ": o tempo deve ser maior que o da mensagem anterior (os tempos contam a partir da sua última mensagem).";
+        }
+        previous = minutes;
+    }
+    return null;
 }
 
 function toggleAutoAssignFields() {
@@ -591,6 +727,14 @@ document.addEventListener("DOMContentLoaded", function() {
             
             const stageId = document.getElementById("kt_stage_id").value;
             const isEdit = stageId !== "";
+            
+            const followupError = stageFollowupValidate();
+            if (followupError) {
+                const followupTab = document.querySelector('a[href="#kt_tab_stage_followup"]');
+                if (followupTab) bootstrap.Tab.getOrCreateInstance(followupTab).show();
+                Swal.fire({ icon: 'warning', title: 'Follow-up', text: followupError, confirmButtonText: 'OK' });
+                return;
+            }
             const url = isEdit 
                 ? window.KANBAN_CONFIG.funnelBaseUrl + "/stages/" + stageId
                 : window.KANBAN_CONFIG.funnelBaseUrl + "/stages";
@@ -696,9 +840,21 @@ document.addEventListener("DOMContentLoaded", function() {
                 
                 if (data.success) {
                     console.log("✅ Estágio salvo com sucesso!");
-                    const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_stage"));
-                    modal.hide();
-                    location.reload();
+                    const savedStageId = isEdit ? stageId : (data.id || (data.stage && data.stage.id));
+                    stageFollowupSave(savedStageId, !isEdit).then(followupSaveError => {
+                        const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_stage"));
+                        if (followupSaveError) {
+                            Swal.fire({
+                                icon: 'warning',
+                                title: 'Etapa salva, mas o follow-up não',
+                                text: followupSaveError,
+                                confirmButtonText: 'OK'
+                            }).then(() => location.reload());
+                            return;
+                        }
+                        modal.hide();
+                        location.reload();
+                    });
                 } else {
                     console.error("❌ Erro ao salvar:", data.message);
                     Swal.fire({
@@ -737,7 +893,15 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById("kt_modal_stage_title").textContent = "Novo Estágio";
             document.getElementById("kt_stage_id").value = "";
             document.getElementById("kt_stage_color").value = "#009ef7";
+            if (document.getElementById("kt_stage_followup_steps")) stageFollowupFill(null);
         });
+        
+        const followupAddBtn = document.getElementById("kt_stage_followup_add");
+        if (followupAddBtn) {
+            followupAddBtn.addEventListener("click", function() {
+                stageFollowupAddStep();
+            });
+        }
     }
     
     // Abrir modal de novo estágio quando clicar no botão

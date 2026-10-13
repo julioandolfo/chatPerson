@@ -240,6 +240,11 @@ try {
         ChatbotTimeoutJob::run();
     }, 15);
 
+    // ✅ Follow-up por etapa do funil ("vamos continuar?") — executar sempre
+    cronRunJob('StageFollowupJob', function() {
+        \App\Jobs\StageFollowupJob::run();
+    }, 30);
+
     // ✅ Reprocessar fila de rate limit de mídia (executar sempre)
     cronRunJob('MediaRateRetryJob', function() {
         \App\Jobs\MediaRateRetryJob::run();

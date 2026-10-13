@@ -4583,6 +4583,14 @@ function getChannelInfo(channel) {
             <?php endif; ?>
         </div>
         
+        <!-- Banner follow-up por etapa ("vamos continuar?") -->
+        <div id="stageFollowupBanner" class="d-none" style="padding: 8px 16px; border-top: 1px solid #b5d7ff; background: linear-gradient(135deg, #eef6ff 0%, #e1efff 100%); display: flex; align-items: center; gap: 10px;">
+            <i class="ki-duotone ki-time fs-4 text-primary" id="stageFollowupBannerIcon"><span class="path1"></span><span class="path2"></span></i>
+            <span class="fs-7 text-gray-700 flex-grow-1" id="stageFollowupBannerText" style="min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+            <button type="button" class="btn btn-sm btn-light flex-shrink-0" onclick="showStageFollowupSteps()">Ver sequência</button>
+            <button type="button" class="btn btn-sm flex-shrink-0" id="stageFollowupActionBtn"></button>
+        </div>
+
         <!-- Banner janela 24h Cloud API -->
         <div id="cloudWindowBanner" class="d-none" style="padding: 8px 16px; background: linear-gradient(135deg, #fff3cd 0%, #ffeeba 100%); border-top: 1px solid #ffc107; display: flex; align-items: center; gap: 10px;">
             <i class="ki-duotone ki-time fs-4 text-warning"><span class="path1"></span><span class="path2"></span></i>
@@ -9652,6 +9660,9 @@ function selectConversation(id) {
 
             // Verificar janela 24h para conversas Cloud API
             checkAndShowCloudWindowBanner(id);
+
+            // Follow-up por etapa (aviso + cancelar)
+            loadStageFollowup(id);
             
             // Atualizar timeline quando conversa é selecionada
             updateConversationTimeline(data.conversation.id);
@@ -12603,6 +12614,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (accessRestricted) {
             console.log('🔒 Acesso restrito - não carregando dados adicionais');
             return; // Não fazer mais nada
+        }
+
+        if (typeof loadStageFollowup === 'function') {
+            loadStageFollowup(currentConversationId);
         }
         
         // Se já temos dados da conversa do PHP, usar diretamente
@@ -16233,6 +16248,9 @@ function sendMessage() {
             }
             
             updateConversationInList(conversationId, message, data.message?.id || null);
+            
+            // A mensagem enviada passa a ser a "última": o follow-up da etapa é (re)ligado
+            if (!isNote) scheduleStageFollowupRefresh(conversationId, 600);
         } else {
             _showMessageError(tempMessage.id, data.message || 'Erro desconhecido', conversationId, finalMessage, isNote, replyContext, filesToRetry);
         }
@@ -25858,6 +25876,196 @@ function submitWaCloudTemplate() {
     .finally(() => {
         btn.disabled = false;
         btn.innerHTML = '<i class="ki-duotone ki-send fs-4 me-1"><span class="path1"></span><span class="path2"></span></i> Enviar Template';
+    });
+}
+
+// ============================================================================
+// FOLLOW-UP POR ETAPA ("vamos continuar?")
+// Aviso acima da caixa de mensagem mostrando a próxima mensagem automática,
+// com botão para o agente cancelar a sequência nesta conversa.
+// ============================================================================
+let _stageFollowupConvId = null;
+let _stageFollowupData = null;
+let _stageFollowupTicker = null;
+let _stageFollowupRefreshTimeout = null;
+let _stageFollowupLastAutoRefresh = 0;
+
+function _stageFollowupEscape(text) {
+    const div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+}
+
+function loadStageFollowup(conversationId) {
+    if (!conversationId) return;
+    if (_stageFollowupConvId !== parseInt(conversationId)) {
+        _stageFollowupData = null;
+        renderStageFollowupBanner();
+    }
+    _stageFollowupConvId = parseInt(conversationId);
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/stage-followup`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (_stageFollowupConvId !== parseInt(conversationId)) return; // usuário já trocou de conversa
+        _stageFollowupData = data && data.success ? data : null;
+        renderStageFollowupBanner();
+    })
+    .catch(() => {
+        if (_stageFollowupConvId !== parseInt(conversationId)) return;
+        _stageFollowupData = null;
+        renderStageFollowupBanner();
+    });
+}
+
+function scheduleStageFollowupRefresh(conversationId, delayMs = 1500) {
+    if (!conversationId || parseInt(conversationId) !== parseInt(window.currentConversationId)) return;
+    clearTimeout(_stageFollowupRefreshTimeout);
+    _stageFollowupRefreshTimeout = setTimeout(() => loadStageFollowup(conversationId), delayMs);
+}
+
+// Nova mensagem (WebSocket ou polling) na conversa aberta: cliente respondeu ou saiu mensagem nossa
+document.addEventListener('realtime:new_message', function (e) {
+    const detail = e.detail || {};
+    if (detail.conversation_id && parseInt(detail.conversation_id) === parseInt(window.currentConversationId)) {
+        scheduleStageFollowupRefresh(detail.conversation_id);
+    }
+});
+
+function _formatStageFollowupCountdown(seconds) {
+    if (seconds <= 0) return 'instantes';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
+    return `${Math.max(1, minutes)} min`;
+}
+
+function renderStageFollowupBanner() {
+    const banner = document.getElementById('stageFollowupBanner');
+    const textEl = document.getElementById('stageFollowupBannerText');
+    const actionBtn = document.getElementById('stageFollowupActionBtn');
+    if (!banner || !textEl || !actionBtn) return;
+
+    if (_stageFollowupTicker) { clearInterval(_stageFollowupTicker); _stageFollowupTicker = null; }
+
+    const followup = _stageFollowupData && _stageFollowupData.followup;
+    const visible = followup && (followup.status === 'active' || followup.status === 'cancelled');
+    if (!visible) {
+        banner.classList.add('d-none');
+        return;
+    }
+
+    banner.classList.remove('d-none');
+
+    if (followup.status === 'active') {
+        banner.style.background = 'linear-gradient(135deg, #eef6ff 0%, #e1efff 100%)';
+        banner.style.borderTopColor = '#b5d7ff';
+
+        const update = () => {
+            const remaining = followup.next_run_at ? Math.floor((new Date(followup.next_run_at) - new Date()) / 1000) : 0;
+            const preview = followup.next_message ? ` — <em>“${_stageFollowupEscape(followup.next_message)}”</em>` : '';
+            textEl.innerHTML = `<strong>Follow-up automático ativo.</strong> Mensagem ${followup.next_step + 1}/${followup.total_steps} em <strong>${_formatStageFollowupCountdown(remaining)}</strong>${preview}`;
+            textEl.title = followup.next_message || '';
+
+            // Passou da hora: o cron envia em até ~1 min; atualizar para refletir o envio
+            const now = Date.now();
+            if (remaining < -60 && now - _stageFollowupLastAutoRefresh > 60000) {
+                _stageFollowupLastAutoRefresh = now;
+                loadStageFollowup(_stageFollowupConvId);
+            }
+        };
+        update();
+        _stageFollowupTicker = setInterval(update, 30000);
+
+        actionBtn.className = 'btn btn-sm btn-light-danger flex-shrink-0';
+        actionBtn.textContent = 'Cancelar follow-up';
+        actionBtn.classList.remove('d-none');
+        actionBtn.onclick = cancelStageFollowup;
+    } else {
+        banner.style.background = '#f5f8fa';
+        banner.style.borderTopColor = '#e4e6ef';
+        const who = followup.cancelled_by_name ? ` por ${_stageFollowupEscape(followup.cancelled_by_name)}` : '';
+        textEl.innerHTML = `<strong>Follow-up cancelado${who}.</strong> Será ligado de novo na sua próxima mensagem.`;
+        textEl.title = '';
+
+        if (followup.can_reactivate) {
+            actionBtn.className = 'btn btn-sm btn-light-primary flex-shrink-0';
+            actionBtn.textContent = 'Reativar';
+            actionBtn.onclick = reactivateStageFollowup;
+        } else {
+            actionBtn.className = 'btn btn-sm flex-shrink-0 d-none';
+            actionBtn.onclick = null;
+        }
+    }
+}
+
+function _postStageFollowupAction(action) {
+    const conversationId = _stageFollowupConvId;
+    if (!conversationId) return;
+    const actionBtn = document.getElementById('stageFollowupActionBtn');
+    if (actionBtn) actionBtn.disabled = true;
+
+    fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/stage-followup/${action}`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: '{}'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (_stageFollowupConvId !== conversationId) return;
+        if (data.success) {
+            _stageFollowupData = data;
+            renderStageFollowupBanner();
+            showToast('success', data.message);
+        } else {
+            showToast('error', data.message || 'Não foi possível alterar o follow-up');
+            loadStageFollowup(conversationId);
+        }
+    })
+    .catch(() => showToast('error', 'Erro de conexão ao alterar o follow-up'))
+    .finally(() => { if (actionBtn) actionBtn.disabled = false; });
+}
+
+function cancelStageFollowup() {
+    _postStageFollowupAction('cancel');
+}
+
+function reactivateStageFollowup() {
+    _postStageFollowupAction('reactivate');
+}
+
+function showStageFollowupSteps() {
+    const followup = _stageFollowupData && _stageFollowupData.followup;
+    if (!followup || typeof Swal === 'undefined') return;
+
+    const rows = (followup.steps || []).map(step => {
+        let badge;
+        if (step.sent_at) {
+            badge = `<span class="badge badge-light-success">Enviada ${new Date(step.sent_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>`;
+        } else if (followup.status === 'active' && step.index === followup.next_step) {
+            badge = `<span class="badge badge-light-primary">Próxima</span>`;
+        } else {
+            badge = `<span class="badge badge-light">Pendente</span>`;
+        }
+        return `<div class="d-flex align-items-start gap-3 py-3 border-bottom">
+                    <div class="text-nowrap fw-bold text-gray-700 fs-7" style="min-width: 80px;">após ${_stageFollowupEscape(step.delay_label)}</div>
+                    <div class="flex-grow-1 fs-7 text-gray-800" style="white-space: pre-wrap;">${_stageFollowupEscape(step.message)}</div>
+                    <div>${badge}</div>
+                </div>`;
+    }).join('');
+
+    Swal.fire({
+        title: 'Sequência de follow-up',
+        html: `<div class="text-start">
+                   <div class="text-muted fs-7 mb-2">Tempos contados a partir da sua última mensagem. Se o cliente responder, a sequência para.</div>
+                   ${rows || '<div class="text-muted">Nenhuma mensagem configurada.</div>'}
+               </div>`,
+        width: 640,
+        confirmButtonText: 'Fechar'
     });
 }
 

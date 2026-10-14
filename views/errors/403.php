@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>403 - Acesso negado</title>
     <?php require_once __DIR__ . '/../../app/Helpers/autoload.php'; ?>
     
@@ -14,6 +14,7 @@
     <link href="<?= \App\Helpers\Url::asset('plugins/global/plugins.bundle.css') ?>" rel="stylesheet" type="text/css" />
     <link href="<?= \App\Helpers\Url::asset('css/metronic/style.bundle.css') ?>" rel="stylesheet" type="text/css" />
     <!--end::Global Stylesheets Bundle-->
+    <?php include __DIR__ . '/../partials/pwa-head.php'; ?>
 </head>
 <body id="kt_body" class="app-blank">
     <!--begin::Theme mode setup on page load-->
@@ -101,6 +102,7 @@
     <script src="<?= \App\Helpers\Url::asset('js/metronic/scripts.bundle.js') ?>"></script>
     <!--end::Global Javascript Bundle-->
     <!--end::Javascript-->
+<?php include __DIR__ . '/../partials/pwa-scripts.php'; ?>
 </body>
 </html>
 

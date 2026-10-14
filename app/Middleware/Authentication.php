@@ -63,6 +63,11 @@ class Authentication
                 exit;
             }
             
+            // Voltar para esta página depois do login (ex.: app instalado abrindo em /conversations)
+            if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'text/html')) {
+                Auth::setIntendedUrl($uri);
+            }
+
             Response::redirect('/login');
         } else {
             $userId = Auth::id();

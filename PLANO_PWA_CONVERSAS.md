@@ -1,5 +1,9 @@
 # Plano — PWA do CRM (começando pelas Conversas)
 
+> **Status:** Fases 0 a 4 implementadas — ver `PWA_APP_INSTALAVEL.md`. Fases 5 e 6 (opcionais) não iniciadas.
+> Decisões aplicadas: notificação mostra o texto (com opção de ocultar por aparelho); sem Play Store; nome/logo do app vêm de Configurações.
+> Diferença do plano: o Web Push foi feito sem a biblioteca `minishlink/web-push` (criptografia própria validada contra a referência), então não muda o Composer nem o Dockerfile.
+
 Objetivo: o agente instala o CRM no celular (e no desktop) como um app, abre direto nas
 Conversas, recebe notificação de mensagem nova com o app fechado e consegue atender
 (ler, responder, áudio, anexo, follow-up) com conforto.

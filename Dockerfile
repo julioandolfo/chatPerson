@@ -10,7 +10,8 @@ upload_max_filesize=256M\n\
 post_max_size=256M\n\
 memory_limit=512M\n\
 max_execution_time=300\n\
-max_input_time=300\n" \
+max_input_time=300\n\
+session.gc_maxlifetime=28800\n" \
 > /usr/local/etc/php/conf.d/99-app.ini
 
 # Instala dependências de sistema

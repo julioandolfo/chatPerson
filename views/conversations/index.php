@@ -3976,7 +3976,7 @@ function getChannelInfo(channel) {
         <!-- Header do Chat (sempre presente, mas pode estar oculto) -->
         <div class="chat-header" id="chatHeader" style="<?= empty($selectedConversation) ? 'display: none;' : '' ?>">
             <!-- Botão Voltar (Mobile) -->
-            <button class="btn btn-sm btn-icon btn-light chat-header-back-btn d-none" onclick="showListView()" title="Voltar para lista" id="chatHeaderBackBtn" style="display: none;">
+            <button class="btn btn-sm btn-icon btn-light chat-header-back-btn d-none" onclick="mobileBackToList()" title="Voltar para lista" id="chatHeaderBackBtn" style="display: none;">
                 <i class="ki-duotone ki-arrow-left fs-2">
                     <span class="path1"></span>
                     <span class="path2"></span>
@@ -15962,6 +15962,10 @@ function hideRecordingIndicator() {
 
 // Enviar mensagem de áudio com UI otimista
 function sendAudioMessage(audioBlob, conversationId) {
+    if (navigator.onLine === false) {
+        showToast('error', 'Sem conexão com a internet. O áudio não foi enviado.');
+        return;
+    }
     const tempId = 'temp_audio_' + Date.now();
     const blobUrl = URL.createObjectURL(audioBlob);
     
@@ -15975,7 +15979,7 @@ function sendAudioMessage(audioBlob, conversationId) {
         created_at: new Date().toISOString(),
         sender_name: 'Você',
         status: 'sending',
-        attachments: [{ type: 'audio', url: blobUrl, mime_type: 'audio/webm' }]
+        attachments: [{ type: 'audio', url: blobUrl, mime_type: audioBlob.type || 'audio/webm' }]
     };
     const messageDiv = addMessageToChat(tempMessage);
     if (messageDiv) {
@@ -16000,7 +16004,13 @@ function sendAudioMessage(audioBlob, conversationId) {
     }, 20000);
 
     const formData = new FormData();
-    formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.webm');
+    // Extensão conforme o formato real: o Safari (iPhone) grava audio/mp4, Chrome/Firefox webm/ogg
+    const audioType = (audioBlob.type || '').toLowerCase();
+    const audioExt = audioType.includes('mp4') || audioType.includes('m4a') ? 'm4a'
+        : audioType.includes('aac') ? 'aac'
+        : audioType.includes('ogg') ? 'ogg'
+        : 'webm';
+    formData.append('attachments[]', audioBlob, 'audio-' + Date.now() + '.' + audioExt);
     formData.append('content', '');
 
     fetch(`<?= \App\Helpers\Url::to("/conversations") ?>/${conversationId}/messages`, {
@@ -16071,6 +16081,12 @@ let _sendingMessage = false;
 function sendMessage() {
     // Mutex para prevenir envio duplicado (Enter + click simultâneo, double-click, etc.)
     if (_sendingMessage) return;
+
+    // Sem internet: não tenta enviar (o texto continua na caixa para enviar depois)
+    if (navigator.onLine === false) {
+        showToast('error', 'Sem conexão com a internet. A mensagem não foi enviada.');
+        return;
+    }
     _sendingMessage = true;
     
     const input = document.getElementById('messageInput');
@@ -20434,6 +20450,108 @@ function showDetailsView() {
     }
 }
 
+// ============================================================================
+// APP NO CELULAR (PWA): voltar do Android, teclado do iPhone, volta do 2º plano
+// ============================================================================
+
+// Botão/gesto "voltar" no celular: do chat volta para a lista (e dos detalhes para o chat),
+// em vez de abrir a conversa anterior ou fechar o app. Registrado antes do popstate
+// padrão da página (que roda no DOMContentLoaded) para poder interceptá-lo.
+window.addEventListener('popstate', function (event) {
+    if (!isMobile()) return;
+
+    if (window.mobileViewState === 'sidebar') {
+        event.stopImmediatePropagation();
+        closeConversationSidebar(); // volta para o chat
+        // Repõe a entrada da conversa: o próximo "voltar" leva à lista
+        if (window.currentConversationId) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('id', window.currentConversationId);
+            window.history.pushState({ conversationId: window.currentConversationId }, '', `<?= \App\Helpers\Url::to('/conversations') ?>?${params.toString()}`);
+        }
+        return;
+    }
+
+    // Na lista ou no chat, o "voltar" nunca abre outra conversa sozinho (abrir marca as
+    // mensagens como lidas); só mostra a lista ou deixa o navegador sair do app
+    event.stopImmediatePropagation();
+    if (window.mobileViewState === 'chat') {
+        showListView();
+    }
+});
+
+// Seta "voltar" do cabeçalho do chat: usa o histórico para o "voltar" do aparelho continuar em sincronia
+function mobileBackToList() {
+    if (isMobile() && history.state && history.state.conversationId) {
+        history.back(); // o popstate acima mostra a lista
+        return;
+    }
+    showListView();
+}
+
+// Aberto direto numa conversa (toque na notificação, link): cria a entrada da lista
+// por baixo, para o "voltar" ir à lista e não fechar o app
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get('id') || window.innerWidth > 767 || (history.state && history.state.cpListBase)) return;
+    const original = window.location.href;
+    params.delete('id');
+    const listUrl = `<?= \App\Helpers\Url::to('/conversations') ?>${params.toString() ? '?' + params.toString() : ''}`;
+    window.history.replaceState({ cpListBase: true }, '', listUrl);
+    window.history.pushState({ conversationId: parseInt(new URL(original).searchParams.get('id')) }, '', original);
+})();
+
+// Teclado virtual no iPhone: o Safari não encolhe a página quando o teclado abre, então a
+// caixa de mensagem ficava escondida. Ajusta a altura do layout à área visível.
+// (No Android o meta viewport "interactive-widget=resizes-content" já resolve.)
+(function () {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let raf = null;
+
+    function fit() {
+        raf = null;
+        const layout = document.querySelector('.conversations-layout');
+        if (!layout) return;
+        const keyboardOpen = isMobile() && (window.innerHeight - vv.height) > 120;
+        if (!keyboardOpen) {
+            layout.style.removeProperty('height');
+            return;
+        }
+        const top = layout.getBoundingClientRect().top;
+        const available = Math.round(vv.height + vv.offsetTop - Math.max(top, 0));
+        if (available > 200) {
+            layout.style.height = available + 'px';
+            const messages = document.getElementById('chatMessages');
+            if (messages && document.activeElement && document.activeElement.id === 'messageInput') {
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+    }
+
+    function schedule() {
+        if (!raf) raf = requestAnimationFrame(fit);
+    }
+    vv.addEventListener('resize', schedule);
+    vv.addEventListener('scroll', schedule);
+    document.addEventListener('focusout', function () { setTimeout(schedule, 150); });
+})();
+
+// App voltou do segundo plano / internet voltou: o celular pausa WebSocket e polling,
+// então busca o que chegou nesse meio tempo
+document.addEventListener('pwa:resume', function () {
+    const client = window.wsClient;
+    if (client && client.ws && client.ws.readyState > 1 && client.userId && client.mode !== 'polling') {
+        client.reconnectAttempts = 0;
+        try { client.connectWebSocket(client.userId); } catch (e) { /* cai no polling */ }
+    }
+    if (typeof refreshConversationBadges === 'function') refreshConversationBadges();
+    if (window.currentConversationId) {
+        if (typeof checkForNewMessages === 'function') checkForNewMessages(window.currentConversationId);
+        if (typeof loadStageFollowup === 'function') loadStageFollowup(window.currentConversationId);
+    }
+});
+
 // Toggle sidebar de detalhes (adaptado para mobile)
 function toggleConversationSidebar() {
     const sidebar = document.getElementById('conversationSidebar');
@@ -20493,8 +20611,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 sidebarView.classList.add('open');
             }
         } else if (isMobile()) {
-            // Mobile: mostrar apenas lista inicialmente
-            showListView();
+            // Mobile: manter a tela atual. Abrir o teclado no Android dispara "resize" e
+            // antes isso jogava o agente de volta para a lista no meio da digitação.
+            if (window.mobileViewState === 'chat') {
+                showChatView();
+            } else if (window.mobileViewState !== 'sidebar') {
+                showListView();
+            }
         }
     }
     

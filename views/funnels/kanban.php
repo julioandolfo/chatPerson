@@ -1683,8 +1683,8 @@ window.KANBAN_CONFIG = {
 console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 </script>
 <!-- Kanban JavaScript -->
-<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '?v=' . time() . '"></script>
-<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '?v=' . time() . '"></script>
+<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>
+<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '"></script>
 <script>
 // Configurações globais para o Kanban.js
 const __KANBAN_BASE_PATH = "' . $basePath . '";
@@ -1700,8 +1700,8 @@ window.KANBAN_CONFIG = {
 console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 </script>
 <!-- Kanban JavaScript -->
-<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '?v=' . time() . '"></script>
-<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '?v=' . time() . '"></script>
+<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>
+<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '"></script>
 ';
 
 $scripts .= <<<'SCRIPTS_INLINE'

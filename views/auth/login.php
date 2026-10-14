@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Login - Sistema Multiatendimento</title>
     <?php
     try {
@@ -184,6 +184,7 @@
             }
         }
     </style>
+    <?php include __DIR__ . '/../partials/pwa-head.php'; ?>
 </head>
 <body id="kt_body" class="auth-bg login-page">
     <!--begin::Theme mode setup on page load-->
@@ -297,7 +298,10 @@
 
                 <!--begin::Wrapper-->
                 <div class="d-flex flex-stack flex-wrap gap-3 fs-base fw-semibold mb-8">
-                    <div></div>
+                    <label class="form-check form-check-custom form-check-solid form-check-sm">
+                        <input class="form-check-input" type="checkbox" name="remember" value="1" id="login_remember" />
+                        <span class="form-check-label text-gray-700">Manter conectado</span>
+                    </label>
                     <a href="#" class="link-primary">Esqueceu a senha?</a>
                 </div>
                 <!--end::Wrapper-->
@@ -313,6 +317,14 @@
                 </div>
                 <!--end::Submit button-->
             </form>
+            <script>
+                // No app instalado (PWA) "Manter conectado" vem marcado: no iPhone o login some ao fechar o app
+                (function () {
+                    var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+                    var box = document.getElementById('login_remember');
+                    if (box && standalone) box.checked = true;
+                })();
+            </script>
 
             <div class="login-footer-note">
                 Gerencie todas as suas conversas e atendimentos em um só lugar
@@ -344,5 +356,6 @@
     </script>
     <!--end::Custom Javascript-->
     <!--end::Javascript-->
+<?php include __DIR__ . '/../partials/pwa-scripts.php'; ?>
 </body>
 </html>

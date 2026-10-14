@@ -61,6 +61,16 @@ ob_start();
                                 Notificações
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= $activeTab === 'app' ? 'active' : '' ?>" 
+                               data-bs-toggle="tab" href="#tab_app">
+                                <i class="ki-duotone ki-phone fs-4 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                App e aparelhos
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 
@@ -69,6 +79,10 @@ ob_start();
                         <!-- Tab: Notificações -->
                         <div class="tab-pane fade <?= $activeTab === 'notifications' ? 'show active' : '' ?>" id="tab_notifications">
                             <?php include __DIR__ . '/notifications-tab.php'; ?>
+                        </div>
+                        <!-- Tab: App e aparelhos (PWA) -->
+                        <div class="tab-pane fade <?= $activeTab === 'app' ? 'show active' : '' ?>" id="tab_app">
+                            <?php include __DIR__ . '/app-tab.php'; ?>
                         </div>
                     </div>
                 </div>

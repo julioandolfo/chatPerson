@@ -7,6 +7,13 @@ php_value memory_limit 256M
 
 RewriteEngine On
 
+# PWA: o navegador sempre confere se há versão nova do service worker
+<IfModule mod_headers.c>
+    <Files "sw.js">
+        Header set Cache-Control "no-cache"
+    </Files>
+</IfModule>
+
 # Repassar header Authorization para PHP (necessário para API)
 RewriteCond %{HTTP:Authorization} .
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

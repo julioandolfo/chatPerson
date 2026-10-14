@@ -11,6 +11,7 @@ use App\Controllers\ContactController;
 use App\Controllers\ContactAgentController;
 use App\Controllers\FunnelController;
 use App\Controllers\StageFollowupController;
+use App\Controllers\PwaController;
 use App\Controllers\AutomationController;
 use App\Controllers\AgentController;
 use App\Controllers\UserController;
@@ -57,6 +58,19 @@ Router::get('/', function() {
 });
 
 Router::get('/login', [AuthController::class, 'showLogin']);
+
+// App instalável (PWA) — públicos: o navegador busca o manifest/ícones sem cookies
+Router::get('/manifest.webmanifest', [PwaController::class, 'manifest']);
+Router::get('/pwa/icon/{size}', [PwaController::class, 'icon']);
+// Notificações push e aparelhos conectados
+Router::get('/pwa/push/public-key', [PwaController::class, 'pushPublicKey'], ['Authentication']);
+Router::post('/pwa/push/status', [PwaController::class, 'pushStatus'], ['Authentication']);
+Router::post('/pwa/push/subscribe', [PwaController::class, 'pushSubscribe'], ['Authentication']);
+Router::post('/pwa/push/unsubscribe', [PwaController::class, 'pushUnsubscribe'], ['Authentication']);
+Router::post('/pwa/push/preferences', [PwaController::class, 'pushPreferences'], ['Authentication']);
+Router::post('/pwa/push/test', [PwaController::class, 'pushTest'], ['Authentication']);
+Router::get('/pwa/devices', [PwaController::class, 'devices'], ['Authentication']);
+Router::post('/pwa/devices/{id}/revoke', [PwaController::class, 'revokeDevice'], ['Authentication']);
 Router::post('/login', [AuthController::class, 'login']);
 Router::get('/logout', [AuthController::class, 'logout']);
 

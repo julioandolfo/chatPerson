@@ -240,6 +240,25 @@
                         </a>
                     </div>
                     <!--end::Menu item-->
+
+                    <!--begin::Menu item - App (PWA)-->
+                    <div class="menu-item px-5">
+                        <a href="<?= \App\Helpers\Url::to('/profile?tab=app') ?>" class="menu-link px-5">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-phone fs-5"><span class="path1"></span><span class="path2"></span></i>
+                            </span>
+                            App e aparelhos
+                        </a>
+                    </div>
+                    <div class="menu-item px-5 d-none" data-pwa-install>
+                        <a href="#" class="menu-link px-5">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-cloud-download fs-5"><span class="path1"></span><span class="path2"></span></i>
+                            </span>
+                            Instalar app
+                        </a>
+                    </div>
+                    <!--end::Menu item-->
                     
                     <!--begin::Menu separator-->
                     <div class="separator my-2"></div>

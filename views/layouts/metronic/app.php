@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
     <title><?= $title ?? 'Sistema Multiatendimento' ?></title>
     <?php 
     $favicon = \App\Services\SettingService::get('app_favicon', '');
@@ -94,6 +94,7 @@
     
     <?= $head ?? '' ?>
     <?= $styles ?? '' ?>
+    <?php include __DIR__ . '/../../partials/pwa-head.php'; ?>
 </head>
 <body id="kt_body" class="header-fixed sidebar-enabled" style="--bs-gutter-x: 0">
     <!--begin::Theme mode setup on page load-->
@@ -1161,6 +1162,7 @@
     <!--begin::API4Com WebPhone Widget-->
     <?php include __DIR__ . '/../../partials/webphone-widget.php'; ?>
     <!--end::API4Com WebPhone Widget-->
+<?php include __DIR__ . '/../../partials/pwa-scripts.php'; ?>
 </body>
 </html>
 

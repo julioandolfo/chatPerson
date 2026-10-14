@@ -37,8 +37,9 @@ class AuthController
         
         if (Auth::check()) {
             $userId = Auth::id();
-            self::logAuth("showLogin - Usuário já autenticado (userId={$userId}), redirecionando para /dashboard");
-            Response::redirect('/dashboard');
+            $intended = Auth::pullIntendedUrl();
+            self::logAuth("showLogin - Usuário já autenticado (userId={$userId}), redirecionando para " . ($intended ?: '/dashboard'));
+            Response::redirect($intended ?: '/dashboard');
             return;
         }
 
@@ -106,6 +107,15 @@ class AuthController
         
         self::logAuth("login - Auth::login chamado com sucesso");
 
+        // "Manter conectado": token de longa duração para este aparelho
+        if (!empty($_POST['remember'])) {
+            try {
+                \App\Services\RememberMeService::issue((int)$user['id']);
+            } catch (\Throwable $e) {
+                self::logAuth("login - Erro ao criar token 'manter conectado': " . $e->getMessage());
+            }
+        }
+
         // Marcar como online automaticamente (se configurado)
         try {
             \App\Services\AvailabilityService::markOnlineOnLogin($user['id']);
@@ -114,8 +124,9 @@ class AuthController
             self::logAuth("login - Erro ao marcar online: " . $e->getMessage());
         }
 
-        self::logAuth("login - Redirecionando para /dashboard...");
-        Response::redirect('/dashboard');
+        $intended = Auth::pullIntendedUrl();
+        self::logAuth("login - Redirecionando para " . ($intended ?: '/dashboard') . "...");
+        Response::redirect($intended ?: '/dashboard');
         self::logAuth("login - Redirect executado");
     }
 

@@ -33,7 +33,7 @@ class AttachmentService
     private static array $allowedTypes = [
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'webp'],
         'video' => ['mp4', 'webm', 'ogg', 'mov', 'm4v'],
-        'audio' => ['mp3', 'wav', 'ogg', 'webm'], // webm (audio/webm) será convertido para ogg/opus
+        'audio' => ['mp3', 'wav', 'ogg', 'webm', 'm4a', 'aac'], // webm/m4a/aac gravados no navegador viram ogg/opus
         'document' => ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'csv']
     ];
 
@@ -95,6 +95,12 @@ class AttachmentService
         if ($fileType === 'audio' && (str_contains($mimeType, 'webm') || $extension === 'webm')) {
             $isAudioWebm = true;
             Logger::quepasa("AttachmentService::upload - Detectado como áudio webm (fileType=audio)");
+        }
+
+        // Áudio gravado no iPhone/Safari (m4a/aac): também vira ogg/opus (áudio de voz no WhatsApp)
+        if ($fileType === 'audio' && in_array($extension, ['m4a', 'aac'], true)) {
+            $isAudioWebm = true;
+            Logger::quepasa("AttachmentService::upload - Áudio {$extension} (gravação do Safari) será convertido para ogg/opus");
         }
         
         // Caso 2: Detectado como video/webm mas pode ser apenas áudio (gravação de áudio do navegador)
@@ -230,6 +236,11 @@ class AttachmentService
             if (in_array($extension, $extensions)) {
                 // Caso especial: webm gravado como áudio (audio/webm)
                 if ($extension === 'webm' && $mimePrefix === 'audio') {
+                    return 'audio';
+                }
+
+                // Áudio gravado no iPhone/Safari (AAC em MP4): o finfo pode dizer video/mp4
+                if (in_array($extension, ['m4a', 'aac'], true) && in_array($mimePrefix, ['audio', 'video'], true)) {
                     return 'audio';
                 }
 

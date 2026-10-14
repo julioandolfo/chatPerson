@@ -1164,11 +1164,33 @@
          */
         showBrowserNotification: function(title, message, conversationId) {
             if ('Notification' in window && Notification.permission === 'granted') {
-                const notification = new Notification(title, {
+                // Com service worker (app/PWA): é o único jeito que funciona no Chrome Android
+                // ("new Notification" lança erro lá). O clique é tratado no sw.js/pwa.js.
+                if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.ready.then((registration) => registration.showNotification(title, {
+                        body: message,
+                        icon: (window.CP_PWA ? window.CP_PWA.scope : '/') + 'assets/media/pwa/icon-192.png',
+                        badge: (window.CP_PWA ? window.CP_PWA.scope : '/') + 'assets/media/pwa/badge-96.png',
+                        tag: conversationId ? `conversation-${conversationId}` : undefined,
+                        data: {
+                            conversation_id: conversationId || null,
+                            url: (window.CP_PWA ? window.CP_PWA.scope : '/') + (conversationId ? 'conversations?id=' + conversationId : 'conversations')
+                        }
+                    })).catch((err) => console.warn('Falha ao mostrar notificação:', err));
+                    return;
+                }
+
+                let notification;
+                try {
+                    notification = new Notification(title, {
                     body: message,
                     icon: '/assets/media/logos/favicon.ico',
                     tag: conversationId ? `conversation-${conversationId}` : undefined
                 });
+                } catch (err) {
+                    console.warn('Notificação do navegador indisponível:', err);
+                    return;
+                }
                 
                 notification.onclick = () => {
                     window.focus();

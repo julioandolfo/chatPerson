@@ -153,6 +153,8 @@ class UserService
         // Hash da senha se fornecida e não vazia
         if (isset($data['password']) && !empty(trim($data['password'] ?? ''))) {
             $data['password'] = User::hashPassword($data['password']);
+            // Senha nova: desconectar os aparelhos com "Manter conectado"
+            \App\Services\RememberMeService::revokeAllForUser((int)$user['id']);
         } else {
             // Remover campo password se vazio para não atualizar
             unset($data['password']);

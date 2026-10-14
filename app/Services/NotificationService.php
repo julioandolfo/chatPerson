@@ -35,7 +35,16 @@ class NotificationService
             throw new \InvalidArgumentException('Dados inválidos: ' . implode(', ', $errors));
         }
         
-        return Notification::createNotification($data);
+        $notificationId = Notification::createNotification($data);
+
+        // Também envia como push para os aparelhos do usuário (app instalado/PWA)
+        try {
+            PushService::queueFromNotification($data);
+        } catch (\Throwable $e) {
+            Logger::error("Erro ao enfileirar push da notificação: " . $e->getMessage());
+        }
+
+        return $notificationId;
     }
 
     /**

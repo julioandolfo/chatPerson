@@ -10,7 +10,8 @@ upload_max_filesize=256M\n\
 post_max_size=256M\n\
 memory_limit=512M\n\
 max_execution_time=300\n\
-max_input_time=300\n" \
+max_input_time=300\n\
+session.gc_maxlifetime=28800\n" \
 > /usr/local/etc/php/conf.d/99-app.ini
 
 # Instala dependências de sistema
@@ -52,15 +53,17 @@ COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader \
  && composer dump-autoload --optimize --no-dev
 
-# Copia o resto do projeto
-COPY . .
+# Copia o resto do projeto já com o dono certo (evita um "chown -R" que duplicaria
+# todos os arquivos numa nova camada e dobraria o tamanho da imagem)
+COPY --chown=www-data:www-data . .
 
 # Regenerar autoloader após copiar tudo
 RUN composer dump-autoload --optimize --no-dev --classmap-authoritative
 
 # Criar diretórios obrigatórios e garantir permissões
 RUN mkdir -p storage/cache storage/logs storage/uploads bootstrap/cache \
- && chown -R www-data:www-data /var/www/html \
+ && chown www-data:www-data /var/www/html \
+ && chown -R www-data:www-data vendor storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
 EXPOSE 80

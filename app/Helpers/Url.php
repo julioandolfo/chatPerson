@@ -59,7 +59,19 @@ class Url
      */
     public static function asset(string $path): string
     {
-        return self::to('assets/' . ltrim($path, '/'));
+        $path = ltrim($path, '/');
+        $url = self::to('assets/' . $path);
+
+        // JS/CSS ganham ?v=<data de modificação>: o navegador e o service worker (PWA)
+        // passam a buscar a versão nova automaticamente após cada deploy
+        if (preg_match('/\.(js|css)$/i', $path)) {
+            $mtime = @filemtime(dirname(__DIR__, 2) . '/public/assets/' . $path);
+            if ($mtime) {
+                $url .= '?v=' . $mtime;
+            }
+        }
+
+        return $url;
     }
 
     /**

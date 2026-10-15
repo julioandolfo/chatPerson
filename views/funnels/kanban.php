@@ -1715,23 +1715,6 @@ console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
 <!-- Kanban JavaScript -->
 <script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>
 <script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '"></script>
-<script>
-// Configurações globais para o Kanban.js
-const __KANBAN_BASE_PATH = "' . $basePath . '";
-const __KANBAN_ORIGIN = window.location.origin || (window.location.protocol + "//" + window.location.host);
-
-window.KANBAN_CONFIG = {
-    funnelId: ' . $funnelIdForJs . ',
-    moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",
-    funnelBaseUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs) . '",
-    funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '",
-    BASE_URL: __KANBAN_ORIGIN + __KANBAN_BASE_PATH
-};
-console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
-</script>
-<!-- Kanban JavaScript -->
-<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>
-<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '"></script>
 ';
 
 $scripts .= <<<'SCRIPTS_INLINE'

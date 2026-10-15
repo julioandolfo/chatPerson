@@ -16,6 +16,19 @@ use App\Services\StageFollowupService;
 class StageFollowupController
 {
     /**
+     * Tabela/coluna faltando = migrations do follow-up não executadas no servidor
+     */
+    private static function missingMigrationMessage(\Throwable $e): ?string
+    {
+        if ($e instanceof \PDOException && in_array($e->getCode(), ['42S02', '42S22'], true)) {
+            return 'O banco ainda não tem as tabelas do follow-up. No servidor, execute: '
+                . 'php -d variables_order=EGPCS database/run_migrations.php 159 && '
+                . 'php -d variables_order=EGPCS database/run_migrations.php 161';
+        }
+        return null;
+    }
+
+    /**
      * Configuração de follow-up da etapa
      */
     public function getStageConfig(int $stageId): void
@@ -25,7 +38,7 @@ class StageFollowupController
         try {
             Response::json(['success' => true, 'config' => StageFollowupService::getStageConfig($stageId)]);
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => $e->getMessage()], 400);
+            Response::json(['success' => false, 'message' => self::missingMigrationMessage($e) ?? $e->getMessage()], 400);
         }
     }
 
@@ -42,7 +55,7 @@ class StageFollowupController
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => 'Erro ao salvar follow-up: ' . $e->getMessage()], 500);
+            Response::json(['success' => false, 'message' => self::missingMigrationMessage($e) ?? ('Erro ao salvar follow-up: ' . $e->getMessage())], 500);
         }
     }
 
@@ -69,7 +82,7 @@ class StageFollowupController
         } catch (\InvalidArgumentException $e) {
             Response::json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Exception $e) {
-            Response::json(['success' => false, 'message' => 'Erro ao salvar limites: ' . $e->getMessage()], 500);
+            Response::json(['success' => false, 'message' => self::missingMigrationMessage($e) ?? ('Erro ao salvar limites: ' . $e->getMessage())], 500);
         }
     }
 

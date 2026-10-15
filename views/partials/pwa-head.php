@@ -25,3 +25,20 @@ $pwaAppleIcon = $pwaIconVersion !== null
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="<?= htmlspecialchars($pwaAppName, ENT_QUOTES) ?>" />
     <link rel="apple-touch-icon" href="<?= $pwaAppleIcon ?>" />
+    <script>
+        // App instalado (PWA): marca o <html> já no carregamento (antes do conteúdo aparecer)
+        (function () {
+            var standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+            window.CP_IS_PWA = standalone;
+            if (standalone) document.documentElement.classList.add('pwa-standalone');
+        })();
+    </script>
+    <style>
+        /* No app instalado: sem Copiloto e sem telefone (Api4Com/webphone) */
+        html.pwa-standalone button[data-bs-target="#copilotPanel"],
+        html.pwa-standalone #copilotPanel,
+        html.pwa-standalone #btnApi4ComCall,
+        html.pwa-standalone #api4com-webphone-widget {
+            display: none !important;
+        }
+    </style>

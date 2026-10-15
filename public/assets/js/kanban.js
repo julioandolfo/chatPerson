@@ -487,7 +487,72 @@ function stageFollowupSave(stageId, isNewStage) {
 /**
  * Validação no navegador (o servidor valida de novo) para não salvar a etapa e falhar no follow-up
  */
+// --- Limites anti-spam (globais: valem para todas as etapas) ---
+let stageFollowupLimitsSnapshot = null;
+
+function stageFollowupLimitsUrl() {
+    return window.KANBAN_CONFIG.BASE_URL + "/funnel-stages/followup-limits";
+}
+
+function stageFollowupCollectLimits() {
+    const num = (id) => parseInt((document.getElementById(id) || {}).value, 10);
+    return {
+        min_interval_seconds: num("kt_followup_limit_min"),
+        max_interval_seconds: num("kt_followup_limit_max"),
+        max_per_hour: num("kt_followup_limit_hour"),
+        max_per_day: num("kt_followup_limit_day")
+    };
+}
+
+function stageFollowupLoadLimits() {
+    if (!document.getElementById("kt_followup_limit_min")) return;
+    stageFollowupLimitsSnapshot = null;
+    fetch(stageFollowupLimitsUrl(), { headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" } })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            const l = data.limits;
+            document.getElementById("kt_followup_limit_min").value = l.min_interval_seconds;
+            document.getElementById("kt_followup_limit_max").value = l.max_interval_seconds;
+            document.getElementById("kt_followup_limit_hour").value = l.max_per_hour;
+            document.getElementById("kt_followup_limit_day").value = l.max_per_day;
+            stageFollowupLimitsSnapshot = JSON.stringify(stageFollowupCollectLimits());
+        })
+        .catch(err => console.error("Erro ao carregar limites do follow-up:", err));
+}
+
+function stageFollowupValidateLimits() {
+    if (!document.getElementById("kt_followup_limit_min") || stageFollowupLimitsSnapshot === null) return null;
+    const l = stageFollowupCollectLimits();
+    if ([l.min_interval_seconds, l.max_interval_seconds, l.max_per_hour, l.max_per_day].some(v => isNaN(v))) {
+        return "Limites de envio: preencha todos os campos.";
+    }
+    if (l.min_interval_seconds < 0 || l.max_interval_seconds > 3600) return "Limites de envio: o intervalo deve ficar entre 0 e 3600 segundos.";
+    if (l.max_interval_seconds < l.min_interval_seconds) return "Limites de envio: o intervalo máximo deve ser maior ou igual ao mínimo.";
+    if (l.max_per_hour < 1) return "Limites de envio: o máximo por hora deve ser pelo menos 1.";
+    if (l.max_per_day < l.max_per_hour) return "Limites de envio: o máximo por dia não pode ser menor que o máximo por hora.";
+    return null;
+}
+
+/** Salva os limites só se mudaram. Resolve com null (ok) ou a mensagem de erro. */
+function stageFollowupSaveLimits() {
+    if (!document.getElementById("kt_followup_limit_min") || stageFollowupLimitsSnapshot === null) return Promise.resolve(null);
+    const payload = stageFollowupCollectLimits();
+    if (JSON.stringify(payload) === stageFollowupLimitsSnapshot) return Promise.resolve(null);
+
+    return fetch(stageFollowupLimitsUrl(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(data => data.success ? null : (data.message || "Erro ao salvar limites de envio"))
+        .catch(err => "Erro ao salvar limites de envio: " + err.message);
+}
+
 function stageFollowupValidate() {
+    const limitsError = stageFollowupValidateLimits();
+    if (limitsError) return limitsError;
     if (!document.getElementById("kt_stage_followup_steps")) return null;
     const payload = stageFollowupCollect();
     const factor = { minutes: 1, hours: 60, days: 1440 };
@@ -841,7 +906,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data.success) {
                     console.log("✅ Estágio salvo com sucesso!");
                     const savedStageId = isEdit ? stageId : (data.id || (data.stage && data.stage.id));
-                    stageFollowupSave(savedStageId, !isEdit).then(followupSaveError => {
+                    Promise.all([stageFollowupSave(savedStageId, !isEdit), stageFollowupSaveLimits()]).then(errors => {
+                        const followupSaveError = errors.filter(Boolean).join(" ");
                         const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_stage"));
                         if (followupSaveError) {
                             Swal.fire({
@@ -888,6 +954,8 @@ document.addEventListener("DOMContentLoaded", function() {
         }
         
         // Resetar formulário ao fechar modal
+        document.getElementById("kt_modal_stage").addEventListener("show.bs.modal", stageFollowupLoadLimits);
+
         document.getElementById("kt_modal_stage").addEventListener("hidden.bs.modal", function() {
             stageForm.reset();
             document.getElementById("kt_modal_stage_title").textContent = "Novo Estágio";

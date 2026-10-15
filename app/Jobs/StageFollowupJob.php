@@ -18,13 +18,13 @@ class StageFollowupJob
             $stats = StageFollowupService::processDue();
 
             if ($stats['due'] > 0) {
-                Logger::info("StageFollowupJob: vencidos={$stats['due']}, enviados={$stats['sent']}, ignorados={$stats['skipped']}, falhas={$stats['failed']}");
+                Logger::info("StageFollowupJob: vencidos={$stats['due']}, enviados={$stats['sent']}, ignorados={$stats['skipped']}, falhas={$stats['failed']}, aguardando_vez={$stats['throttled']}");
             }
-            echo "[" . date('Y-m-d H:i:s') . "] StageFollowupJob: vencidos={$stats['due']}, enviados={$stats['sent']}, ignorados={$stats['skipped']}, falhas={$stats['failed']}\n";
+            echo "[" . date('Y-m-d H:i:s') . "] StageFollowupJob: vencidos={$stats['due']}, enviados={$stats['sent']}, ignorados={$stats['skipped']}, falhas={$stats['failed']}, aguardando_vez={$stats['throttled']}\n";
         } catch (\PDOException $e) {
-            // Tabelas ainda não criadas (migration 159 pendente): não quebrar o cron
-            if ($e->getCode() === '42S02') {
-                echo "[" . date('Y-m-d H:i:s') . "] StageFollowupJob: tabelas não encontradas — execute: php database/run_migrations.php 159\n";
+            // Tabela/coluna ainda não criada (migrations 159/161 pendentes): não quebrar o cron
+            if (in_array($e->getCode(), ['42S02', '42S22'], true)) {
+                echo "[" . date('Y-m-d H:i:s') . "] StageFollowupJob: banco desatualizado — execute: php database/run_migrations.php 159 && php database/run_migrations.php 161\n";
                 return;
             }
             throw $e;

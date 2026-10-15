@@ -11,6 +11,7 @@ use App\Controllers\ContactController;
 use App\Controllers\ContactAgentController;
 use App\Controllers\FunnelController;
 use App\Controllers\StageFollowupController;
+use App\Controllers\StageAlertController;
 use App\Controllers\PwaController;
 use App\Controllers\AutomationController;
 use App\Controllers\AgentController;
@@ -282,6 +283,10 @@ Router::get('/funnel-stages/followup-limits', [StageFollowupController::class, '
 Router::post('/funnel-stages/followup-limits', [StageFollowupController::class, 'saveLimits'], ['Authentication']);
 Router::get('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'getStageConfig'], ['Authentication']);
 Router::post('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'saveStageConfig'], ['Authentication']);
+Router::get('/funnel-stages/{stageId}/alert', [StageAlertController::class, 'getStageConfig'], ['Authentication']);
+Router::post('/funnel-stages/{stageId}/alert', [StageAlertController::class, 'saveStageConfig'], ['Authentication']);
+// Alerta de conversa parada na etapa (consultado pelo navegador do agente)
+Router::get('/stage-alerts', [StageAlertController::class, 'myAlerts'], ['Authentication']);
 
 // Rotas de Automações
 Router::get('/automations', [AutomationController::class, 'index'], ['Authentication']);

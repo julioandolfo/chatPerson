@@ -1162,6 +1162,7 @@
     <!--begin::API4Com WebPhone Widget-->
     <?php include __DIR__ . '/../../partials/webphone-widget.php'; ?>
     <!--end::API4Com WebPhone Widget-->
+<?php include __DIR__ . '/../../partials/stage-alerts.php'; ?>
 <?php include __DIR__ . '/../../partials/pwa-scripts.php'; ?>
 </body>
 </html>

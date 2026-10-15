@@ -18,6 +18,7 @@ const AUTO_MIGRATIONS = [
     '159', // follow-up por etapa
     '160', // PWA: manter conectado + push
     '161', // follow-up: limites de envio anti-spam
+    '162', // alerta de conversa parada na etapa
 ];
 
 const DB_WAIT_SECONDS = 60;

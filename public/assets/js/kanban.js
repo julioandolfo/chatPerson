@@ -343,6 +343,7 @@ function editStage(stageId, name, description, color) {
                 toggleAutoAssignFields();
                 
                 stageFollowupLoad(stageId);
+                stageAlertLoad(stageId);
                 
                 const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
                 modal.show();
@@ -355,6 +356,7 @@ function editStage(stageId, name, description, color) {
                 document.getElementById("kt_stage_color").value = color || "#009ef7";
                 document.getElementById("kt_stage_default").checked = false;
                 stageFollowupLoad(stageId);
+                stageAlertLoad(stageId);
                 
                 const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
                 modal.show();
@@ -370,6 +372,7 @@ function editStage(stageId, name, description, color) {
             document.getElementById("kt_stage_color").value = color || "#009ef7";
             document.getElementById("kt_stage_default").checked = false;
             stageFollowupLoad(stageId);
+            stageAlertLoad(stageId);
             
             const modal = new bootstrap.Modal(document.getElementById("kt_modal_stage"));
             modal.show();
@@ -571,6 +574,124 @@ function stageFollowupValidate() {
         previous = minutes;
     }
     return null;
+}
+
+// ============================================================================
+// ALERTA DE CLIENTE SEM RESPOSTA NA ETAPA
+// ============================================================================
+
+function stageAlertUrl(stageId) {
+    return window.KANBAN_CONFIG.BASE_URL + "/funnel-stages/" + stageId + "/alert";
+}
+
+function stageAlertSoundsUrl(file) {
+    return window.KANBAN_CONFIG.BASE_URL + "/assets/sounds/" + file;
+}
+
+let stageAlertLoaded = false;
+
+function stageAlertFillSounds(sounds) {
+    const select = document.getElementById("kt_stage_alert_sound");
+    if (!select || select.options.length > 1 || !sounds) return;
+    Object.keys(sounds).forEach(file => {
+        const opt = document.createElement("option");
+        opt.value = file;
+        opt.textContent = sounds[file];
+        select.appendChild(opt);
+    });
+}
+
+function stageAlertFill(config) {
+    if (!document.getElementById("kt_stage_alert_enabled")) return;
+    config = config || { enabled: false, after_minutes: 30, sound: "alert.mp3", repeat_minutes: 5, include_unassigned: false, notify_user_ids: [], only_business_hours: false };
+    const minutes = parseInt(config.after_minutes, 10) || 30;
+    let unit = 1;
+    if (minutes % 1440 === 0) unit = 1440;
+    else if (minutes % 60 === 0) unit = 60;
+    document.getElementById("kt_stage_alert_enabled").checked = !!config.enabled;
+    document.getElementById("kt_stage_alert_after_value").value = minutes / unit;
+    document.getElementById("kt_stage_alert_after_unit").value = String(unit);
+    const soundSelect = document.getElementById("kt_stage_alert_sound");
+    soundSelect.value = config.sound || "";
+    if (soundSelect.value !== (config.sound || "")) soundSelect.value = "alert.mp3";
+    const repeatSelect = document.getElementById("kt_stage_alert_repeat");
+    const repeat = String(config.repeat_minutes || 0);
+    if (!Array.from(repeatSelect.options).some(o => o.value === repeat)) {
+        const opt = document.createElement("option");
+        opt.value = repeat;
+        opt.textContent = "A cada " + repeat + " minutos";
+        repeatSelect.appendChild(opt);
+    }
+    repeatSelect.value = repeat;
+    document.getElementById("kt_stage_alert_unassigned").checked = !!config.include_unassigned;
+    document.getElementById("kt_stage_alert_business_hours").checked = !!config.only_business_hours;
+    $("#kt_stage_alert_users").val((config.notify_user_ids || []).map(String)).trigger("change");
+}
+
+function stageAlertLoad(stageId) {
+    stageAlertLoaded = false;
+    stageAlertFill(null);
+    if (!stageId || !document.getElementById("kt_stage_alert_enabled")) return;
+    fetch(stageAlertUrl(stageId), { headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" } })
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            stageAlertFillSounds(data.sounds);
+            stageAlertFill(data.config);
+            stageAlertLoaded = true;
+        })
+        .catch(err => console.error("Erro ao carregar alerta da etapa:", err));
+}
+
+function stageAlertCollect() {
+    const value = parseInt(document.getElementById("kt_stage_alert_after_value").value, 10) || 0;
+    const unit = parseInt(document.getElementById("kt_stage_alert_after_unit").value, 10) || 1;
+    return {
+        enabled: document.getElementById("kt_stage_alert_enabled").checked,
+        after_minutes: value * unit,
+        sound: document.getElementById("kt_stage_alert_sound").value,
+        repeat_minutes: parseInt(document.getElementById("kt_stage_alert_repeat").value, 10) || 0,
+        include_unassigned: document.getElementById("kt_stage_alert_unassigned").checked,
+        only_business_hours: document.getElementById("kt_stage_alert_business_hours").checked,
+        notify_user_ids: ($("#kt_stage_alert_users").val() || []).map(v => parseInt(v, 10))
+    };
+}
+
+function stageAlertValidate() {
+    if (!document.getElementById("kt_stage_alert_enabled")) return null;
+    const payload = stageAlertCollect();
+    if (!payload.enabled) return null;
+    if (payload.after_minutes < 1) return "Alerta: informe depois de quanto tempo sem resposta o agente deve ser avisado.";
+    if (payload.after_minutes > 43200) return "Alerta: o tempo máximo é de 30 dias.";
+    return null;
+}
+
+/** Resolve com null (ok) ou a mensagem de erro */
+function stageAlertSave(stageId, isNewStage) {
+    if (!stageId || !document.getElementById("kt_stage_alert_enabled")) return Promise.resolve(null);
+    const payload = stageAlertCollect();
+    // Etapa nova sem alerta, ou configuração que não chegou a carregar: não grava à toa
+    if (isNewStage && !payload.enabled) return Promise.resolve(null);
+    if (!isNewStage && !stageAlertLoaded) return Promise.resolve(null);
+
+    return fetch(stageAlertUrl(stageId), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(payload)
+    })
+        .then(r => r.json())
+        .then(data => data.success ? null : (data.message || "Erro ao salvar alerta"))
+        .catch(err => "Erro ao salvar alerta: " + err.message);
+}
+
+function stageAlertTestSound() {
+    const file = document.getElementById("kt_stage_alert_sound").value;
+    if (!file) return;
+    if (window.SoundManager && typeof window.SoundManager.playFile === "function") {
+        window.SoundManager.playFile(file);
+    } else {
+        new Audio(stageAlertSoundsUrl(file)).play().catch(() => {});
+    }
 }
 
 function toggleAutoAssignFields() {
@@ -800,6 +921,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 Swal.fire({ icon: 'warning', title: 'Follow-up', text: followupError, confirmButtonText: 'OK' });
                 return;
             }
+            const alertError = stageAlertValidate();
+            if (alertError) {
+                const alertTab = document.querySelector('a[href="#kt_tab_stage_alert"]');
+                if (alertTab) bootstrap.Tab.getOrCreateInstance(alertTab).show();
+                Swal.fire({ icon: 'warning', title: 'Alerta', text: alertError, confirmButtonText: 'OK' });
+                return;
+            }
             const url = isEdit 
                 ? window.KANBAN_CONFIG.funnelBaseUrl + "/stages/" + stageId
                 : window.KANBAN_CONFIG.funnelBaseUrl + "/stages";
@@ -906,13 +1034,13 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (data.success) {
                     console.log("✅ Estágio salvo com sucesso!");
                     const savedStageId = isEdit ? stageId : (data.id || (data.stage && data.stage.id));
-                    Promise.all([stageFollowupSave(savedStageId, !isEdit), stageFollowupSaveLimits()]).then(errors => {
+                    Promise.all([stageFollowupSave(savedStageId, !isEdit), stageFollowupSaveLimits(), stageAlertSave(savedStageId, !isEdit)]).then(errors => {
                         const followupSaveError = errors.filter(Boolean).join(" ");
                         const modal = bootstrap.Modal.getInstance(document.getElementById("kt_modal_stage"));
                         if (followupSaveError) {
                             Swal.fire({
                                 icon: 'warning',
-                                title: 'Etapa salva, mas o follow-up não',
+                                title: 'Etapa salva, mas o follow-up/alerta não',
                                 text: followupSaveError,
                                 confirmButtonText: 'OK'
                             }).then(() => location.reload());
@@ -955,6 +1083,8 @@ document.addEventListener("DOMContentLoaded", function() {
         
         // Resetar formulário ao fechar modal
         document.getElementById("kt_modal_stage").addEventListener("show.bs.modal", stageFollowupLoadLimits);
+        const alertSoundTest = document.getElementById("kt_stage_alert_sound_test");
+        if (alertSoundTest) alertSoundTest.addEventListener("click", stageAlertTestSound);
 
         document.getElementById("kt_modal_stage").addEventListener("hidden.bs.modal", function() {
             stageForm.reset();
@@ -962,6 +1092,8 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById("kt_stage_id").value = "";
             document.getElementById("kt_stage_color").value = "#009ef7";
             if (document.getElementById("kt_stage_followup_steps")) stageFollowupFill(null);
+            stageAlertFill(null);
+            stageAlertLoaded = false;
         });
         
         const followupAddBtn = document.getElementById("kt_stage_followup_add");

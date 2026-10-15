@@ -50,6 +50,46 @@ class NotificationService
     /**
      * Notificar nova mensagem
      */
+    /**
+     * Mensagem nova do contato: avisa quem deve atender (notificação interna + push no app).
+     * - Conversa com agente e sem IA ativa → o agente.
+     * - Conversa sem agente, com setor → os agentes do setor.
+     * - Sem agente e sem setor, ou com a IA atendendo → ninguém.
+     *
+     * Chamada por todos os canais de entrada (ConversationService::sendMessage, WhatsApp
+     * Cloud API/Coex, Notificame, Instagram).
+     */
+    public static function notifyIncomingContactMessage(int $conversationId, int $messageId): void
+    {
+        $conversation = \App\Models\Conversation::find($conversationId);
+        if (!$conversation) {
+            return;
+        }
+
+        if (!empty($conversation['agent_id'])) {
+            $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
+            if ($aiConversation && $aiConversation['status'] === 'active') {
+                return;
+            }
+            self::notifyNewMessage((int)$conversation['agent_id'], $conversationId, ['id' => $messageId]);
+            return;
+        }
+
+        if (!empty($conversation['department_id'])) {
+            $contact = !empty($conversation['contact_id']) ? \App\Models\Contact::find((int)$conversation['contact_id']) : null;
+            self::notifyDepartment((int)$conversation['department_id'], [
+                'type' => 'message',
+                'title' => 'Nova mensagem',
+                'message' => 'Nova mensagem recebida de ' . ($contact['name'] ?? 'Contato'),
+                'link' => '/conversations/' . $conversationId,
+                'data' => [
+                    'conversation_id' => $conversationId,
+                    'message_id' => $messageId
+                ]
+            ]);
+        }
+    }
+
     public static function notifyNewMessage(int $userId, int $conversationId, array $message): int
     {
         return self::create([

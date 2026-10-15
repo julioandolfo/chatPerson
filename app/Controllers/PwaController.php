@@ -25,14 +25,15 @@ class PwaController
     public function manifest(): void
     {
         $name = trim((string)SettingService::get('app_name', '')) ?: self::DEFAULT_NAME;
-        $customIcon = self::customLogoPath() !== null;
+        $version = self::iconVersion();
 
-        // URLs relativas ao próprio manifest: funciona também com o sistema em subpasta
-        $icons = $customIcon
+        // URLs relativas ao próprio manifest: funciona também com o sistema em subpasta.
+        // "v" muda quando o logo muda, para os aparelhos buscarem o ícone novo.
+        $icons = $version !== null
             ? [
-                ['src' => 'pwa/icon/192', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
-                ['src' => 'pwa/icon/512', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
-                ['src' => 'pwa/icon/512?maskable=1', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
+                ['src' => "pwa/icon/192?v={$version}", 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+                ['src' => "pwa/icon/512?v={$version}", 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
+                ['src' => "pwa/icon/512?maskable=1&v={$version}", 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
             ]
             : [
                 ['src' => 'assets/media/pwa/icon-192.png', 'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
@@ -66,6 +67,7 @@ class PwaController
             ],
         ];
 
+        self::discardOutput();
         header('Content-Type: application/manifest+json; charset=utf-8');
         header('Cache-Control: public, max-age=3600');
         echo json_encode($manifest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
@@ -73,44 +75,30 @@ class PwaController
     }
 
     /**
-     * Ícone a partir do logo enviado em Configurações (PNG/JPG/WebP/GIF)
+     * Ícone a partir do favicon/logo enviado em Configurações (PNG/JPG/WebP/GIF)
      */
     public function icon(string $size): void
     {
         $size = in_array((int)$size, [180, 192, 512], true) ? (int)$size : 192;
         $maskable = !empty($_GET['maskable']);
-        $logo = self::customLogoPath();
+        $source = self::iconSourcePath();
+        $defaultDir = dirname(__DIR__, 2) . '/public/assets/media/pwa/';
 
-        if ($logo === null || !function_exists('imagecreatetruecolor')) {
+        if ($source === null || !function_exists('imagecreatetruecolor')) {
             $file = $size === 180 ? 'apple-touch-icon.png' : ($maskable ? 'icon-maskable-512.png' : "icon-{$size}.png");
-            self::sendPng(file_get_contents(dirname(__DIR__, 2) . '/public/assets/media/pwa/' . $file));
+            self::sendPng(file_get_contents($defaultDir . $file));
         }
 
         $cacheDir = dirname(__DIR__, 2) . '/storage/cache/pwa-icons';
-        $cacheFile = $cacheDir . '/' . md5($logo . filemtime($logo) . $size . (int)$maskable) . '.png';
+        $cacheFile = $cacheDir . '/' . md5(self::ICON_GENERATOR_VERSION . $source . filemtime($source) . $size . (int)$maskable) . '.png';
         if (is_file($cacheFile)) {
             self::sendPng(file_get_contents($cacheFile));
         }
 
-        $source = @imagecreatefromstring(file_get_contents($logo));
-        if (!$source) {
-            self::sendPng(file_get_contents(dirname(__DIR__, 2) . '/public/assets/media/pwa/icon-512.png'));
+        $png = self::renderIcon($source, $size, $maskable);
+        if ($png === null) {
+            self::sendPng(file_get_contents($defaultDir . ($size === 180 ? 'apple-touch-icon.png' : 'icon-512.png')));
         }
-
-        // Fundo branco, logo centralizado. Maskable: logo dentro da zona segura (~60%)
-        $canvas = imagecreatetruecolor($size, $size);
-        imagefill($canvas, 0, 0, imagecolorallocate($canvas, 255, 255, 255));
-        $box = (int)round($size * ($maskable ? 0.6 : 0.8));
-        $w = imagesx($source);
-        $h = imagesy($source);
-        $scale = min($box / $w, $box / $h);
-        $nw = max(1, (int)round($w * $scale));
-        $nh = max(1, (int)round($h * $scale));
-        imagecopyresampled($canvas, $source, (int)(($size - $nw) / 2), (int)(($size - $nh) / 2), 0, 0, $nw, $nh, $w, $h);
-
-        ob_start();
-        imagepng($canvas);
-        $png = ob_get_clean();
 
         if (!is_dir($cacheDir)) {
             @mkdir($cacheDir, 0775, true);
@@ -120,22 +108,142 @@ class PwaController
         self::sendPng($png);
     }
 
+    /** Muda quando a lógica de geração muda (invalida o cache de ícones) */
+    private const ICON_GENERATOR_VERSION = '2';
+
+    /**
+     * Desenha o ícone quadrado. O fundo é escolhido pelo próprio logo:
+     * - logo com fundo próprio (sem transparência): estende a cor do canto;
+     * - logo claro (ex.: branco para menu escuro): fundo na cor do sistema;
+     * - logo escuro/colorido: fundo branco.
+     */
+    private static function renderIcon(string $path, int $size, bool $maskable): ?string
+    {
+        $source = @imagecreatefromstring((string)file_get_contents($path));
+        if (!$source) {
+            return null;
+        }
+        if (!imageistruecolor($source)) {
+            imagepalettetotruecolor($source);
+        }
+
+        $w = imagesx($source);
+        $h = imagesy($source);
+        [$background, $hasOwnBackground] = self::pickBackground($source, $w, $h);
+
+        $canvas = imagecreatetruecolor($size, $size);
+        imagealphablending($canvas, true);
+        imagefill($canvas, 0, 0, imagecolorallocate($canvas, $background[0], $background[1], $background[2]));
+
+        // Área útil: maskable precisa caber na zona segura (~60% central); logo com fundo
+        // próprio pode ocupar mais, porque o fundo se confunde com o do ícone
+        $ratio = $maskable ? 0.6 : ($hasOwnBackground ? 0.9 : 0.72);
+        $box = (int)round($size * $ratio);
+        $scale = min($box / $w, $box / $h);
+        $nw = max(1, (int)round($w * $scale));
+        $nh = max(1, (int)round($h * $scale));
+        imagecopyresampled($canvas, $source, (int)(($size - $nw) / 2), (int)(($size - $nh) / 2), 0, 0, $nw, $nh, $w, $h);
+
+        ob_start();
+        imagepng($canvas);
+        return (string)ob_get_clean();
+    }
+
+    /**
+     * @return array{0: int[], 1: bool} [cor RGB do fundo, logo tem fundo próprio]
+     */
+    private static function pickBackground($image, int $w, int $h): array
+    {
+        $brand = [0x1B, 0x84, 0xFF];
+        $step = max(1, (int)floor(max($w, $h) / 80));
+        $opaque = 0;
+        $total = 0;
+        $lumSum = 0.0;
+
+        for ($y = 0; $y < $h; $y += $step) {
+            for ($x = 0; $x < $w; $x += $step) {
+                $rgba = imagecolorat($image, $x, $y);
+                $alpha = ($rgba >> 24) & 0x7F; // 0 = opaco, 127 = transparente
+                $total++;
+                if ($alpha > 64) {
+                    continue;
+                }
+                $opaque++;
+                $r = ($rgba >> 16) & 0xFF;
+                $g = ($rgba >> 8) & 0xFF;
+                $b = $rgba & 0xFF;
+                $lumSum += (0.2126 * $r + 0.7152 * $g + 0.0722 * $b) / 255;
+            }
+        }
+
+        if ($opaque === 0) {
+            return [$brand, false];
+        }
+
+        // Quase sem transparência: o logo tem fundo próprio → usa a cor do canto
+        if ($opaque / $total > 0.97) {
+            $corner = imagecolorat($image, 0, 0);
+            return [[($corner >> 16) & 0xFF, ($corner >> 8) & 0xFF, $corner & 0xFF], true];
+        }
+
+        // Logo claro sobre transparente some no branco → fundo na cor do sistema
+        $avgLum = $lumSum / $opaque;
+        return [$avgLum > 0.7 ? $brand : [255, 255, 255], false];
+    }
+
     private static function sendPng(string $png): void
     {
+        self::discardOutput();
         header('Content-Type: image/png');
+        header('Content-Length: ' . strlen($png));
         header('Cache-Control: public, max-age=86400');
         echo $png;
         exit;
     }
 
-    private static function customLogoPath(): ?string
+    /**
+     * Descarta qualquer saída anterior (aviso do PHP, espaço em branco...), que
+     * corromperia o PNG/JSON
+     */
+    private static function discardOutput(): void
     {
-        $logo = (string)SettingService::get('app_logo', '');
-        if ($logo === '' || !preg_match('/\.(png|jpe?g|webp|gif)$/i', $logo)) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+    }
+
+    /**
+     * Imagem usada para o ícone: o favicon (costuma ser quadrado) se for imagem comum e
+     * não minúscula; senão o logo
+     */
+    private static function iconSourcePath(): ?string
+    {
+        $favicon = self::uploadedImagePath((string)SettingService::get('app_favicon', ''));
+        if ($favicon !== null) {
+            $info = @getimagesize($favicon);
+            if ($info && min($info[0], $info[1]) >= 64) {
+                return $favicon;
+            }
+        }
+        return self::uploadedImagePath((string)SettingService::get('app_logo', ''));
+    }
+
+    private static function uploadedImagePath(string $relative): ?string
+    {
+        if ($relative === '' || !preg_match('/\.(png|jpe?g|webp|gif)$/i', $relative)) {
             return null;
         }
-        $path = dirname(__DIR__, 2) . '/public/' . ltrim($logo, '/');
+        $path = dirname(__DIR__, 2) . '/public/' . ltrim($relative, '/');
         return is_file($path) ? $path : null;
+    }
+
+    /**
+     * Versão do ícone personalizado (null = sem imagem personalizada, usa o padrão)
+     */
+    public static function iconVersion(): ?string
+    {
+        $source = self::iconSourcePath();
+        return $source === null ? null : substr(md5(self::ICON_GENERATOR_VERSION . $source . filemtime($source)), 0, 8);
     }
 
     private static function shortName(string $name): string

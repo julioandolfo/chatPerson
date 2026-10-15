@@ -249,6 +249,10 @@ let callTimer = null;
 let callSeconds = 0;
 
 document.addEventListener('DOMContentLoaded', function() {
+    // No app instalado (PWA) o telefone fica desligado: não registra o ramal nem
+    // atende chamadas (o autoAnswer atenderia sem ninguém ver)
+    if (window.CP_IS_PWA) return;
+
     // Verificar se o widget existe
     const widget = document.getElementById('api4com-webphone-widget');
     if (!widget) return;

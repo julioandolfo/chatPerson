@@ -28,6 +28,12 @@ $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP
 $acceptsJson = !empty($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
 $isJsonRequest = $isAjax || $acceptsJson || (isset($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false);
 
+// Manifest e ícones do app (PWA): binário/JSON — um aviso do PHP impresso na resposta
+// corromperia a imagem (ícone em branco na tela inicial). Tratar como API: erros só no log.
+if (preg_match('#/(manifest\.webmanifest|pwa/icon/)#', parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '')) {
+    $isJsonRequest = true;
+}
+
 if ($isJsonRequest) {
     // Para APIs, logar erros mas NÃO exibir (para evitar HTML no JSON)
     ini_set('display_errors', '0');

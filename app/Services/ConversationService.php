@@ -2697,39 +2697,14 @@ class ConversationService
             }
         }
         
-        // Criar notificações para agentes relacionados à conversa
+        // Criar notificações para agentes relacionados à conversa (regra em NotificationService)
         try {
-            if (class_exists('\App\Services\NotificationService')) {
-                // Notificar agente atribuído (se houver e não for IA)
-                if (!empty($conversation['agent_id']) && $senderType === 'contact') {
-                    // Verificar se não é agente de IA
-                    $aiConversation = \App\Models\AIConversation::getByConversationId($conversationId);
-                    if (!$aiConversation || $aiConversation['status'] !== 'active') {
-                        \App\Services\NotificationService::notifyNewMessage(
-                            $conversation['agent_id'],
-                            $conversationId,
-                            $message
-                        );
-                    }
-                }
-                
-                // Notificar setor (se não houver agente atribuído e mensagem for do contato)
-                if (empty($conversation['agent_id']) && $senderType === 'contact' && !empty($conversation['department_id'])) {
-                    \App\Services\NotificationService::notifyDepartment($conversation['department_id'], [
-                        'type' => 'message',
-                        'title' => 'Nova mensagem',
-                        'message' => 'Nova mensagem recebida de ' . ($conversation['contact_name'] ?? 'Contato'),
-                        'link' => '/conversations/' . $conversationId,
-                            'data' => [
-                                'conversation_id' => $conversationId,
-                                'message_id' => $messageId
-                            ]
-                        ]);
-                    }
-                }
-            } catch (\Exception $e) {
-                error_log("Erro ao criar notificações: " . $e->getMessage());
+            if ($senderType === 'contact') {
+                \App\Services\NotificationService::notifyIncomingContactMessage($conversationId, (int)$messageId);
             }
+        } catch (\Exception $e) {
+            error_log("Erro ao criar notificações: " . $e->getMessage());
+        }
         }
         
         // Executar automações e agentes (APENAS se não foi solicitado pular - ex: webhook echo de API)

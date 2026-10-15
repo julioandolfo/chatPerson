@@ -769,6 +769,13 @@ class WhatsAppCloudService extends MetaIntegrationService
         // Notificar via WebSocket
         WebSocket::notifyNewMessage($conversation['id'], $newMessage);
         
+        // Avisar o agente/setor (notificação interna + push no app)
+        try {
+            \App\Services\NotificationService::notifyIncomingContactMessage((int)$conversation['id'], (int)$newMessageId);
+        } catch (\Throwable $e) {
+            \App\Helpers\Logger::error("WhatsApp Cloud: erro ao notificar agentes: " . $e->getMessage());
+        }
+        
         // Executar automações
         AutomationService::executeForNewMessage($newMessageId);
     }

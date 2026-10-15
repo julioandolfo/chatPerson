@@ -4,15 +4,19 @@
  */
 try {
     $pwaAppName = trim((string)\App\Services\SettingService::get('app_name', '')) ?: 'Sistema Multiatendimento';
-    $pwaLogo = (string)\App\Services\SettingService::get('app_logo', '');
 } catch (\Throwable $e) {
     // Banco indisponível (ex.: página de erro): segue com os padrões
     $pwaAppName = 'Sistema Multiatendimento';
-    $pwaLogo = '';
 }
-$pwaAppleIcon = preg_match('/\.(png|jpe?g|webp|gif)$/i', $pwaLogo) && is_file(dirname(__DIR__, 2) . '/public/' . ltrim($pwaLogo, '/'))
-    ? \App\Helpers\Url::to('pwa/icon/180')
-    : \App\Helpers\Url::asset('media/pwa/apple-touch-icon.png');
+try {
+    $pwaIconVersion = \App\Controllers\PwaController::iconVersion();
+} catch (\Throwable $e) {
+    $pwaIconVersion = null;
+}
+// Mesmo ícone do manifest (gerado a partir do favicon/logo de Configurações, ou o padrão)
+$pwaAppleIcon = $pwaIconVersion !== null
+    ? \App\Helpers\Url::to('pwa/icon/180?v=' . $pwaIconVersion)
+    : \App\Helpers\Url::to('assets/media/pwa/apple-touch-icon.png');
 ?>
     <link rel="manifest" href="<?= \App\Helpers\Url::to('manifest.webmanifest') ?>" />
     <meta name="theme-color" content="#1B84FF" />

@@ -66,4 +66,11 @@ RUN mkdir -p storage/cache storage/logs storage/uploads bootstrap/cache \
  && chown -R www-data:www-data vendor storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
+# Ao subir o container: migrations automáticas (database/auto_migrate.php) e depois o Apache
+COPY docker/entrypoint.sh /usr/local/bin/app-entrypoint
+RUN sed -i 's/\r$//' /usr/local/bin/app-entrypoint && chmod +x /usr/local/bin/app-entrypoint
+
 EXPOSE 80
+
+ENTRYPOINT ["app-entrypoint"]
+CMD ["apache2-foreground"]

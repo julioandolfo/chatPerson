@@ -4,6 +4,9 @@ Implementação das Fases 0 a 4 do `PLANO_PWA_CONVERSAS.md`.
 
 ## Colocar no ar
 
+As tabelas são criadas **automaticamente no deploy** (`docker/entrypoint.sh` →
+`database/auto_migrate.php`, registro em `schema_migrations`). Fora do Docker, rode:
+
 ```bash
 php database/run_migrations.php 160
 ```

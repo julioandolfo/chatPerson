@@ -13,6 +13,9 @@ Exemplo (etapa "Proposta"):
 
 ## Instalação
 
+As tabelas são criadas **automaticamente no deploy** (`docker/entrypoint.sh` →
+`database/auto_migrate.php`, registro em `schema_migrations`). Fora do Docker, rode:
+
 ```bash
 php database/run_migrations.php 159
 php database/run_migrations.php 161   # limites de envio (anti-spam)

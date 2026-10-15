@@ -1262,6 +1262,11 @@ ob_start();
                                 Follow-up
                             </a>
                         </li>
+                        <li class="nav-item mt-2">
+                            <a class="nav-link text-active-primary ms-0 me-10" data-bs-toggle="tab" href="#kt_tab_stage_alert">
+                                Alerta
+                            </a>
+                        </li>
                     </ul>
                     <!--end::Tabs-->
                     
@@ -1528,6 +1533,93 @@ ob_start();
                             </div>
                         </div>
                         <!--end::Tab Pane - Follow-up-->
+
+                        <!--begin::Tab Pane - Alerta-->
+                        <div class="tab-pane fade" id="kt_tab_stage_alert" role="tabpanel">
+                            <div class="notice d-flex bg-light-danger rounded border-danger border border-dashed p-4 mb-7">
+                                <i class="ki-duotone ki-notification-on fs-2tx text-danger me-4"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span><span class="path5"></span></i>
+                                <div class="fw-semibold">
+                                    <h4 class="text-gray-900 fw-bold">Alerta de cliente sem resposta</h4>
+                                    <div class="fs-7 text-gray-600">
+                                        Quando uma conversa desta etapa ficar com o <strong>cliente esperando resposta</strong> pelo tempo definido,
+                                        aparece um alerta na tela do agente (em qualquer página do sistema), com som, e a conversa fica destacada na lista.
+                                        O alerta some quando alguém responde, a conversa é encerrada ou muda de etapa.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Sem atributo name: salvos separadamente em /funnel-stages/{id}/alert -->
+                            <div class="fv-row mb-5">
+                                <div class="form-check form-switch form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_alert_enabled" />
+                                    <label class="form-check-label fw-semibold" for="kt_stage_alert_enabled">Ativar alerta nesta etapa</label>
+                                </div>
+                            </div>
+
+                            <div class="row g-4 mb-5">
+                                <div class="col-12 col-md-6">
+                                    <label class="fw-semibold fs-7 mb-2">Alertar após o cliente esperar</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="number" min="1" class="form-control form-control-sm form-control-solid w-80px" id="kt_stage_alert_after_value" value="30" />
+                                        <select class="form-select form-select-sm form-select-solid w-125px" id="kt_stage_alert_after_unit">
+                                            <option value="1">minutos</option>
+                                            <option value="60">horas</option>
+                                            <option value="1440">dias</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-text">Conta da primeira mensagem do cliente sem resposta (ou da entrada na etapa, se for depois).</div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="fw-semibold fs-7 mb-2">Som</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <select class="form-select form-select-sm form-select-solid" id="kt_stage_alert_sound">
+                                            <option value="">Sem som (só alerta visual)</option>
+                                        </select>
+                                        <button type="button" class="btn btn-sm btn-light-primary flex-shrink-0" id="kt_stage_alert_sound_test" title="Ouvir o som">▶ Ouvir</button>
+                                    </div>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="fw-semibold fs-7 mb-2">Repetir o som</label>
+                                    <select class="form-select form-select-sm form-select-solid" id="kt_stage_alert_repeat">
+                                        <option value="0">Não repetir (toca uma vez)</option>
+                                        <option value="1">A cada 1 minuto</option>
+                                        <option value="2">A cada 2 minutos</option>
+                                        <option value="5">A cada 5 minutos</option>
+                                        <option value="10">A cada 10 minutos</option>
+                                        <option value="15">A cada 15 minutos</option>
+                                        <option value="30">A cada 30 minutos</option>
+                                        <option value="60">A cada 1 hora</option>
+                                    </select>
+                                    <div class="form-text">Enquanto o cliente continuar sem resposta. O agente pode adiar ou silenciar.</div>
+                                </div>
+                            </div>
+
+                            <div class="fv-row mb-3">
+                                <div class="form-check form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_alert_unassigned" />
+                                    <label class="form-check-label" for="kt_stage_alert_unassigned">Alertar também conversas sem agente atribuído</label>
+                                </div>
+                                <div class="form-text ms-9">Vão para todos os agentes que têm acesso à conversa. A conversa atribuída alerta só o agente dela.</div>
+                            </div>
+                            <div class="fv-row mb-5">
+                                <div class="form-check form-check-custom form-check-solid">
+                                    <input class="form-check-input" type="checkbox" id="kt_stage_alert_business_hours" />
+                                    <label class="form-check-label" for="kt_stage_alert_business_hours">Contar só o horário de atendimento</label>
+                                </div>
+                                <div class="form-text ms-9">Fora do expediente (Configurações de horário de trabalho/feriados) o tempo não corre e não há alerta.</div>
+                            </div>
+
+                            <div class="fv-row">
+                                <label class="fw-semibold fs-7 mb-2">Alertar também (supervisores)</label>
+                                <select class="form-select form-select-solid" id="kt_stage_alert_users" multiple data-control="select2" data-dropdown-parent="#kt_modal_stage" data-close-on-select="false" data-placeholder="Ninguém além do agente da conversa">
+                                    <?php foreach (\App\Models\User::getAgents() as $alertUser): ?>
+                                        <option value="<?= (int)$alertUser['id'] ?>"><?= htmlspecialchars($alertUser['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                                <div class="form-text">Estes usuários recebem o alerta de <strong>todas</strong> as conversas da etapa, de qualquer agente.</div>
+                            </div>
+                        </div>
+                        <!--end::Tab Pane - Alerta-->
                     </div>
                     <!--end::Tab Content-->
                 </div>
@@ -1699,23 +1791,6 @@ $scripts = <<<'SCRIPTS'
 SCRIPTS;
 
 $scripts .= '
-// Configurações globais para o Kanban.js
-const __KANBAN_BASE_PATH = "' . $basePath . '";
-const __KANBAN_ORIGIN = window.location.origin || (window.location.protocol + "//" + window.location.host);
-
-window.KANBAN_CONFIG = {
-    funnelId: ' . $funnelIdForJs . ',
-    moveConversationUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs . '/conversations/move') . '",
-    funnelBaseUrl: "' . \App\Helpers\Url::to('/funnels/' . $funnelIdForJs) . '",
-    funnelsUrl: "' . \App\Helpers\Url::to('/funnels') . '",
-    BASE_URL: __KANBAN_ORIGIN + __KANBAN_BASE_PATH
-};
-console.log("KANBAN_CONFIG inicializado:", window.KANBAN_CONFIG);
-</script>
-<!-- Kanban JavaScript -->
-<script src="' . \App\Helpers\Url::asset('js/kanban.js') . '"></script>
-<script src="' . \App\Helpers\Url::asset('js/conversation-details.js') . '"></script>
-<script>
 // Configurações globais para o Kanban.js
 const __KANBAN_BASE_PATH = "' . $basePath . '";
 const __KANBAN_ORIGIN = window.location.origin || (window.location.protocol + "//" + window.location.host);

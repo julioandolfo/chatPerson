@@ -25,6 +25,20 @@ $autoCloseSettings = $cs['auto_close'] ?? [];
             </label>
             <div class="form-text">Quando habilitado, o nome do agente será enviado em negrito (*Nome*) antes da mensagem por padrão. O agente pode ativar/desativar individualmente no chat.</div>
         </div>
+        <div class="fv-row mb-7">
+            <label class="d-flex align-items-center">
+                <input type="checkbox" name="chat_auto_refresh_enabled" class="form-check-input me-2" 
+                       <?= \App\Services\SettingService::get('chat_auto_refresh_enabled', true) ? 'checked' : '' ?> />
+                <span class="fw-semibold fs-6">Atualizar a página de conversas automaticamente</span>
+            </label>
+            <div class="d-flex align-items-center gap-2 mt-3 ms-7">
+                <span class="text-gray-700 fs-6">A cada</span>
+                <input type="number" name="chat_auto_refresh_minutes" class="form-control form-control-solid w-100px" min="1" max="240"
+                       value="<?= (int)\App\Services\SettingService::get('chat_auto_refresh_minutes', 15) ?: 15 ?>" />
+                <span class="text-gray-700 fs-6">minutos</span>
+            </div>
+            <div class="form-text ms-7">Mostra uma contagem regressiva no topo da lista de conversas. Se o agente estiver digitando, gravando áudio, com anexo pendente ou com uma janela aberta, a atualização espera ele terminar.</div>
+        </div>
     </div>
     <!--end::Configurações de Chat-->
     

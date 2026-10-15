@@ -12,6 +12,11 @@ function up_add_followup_send_pacing() {
     global $pdo;
     $db = isset($pdo) ? $pdo : \App\Helpers\Database::getInstance();
 
+    $hasBase = $db->query("SHOW TABLES LIKE 'conversation_followup_messages'")->fetch(\PDO::FETCH_ASSOC);
+    if (!$hasBase) {
+        throw new \RuntimeException("Tabela 'conversation_followup_messages' não existe: execute antes a migration 159 (php database/run_migrations.php 159)");
+    }
+
     $hasColumn = $db->query("SHOW COLUMNS FROM conversation_followup_messages LIKE 'account_key'")->fetch(\PDO::FETCH_ASSOC);
     if (!$hasColumn) {
         $db->exec("ALTER TABLE conversation_followup_messages

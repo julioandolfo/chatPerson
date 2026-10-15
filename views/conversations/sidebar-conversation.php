@@ -2451,7 +2451,8 @@ window.showAIHistory = function() {
                 showConfirmButton: true,
                 confirmButtonText: 'Fechar'
             });
-        })
+        });
+    })
     .catch(error => {
         console.error('Erro:', error);
         Swal.fire({

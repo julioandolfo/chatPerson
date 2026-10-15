@@ -623,6 +623,11 @@ class SettingsController
             
             // Salvar configuração de nome do agente no chat
             SettingService::set('chat_agent_name_enabled', isset($data['chat_agent_name_enabled']), 'boolean', 'general');
+
+            // Atualização automática da página de conversas (contagem regressiva)
+            SettingService::set('chat_auto_refresh_enabled', isset($data['chat_auto_refresh_enabled']), 'boolean', 'general');
+            $autoRefreshMinutes = (int)($data['chat_auto_refresh_minutes'] ?? 15);
+            SettingService::set('chat_auto_refresh_minutes', max(1, min(240, $autoRefreshMinutes ?: 15)), 'integer', 'general');
             
             // Processar dados do formulário e converter para estrutura esperada
             $settings = [

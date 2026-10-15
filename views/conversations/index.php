@@ -3542,6 +3542,13 @@ function getChannelInfo(channel) {
                     <span id="headerPendingInvitesBadge" class="position-absolute top-0 start-100 translate-middle badge badge-circle badge-sm badge-danger d-none">0</span>
                 </button>
                 
+                <!-- Contagem regressiva da atualização automática (Configurações → Conversas) -->
+                <button type="button" class="btn btn-sm btn-light d-none px-3 text-nowrap" id="autoRefreshBtn"
+                        title="Atualização automática da página — clique para atualizar agora" onclick="autoRefreshNow()"
+                        style="font-variant-numeric: tabular-nums; min-width: 74px;">
+                    <i class="ki-duotone ki-arrows-circle fs-5 me-1"><span class="path1"></span><span class="path2"></span></i><span id="autoRefreshLabel">--:--</span>
+                </button>
+
                 <button type="button" class="btn btn-sm btn-icon btn-primary" id="btn_new_conversation" title="Nova conversa" onclick="if(typeof showNewConversationModal === 'function') { showNewConversationModal(); } else { console.error('showNewConversationModal não está definida'); }">
                     <i class="ki-duotone ki-plus fs-2">
                         <span class="path1"></span>
@@ -26191,6 +26198,97 @@ function showStageFollowupSteps() {
         confirmButtonText: 'Fechar'
     });
 }
+
+// ============================================================================
+// ATUALIZAÇÃO AUTOMÁTICA DA PÁGINA (contagem regressiva)
+// Configurável em Configurações → Conversas. Não recarrega no meio de um trabalho
+// (digitando, gravando áudio, anexo pendente, enviando ou com janela aberta).
+// ============================================================================
+(function () {
+    const enabled = <?= json_encode((bool)\App\Services\SettingService::get('chat_auto_refresh_enabled', true)) ?>;
+    const minutes = <?= max(1, min(240, (int)\App\Services\SettingService::get('chat_auto_refresh_minutes', 15) ?: 15)) ?>;
+    const RETRY_SECONDS = 30;
+
+    let deadline = Date.now() + minutes * 60 * 1000;
+    let waitingReason = null;
+
+    function busyReason() {
+        const input = document.getElementById('messageInput');
+        if (input && input.value.trim() !== '') return 'mensagem sendo digitada';
+        if (typeof mediaRecorder !== 'undefined' && mediaRecorder && mediaRecorder.state === 'recording') return 'gravando áudio';
+        if (typeof pendingAttachments !== 'undefined' && pendingAttachments.length > 0) return 'anexo aguardando envio';
+        if (typeof _sendingMessage !== 'undefined' && _sendingMessage) return 'mensagem sendo enviada';
+        if (document.querySelector('.modal.show, .swal2-container, .offcanvas.show')) return 'janela aberta';
+        if (navigator.onLine === false) return 'sem conexão';
+        return null;
+    }
+
+    function format(totalSeconds) {
+        const m = Math.floor(totalSeconds / 60);
+        const sec = totalSeconds % 60;
+        return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+    }
+
+    function render(remaining) {
+        const btn = document.getElementById('autoRefreshBtn');
+        const label = document.getElementById('autoRefreshLabel');
+        if (!btn || !label) return;
+        btn.classList.remove('d-none');
+        if (waitingReason) {
+            label.textContent = 'aguardando';
+            btn.title = `Atualização automática adiada: ${waitingReason}. Clique para atualizar agora.`;
+            btn.classList.add('btn-light-warning');
+            btn.classList.remove('btn-light');
+        } else {
+            label.textContent = format(remaining);
+            btn.title = `A página será atualizada em ${format(remaining)} — clique para atualizar agora`;
+            btn.classList.add('btn-light');
+            btn.classList.remove('btn-light-warning');
+        }
+    }
+
+    function tick() {
+        const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+        if (remaining > 0) {
+            render(remaining);
+            return;
+        }
+        // Aba em segundo plano: atualiza quando o agente voltar
+        if (document.visibilityState === 'hidden') return;
+
+        const reason = busyReason();
+        if (reason) {
+            waitingReason = reason;
+            deadline = Date.now() + RETRY_SECONDS * 1000;
+            render(RETRY_SECONDS);
+            return;
+        }
+        window.location.reload();
+    }
+
+    // Clique no contador: atualiza agora (confirma se houver texto digitado)
+    window.autoRefreshNow = function () {
+        const input = document.getElementById('messageInput');
+        if (input && input.value.trim() !== '' && !confirm('Há uma mensagem digitada que ainda não foi enviada. Atualizar a página mesmo assim?')) {
+            return;
+        }
+        window.location.reload();
+    };
+
+    if (!enabled) return;
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible') tick();
+    });
+    render(minutes * 60);
+    setInterval(function () {
+        if (waitingReason && Date.now() < deadline) {
+            render(Math.ceil((deadline - Date.now()) / 1000));
+            return;
+        }
+        waitingReason = null;
+        tick();
+    }, 1000);
+})();
 
 // Timer da janela 24h
 let _windowTimerInterval = null;

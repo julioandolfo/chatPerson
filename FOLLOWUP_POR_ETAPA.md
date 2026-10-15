@@ -15,6 +15,7 @@ Exemplo (etapa "Proposta"):
 
 ```bash
 php database/run_migrations.php 159
+php database/run_migrations.php 161   # limites de envio (anti-spam)
 ```
 
 O envio é feito pelo cron principal (`public/run-scheduled-jobs.php`, job `StageFollowupJob`),
@@ -33,6 +34,25 @@ Funis → Kanban → editar etapa → aba **Follow-up**:
   mensagem** e precisam ser crescentes.
 - Variáveis: `{{contact.name}}`, `{{contact.phone}}`, `{{contact.email}}`, `{{agent.name}}`,
   `{{date}}`, `{{time}}`, `{{datetime}}`.
+
+## Limites de envio (anti-spam)
+
+Na mesma aba **Follow-up**, seção **Limites de envio** — valem para **todas as etapas** e são
+contados **por número de WhatsApp/conta** de envio:
+
+| Campo | Padrão | O que faz |
+|---|---|---|
+| Intervalo entre mensagens | 15 a 45 s (aleatório) | Espera entre dois follow-ups do mesmo número |
+| Máximo por hora | 60 | Por número, janela móvel de 60 min |
+| Máximo por dia | 300 | Por número, janela móvel de 24 h |
+
+- O que passar do limite **não se perde**: continua na fila e sai nas próximas execuções do cron,
+  na ordem em que venceu.
+- Números diferentes têm cada um a sua vez (um número cheio não segura os outros).
+- Duas execuções do cron ao mesmo tempo dividem a vez do número (não dobram a velocidade).
+- Cada execução do cron envia por no máximo ~20 s. Com o cron a cada 1 minuto e intervalo de
+  15–45 s, sai cerca de 1 mensagem por minuto por número; com o cron a cada 5 minutos, bem menos.
+  Para filas grandes, agende `public/run-scheduled-jobs.php` a cada 1 minuto.
 
 ## Como funciona
 

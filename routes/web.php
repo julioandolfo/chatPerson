@@ -278,6 +278,8 @@ Router::delete('/funnels/{id}/stages/{stageId}', [FunnelController::class, 'dele
 Router::get('/funnels/{id}/metrics', [FunnelController::class, 'getFunnelMetrics'], ['Authentication']);
 Router::get('/funnels/{id}/stages/metrics', [FunnelController::class, 'getStageMetrics'], ['Authentication']);
 // Configuração de follow-up por etapa ("vamos continuar?")
+Router::get('/funnel-stages/followup-limits', [StageFollowupController::class, 'getLimits'], ['Authentication']);
+Router::post('/funnel-stages/followup-limits', [StageFollowupController::class, 'saveLimits'], ['Authentication']);
 Router::get('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'getStageConfig'], ['Authentication']);
 Router::post('/funnel-stages/{stageId}/followup', [StageFollowupController::class, 'saveStageConfig'], ['Authentication']);
 

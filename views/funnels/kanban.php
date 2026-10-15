@@ -1496,6 +1496,36 @@ ob_start();
                             <div class="form-text mt-3">
                                 Variáveis: <code>{{contact.name}}</code> <code>{{agent.name}}</code> <code>{{contact.phone}}</code> <code>{{date}}</code> <code>{{time}}</code>
                             </div>
+
+                            <!-- Limites anti-spam: globais, salvos em /funnel-stages/followup-limits -->
+                            <div class="separator separator-dashed my-7"></div>
+                            <h5 class="fw-bold mb-1">Limites de envio <span class="badge badge-light-warning ms-2 fs-8">valem para todas as etapas</span></h5>
+                            <div class="form-text mb-5">
+                                Evita disparar muitas mensagens de uma vez pelo mesmo número de WhatsApp (risco de bloqueio por spam).
+                                O que passar do limite não se perde: sai nas próximas rodadas, na ordem em que venceu.
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-12 col-md-6">
+                                    <label class="fw-semibold fs-7 mb-2">Intervalo entre mensagens do mesmo número</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="text-muted fs-7">de</span>
+                                        <input type="number" min="0" max="3600" class="form-control form-control-sm form-control-solid w-80px" id="kt_followup_limit_min" />
+                                        <span class="text-muted fs-7">a</span>
+                                        <input type="number" min="0" max="3600" class="form-control form-control-sm form-control-solid w-80px" id="kt_followup_limit_max" />
+                                        <span class="text-muted fs-7">segundos (aleatório)</span>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="fw-semibold fs-7 mb-2">Máximo por hora</label>
+                                    <input type="number" min="1" max="1000" class="form-control form-control-sm form-control-solid" id="kt_followup_limit_hour" />
+                                    <div class="form-text">por número</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="fw-semibold fs-7 mb-2">Máximo por dia</label>
+                                    <input type="number" min="1" max="20000" class="form-control form-control-sm form-control-solid" id="kt_followup_limit_day" />
+                                    <div class="form-text">por número</div>
+                                </div>
+                            </div>
                         </div>
                         <!--end::Tab Pane - Follow-up-->
                     </div>

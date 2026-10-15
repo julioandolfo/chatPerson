@@ -44,6 +44,17 @@ class StageFollowupService
 
     private const OPEN_STATUSES = ['open', 'pending'];
 
+    /** Limites anti-spam padrão (por número/conta de envio), ajustáveis na aba Follow-up */
+    public const DEFAULT_LIMITS = [
+        'min_interval_seconds' => 15,
+        'max_interval_seconds' => 45,
+        'max_per_hour' => 60,
+        'max_per_day' => 300,
+    ];
+
+    /** Tempo máximo que uma execução do cron fica enviando (o job tem 30s no run-scheduled-jobs) */
+    private const RUN_TIME_BUDGET_SECONDS = 20;
+
     /** true enquanto o próprio follow-up envia — a mensagem enviada não pode rearmar a sequência */
     private static bool $sending = false;
 
@@ -404,26 +415,50 @@ class StageFollowupService
 
     /**
      * Enviar os passos vencidos. Chamado pelo StageFollowupJob a cada execução do cron.
+     *
+     * Anti-spam por número de envio: intervalo aleatório entre mensagens e máximo por
+     * hora/dia. O que não couber fica na fila (continua vencido) e sai nas próximas
+     * execuções, na ordem em que venceu.
      */
-    public static function processDue(int $limit = 100): array
+    public static function processDue(int $limit = 300, ?int $timeBudgetSeconds = null): array
     {
-        $stats = ['due' => 0, 'sent' => 0, 'skipped' => 0, 'failed' => 0];
+        $stats = ['due' => 0, 'sent' => 0, 'skipped' => 0, 'failed' => 0, 'throttled' => 0];
+        $deadline = microtime(true) + ($timeBudgetSeconds ?? self::RUN_TIME_BUDGET_SECONDS);
+        $limits = self::getLimits();
 
         $rows = Database::fetchAll(
-            "SELECT * FROM conversation_followups
-             WHERE status = 'active' AND next_run_at IS NOT NULL AND next_run_at <= ?
-             ORDER BY next_run_at ASC
+            "SELECT f.*, c.integration_account_id AS _integration_account_id, c.whatsapp_account_id AS _whatsapp_account_id
+             FROM conversation_followups f
+             JOIN conversations c ON c.id = f.conversation_id
+             WHERE f.status = 'active' AND f.next_run_at IS NOT NULL AND f.next_run_at <= ?
+             ORDER BY f.next_run_at ASC
              LIMIT " . (int)$limit,
             [date('Y-m-d H:i:s')]
         );
         $stats['due'] = count($rows);
 
-        foreach ($rows as $state) {
+        $blockedAccounts = []; // números sem vaga nesta execução (limite ou intervalo)
+        foreach ($rows as $i => $state) {
+            if (microtime(true) >= $deadline) {
+                $stats['throttled'] += count($rows) - $i;
+                break;
+            }
+
+            $accountKey = self::accountKey($state);
+            if (isset($blockedAccounts[$accountKey])) {
+                $stats['throttled']++;
+                continue;
+            }
+
             try {
-                $result = self::processOne($state);
+                $result = self::processOne($state, $accountKey, $limits, $deadline);
             } catch (\Throwable $e) {
                 $result = 'failed';
                 Logger::error("StageFollowup: erro ao processar conversa {$state['conversation_id']}: " . $e->getMessage());
+            }
+
+            if ($result === 'throttled') {
+                $blockedAccounts[$accountKey] = true;
             }
             $stats[$result]++;
         }
@@ -431,8 +466,111 @@ class StageFollowupService
         return $stats;
     }
 
-    private static function processOne(array $state): string
+    /**
+     * Número/conta por onde a mensagem sai (o limite anti-spam é por número)
+     */
+    private static function accountKey(array $state): string
     {
+        if (!empty($state['_integration_account_id'])) {
+            return 'i:' . (int)$state['_integration_account_id'];
+        }
+        if (!empty($state['_whatsapp_account_id'])) {
+            return 'w:' . (int)$state['_whatsapp_account_id'];
+        }
+        return 'default';
+    }
+
+    /**
+     * Reserva a vez deste número para enviar agora. Respeita máximo por hora/dia e o
+     * intervalo aleatório desde o último envio; se a vez chega dentro do tempo desta
+     * execução, espera por ela.
+     */
+    private static function acquireSendSlot(string $accountKey, array $limits, float $deadline): bool
+    {
+        $now = date('Y-m-d H:i:s');
+        $counts = Database::fetch(
+            "SELECT COALESCE(SUM(created_at >= ?), 0) AS last_hour, COUNT(*) AS last_day
+             FROM conversation_followup_messages
+             WHERE account_key = ? AND status = 'sent' AND created_at >= ?",
+            [date('Y-m-d H:i:s', time() - 3600), $accountKey, date('Y-m-d H:i:s', time() - 86400)]
+        );
+        if ((int)$counts['last_hour'] >= $limits['max_per_hour'] || (int)$counts['last_day'] >= $limits['max_per_day']) {
+            return false;
+        }
+
+        Database::execute(
+            "INSERT IGNORE INTO followup_send_pacing (account_key, next_allowed_at, version) VALUES (?, ?, 0)",
+            [$accountKey, '2000-01-01 00:00:00']
+        );
+        $row = Database::fetch("SELECT next_allowed_at, version FROM followup_send_pacing WHERE account_key = ?", [$accountKey]);
+
+        $wait = strtotime($row['next_allowed_at']) - microtime(true);
+        if ($wait > 0) {
+            if (microtime(true) + $wait > $deadline) {
+                return false;
+            }
+            usleep((int)ceil($wait * 1000000));
+        }
+
+        // Próxima vez deste número: agora (arredondado para cima) + intervalo aleatório.
+        // Atômico pela versão: se outra execução do cron pegou a vez antes, esta desiste.
+        $interval = random_int($limits['min_interval_seconds'], $limits['max_interval_seconds']);
+        return Database::execute(
+            "UPDATE followup_send_pacing SET next_allowed_at = ?, version = version + 1 WHERE account_key = ? AND version = ?",
+            [date('Y-m-d H:i:s', $interval > 0 ? (int)ceil(microtime(true)) + $interval : time()), $accountKey, (int)$row['version']]
+        ) > 0;
+    }
+
+    // =====================================================================
+    // LIMITES ANTI-SPAM (valem para todas as etapas)
+    // =====================================================================
+
+    public static function getLimits(): array
+    {
+        $limits = self::DEFAULT_LIMITS;
+        foreach ($limits as $key => $default) {
+            $value = SettingService::get('followup_' . $key, null);
+            if ($value !== null && $value !== '' && is_numeric($value)) {
+                $limits[$key] = (int)$value;
+            }
+        }
+        $limits['max_interval_seconds'] = max($limits['max_interval_seconds'], $limits['min_interval_seconds']);
+        return $limits;
+    }
+
+    public static function saveLimits(array $data): array
+    {
+        $min = (int)($data['min_interval_seconds'] ?? self::DEFAULT_LIMITS['min_interval_seconds']);
+        $max = (int)($data['max_interval_seconds'] ?? self::DEFAULT_LIMITS['max_interval_seconds']);
+        $perHour = (int)($data['max_per_hour'] ?? self::DEFAULT_LIMITS['max_per_hour']);
+        $perDay = (int)($data['max_per_day'] ?? self::DEFAULT_LIMITS['max_per_day']);
+
+        if ($min < 0 || $max > 3600) {
+            throw new \InvalidArgumentException('Intervalo entre mensagens deve ficar entre 0 e 3600 segundos');
+        }
+        if ($max < $min) {
+            throw new \InvalidArgumentException('O intervalo máximo deve ser maior ou igual ao mínimo');
+        }
+        if ($perHour < 1 || $perHour > 1000) {
+            throw new \InvalidArgumentException('Máximo por hora deve ficar entre 1 e 1000');
+        }
+        if ($perDay < 1 || $perDay > 20000) {
+            throw new \InvalidArgumentException('Máximo por dia deve ficar entre 1 e 20000');
+        }
+        if ($perDay < $perHour) {
+            throw new \InvalidArgumentException('O máximo por dia não pode ser menor que o máximo por hora');
+        }
+
+        foreach (['min_interval_seconds' => $min, 'max_interval_seconds' => $max, 'max_per_hour' => $perHour, 'max_per_day' => $perDay] as $key => $value) {
+            SettingService::set('followup_' . $key, (string)$value, 'integer', 'followup');
+        }
+
+        return self::getLimits();
+    }
+
+    private static function processOne(array $state, string $accountKey, array $limits, float $deadline): string
+    {
+        $dueAt = $state['next_run_at'];
         $conversationId = (int)$state['conversation_id'];
 
         // Reservar o passo: se outra execução do cron já pegou, pula
@@ -468,6 +606,13 @@ class StageFollowupService
             }
         }
 
+        // Anti-spam: espera a vez deste número. Sem vaga agora → volta para a fila
+        // mantendo o horário original (continua na frente dos que venceram depois)
+        if (!self::acquireSendSlot($accountKey, $limits, $deadline)) {
+            self::reschedule($state, strtotime($dueAt), (int)$state['attempts']);
+            return 'throttled';
+        }
+
         $content = AutomationService::processVariablesPublic($step['message'], $conversation);
 
         self::$sending = true;
@@ -481,7 +626,7 @@ class StageFollowupService
         }
         self::$sending = false;
 
-        self::logStep($state, $stepIndex, $messageId ? (int)$messageId : null, 'sent', null);
+        self::logStep($state, $stepIndex, $messageId ? (int)$messageId : null, 'sent', null, $accountKey);
 
         $nextIndex = $stepIndex + 1;
         if (isset($config['steps'][$nextIndex])) {
@@ -526,14 +671,14 @@ class StageFollowupService
         );
     }
 
-    private static function logStep(array $state, int $stepIndex, ?int $messageId, string $status, ?string $error): void
+    private static function logStep(array $state, int $stepIndex, ?int $messageId, string $status, ?string $error, ?string $accountKey = null): void
     {
         try {
             Database::insert(
                 "INSERT INTO conversation_followup_messages
-                    (conversation_followup_id, conversation_id, funnel_stage_id, anchor_message_id, step_index, message_id, status, error_message)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                [(int)$state['id'], (int)$state['conversation_id'], $state['funnel_stage_id'], $state['anchor_message_id'], $stepIndex, $messageId, $status, $error]
+                    (conversation_followup_id, conversation_id, account_key, funnel_stage_id, anchor_message_id, step_index, message_id, status, error_message)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(int)$state['id'], (int)$state['conversation_id'], $accountKey, $state['funnel_stage_id'], $state['anchor_message_id'], $stepIndex, $messageId, $status, $error]
             );
         } catch (\Throwable $e) {
             Logger::error("StageFollowup: erro ao registrar histórico: " . $e->getMessage());

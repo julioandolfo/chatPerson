@@ -47,6 +47,33 @@ class StageFollowupController
     }
 
     /**
+     * Limites anti-spam do follow-up (valem para todas as etapas)
+     */
+    public function getLimits(): void
+    {
+        Permission::abortIfCannot('funnels.view');
+        Response::json([
+            'success' => true,
+            'limits' => StageFollowupService::getLimits(),
+            'defaults' => StageFollowupService::DEFAULT_LIMITS,
+        ]);
+    }
+
+    public function saveLimits(): void
+    {
+        Permission::abortIfCannot('funnels.edit');
+
+        try {
+            $limits = StageFollowupService::saveLimits(Request::json());
+            Response::json(['success' => true, 'message' => 'Limites de envio salvos', 'limits' => $limits]);
+        } catch (\InvalidArgumentException $e) {
+            Response::json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Exception $e) {
+            Response::json(['success' => false, 'message' => 'Erro ao salvar limites: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Situação do follow-up na conversa (aviso no chat)
      */
     public function getConversationStatus(int $id): void

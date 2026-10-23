@@ -245,6 +245,11 @@ try {
         \App\Jobs\StageFollowupJob::run();
     }, 30);
 
+    // ✅ Mensagem de ausência do agente (pendentes que o processo em segundo plano não enviou)
+    cronRunJob('AgentAbsenceJob', function() {
+        \App\Jobs\AgentAbsenceJob::run();
+    }, 30);
+
     // ✅ Reprocessar fila de rate limit de mídia (executar sempre)
     cronRunJob('MediaRateRetryJob', function() {
         \App\Jobs\MediaRateRetryJob::run();

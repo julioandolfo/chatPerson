@@ -182,6 +182,10 @@ class StageAlertService
 
         // Mensagem "relevante" = não é nota interna nem mensagem de sistema
         $relevant = "m.sender_type <> 'system' AND COALESCE(m.message_type, 'text') NOT IN ('note', 'system')";
+        // Mensagem automática de ausência não é resposta: o cliente continua esperando
+        if (self::hasAbsenceTable()) {
+            $relevant .= " AND NOT EXISTS (SELECT 1 FROM agent_absence_replies ar WHERE ar.sent_message_id = m.id)";
+        }
 
         $rows = Database::fetchAll(
             "SELECT x.*,
@@ -320,6 +324,19 @@ class StageAlertService
             return $labels[$type ?? ''] ?? 'Mensagem';
         }
         return mb_strlen($text) > 90 ? mb_substr($text, 0, 90) . '…' : $text;
+    }
+
+    private static function hasAbsenceTable(): bool
+    {
+        static $exists = null;
+        if ($exists === null) {
+            try {
+                $exists = (bool)Database::fetch("SHOW TABLES LIKE 'agent_absence_replies'");
+            } catch (\Throwable $e) {
+                $exists = false;
+            }
+        }
+        return $exists;
     }
 
     private static function placeholders(array $values): string

@@ -2700,6 +2700,8 @@ class ConversationService
         // Criar notificações para agentes relacionados à conversa (regra em NotificationService)
         try {
             if ($senderType === 'contact') {
+                // Mensagem de ausência do agente (se ele estiver ausente agora; não lança exceção)
+                \App\Services\AgentAbsenceService::onIncomingContactMessage($conversationId, (int)$messageId);
                 \App\Services\NotificationService::notifyIncomingContactMessage($conversationId, (int)$messageId);
             }
         } catch (\Exception $e) {

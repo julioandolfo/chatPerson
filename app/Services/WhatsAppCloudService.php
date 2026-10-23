@@ -771,6 +771,8 @@ class WhatsAppCloudService extends MetaIntegrationService
         
         // Avisar o agente/setor (notificação interna + push no app)
         try {
+            // Mensagem de ausência do agente (se ele estiver ausente agora; não lança exceção)
+            \App\Services\AgentAbsenceService::onIncomingContactMessage((int)$conversation['id'], (int)$newMessageId);
             \App\Services\NotificationService::notifyIncomingContactMessage((int)$conversation['id'], (int)$newMessageId);
         } catch (\Throwable $e) {
             \App\Helpers\Logger::error("WhatsApp Cloud: erro ao notificar agentes: " . $e->getMessage());

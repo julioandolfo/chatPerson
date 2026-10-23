@@ -1409,6 +1409,8 @@ class NotificameService
 
         // Avisar o agente/setor (notificação interna + push no app)
         try {
+            // Mensagem de ausência do agente (se ele estiver ausente agora; não lança exceção)
+            \App\Services\AgentAbsenceService::onIncomingContactMessage((int)$conversation['id'], (int)$messageId);
             \App\Services\NotificationService::notifyIncomingContactMessage((int)$conversation['id'], (int)$messageId);
         } catch (\Throwable $e) {
             self::logError("Notificame webhook: erro ao notificar agentes: " . $e->getMessage());

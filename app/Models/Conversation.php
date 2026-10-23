@@ -90,6 +90,8 @@ class Conversation extends Model
     public static function getAll(array $filters = []): array
     {
         try {
+            // Mensagem automática de ausência não conta como resposta do agente ("Aguardando" continua)
+            $notAutoReply = \App\Services\AgentAbsenceService::notAutoReplySql('m');
             $sql = "SELECT c.*, 
                        ct.name as contact_name, ct.phone as contact_phone, ct.email as contact_email, ct.avatar as contact_avatar,
                        CASE 
@@ -105,11 +107,11 @@ class Conversation extends Model
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent', 'ai_agent') ORDER BY m.id ASC LIMIT 1) as first_response_at_calc,
                        (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact' ORDER BY m.id DESC LIMIT 1) as last_contact_message_at,
-                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent') ORDER BY m.id DESC LIMIT 1) as last_agent_message_at,
+                       (SELECT created_at FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent')" . $notAutoReply . " ORDER BY m.id DESC LIMIT 1) as last_agent_message_at,
                        -- IDs para o front decidir quem falou por ultimo sem depender de relogio:
                        -- o created_at das recebidas vem do provedor e o das enviadas do servidor
                        (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = 'contact') as last_contact_message_id,
-                       (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent')) as last_agent_message_id,
+                       (SELECT MAX(m.id) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type IN ('agent','ai_agent')" . $notAutoReply . ") as last_agent_message_id,
                        GROUP_CONCAT(DISTINCT CONCAT(t.id, ':', t.name, ':', COALESCE(t.color, '#009ef7')) SEPARATOR '|||') as tags_data,
                        GROUP_CONCAT(DISTINCT CONCAT(cp.user_id, ':', cp_user.name) SEPARATOR '|||') as participants_data,
                        COALESCE(c.pinned, 0) as pinned,

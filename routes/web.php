@@ -12,6 +12,7 @@ use App\Controllers\ContactAgentController;
 use App\Controllers\FunnelController;
 use App\Controllers\StageFollowupController;
 use App\Controllers\StageAlertController;
+use App\Controllers\AgentAbsenceController;
 use App\Controllers\PwaController;
 use App\Controllers\AutomationController;
 use App\Controllers\AgentController;
@@ -85,6 +86,13 @@ Router::post('/profile/sounds/upload', [ProfileController::class, 'uploadSound']
 Router::delete('/profile/sounds/{id}', [ProfileController::class, 'deleteSound'], ['Authentication']);
 Router::get('/profile/sounds/available', [ProfileController::class, 'getAvailableSounds'], ['Authentication']);
 Router::get('/profile/sounds/custom', [ProfileController::class, 'getCustomSounds'], ['Authentication']);
+// Mensagem de ausência do agente
+Router::get('/profile/absences', [AgentAbsenceController::class, 'index'], ['Authentication']);
+Router::post('/profile/absences', [AgentAbsenceController::class, 'store'], ['Authentication']);
+Router::post('/profile/absences/{id}', [AgentAbsenceController::class, 'update'], ['Authentication']);
+Router::post('/profile/absences/{id}/end', [AgentAbsenceController::class, 'end'], ['Authentication']);
+Router::post('/profile/absences/{id}/delete', [AgentAbsenceController::class, 'destroy'], ['Authentication']);
+Router::get('/profile/absences/{id}/replies', [AgentAbsenceController::class, 'replies'], ['Authentication']);
 
 Router::get('/dashboard', [DashboardController::class, 'index'], ['Authentication']);
 Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Authentication']);

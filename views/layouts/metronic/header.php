@@ -241,6 +241,28 @@
                     </div>
                     <!--end::Menu item-->
 
+                    <!--begin::Menu item - Mensagem de ausência-->
+                    <?php
+                    $headerAbsenceActive = false;
+                    try {
+                        $headerAbsenceActive = (bool)\App\Services\AgentAbsenceService::getActive((int)\App\Helpers\Auth::id());
+                    } catch (\Throwable $e) {
+                        // tabela ainda não criada
+                    }
+                    ?>
+                    <div class="menu-item px-5">
+                        <a href="<?= \App\Helpers\Url::to('/profile?tab=absence') ?>" class="menu-link px-5">
+                            <span class="menu-icon">
+                                <i class="ki-duotone ki-time fs-5"><span class="path1"></span><span class="path2"></span></i>
+                            </span>
+                            <span class="menu-title">Mensagem de ausência</span>
+                            <?php if ($headerAbsenceActive): ?>
+                                <span class="menu-badge"><span class="badge badge-light-warning fw-bold fs-8 px-2 py-1">Ativa</span></span>
+                            <?php endif; ?>
+                        </a>
+                    </div>
+                    <!--end::Menu item-->
+
                     <!--begin::Menu item - App (PWA)-->
                     <div class="menu-item px-5">
                         <a href="<?= \App\Helpers\Url::to('/profile?tab=app') ?>" class="menu-link px-5">

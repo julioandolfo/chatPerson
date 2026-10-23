@@ -212,6 +212,10 @@ class RealtimeController
                             // Log do que será enviado
                             \App\Helpers\Logger::info("📤 Polling: Enviando para frontend - " . json_encode($messageData), 'conversas.log');
                             
+                            if ($senderType === 'agent' && (int)($msg['sender_id'] ?? 0) === 0) {
+                                // Mensagem de ausência: o front não a trata como resposta do agente
+                                $messageData['auto_reply'] = \App\Services\AgentAbsenceService::flagAutoReplies([$messageData])[0]['auto_reply'];
+                            }
                             $updates['new_messages'][] = $messageData;
                         }
 

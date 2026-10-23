@@ -2624,6 +2624,11 @@ class ConversationController
                 }
             }
             unset($msg); // Limpar referência
+            foreach ($messages as &$msg) {
+                $msg['conversation_id'] = $msg['conversation_id'] ?? $id;
+            }
+            unset($msg);
+            $messages = \App\Services\AgentAbsenceService::flagAutoReplies($messages);
             
             // Contar total de mensagens
             $total = \App\Models\Message::countByConversation($id);

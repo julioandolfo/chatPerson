@@ -71,6 +71,16 @@ ob_start();
                                 App e aparelhos
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link <?= $activeTab === 'absence' ? 'active' : '' ?>" 
+                               data-bs-toggle="tab" href="#tab_absence">
+                                <i class="ki-duotone ki-time fs-4 me-2">
+                                    <span class="path1"></span>
+                                    <span class="path2"></span>
+                                </i>
+                                Ausência
+                            </a>
+                        </li>
                     </ul>
                 </div>
                 
@@ -83,6 +93,10 @@ ob_start();
                         <!-- Tab: App e aparelhos (PWA) -->
                         <div class="tab-pane fade <?= $activeTab === 'app' ? 'show active' : '' ?>" id="tab_app">
                             <?php include __DIR__ . '/app-tab.php'; ?>
+                        </div>
+                        <!-- Tab: Mensagem de ausência -->
+                        <div class="tab-pane fade <?= $activeTab === 'absence' ? 'show active' : '' ?>" id="tab_absence">
+                            <?php include __DIR__ . '/absence-tab.php'; ?>
                         </div>
                     </div>
                 </div>

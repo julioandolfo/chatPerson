@@ -426,6 +426,85 @@ class AgentAbsenceService
     }
 
     // ---------------------------------------------------------------------------------
+    // Identificar as mensagens automáticas de ausência (não contam como resposta do agente)
+    // ---------------------------------------------------------------------------------
+
+    /** As tabelas da ausência existem? (migration 163) */
+    public static function tableReady(): bool
+    {
+        static $ready = null;
+        if ($ready === null) {
+            try {
+                $ready = (bool)Database::fetch("SHOW TABLES LIKE 'agent_absence_replies'");
+            } catch (\Throwable $e) {
+                $ready = false;
+            }
+        }
+        return $ready;
+    }
+
+    /** Trecho SQL "e a mensagem {alias} não é resposta automática de ausência" */
+    public static function notAutoReplySql(string $alias = 'm'): string
+    {
+        if (!self::tableReady()) {
+            return '';
+        }
+        return " AND NOT EXISTS (SELECT 1 FROM agent_absence_replies ar WHERE ar.sent_message_id = {$alias}.id)";
+    }
+
+    /**
+     * Marca auto_reply = true nas mensagens que são a mensagem de ausência.
+     * Inclui a que está saindo agora (o id só é gravado depois que o envio termina).
+     */
+    public static function flagAutoReplies(array $messages): array
+    {
+        $candidates = [];
+        foreach ($messages as $i => $msg) {
+            $messages[$i]['auto_reply'] = false;
+            if (($msg['sender_type'] ?? '') === 'agent' && (int)($msg['sender_id'] ?? 0) === 0 && !empty($msg['id'])) {
+                $candidates[$i] = (int)$msg['id'];
+            }
+        }
+        if (!$candidates || !self::tableReady()) {
+            return $messages;
+        }
+
+        try {
+            $ids = array_values(array_unique($candidates));
+            $placeholders = implode(',', array_fill(0, count($ids), '?'));
+            $sent = array_map('intval', array_column(Database::fetchAll(
+                "SELECT sent_message_id FROM agent_absence_replies WHERE sent_message_id IN ($placeholders)",
+                $ids
+            ), 'sent_message_id'));
+
+            $sendingConversations = [];
+            foreach ($candidates as $i => $id) {
+                $convId = (int)($messages[$i]['conversation_id'] ?? 0);
+                if (!in_array($id, $sent, true) && $convId > 0) {
+                    $sendingConversations[$convId] = $convId;
+                }
+            }
+            $sending = [];
+            if ($sendingConversations) {
+                $convIds = array_values($sendingConversations);
+                $placeholders = implode(',', array_fill(0, count($convIds), '?'));
+                $sending = array_map('intval', array_column(Database::fetchAll(
+                    "SELECT conversation_id FROM agent_absence_replies WHERE status = 'sending' AND conversation_id IN ($placeholders)",
+                    $convIds
+                ), 'conversation_id'));
+            }
+
+            foreach ($candidates as $i => $id) {
+                $messages[$i]['auto_reply'] = in_array($id, $sent, true)
+                    || in_array((int)($messages[$i]['conversation_id'] ?? 0), $sending, true);
+            }
+        } catch (\Throwable $e) {
+            // sem marcação: a mensagem aparece como resposta comum
+        }
+        return $messages;
+    }
+
+    // ---------------------------------------------------------------------------------
     // Internos
     // ---------------------------------------------------------------------------------
 

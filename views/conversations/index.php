@@ -9375,7 +9375,8 @@ function updateConversationListPreview(conversationId, lastMessage) {
         if (lastMessage.sender_type === 'contact') {
             conversationItem.dataset.lastContactMessageAt = lastMessage.created_at;
             if (lastMessage.id) conversationItem.dataset.lastContactMessageId = lastMessage.id;
-        } else if (lastMessage.sender_type === 'agent') {
+        } else if (lastMessage.sender_type === 'agent' && !lastMessage.auto_reply) {
+            // auto_reply = mensagem de ausência automática: não é resposta do agente
             conversationItem.dataset.lastAgentMessageAt = lastMessage.created_at;
             if (lastMessage.id) conversationItem.dataset.lastAgentMessageId = lastMessage.id;
         }
@@ -20743,7 +20744,7 @@ if (typeof window.wsClient !== 'undefined') {
                 if (data.message.sender_type === 'contact') {
                     conversationItem.dataset.lastContactMessageAt = data.message.created_at;
                     if (data.message.id) conversationItem.dataset.lastContactMessageId = data.message.id;
-                } else if (data.message.sender_type === 'agent') {
+                } else if (data.message.sender_type === 'agent' && !data.message.auto_reply) {
                     conversationItem.dataset.lastAgentMessageAt = data.message.created_at;
                     if (data.message.id) conversationItem.dataset.lastAgentMessageId = data.message.id;
                 }

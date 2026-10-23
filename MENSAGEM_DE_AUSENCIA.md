@@ -46,7 +46,10 @@ cadastrar duas ausências no mesmo horário.
 - Conversas com agente de IA ativo e conversas sem agente são ignoradas.
 - A mensagem sai como mensagem do sistema: não reatribui a conversa, não desliga a IA, não liga
   o follow-up por etapa e **não conta como primeira resposta** (SLA intacto).
-- O alerta de cliente sem resposta por etapa também não a considera resposta.
+- **Não marca a conversa como lida**: as mensagens do cliente continuam como não lidas (contador
+  da lista) até o agente abrir a conversa. Nenhum "visto" é enviado ao cliente.
+- **Não conta como resposta**: a conversa continua com o selo **Aguardando** na lista (também em
+  tempo real) e no alerta de cliente sem resposta por etapa, até um agente responder de verdade.
 
 ## Como o envio acontece
 

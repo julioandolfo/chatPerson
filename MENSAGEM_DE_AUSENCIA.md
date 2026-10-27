@@ -49,7 +49,8 @@ cadastrar duas ausências no mesmo horário.
 - **Não marca a conversa como lida**: as mensagens do cliente continuam como não lidas (contador
   da lista) até o agente abrir a conversa. Nenhum "visto" é enviado ao cliente.
 - **Não conta como resposta**: a conversa continua com o selo **Aguardando** na lista (também em
-  tempo real) e no alerta de cliente sem resposta por etapa, até um agente responder de verdade.
+  tempo real), no filtro **Não respondidas** (e fora de **Respondidas**) e no alerta de cliente
+  sem resposta por etapa, até um agente responder de verdade.
 
 ## Como o envio acontece
 

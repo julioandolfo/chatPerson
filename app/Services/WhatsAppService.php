@@ -606,6 +606,11 @@ class WhatsAppService
      */
     private static function isTransientError(int $httpCode, string $responseBody): bool
     {
+        // Número não encontrado no WhatsApp não melhora esperando
+        if (self::isLidNotFoundError($responseBody)) {
+            return false;
+        }
+
         // HTTP 429 (Too Many Requests), 502, 503, 504 são sempre transitórios
         if (in_array($httpCode, [429, 502, 503, 504])) {
             return true;
@@ -1475,6 +1480,115 @@ class WhatsAppService
      * Enviar mensagem via WhatsApp (Quepasa self-hosted ou Native Baileys)
      * Endpoint: POST /send
      */
+    /**
+     * Erro do Quepasa/whatsmeow quando o WhatsApp não devolve o LID do número
+     * (número sem WhatsApp, formato do 9º dígito diferente ou LID não exposto).
+     * Ex.: "failed to resolve LID for PN 5511...@s.whatsapp.net: USync returned no LID for ..."
+     */
+    private static function isLidNotFoundError(?string $response): bool
+    {
+        $text = strtolower((string)$response);
+        return $text !== ''
+            && (str_contains($text, 'failed to resolve lid') || str_contains($text, 'returned no lid'));
+    }
+
+    /**
+     * Identificadores alternativos para o mesmo destino, na ordem de tentativa:
+     * 1. LID salvo do contato (quando o cliente já falou com a gente por LID);
+     * 2. o número com/sem o 9º dígito (contas antigas do WhatsApp ficaram sem o 9).
+     */
+    private static function alternativeChatIds(string $chatId, string $to, ?string $contactLid): array
+    {
+        $ids = [];
+        if ($contactLid && $contactLid !== $chatId) {
+            $ids[] = $contactLid;
+        }
+
+        $digits = preg_replace('/\D/', '', str_contains($to, '@') ? strstr($to, '@', true) : $to);
+        if (str_starts_with($digits, '55')) {
+            $national = substr($digits, 2);
+            if (strlen($national) === 11 && $national[2] === '9') {
+                $ids[] = '55' . substr($national, 0, 2) . substr($national, 3) . '@s.whatsapp.net';
+            } elseif (strlen($national) === 10 && in_array($national[2], ['6', '7', '8', '9'], true)) {
+                $ids[] = '55' . substr($national, 0, 2) . '9' . substr($national, 2) . '@s.whatsapp.net';
+            }
+        }
+
+        return array_values(array_unique(array_filter($ids, fn($id) => $id !== $chatId)));
+    }
+
+    /**
+     * Reenvia uma vez para cada identificador alternativo. Retorna o resultado de sucesso
+     * ou null se nenhum funcionou. Se a variação do 9º dígito funcionar, grava no contato
+     * para os próximos envios irem direto.
+     */
+    private static function retryQuepasaWithAlternativeChatIds(string $url, array $headers, array $payload, string $chatId, string $to, ?string $contactLid, ?int $contactId): ?array
+    {
+        foreach (self::alternativeChatIds($chatId, $to, $contactLid) as $altChatId) {
+            $altPayload = $payload;
+            if (array_key_exists('chatid', $altPayload)) {
+                $altPayload['chatid'] = $altChatId;
+            }
+            if (array_key_exists('chatId', $altPayload) || !array_key_exists('chatid', $altPayload)) {
+                $altPayload['chatId'] = $altChatId;
+            }
+            $altHeaders = array_map(
+                fn($h) => stripos($h, 'X-QUEPASA-CHATID:') === 0 ? 'X-QUEPASA-CHATID: ' . $altChatId : $h,
+                $headers
+            );
+
+            Logger::quepasa("sendMessage - 🔄 Número não encontrado pelo WhatsApp em {$chatId}; tentando {$altChatId}");
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 120,
+                CURLOPT_CONNECTTIMEOUT => 30,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($altPayload),
+                CURLOPT_HTTPHEADER => $altHeaders,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+
+            Logger::quepasa("sendMessage - Tentativa com {$altChatId}: HTTP {$httpCode} " . ($error ? "| cURL: {$error} " : '') . "| " . substr((string)$response, 0, 300));
+
+            if ($httpCode === 200 || $httpCode === 201) {
+                $data = json_decode((string)$response, true) ?: [];
+                $messageId = $data['id'] ?? $data['message_id'] ?? ($data['message']['id'] ?? null);
+                Logger::quepasa("sendMessage - ✅ Enviado usando {$altChatId} (message_id=" . ($messageId ?? 'null') . ")");
+
+                // Variação do 9º dígito funcionou: próximos envios vão direto por ela
+                if ($contactId && str_ends_with($altChatId, '@s.whatsapp.net')) {
+                    try {
+                        \App\Models\Contact::update($contactId, ['whatsapp_id' => $altChatId]);
+                        Logger::quepasa("sendMessage - whatsapp_id do contato {$contactId} atualizado para {$altChatId}");
+                    } catch (\Throwable $e) {
+                        Logger::quepasa("sendMessage - ⚠️ Não foi possível atualizar whatsapp_id do contato {$contactId}: " . $e->getMessage());
+                    }
+                }
+
+                return [
+                    'success' => true,
+                    'message_id' => $messageId,
+                    'status' => $data['status'] ?? 'sent'
+                ];
+            }
+
+            if ($error) {
+                // Timeout/conexão: não insiste com outros identificadores (pode ter saído)
+                return null;
+            }
+        }
+        return null;
+    }
+
     public static function sendMessage(int $accountId, string $to, string $message, array $options = []): array
     {
         Logger::quepasa("sendMessage - Iniciando envio: accountId={$accountId}, to={$to}");
@@ -1529,10 +1643,16 @@ class WhatsAppService
             Logger::quepasa("sendMessage - Resolvendo chatId para: {$to}");
             
             // Se existir contato com whatsapp_id, usar APENAS se corresponder ao telefone de destino
+            $contactLid = null;      // LID do contato: tentativa extra se o WhatsApp não achar o número
+            $contactIdForSend = null;
             try {
                 $contact = \App\Models\Contact::findByPhoneNormalized($to);
                 if ($contact) {
                     Logger::quepasa("sendMessage - Contato encontrado: ID={$contact['id']}, whatsapp_id=" . ($contact['whatsapp_id'] ?? 'NULL'));
+                    $contactIdForSend = (int)$contact['id'];
+                    if (!empty($contact['whatsapp_id']) && str_ends_with($contact['whatsapp_id'], '@lid')) {
+                        $contactLid = $contact['whatsapp_id'];
+                    }
                     if (!empty($contact['whatsapp_id'])) {
                         // Extrair número do whatsapp_id para validar (ex: 5535991340446@s.whatsapp.net → 5535991340446)
                         $whatsappPhone = preg_replace('/@.*$/', '', $contact['whatsapp_id']);
@@ -2093,6 +2213,21 @@ class WhatsAppService
                 Logger::quepasa("sendMessage - Erro transitório detectado, tentando novamente...");
             }
             
+            // WhatsApp não achou o número ("failed to resolve LID ... USync returned no LID"):
+            // tenta pelo LID salvo do contato e pela variação com/sem o 9º dígito
+            if (!$lastError && self::isLidNotFoundError($lastResponse)) {
+                $retry = self::retryQuepasaWithAlternativeChatIds($url, $headers, $payload, $chatId, $to, $contactLid, $contactIdForSend);
+                if ($retry !== null) {
+                    return $retry;
+                }
+                Logger::quepasa("sendMessage - ❌ Número não encontrado no WhatsApp: {$to} (chatId={$chatId}, lid=" . ($contactLid ?? 'nenhum') . "): {$lastResponse}");
+                Logger::error("WhatsApp sendMessage: número não encontrado no WhatsApp ({$to}): {$lastResponse}");
+                throw new \Exception(
+                    'Não foi possível encontrar o número ' . self::formatPhoneForDisplay(preg_replace('/@.*$/', '', $to)) . ' no WhatsApp. '
+                    . 'Confira se o número está correto e se ele tem WhatsApp.'
+                );
+            }
+
             // Esgotou tentativas base64 — verificar se é erro CDN
             $finalError = $lastError ?: "HTTP {$lastHttpCode}: {$lastResponse}";
             $finalRespLower = strtolower($lastResponse . ' ' . ($lastError ?? ''));

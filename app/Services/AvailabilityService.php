@@ -134,8 +134,10 @@ class AvailabilityService
         ];
 
         // Se estava 'away' e teve atividade, voltar para 'online' IMEDIATAMENTE
+        // (exceto durante uma ausência rápida, ex.: almoço — volta ao clicar em "Voltei" ou quando ela acaba)
         $user = User::find($userId);
-        if ($user && ($user['availability_status'] ?? 'offline') === 'away') {
+        if ($user && ($user['availability_status'] ?? 'offline') === 'away'
+            && !\App\Services\AgentAbsenceService::holdsAwayStatus($userId)) {
             self::updateAvailabilityStatus($userId, 'online', 'activity_detected');
         } else {
             User::update($userId, $data);

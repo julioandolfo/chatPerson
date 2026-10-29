@@ -64,6 +64,9 @@
         
         <!--begin::Topbar-->
         <div class="d-flex align-items-center flex-shrink-0 mb-0 mb-lg-0">
+            <!--begin::Ausência rápida (almoço, pausa)-->
+            <?php include __DIR__ . '/../../partials/quick-absence.php'; ?>
+            <!--end::Ausência rápida-->
             <!--begin::Notifications-->
             <div class="d-flex align-items-center ms-3 ms-lg-4">
                 <?php include __DIR__ . '/../../components/notifications-dropdown.php'; ?>

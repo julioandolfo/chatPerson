@@ -8,6 +8,8 @@ $absenceConfig = [
     'url' => \App\Helpers\Url::to('profile/absences'),
     'conversationsUrl' => \App\Helpers\Url::to('conversations'),
     'agentName' => $absenceUserName,
+    'quickUrl' => \App\Helpers\Url::to('profile/absences/quick'),
+    'presetsUrl' => \App\Helpers\Url::to('profile/absence-presets'),
 ];
 ?>
 <div id="absence_root">
@@ -28,6 +30,82 @@ $absenceConfig = [
             <div class="fs-7 text-gray-700" id="absence_active_info"></div>
         </div>
         <button type="button" class="btn btn-sm btn-light-warning fw-bold flex-shrink-0" id="absence_active_end">Voltei — encerrar agora</button>
+    </div>
+
+    <!-- Ausências rápidas -->
+    <div class="border border-gray-300 border-dashed rounded p-6 mb-7">
+        <div class="d-flex align-items-center flex-wrap gap-3 mb-2">
+            <h4 class="fw-bold mb-0">Ausências rápidas</h4>
+            <span class="text-muted fs-7">Um clique no botão ☕ do topo da tela e a ausência começa na hora.</span>
+            <button type="button" class="btn btn-sm btn-light-primary ms-auto" id="qa_new">+ Nova ausência rápida</button>
+        </div>
+        <div class="text-muted fs-7 mb-5">Ex.: 🍽️ Almoço (1 h), ☕ Pausa (15 min), 🏥 Médico (2 h). Enquanto durar, os clientes recebem a mensagem automática e você aparece como Ausente.</div>
+        <div id="qa_list" class="row g-4"><div class="col-12 text-muted">Carregando…</div></div>
+    </div>
+
+    <!-- Modal: ausência rápida -->
+    <div class="modal fade" id="qa_modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered mw-600px">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="qa_modal_title">Nova ausência rápida</h3>
+                    <button type="button" class="btn btn-sm btn-icon btn-active-color-primary" data-bs-dismiss="modal">✕</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="qa_id" />
+                    <div class="row g-4 mb-4">
+                        <div class="col-4 col-sm-3">
+                            <label class="form-label fw-semibold" for="qa_icon">Ícone</label>
+                            <input type="text" class="form-control form-control-solid text-center fs-3" id="qa_icon" maxlength="8" />
+                        </div>
+                        <div class="col-8 col-sm-9">
+                            <label class="form-label fw-semibold required" for="qa_name">Nome</label>
+                            <input type="text" class="form-control form-control-solid" id="qa_name" maxlength="60" placeholder="Almoço" />
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mb-5" id="qa_icons">
+                        <?php foreach (['🍽️', '☕', '🏥', '🚗', '📞', '🧑‍🏫', '🏦', '🧘', '🌙'] as $qaIcon): ?>
+                            <button type="button" class="btn btn-sm btn-light fs-4 px-3 py-1" data-icon="<?= $qaIcon ?>"><?= $qaIcon ?></button>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="row g-4 mb-4">
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label fw-semibold required" for="qa_duration">Duração</label>
+                            <div class="d-flex gap-2">
+                                <input type="number" min="1" class="form-control form-control-solid w-100px" id="qa_duration" value="1" />
+                                <select class="form-select form-select-solid" id="qa_duration_unit">
+                                    <option value="1">minutos</option>
+                                    <option value="60" selected>horas</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-6">
+                            <label class="form-label fw-semibold" for="qa_delay">Responder o cliente após</label>
+                            <div class="input-group input-group-solid">
+                                <input type="number" min="0" max="3600" class="form-control form-control-solid" id="qa_delay" value="10" />
+                                <span class="input-group-text">segundos</span>
+                            </div>
+                        </div>
+                    </div>
+                    <label class="form-label fw-semibold required" for="qa_message">Mensagem para o cliente</label>
+                    <textarea class="form-control form-control-solid" id="qa_message" rows="3" maxlength="4000"></textarea>
+                    <div class="form-text mb-5">Variáveis: <code>{{contact.name}}</code> <code>{{absence.return}}</code> (ex.: hoje às 13:00) <code>{{absence.return_time}}</code> <code>{{agent.name}}</code></div>
+                    <div class="form-check form-switch form-check-custom form-check-solid mb-3">
+                        <input class="form-check-input" type="checkbox" id="qa_set_away" checked />
+                        <label class="form-check-label" for="qa_set_away">Mudar meu status para <strong>Ausente</strong> enquanto durar</label>
+                    </div>
+                    <div class="form-text ms-9 mb-4">Volta para Online ao clicar em "Voltei". Conforme Configurações → Disponibilidade, quem está Ausente não recebe novas conversas.</div>
+                    <div class="form-check form-check-custom form-check-solid d-none" id="qa_scope_row">
+                        <input class="form-check-input" type="checkbox" id="qa_scope_all" />
+                        <label class="form-check-label" for="qa_scope_all">Disponível para <strong>todos os agentes</strong></label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="qa_save">Salvar</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row g-7">
@@ -236,7 +314,8 @@ $absenceConfig = [
         if (active) {
             $('absence_active').classList.remove('d-none');
             $('absence_active').classList.add('d-flex');
-            $('absence_active_title').textContent = 'Você está ausente até ' + returnLabel(fromLocalInput(active.ends_at));
+            $('absence_active_title').textContent = (active.label ? (active.icon || '') + ' ' + active.label + ' — ' : '')
+                + 'você está ausente até ' + returnLabel(fromLocalInput(active.ends_at));
             $('absence_active_info').textContent = 'Mensagens automáticas enviadas: ' + (active.sent_count || 0)
                 + (active.pending_count ? ' · aguardando envio: ' + active.pending_count : '');
             $('absence_active_end').dataset.id = active.id;
@@ -255,7 +334,8 @@ $absenceConfig = [
             const sent = a.sent_count || 0;
             return '<div class="border rounded p-4" data-absence-id="' + a.id + '">' +
                 '<div class="d-flex align-items-center flex-wrap gap-2 mb-2">' +
-                    '<span class="fw-bold fs-6">' + esc(a.period_label) + '</span>' +
+                    (a.label ? '<span class="fw-bold fs-6">' + esc((a.icon || '') + ' ' + a.label) + '</span>' : '') +
+                    '<span class="' + (a.label ? 'text-gray-700 fs-7' : 'fw-bold fs-6') + '">' + esc(a.period_label) + '</span>' +
                     '<span class="badge ' + st[1] + '">' + st[0] + '</span>' +
                     '<span class="text-muted fs-8 ms-auto">envia ' + delayLabel(a.delay_seconds) + ' depois' +
                         (a.resend_after_hours ? ' · repete após ' + a.resend_after_hours + ' h' : ' · 1 vez por conversa') + '</span>' +
@@ -271,6 +351,127 @@ $absenceConfig = [
             '</div>';
         }).join('');
     }
+
+    function syncHeader() {
+        if (window.QuickAbsence) window.QuickAbsence.refresh();
+    }
+
+    // ---------------- Ausências rápidas ----------------
+    let presets = [];
+    let canManageTeam = false;
+
+    function loadPresets() {
+        return fetch(cfg.quickUrl, { headers })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) {
+                    $('qa_list').innerHTML = '<div class="col-12 text-danger">' + esc(data.message || 'Erro ao carregar') + '</div>';
+                    return;
+                }
+                presets = data.presets || [];
+                canManageTeam = !!data.can_manage_team;
+                renderPresets(data.active);
+            })
+            .catch(() => { $('qa_list').innerHTML = '<div class="col-12 text-danger">Erro ao carregar as ausências rápidas.</div>'; });
+    }
+
+    function renderPresets(active) {
+        if (!presets.length) {
+            $('qa_list').innerHTML = '<div class="col-12 text-muted">Nenhuma ausência rápida. Crie uma, ex.: 🍽️ Almoço de 1 hora.</div>';
+            return;
+        }
+        $('qa_list').innerHTML = presets.map(p =>
+            '<div class="col-12 col-md-6 col-xxl-4" data-preset-id="' + p.id + '">' +
+                '<div class="border rounded p-4 h-100 d-flex flex-column">' +
+                    '<div class="d-flex align-items-center gap-3 mb-2">' +
+                        '<span class="fs-2x">' + esc(p.icon) + '</span>' +
+                        '<div class="flex-grow-1">' +
+                            '<div class="fw-bold fs-5">' + esc(p.name) + '</div>' +
+                            '<div class="text-muted fs-7">' + esc(p.duration_label) + (p.set_away ? ' · fica Ausente' : '') +
+                                (p.scope === 'all' ? ' · <span class="badge badge-light-info">equipe</span>' : '') + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="text-gray-700 fs-7 mb-4 flex-grow-1" style="white-space: pre-wrap">' + esc(p.message.length > 140 ? p.message.slice(0, 140) + '…' : p.message) + '</div>' +
+                    '<div class="d-flex gap-2">' +
+                        '<button type="button" class="btn btn-sm btn-primary" data-qa="start"' + (active ? ' disabled title="Você já está ausente"' : '') + '>Iniciar agora</button>' +
+                        (p.can_edit ? '<button type="button" class="btn btn-sm btn-light-primary" data-qa="edit">Editar</button>' +
+                            '<button type="button" class="btn btn-sm btn-light-danger ms-auto" data-qa="delete">Excluir</button>' : '') +
+                    '</div>' +
+                '</div>' +
+            '</div>'
+        ).join('');
+    }
+
+    function openPreset(p) {
+        $('qa_modal_title').textContent = p ? 'Editar ausência rápida' : 'Nova ausência rápida';
+        $('qa_id').value = p ? p.id : '';
+        $('qa_icon').value = p ? p.icon : '🍽️';
+        $('qa_name').value = p ? p.name : '';
+        const minutes = p ? p.duration_minutes : 60;
+        const inHours = minutes % 60 === 0;
+        $('qa_duration').value = inHours ? minutes / 60 : minutes;
+        $('qa_duration_unit').value = inHours ? '60' : '1';
+        $('qa_delay').value = p ? p.delay_seconds : 10;
+        $('qa_message').value = p ? p.message : 'Olá, {{contact.name}}! Saí para o almoço e retorno {{absence.return}}. Assim que voltar, respondo sua mensagem. 😊';
+        $('qa_set_away').checked = p ? p.set_away : true;
+        $('qa_scope_row').classList.toggle('d-none', !canManageTeam);
+        $('qa_scope_all').checked = p ? p.scope === 'all' : false;
+        bootstrap.Modal.getOrCreateInstance($('qa_modal')).show();
+    }
+
+    function savePreset() {
+        const id = $('qa_id').value;
+        const payload = {
+            icon: $('qa_icon').value.trim(),
+            name: $('qa_name').value.trim(),
+            duration_minutes: (parseInt($('qa_duration').value, 10) || 0) * (parseInt($('qa_duration_unit').value, 10) || 1),
+            delay_seconds: parseInt($('qa_delay').value, 10) || 0,
+            message: $('qa_message').value,
+            set_away: $('qa_set_away').checked,
+            scope: $('qa_scope_all').checked ? 'all' : 'me'
+        };
+        $('qa_save').disabled = true;
+        post(cfg.presetsUrl + (id ? '/' + id : ''), payload)
+            .then(data => {
+                notify(data.success, data.message || 'Erro ao salvar');
+                if (data.success) {
+                    bootstrap.Modal.getOrCreateInstance($('qa_modal')).hide();
+                    loadPresets();
+                    syncHeader();
+                }
+            })
+            .finally(() => { $('qa_save').disabled = false; });
+    }
+
+    $('qa_new').addEventListener('click', () => openPreset(null));
+    $('qa_save').addEventListener('click', savePreset);
+    $('qa_icons').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-icon]');
+        if (btn) $('qa_icon').value = btn.dataset.icon;
+    });
+    $('qa_list').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-qa]');
+        if (!btn) return;
+        const id = parseInt(btn.closest('[data-preset-id]').dataset.presetId, 10);
+        const p = presets.find(x => x.id === id);
+        if (!p) return;
+        if (btn.dataset.qa === 'edit') openPreset(p);
+        else if (btn.dataset.qa === 'start') {
+            btn.disabled = true;
+            post(cfg.presetsUrl + '/' + id + '/start').then(data => {
+                notify(data.success, data.message);
+                load(); loadPresets(); syncHeader();
+            });
+        } else if (btn.dataset.qa === 'delete') {
+            confirmThen('Excluir a ausência rápida "' + p.name + '"?', 'Excluir', () =>
+                post(cfg.presetsUrl + '/' + id + '/delete').then(data => {
+                    notify(data.success, data.message);
+                    loadPresets(); syncHeader();
+                }));
+        }
+    });
+    // Iniciou/voltou pelo botão do topo: atualiza esta tela
+    window.addEventListener('quick-absence:changed', () => { load(); loadPresets(); });
 
     function load() {
         return fetch(cfg.url, { headers })
@@ -324,7 +525,7 @@ $absenceConfig = [
                 notify(data.success, data.message || (data.success ? 'Salvo' : 'Erro ao salvar'));
                 if (data.success) {
                     resetForm();
-                    load();
+                    load(); loadPresets(); syncHeader();
                 }
             })
             .finally(() => { btn.removeAttribute('data-kt-indicator'); btn.disabled = false; });
@@ -341,7 +542,7 @@ $absenceConfig = [
 
     function endNow(id) {
         confirmThen('Encerrar a ausência agora? Os clientes deixam de receber a mensagem automática.', 'Encerrar', () =>
-            post(cfg.url + '/' + id + '/end').then(data => { notify(data.success, data.message); load(); }));
+            post(cfg.url + '/' + id + '/end').then(data => { notify(data.success, data.message); load(); loadPresets(); syncHeader(); }));
     }
 
     function showReplies(a) {
@@ -378,7 +579,7 @@ $absenceConfig = [
                 post(cfg.url + '/' + id + '/delete').then(data => {
                     notify(data.success, data.message);
                     if (String($('absence_id').value) === String(id)) resetForm();
-                    load();
+                    load(); loadPresets(); syncHeader();
                 }));
         }
     });
@@ -420,5 +621,6 @@ $absenceConfig = [
     $('absence_active_end').addEventListener('click', () => endNow($('absence_active_end').dataset.id));
 
     load();
+    loadPresets();
 })();
 </script>

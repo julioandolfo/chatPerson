@@ -93,6 +93,12 @@ Router::post('/profile/absences/{id}', [AgentAbsenceController::class, 'update']
 Router::post('/profile/absences/{id}/end', [AgentAbsenceController::class, 'end'], ['Authentication']);
 Router::post('/profile/absences/{id}/delete', [AgentAbsenceController::class, 'destroy'], ['Authentication']);
 Router::get('/profile/absences/{id}/replies', [AgentAbsenceController::class, 'replies'], ['Authentication']);
+// Ausências rápidas ("Sair para almoço")
+Router::get('/profile/absences/quick', [AgentAbsenceController::class, 'quick'], ['Authentication']);
+Router::post('/profile/absence-presets', [AgentAbsenceController::class, 'storePreset'], ['Authentication']);
+Router::post('/profile/absence-presets/{id}', [AgentAbsenceController::class, 'updatePreset'], ['Authentication']);
+Router::post('/profile/absence-presets/{id}/delete', [AgentAbsenceController::class, 'destroyPreset'], ['Authentication']);
+Router::post('/profile/absence-presets/{id}/start', [AgentAbsenceController::class, 'startPreset'], ['Authentication']);
 
 Router::get('/dashboard', [DashboardController::class, 'index'], ['Authentication']);
 Router::get('/dashboard/ai', [DashboardController::class, 'aiDashboard'], ['Authentication']);

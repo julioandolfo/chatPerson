@@ -162,14 +162,178 @@ class AgentAbsenceService
         }
         Database::execute("UPDATE agent_absences SET ends_at = ? WHERE id = ? AND user_id = ?", [date('Y-m-d H:i:s'), $id, $userId]);
         self::cancelPending($id, 'Ausência encerrada pelo agente');
+        self::restoreOnline($absence);
         return self::present(self::findOwned($id, $userId) + ['sent_count' => null, 'pending_count' => null]);
     }
 
     public static function delete(int $id, int $userId): void
     {
-        self::findOwned($id, $userId);
+        $absence = self::findOwned($id, $userId);
         self::cancelPending($id, 'Ausência excluída');
         Database::execute("DELETE FROM agent_absences WHERE id = ? AND user_id = ?", [$id, $userId]);
+        if (strtotime($absence['starts_at']) <= time() && strtotime($absence['ends_at']) > time()) {
+            self::restoreOnline($absence);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------
+    // Ausências rápidas ("Sair para almoço")
+    // ---------------------------------------------------------------------------------
+
+    /** Modelos que o usuário pode usar: os da equipe (user_id NULL) e os dele */
+    public static function listPresets(int $userId, bool $canManageTeam = false): array
+    {
+        $rows = Database::fetchAll(
+            "SELECT * FROM agent_absence_presets WHERE user_id IS NULL OR user_id = ?
+             ORDER BY (user_id IS NULL) DESC, sort_order ASC, name ASC",
+            [$userId]
+        );
+        return array_map(fn($row) => self::presentPreset($row, $userId, $canManageTeam), $rows);
+    }
+
+    public static function savePreset(int $userId, array $data, ?int $id = null, bool $canManageTeam = false): array
+    {
+        $existing = null;
+        if ($id !== null) {
+            $existing = self::findEditablePreset($id, $userId, $canManageTeam);
+        }
+
+        $name = trim((string)($data['name'] ?? ''));
+        if ($name === '' || mb_strlen($name) > 60) {
+            throw new \InvalidArgumentException('Dê um nome de até 60 caracteres (ex.: Almoço).');
+        }
+        $icon = trim((string)($data['icon'] ?? ''));
+        if (mb_strlen($icon) > 8) {
+            throw new \InvalidArgumentException('Use um emoji só como ícone.');
+        }
+        $duration = (int)($data['duration_minutes'] ?? 0);
+        if ($duration < 1 || $duration > 720) {
+            throw new \InvalidArgumentException('A duração deve ficar entre 1 minuto e 12 horas.');
+        }
+        $message = trim((string)($data['message'] ?? ''));
+        if ($message === '' || mb_strlen($message) > 4000) {
+            throw new \InvalidArgumentException('Escreva a mensagem (até 4000 caracteres).');
+        }
+        $delay = (int)($data['delay_seconds'] ?? 10);
+        if ($delay < 0 || $delay > self::MAX_DELAY_SECONDS) {
+            throw new \InvalidArgumentException('O tempo de espera deve ficar entre 0 segundos e 1 hora.');
+        }
+        $setAway = array_key_exists('set_away', $data) ? filter_var($data['set_away'], FILTER_VALIDATE_BOOLEAN) : true;
+        $forTeam = ($data['scope'] ?? 'me') === 'all';
+        if ($forTeam && !$canManageTeam) {
+            throw new \InvalidArgumentException('Só administradores criam ausências rápidas para toda a equipe.');
+        }
+        $ownerId = $forTeam ? null : $userId;
+
+        if ($existing) {
+            Database::execute(
+                "UPDATE agent_absence_presets
+                 SET user_id = ?, name = ?, icon = ?, duration_minutes = ?, message = ?, delay_seconds = ?, set_away = ?
+                 WHERE id = ?",
+                [$ownerId, $name, $icon !== '' ? $icon : null, $duration, $message, $delay, $setAway ? 1 : 0, $id]
+            );
+        } else {
+            $order = (int)(Database::fetch("SELECT COALESCE(MAX(sort_order), 0) AS m FROM agent_absence_presets")['m'] ?? 0) + 1;
+            $id = Database::insert(
+                "INSERT INTO agent_absence_presets (user_id, name, icon, duration_minutes, message, delay_seconds, set_away, sort_order, created_by)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [$ownerId, $name, $icon !== '' ? $icon : null, $duration, $message, $delay, $setAway ? 1 : 0, $order, $userId]
+            );
+        }
+
+        $row = Database::fetch("SELECT * FROM agent_absence_presets WHERE id = ?", [$id]);
+        return self::presentPreset($row, $userId, $canManageTeam);
+    }
+
+    public static function deletePreset(int $id, int $userId, bool $canManageTeam = false): void
+    {
+        self::findEditablePreset($id, $userId, $canManageTeam);
+        Database::execute("DELETE FROM agent_absence_presets WHERE id = ?", [$id]);
+    }
+
+    /**
+     * "Sair para almoço": começa agora e termina daqui a duração do modelo.
+     * Se houver ausência agendada antes disso, termina quando ela começar.
+     */
+    public static function startPreset(int $presetId, int $userId): array
+    {
+        $preset = Database::fetch(
+            "SELECT * FROM agent_absence_presets WHERE id = ? AND (user_id IS NULL OR user_id = ?)",
+            [$presetId, $userId]
+        );
+        if (!$preset) {
+            throw new \InvalidArgumentException('Ausência rápida não encontrada.');
+        }
+
+        $active = self::getActive($userId);
+        if ($active) {
+            throw new \InvalidArgumentException(
+                'Você já está ausente até ' . date('H:i', strtotime($active['ends_at'])) . '. Clique em "Voltei" antes de iniciar outra.'
+            );
+        }
+
+        $now = time();
+        $endsTs = $now + (int)$preset['duration_minutes'] * 60;
+        $next = Database::fetch(
+            "SELECT starts_at FROM agent_absences
+             WHERE user_id = ? AND enabled = 1 AND starts_at > ? AND starts_at < ?
+             ORDER BY starts_at ASC LIMIT 1",
+            [$userId, date('Y-m-d H:i:s', $now), date('Y-m-d H:i:s', $endsTs)]
+        );
+        if ($next) {
+            $endsTs = strtotime($next['starts_at']);
+            if ($endsTs - $now < 60) {
+                throw new \InvalidArgumentException('Você tem uma ausência agendada começando agora.');
+            }
+        }
+
+        $id = Database::insert(
+            "INSERT INTO agent_absences (user_id, label, icon, preset_id, starts_at, ends_at, message, delay_seconds, resend_after_hours, enabled, set_away, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?)",
+            [
+                $userId, $preset['name'], $preset['icon'], $presetId,
+                date('Y-m-d H:i:s', $now), date('Y-m-d H:i:s', $endsTs),
+                $preset['message'], (int)$preset['delay_seconds'], (int)$preset['set_away'], $userId,
+            ]
+        );
+
+        if (!empty($preset['set_away'])) {
+            try {
+                AvailabilityService::updateAvailabilityStatus($userId, 'away', 'absence:' . $preset['name']);
+            } catch (\Throwable $e) {
+                Logger::error('AgentAbsence: não foi possível marcar Ausente: ' . $e->getMessage());
+            }
+        }
+
+        Logger::info("AgentAbsence: usuário {$userId} iniciou ausência rápida '{$preset['name']}' até " . date('H:i', $endsTs));
+        return self::present(self::findOwned($id, $userId) + ['sent_count' => 0, 'pending_count' => 0]);
+    }
+
+    /** Estado para o botão do topo: ausência ativa (se houver) e modelos */
+    public static function quickState(int $userId, bool $canManageTeam = false): array
+    {
+        $active = self::getActive($userId);
+        return [
+            'active' => $active ? self::present($active + [
+                'sent_count' => (int)(Database::fetch(
+                    "SELECT COUNT(*) AS n FROM agent_absence_replies WHERE absence_id = ? AND status = 'sent'",
+                    [(int)$active['id']]
+                )['n'] ?? 0),
+                'pending_count' => null,
+            ]) : null,
+            'presets' => self::listPresets($userId, $canManageTeam),
+        ];
+    }
+
+    /** Usuário marcou atividade enquanto está numa ausência que o deixou "Ausente": não volta para Online */
+    public static function holdsAwayStatus(int $userId): bool
+    {
+        try {
+            $active = self::getActive($userId);
+            return $active && !empty($active['set_away']);
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /** Para onde a mensagem foi (ou vai) */
@@ -517,6 +681,53 @@ class AgentAbsenceService
         return $row;
     }
 
+    private static function findEditablePreset(int $id, int $userId, bool $canManageTeam): array
+    {
+        $row = Database::fetch("SELECT * FROM agent_absence_presets WHERE id = ?", [$id]);
+        if (!$row || ($row['user_id'] !== null && (int)$row['user_id'] !== $userId)) {
+            throw new \InvalidArgumentException('Ausência rápida não encontrada.');
+        }
+        if ($row['user_id'] === null && !$canManageTeam) {
+            throw new \InvalidArgumentException('Esta ausência rápida é da equipe: só administradores podem alterá-la.');
+        }
+        return $row;
+    }
+
+    private static function presentPreset(array $row, int $userId, bool $canManageTeam): array
+    {
+        $minutes = (int)$row['duration_minutes'];
+        $label = $minutes % 60 === 0 ? ($minutes / 60) . ' h' : ($minutes > 60 ? intdiv($minutes, 60) . ' h ' . ($minutes % 60) . ' min' : $minutes . ' min');
+        $team = $row['user_id'] === null;
+        return [
+            'id' => (int)$row['id'],
+            'name' => $row['name'],
+            'icon' => $row['icon'] ?: '⏸️',
+            'duration_minutes' => $minutes,
+            'duration_label' => $label,
+            'message' => $row['message'],
+            'delay_seconds' => (int)$row['delay_seconds'],
+            'set_away' => !empty($row['set_away']),
+            'scope' => $team ? 'all' : 'me',
+            'can_edit' => $team ? $canManageTeam : ((int)$row['user_id'] === $userId),
+        ];
+    }
+
+    /** Ausência que deixou o agente "Ausente" terminou antes: volta para Online */
+    private static function restoreOnline(array $absence): void
+    {
+        if (empty($absence['set_away'])) {
+            return;
+        }
+        try {
+            $user = Database::fetch("SELECT availability_status FROM users WHERE id = ?", [(int)$absence['user_id']]);
+            if (($user['availability_status'] ?? '') === 'away') {
+                AvailabilityService::updateAvailabilityStatus((int)$absence['user_id'], 'online', 'absence_ended');
+            }
+        } catch (\Throwable $e) {
+            Logger::error('AgentAbsence: não foi possível voltar para Online: ' . $e->getMessage());
+        }
+    }
+
     private static function cancelPending(int $absenceId, string $reason): void
     {
         Database::execute(
@@ -631,6 +842,10 @@ class AgentAbsenceService
 
         return [
             'id' => (int)$row['id'],
+            'label' => $row['label'] ?? null,
+            'icon' => $row['icon'] ?? null,
+            'set_away' => !empty($row['set_away']),
+            'ends_time' => date('H:i', $e),
             'starts_at' => date('Y-m-d\TH:i', $s),
             'ends_at' => date('Y-m-d\TH:i', $e),
             'period_label' => self::periodLabel($row['starts_at'], $row['ends_at']),

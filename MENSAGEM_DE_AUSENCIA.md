@@ -10,7 +10,31 @@ As tabelas são criadas **automaticamente no deploy** (`database/auto_migrate.ph
 
 ```bash
 php database/run_migrations.php 163
+php database/run_migrations.php 164   # ausências rápidas
 ```
+
+## Ausências rápidas (almoço, pausa)
+
+Para sair na hora, sem agendar: botão **☕** no topo da tela → **Almoço** / **Pausa** / ...
+A ausência começa agora e termina depois da duração do modelo. Enquanto durar:
+
+- o topo mostra **🍽️ Almoço até 13:05** (em qualquer página e no app do celular);
+- clientes que escreverem recebem a mensagem automática do modelo (mesmas regras abaixo);
+- o status fica **Ausente** (se o modelo estiver assim) e não volta para Online sozinho quando
+  o agente mexe no sistema — conforme Configurações → Disponibilidade, quem está Ausente não
+  recebe novas conversas;
+- **Voltei** (no topo ou na aba Ausência) encerra na hora e volta o status para Online.
+  Se ninguém clicar, a ausência termina no horário e o status volta para Online com a próxima
+  atividade do agente.
+
+Modelos em Perfil → **Ausência** → **Ausências rápidas**: ícone, nome, duração (1 min a 12 h),
+mensagem, tempo para responder o cliente e se muda o status para Ausente.
+
+- Já vêm criados **🍽️ Almoço (1 h)** e **☕ Pausa (15 min)** para toda a equipe (edite à vontade).
+- Administradores (ou quem tem `settings.manage`) criam modelos **para todos os agentes**;
+  cada agente pode criar os seus.
+- Não dá para iniciar uma ausência rápida estando já ausente; se houver ausência agendada antes
+  do fim, a rápida termina quando a agendada começar.
 
 ## Onde configurar
 
@@ -64,6 +88,8 @@ cadastrar duas ausências no mesmo horário.
 ## Arquivos
 
 - `database/migrations/163_create_agent_absences.php` — `agent_absences`, `agent_absence_replies`
+- `database/migrations/164_create_agent_absence_presets.php` — `agent_absence_presets` (ausências rápidas)
+- `views/partials/quick-absence.php` — botão ☕ / "Voltei" no topo
 - `app/Services/AgentAbsenceService.php` — regras, agendamento e envio
 - `app/Controllers/AgentAbsenceController.php` — endpoints
 - `scripts/absence-reply-worker.php` — envio em segundo plano
@@ -77,3 +103,5 @@ Endpoints (sempre do usuário logado):
 - `GET/POST /profile/absences`
 - `POST /profile/absences/{id}` (editar), `/profile/absences/{id}/end`, `/profile/absences/{id}/delete`
 - `GET /profile/absences/{id}/replies`
+- `GET /profile/absences/quick` (estado do botão do topo)
+- `POST /profile/absence-presets`, `/profile/absence-presets/{id}`, `/{id}/delete`, `/{id}/start`
